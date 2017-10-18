@@ -140,4 +140,4 @@ The fields are:
 
   .. http:get:: /stats?format=json
 
-    Same as /stats but outputs them in json format. This can be used for programmatic access of stats.
+  Same as /stats the output is in JSON format. This can be used for programmatic access of stats.

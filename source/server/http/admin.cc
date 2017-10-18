@@ -31,6 +31,8 @@
 #include "common/upstream/host_utility.h"
 
 #include "fmt/format.h"
+
+//TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/prettywriter.h"
@@ -291,34 +293,16 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
   }
 
   if (params.size() == 0) {
-    // No Arguments so use the standard
+    // No Arguments so use the standard.
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
   } else {
-    std::string format = params.begin()->first;
-    std::string formatvalue = params.begin()->second;
-    if (format == "format" && formatvalue == "json") {
-      rapidjson::Document document;
-      document.SetObject();
-      rapidjson::Value statsArray(rapidjson::kArrayType);
-      rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-      for (auto stat : all_stats) {
-        Value statsObj;
-        statsObj.SetObject();
-        Value statname;
-        statname.SetString(stat.first.c_str(), allocator);
-        statsObj.AddMember("name", statname, allocator);
-        Value statvalue;
-        statvalue.SetInt(stat.second);
-        statsObj.AddMember("value", statvalue, allocator);
-        statsArray.PushBack(statsObj, allocator);
-      }
-      document.AddMember("stats", statsArray, allocator);
-      rapidjson::StringBuffer strbuf;
-      rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-      document.Accept(writer);
-      response.add(strbuf.GetString());
+    std::string format_key = params.begin()->first;
+    std::string format_value = params.begin()->second;
+    if (format_key == "format" && format_value == "json") {
+      std::string json_stats = statsAsJson(all_stats);
+      response.add(json_stats);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -326,6 +310,29 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
     }
   }
   return rc;
+}
+
+std::string AdminImpl::statsAsJson(std::map<std::string, uint64_t> all_stats) {
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Value stats_array(rapidjson::kArrayType);
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  for (auto stat : all_stats) {
+    Value stat_obj;
+    stat_obj.SetObject();
+    Value stat_name;
+    stat_name.SetString(stat.first.c_str(), allocator);
+    stat_obj.AddMember("name", stat_name, allocator);
+    Value stat_value;
+    stat_value.SetInt(stat.second);
+    stat_obj.AddMember("value", stat_value, allocator);
+    stats_array.PushBack(stat_obj, allocator);
+  }
+  document.AddMember("stats", stats_array, allocator);
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  return strbuf.GetString();
 }
 
 Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& response) {

@@ -115,7 +115,7 @@ private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
-
+  std::string statsAsJson(std::map<std::string, uint64_t> all_stats);
   /**
    * URL handlers.
    */
