@@ -9,6 +9,25 @@ namespace Http {
 namespace Filter {
 namespace Lua {
 
+class HeaderMapWrapper;
+
+/**
+ * Iterator over a header map.
+ */
+class HeaderMapIterator : public Envoy::Lua::BaseLuaObject<HeaderMapIterator> {
+public:
+  HeaderMapIterator(HeaderMapWrapper& parent);
+
+  static ExportedFunctions exportedFunctions() { return {}; }
+
+  DECLARE_LUA_CLOSURE(HeaderMapIterator, luaPairsIterator);
+
+private:
+  HeaderMapWrapper& parent_;
+  std::vector<const HeaderEntry*> entries_;
+  uint64_t current_{};
+};
+
 /**
  * Lua wrapper for a header map. Methods that will modify the map will call a check function
  * to see if modification is allowed.
@@ -22,8 +41,8 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"add", static_luaAdd},
             {"get", static_luaGet},
-            {"iterate", static_luaIterate},
-            {"remove", static_luaRemove}};
+            {"remove", static_luaRemove},
+            {"__pairs", static_luaPairs}};
   }
 
 private:
@@ -43,11 +62,10 @@ private:
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGet);
 
   /**
-   * Iterate through all headers.
-   * @param 1 (function): callback(key, value) that will be called for each header in the map.
-   * @return nothing.
+   * Implementation of the __pairs metamethod so a headers wrapper can be iterated over using
+   * pairs().
    */
-  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaIterate);
+  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaPairs);
 
   /**
    * Remove a header from the map.
@@ -56,14 +74,13 @@ private:
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaRemove);
 
-  void checkModifiable(lua_State* state) {
-    if (!cb_()) {
-      luaL_error(state, "header map can no longer be modified");
-    }
-  }
+  void checkModifiable(lua_State* state);
 
   HeaderMap& headers_;
   CheckModifiableCb cb_;
+  bool iterating_{};
+
+  friend class HeaderMapIterator;
 };
 
 } // namespace Lua

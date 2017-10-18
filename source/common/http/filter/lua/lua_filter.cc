@@ -336,10 +336,39 @@ int StreamHandleWrapper::luaTrailers(lua_State* state) {
   }
 }
 
-int StreamHandleWrapper::luaLog(lua_State* state) {
-  int level = luaL_checkint(state, 2);
-  const char* message = luaL_checkstring(state, 3);
-  filter_.scriptLog(level, message);
+int StreamHandleWrapper::luaLogTrace(lua_State* state) {
+  const char* message = luaL_checkstring(state, 2);
+  filter_.scriptLog(spdlog::level::trace, message);
+  return 0;
+}
+
+int StreamHandleWrapper::luaLogDebug(lua_State* state) {
+  const char* message = luaL_checkstring(state, 2);
+  filter_.scriptLog(spdlog::level::debug, message);
+  return 0;
+}
+
+int StreamHandleWrapper::luaLogInfo(lua_State* state) {
+  const char* message = luaL_checkstring(state, 2);
+  filter_.scriptLog(spdlog::level::info, message);
+  return 0;
+}
+
+int StreamHandleWrapper::luaLogWarn(lua_State* state) {
+  const char* message = luaL_checkstring(state, 2);
+  filter_.scriptLog(spdlog::level::warn, message);
+  return 0;
+}
+
+int StreamHandleWrapper::luaLogErr(lua_State* state) {
+  const char* message = luaL_checkstring(state, 2);
+  filter_.scriptLog(spdlog::level::err, message);
+  return 0;
+}
+
+int StreamHandleWrapper::luaLogCritical(lua_State* state) {
+  const char* message = luaL_checkstring(state, 2);
+  filter_.scriptLog(spdlog::level::critical, message);
   return 0;
 }
 
@@ -348,6 +377,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
   lua_state_.registerType<Envoy::Lua::BufferWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
+  lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
@@ -422,7 +452,7 @@ void Filter::scriptError(const Envoy::Lua::LuaException& e) {
   response_stream_wrapper_.reset();
 }
 
-void Filter::scriptLog(int level, const char* message) {
+void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
   switch (level) {
   case spdlog::level::trace:
     return ENVOY_LOG(trace, "script log: {}", message);
@@ -436,6 +466,8 @@ void Filter::scriptLog(int level, const char* message) {
     return ENVOY_LOG(error, "script log: {}", message);
   case spdlog::level::critical:
     return ENVOY_LOG(critical, "script log: {}", message);
+  case spdlog::level::off:
+    NOT_IMPLEMENTED;
   }
 }
 

@@ -5,6 +5,29 @@ namespace Http {
 namespace Filter {
 namespace Lua {
 
+HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent) {
+  entries_.reserve(parent_.headers_.size());
+  parent_.headers_.iterate(
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+        HeaderMapIterator* iterator = static_cast<HeaderMapIterator*>(context);
+        iterator->entries_.push_back(&header);
+        return HeaderMap::Iterate::Continue;
+      },
+      this);
+}
+
+int HeaderMapIterator::luaPairsIterator(lua_State* state) {
+  if (current_ == entries_.size()) {
+    parent_.iterating_ = false;
+    return 0;
+  } else {
+    lua_pushstring(state, entries_[current_]->key().c_str());
+    lua_pushstring(state, entries_[current_]->value().c_str());
+    current_++;
+    return 2;
+  }
+}
+
 int HeaderMapWrapper::luaAdd(lua_State* state) {
   checkModifiable(state);
 
@@ -25,23 +48,22 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   }
 }
 
-int HeaderMapWrapper::luaIterate(lua_State* state) {
-  luaL_checktype(state, 2, LUA_TFUNCTION);
-  headers_.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // Push a duplicate of the function and the params onto the stack and then call.
-        lua_State* state = static_cast<lua_State*>(context);
-        lua_pushvalue(state, -1);
-        lua_pushstring(state, header.key().c_str());
-        lua_pushstring(state, header.value().c_str());
+int HeaderMapWrapper::luaPairs(lua_State* state) {
+  if (iterating_) {
+    luaL_error(state, "cannot create a second iterator before completing the first");
+  }
 
-        // Do not use pcall(). Errors will throw all the way back to the original resume().
-        lua_call(state, 2, 0);
-        return HeaderMap::Iterate::Continue;
-      },
-      state);
-
-  return 0;
+  // The way iteration works is we create an iteration wrapper that snaps pointers to all of
+  // the headers. We don't allow modification while an iterator is active. This means that
+  // currently if a script breaks out of iteration, further modifications will not be possible
+  // because we don't know if they may resume iteration in the future and it isn't safe. There
+  // are potentially better ways of handling this but due to GC of the iterator it's very
+  // difficult to control safety without tracking every allocated iterator and invalidating them
+  // if the map is modified.
+  iterating_ = true;
+  HeaderMapIterator::create(state, *this);
+  lua_pushcclosure(state, HeaderMapIterator::static_luaPairsIterator, 1);
+  return 1;
 }
 
 int HeaderMapWrapper::luaRemove(lua_State* state) {
@@ -50,6 +72,16 @@ int HeaderMapWrapper::luaRemove(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
   headers_.remove(LowerCaseString(key));
   return 0;
+}
+
+void HeaderMapWrapper::checkModifiable(lua_State* state) {
+  if (iterating_) {
+    luaL_error(state, "header map cannot be modified while iterating");
+  }
+
+  if (!cb_()) {
+    luaL_error(state, "header map can no longer be modified");
+  }
 }
 
 } // namespace Lua

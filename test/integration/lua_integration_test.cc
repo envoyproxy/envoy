@@ -56,12 +56,12 @@ config:
   value:
     inline_code: |
       function envoy_on_request(request_handle)
-        request_handle:log(0, "log test")
-        request_handle:log(1, "log test")
-        request_handle:log(2, "log test")
-        request_handle:log(3, "log test")
-        request_handle:log(4, "log test")
-        request_handle:log(5, "log test")
+        request_handle:logTrace("log test")
+        request_handle:logDebug("log test")
+        request_handle:logInfo("log test")
+        request_handle:logWarn("log test")
+        request_handle:logErr("log test")
+        request_handle:logCritical("log test")
 
         request_handle:headers():add("request_body_size", request_handle:body():byteSize())
       end
@@ -144,7 +144,7 @@ config:
   codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
 
   fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream();
+  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
   lua_request_->waitForEndStream(*dispatcher_);
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, false);
@@ -204,7 +204,7 @@ config:
   codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
 
   fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream();
+  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
   lua_request_->waitForEndStream(*dispatcher_);
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);

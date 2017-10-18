@@ -192,7 +192,7 @@ bodyChunks()
   iterator = handle:bodyChunks()
 
 Returns an iterator that can be used to iterate through all received body chunks as they arrive.
-Envoy will yield rthe script in between chunks, but *will not buffer* them. This can be used by
+Envoy will yield the script in between chunks, but *will not buffer* them. This can be used by
 a script to inspect data as it is streaming by.
 
 .. code-block:: lua
@@ -215,15 +215,19 @@ modified before they are sent to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
-log()
-^^^^^
+log*()
+^^^^^^
 
 .. code-block:: lua
 
-  handle:log(level, message)
+  handle:logTrace(message)
+  handle:logDebug(message)
+  handle:logInfo(message)
+  handle:logWarn(message)
+  handle:logErr(message)
+  handle:logCritical(message)
 
-Logs a message using Envoy's application logging. *level* is an integer in the range 0 - 5 which
-maps to the spdlog levels *trace* - *critical*. *message* is a string to log.
+Logs a message using Envoy's application logging. *message* is a string to log.
 
 httpCall()
 ^^^^^^^^^^
@@ -277,17 +281,22 @@ get()
 Gets a header. *key* is a string that suplies the header key. Returns a string that is the header
 value or nil if there is no such header.
 
-iterate()
+__pairs()
 ^^^^^^^^^
 
 .. code-block:: lua
 
-  headers:iterate(
-    function(key, value) end
-  )
+  for key, value in pairs(headers) do
+  end
 
-Iterates through every header. A callback function is supplied that receives every header. *key*
-is a string that supplies the header key. *value* is a string that supplies the header value.
+Iterates through every header. *key* is a string that supplies the header key. *value* is a string
+that supplies the header value.
+
+.. attention::
+
+  In the currently implementation, headers cannot be modified during iteration. Additionally, if
+  it is desired to modify headers after iteration, the iteration must be completed. Meaning, do
+  not use `break` or any other mechanism to exit the loop early. This may be relaxed in the future.
 
 remove()
 ^^^^^^^^

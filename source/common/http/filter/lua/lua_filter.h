@@ -69,13 +69,12 @@ public:
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},
-            {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks},
-            {"trailers", static_luaTrailers},
-            {"log", static_luaLog},
-            {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond}};
+    return {{"headers", static_luaHeaders},       {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks}, {"trailers", static_luaTrailers},
+            {"logTrace", static_luaLogTrace},     {"logDebug", static_luaLogDebug},
+            {"logInfo", static_luaLogInfo},       {"logWarn", static_luaLogWarn},
+            {"logErr", static_luaLogErr},         {"logCritical", static_luaLogCritical},
+            {"httpCall", static_luaHttpCall},     {"respond", static_luaRespond}};
   }
 
 private:
@@ -126,10 +125,14 @@ private:
 
   /**
    * Log a message to the Envoy log.
-   * @param 1 (int): The log level.
-   * @param 2 (string): The log message.
+   * @param 1 (string): The log message.
    */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLog);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogTrace);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogDebug);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogInfo);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogWarn);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogErr);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogCritical);
 
   /**
    * This is the closure/iterator returned by luaBodyChunks() above.
@@ -204,7 +207,7 @@ public:
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const Envoy::Lua::LuaException& e);
-  virtual void scriptLog(int level, const char* message);
+  virtual void scriptLog(spdlog::level::level_enum level, const char* message);
 
   // Http::StreamFilterBase
   void onDestroy() override;

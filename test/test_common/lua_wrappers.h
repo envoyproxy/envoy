@@ -11,7 +11,7 @@ namespace Lua {
 
 template <class T> class LuaWrappersTestBase : public testing::Test {
 public:
-  void setup(const std::string& code) {
+  virtual void setup(const std::string& code) {
     coroutine_.reset();
     state_.reset(new ThreadLocalState(code, tls_));
     state_->registerType<T>();

@@ -10,7 +10,13 @@ namespace Http {
 namespace Filter {
 namespace Lua {
 
-class LuaHeaderMapWrapperTest : public Envoy::Lua::LuaWrappersTestBase<HeaderMapWrapper> {};
+class LuaHeaderMapWrapperTest : public Envoy::Lua::LuaWrappersTestBase<HeaderMapWrapper> {
+public:
+  virtual void setup(const std::string& script) {
+    Envoy::Lua::LuaWrappersTestBase<HeaderMapWrapper>::setup(script);
+    state_->registerType<HeaderMapIterator>();
+  }
+};
 
 // Basic methods test for the header wrapper.
 TEST_F(LuaHeaderMapWrapperTest, Methods) {
@@ -22,18 +28,14 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
       object:add("header1", "")
       object:add("header2", "foo")
 
-      object:iterate(
-        function(key, value)
-          testPrint(string.format("'%s' '%s'", key, value))
-        end
-      )
+      for key, value in pairs(object) do
+        testPrint(string.format("'%s' '%s'", key, value))
+      end
 
       object:remove("header1")
-      object:iterate(
-        function(key, value)
-          testPrint(string.format("'%s' '%s'", key, value))
-        end
-      )
+      for key, value in pairs(object) do
+        testPrint(string.format("'%s' '%s'", key, value))
+      end
     end
   )EOF"};
 
@@ -56,10 +58,8 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   const std::string SCRIPT{R"EOF(
     function shouldBeOk(object)
       object:get("hELLo")
-      object:iterate(
-        function(key, value)
-        end
-      )
+      for key, value in pairs(object) do
+      end
     end
 
     function shouldFailRemove(object)
@@ -81,12 +81,78 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   setup(SCRIPT);
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
   EXPECT_THROW_WITH_MESSAGE(start("shouldFailRemove"), Envoy::Lua::LuaException,
-                            "[string \"...\"]:11: header map can no longer be modified");
+                            "[string \"...\"]:9: header map can no longer be modified");
 
   setup(SCRIPT);
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
   EXPECT_THROW_WITH_MESSAGE(start("shouldFailAdd"), Envoy::Lua::LuaException,
-                            "[string \"...\"]:15: header map can no longer be modified");
+                            "[string \"...\"]:13: header map can no longer be modified");
+}
+
+// Modify during iteration.
+TEST_F(LuaHeaderMapWrapperTest, ModifyDuringIteration) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      for key, value in pairs(object) do
+        object:add("hello", "world")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl headers{{"foo", "bar"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Envoy::Lua::LuaException,
+                            "[string \"...\"]:4: header map cannot be modified while iterating");
+}
+
+// Modify after iteration.
+TEST_F(LuaHeaderMapWrapperTest, ModifyAfterIteration) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      for key, value in pairs(object) do
+        testPrint(string.format("'%s' '%s'", key, value))
+      end
+
+      object:add("hello", "world")
+
+      for key, value in pairs(object) do
+        testPrint(string.format("'%s' '%s'", key, value))
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl headers{{"foo", "bar"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
+  EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
+  EXPECT_CALL(*this, testPrint("'hello' 'world'"));
+  start("callMe");
+}
+
+// Don't finish iteration.
+TEST_F(LuaHeaderMapWrapperTest, DontFinishIteration) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      iterator = pairs(object)
+      key, value = iterator()
+      iterator2 = pairs(object)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_THROW_WITH_MESSAGE(
+      start("callMe"), Envoy::Lua::LuaException,
+      "[string \"...\"]:5: cannot create a second iterator before completing the first");
 }
 
 } // namespace Lua
