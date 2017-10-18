@@ -456,9 +456,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgress) {
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
-  EXPECT_CALL(*span, finishSpan(_))
-      .WillOnce(
-          Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
+  EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
