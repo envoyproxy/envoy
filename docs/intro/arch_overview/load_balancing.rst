@@ -144,7 +144,7 @@ not be used with subsets because the upstream hosts are not known in advance. Su
 with zone aware routing, but be aware that the use of subsets may easily violate the minimum hosts
 condition described above.
 
-If subsets are :ref:`configured
+If subsets are `configured
 <https://github.com/envoyproxy/data-plane-api/blob/master/api/cds.proto#L237>` and a route specifies
 no metadata or no subset matching the metadata exists, the subset load balancer initiates its
 fallback policy. The default policy is `NO_ENDPOINT`, in which case the request fails as if the
