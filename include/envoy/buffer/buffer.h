@@ -53,6 +53,14 @@ public:
   virtual void commit(RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   /**
+   * Copy out a section of the buffer.
+   * @param data supplies the output buffer to fill.
+   * @param size supplies the size of the output buffer.
+   * @param start supplies the buffer index to start copying from.
+   */
+  virtual void copyOut(void* data, uint64_t size, size_t start) const PURE;
+
+  /**
    * Drain data from the buffer.
    * @param size supplies the length of data to drain.
    */

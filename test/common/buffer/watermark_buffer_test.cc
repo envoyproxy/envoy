@@ -18,7 +18,18 @@ public:
   uint32_t times_low_watermark_called_{0};
   uint32_t times_high_watermark_called_{0};
 };
+
 TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
+
+TEST_F(WatermarkBufferTest, CopyOut) {
+  buffer_.add("hello world");
+  std::array<char, 5> out;
+  buffer_.copyOut(out.data(), out.size(), 0);
+  EXPECT_EQ(std::string(out.data(), out.size()), "hello");
+
+  buffer_.copyOut(out.data(), out.size(), 6);
+  EXPECT_EQ(std::string(out.data(), out.size()), "world");
+}
 
 TEST_F(WatermarkBufferTest, AddChar) {
   buffer_.add(TEN_BYTES, 10);
