@@ -19,6 +19,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -159,7 +160,11 @@ void HttpIntegrationTest::initialize() {
 }
 
 void HttpIntegrationTest::createUpstreams() {
-  fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
+  if (autonomous_upstream_) {
+    fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
+  } else {
+    fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
+  }
   ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
 }
 
