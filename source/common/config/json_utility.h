@@ -6,12 +6,6 @@
 
 // NOLINT(namespace-envoy)
 
-// Set a string field in a protobuf message with the corresponding string value
-#define JSON_UTIL_SET_STRING_VALUE(json, message, field_name, value)                               \
-  do {                                                                                             \
-    (message).set_##field_name(value);                                                             \
-  } while (0)
-
 // Set a string field in a protobuf message with the corresponding field's string
 // value from a JSON object.
 #define JSON_UTIL_SET_STRING(json, message, field_name)                                            \

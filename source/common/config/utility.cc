@@ -94,7 +94,7 @@ void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::f
                            json_rds.getInteger("refresh_delay_ms", 30000),
                            json_rds.getString("api_type", ApiType::get().RestLegacy),
                            *rds.mutable_config_source()->mutable_api_config_source());
-  JSON_UTIL_SET_STRING_VALUE(json_rds, rds, route_config_name, name);
+  rds.set_route_config_name(name);
 }
 
 void Utility::translateLdsConfig(const Json::Object& json_lds,
