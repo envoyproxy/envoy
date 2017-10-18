@@ -502,8 +502,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  const HeaderEntry* decorator_operation = request_headers_->EnvoyDecoratorOperation();
-
   ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
@@ -543,7 +541,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
-    traceRequest(decorator_operation);
+    traceRequest();
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.
@@ -551,7 +549,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 
-void ConnectionManagerImpl::ActiveStream::traceRequest(const HeaderEntry* decorator_operation) {
+void ConnectionManagerImpl::ActiveStream::traceRequest() {
   Tracing::Decision tracing_decision =
       Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
@@ -577,12 +575,18 @@ void ConnectionManagerImpl::ActiveStream::traceRequest(const HeaderEntry* decora
     }
   }
 
-  // For igress (inbound) requests, if a decorator operation name has been provided, it
+  const HeaderEntry* decorator_operation = request_headers_->EnvoyDecoratorOperation();
+
+  // For ingress (inbound) requests, if a decorator operation name has been provided, it
   // should be used to override the active span's operation.
-  if (decorator_operation && !decorator_operation->value().empty() &&
-      connection_manager_.config_.tracingConfig()->operation_name_ ==
-          Tracing::OperationName::Ingress) {
-    active_span_->setOperation(decorator_operation->value().c_str());
+  if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+          Tracing::OperationName::Ingress &&
+      decorator_operation) {
+    if (!decorator_operation->value().empty()) {
+      active_span_->setOperation(decorator_operation->value().c_str());
+    }
+    // Remove header so not propagated to service
+    request_headers_->removeEnvoyDecoratorOperation();
   }
 
   // Inject the active span's tracing context into the request headers.
