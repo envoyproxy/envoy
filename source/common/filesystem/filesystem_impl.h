@@ -57,8 +57,7 @@ std::string fileReadToEnd(const std::string& path);
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           Api::OsSysCalls& osSysCalls, Stats::Store& stats_store,
-           std::chrono::milliseconds flush_interval_msec);
+           Stats::Store& stats_store, std::chrono::milliseconds flush_interval_msec);
   ~FileImpl();
 
   // Filesystem::File

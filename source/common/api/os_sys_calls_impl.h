@@ -20,7 +20,7 @@ public:
   void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) override;
 };
 
-typedef ConstSingleton<OsSysCallsImpl> OsSysCallsSingleton;
+typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;
 
 } // namespace Api
 } // namespace Envoy

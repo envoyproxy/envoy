@@ -74,3 +74,11 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "singleton_injector_lib",
+    hdrs = ["singleton_injector.h"],
+    deps = [
+        "//source/common/common:singleton",
+    ],
+)

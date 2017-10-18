@@ -11,6 +11,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -30,9 +31,8 @@ TEST(FileSystemImpl, BadFile) {
   Event::MockDispatcher dispatcher;
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl store;
-  Api::OsSysCallsImpl os_sys_calls;
   EXPECT_CALL(dispatcher, createTimer_(_));
-  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, os_sys_calls, store,
+  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, store,
                                     std::chrono::milliseconds(10000)),
                EnvoyException);
 }
@@ -85,9 +85,10 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector os_calls(&os_sys_calls_);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, os_sys_calls, stats_store,
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
                             std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
@@ -138,9 +139,10 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   Thread::MutexBasicLockable mutex;
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector os_calls(&os_sys_calls_);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, os_sys_calls, stats_store,
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
                             std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
