@@ -29,8 +29,8 @@ route_config_name
   :ref:`RDS HTTP API <config_http_conn_man_rds_api>`. This allows an Envoy configuration with
   multiple HTTP listeners (and associated HTTP connection manager filters) to use different route
   configurations. By default, the maximum length of the name is limited to 60 characters. This
-  limit can be increased by setting the :ref:`--max-obj-name-len <operations_cli_max_obj_name_len>`
-  command line argument to the desired value.
+  limit can be increased by setting the :option:`--max-obj-name-len` command line argument to the
+  desired value.
 
 refresh_delay_ms
   *(optional, integer)* The delay, in milliseconds, between fetches to the RDS API. Envoy will add

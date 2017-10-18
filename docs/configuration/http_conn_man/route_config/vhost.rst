@@ -25,8 +25,7 @@ name
   *(required, string)* The logical name of the virtual host. This is used when emitting certain
   statistics but is not relevant for forwarding. By default, the maximum length of the name is
   limited to 60 characters. This limit can be increased by setting the
-  :ref:`--max-obj-name-len <operations_cli_max_obj_name_len>` command line argument to the desired
-  value.
+  :option:`--max-obj-name-len` command line argument to the desired value.
 
 domains
   *(required, array)* A list of domains (host/authority header) that will be matched to this

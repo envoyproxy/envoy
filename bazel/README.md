@@ -246,7 +246,7 @@ on the Bazel command line.
 ## Stats Tunables
 
 The default maximum number of stats in shared memory, and the default
-maximum length of a cluster/ route config/listener name, can be
+maximum length of a cluster/route config/listener name, can be
 overriden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
 `ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`, respectively, to the desired
 value.  For example:
