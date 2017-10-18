@@ -378,11 +378,10 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   MockClient* client = new NiceMock<MockClient>();
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
-      .WillOnce(
-          Invoke([&](const Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-            EXPECT_EQ(context->hashKey().value(), std::hash<std::string>()("foo"));
-            return cm_.thread_local_cluster_.lb_.host_;
-          }));
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), std::hash<std::string>()("foo"));
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
   PoolRequest* request = conn_pool_->makeRequest("foo", value, callbacks);

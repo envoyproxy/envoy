@@ -219,14 +219,26 @@ public:
   virtual ~HashPolicy() {}
 
   /**
+   * A callback used for requesting that a cookie be set with the given lifetime.
+   * @param key the name of the cookie to be set
+   * @param ttl the lifetime of the cookie
+   * @return std::string the opaque value of the cookie that will be set
+   */
+  typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
+      AddCookieCallback;
+
+  /**
    * @param downstream_address contains the address of the connected client host, or an
    * empty string if the request is initiated from within this host
    * @param headers stores the HTTP headers for the stream
+   * @param add_cookie is called to add a set-cookie header on the reply sent to the downstream
+   * host
    * @return Optional<uint64_t> an optional hash value to route on. A hash value might not be
    * returned if for example the specified HTTP header does not exist.
    */
   virtual Optional<uint64_t> generateHash(const std::string& downstream_address,
-                                          const Http::HeaderMap& headers) const PURE;
+                                          const Http::HeaderMap& headers,
+                                          AddCookieCallback add_cookie) const PURE;
 };
 
 class MetadataMatchCriterion {
@@ -435,13 +447,6 @@ public:
    * router.
    */
   virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
-
-  /**
-   * Return whether the configuration makes use of runtime or not. Callers can use this to
-   * determine whether they should use a fast or slow source of randomness when calling route
-   * functions.
-   */
-  virtual bool usesRuntime() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

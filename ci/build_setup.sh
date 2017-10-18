@@ -63,12 +63,21 @@ BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish"
+  --jobs=${NUM_CPUS} --show_task_finish ${BAZEL_BUILD_EXTRA_OPTIONS}"
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
 ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
+mkdir -p "${TEST_TMPDIR}/_bazel_${USER}/install"
+ln -sf /bazel-prebuilt-root/install/* "${TEST_TMPDIR}/_bazel_${USER}/install/"
+
+# Replace the existing Bazel output cache with a copy of the image's prebuilt deps.
+if [[ -d /bazel-prebuilt-output ]]; then
+  BAZEL_OUTPUT_BASE="$(bazel info output_base)"
+  rm -rf "${BAZEL_OUTPUT_BASE}"
+  cp -R /bazel-prebuilt-output "${BAZEL_OUTPUT_BASE}"
+fi
 
 # Setup Envoy consuming project.
 if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]

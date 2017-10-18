@@ -169,8 +169,9 @@ public:
   ~MockHashPolicy();
 
   // Router::HashPolicy
-  MOCK_CONST_METHOD2(generateHash, Optional<uint64_t>(const std::string& downstream_address,
-                                                      const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD3(generateHash, Optional<uint64_t>(const std::string& downstream_address,
+                                                      const Http::HeaderMap& headers,
+                                                      const AddCookieCallback add_cookie));
 };
 
 class MockMetadataMatchCriteria : public MetadataMatchCriteria {
@@ -258,7 +259,6 @@ public:
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
-  MOCK_CONST_METHOD0(usesRuntime, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;

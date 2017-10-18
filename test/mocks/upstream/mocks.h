@@ -68,7 +68,7 @@ public:
   ~MockLoadBalancer();
 
   // Upstream::LoadBalancer
-  MOCK_METHOD1(chooseHost, HostConstSharedPtr(const LoadBalancerContext* context));
+  MOCK_METHOD1(chooseHost, HostConstSharedPtr(LoadBalancerContext* context));
 
   std::shared_ptr<MockHost> host_{new MockHost()};
 };

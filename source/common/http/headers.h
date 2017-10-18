@@ -70,6 +70,7 @@ public:
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};
+  const LowerCaseString SetCookie{"set-cookie"};
   const LowerCaseString Status{":status"};
   const LowerCaseString TransferEncoding{"transfer-encoding"};
   const LowerCaseString TE{"te"};

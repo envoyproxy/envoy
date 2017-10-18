@@ -2,6 +2,7 @@
 
 #include <sys/mman.h>   // for mode_t
 #include <sys/socket.h> // for sockaddr
+#include <sys/stat.h>
 
 #include <memory>
 #include <string>
@@ -57,6 +58,11 @@ public:
    * @see man 2 mmap
    */
   virtual void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) PURE;
+
+  /**
+   * @see man 2 stat
+   */
+  virtual int stat(const char* pathname, struct stat* buf) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;

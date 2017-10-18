@@ -33,5 +33,7 @@ void* OsSysCallsImpl::mmap(void* addr, size_t length, int prot, int flags, int f
   return ::mmap(addr, length, prot, flags, fd, offset);
 }
 
+int OsSysCallsImpl::stat(const char* pathname, struct stat* buf) { return ::stat(pathname, buf); }
+
 } // namespace Api
 } // namespace Envoy
