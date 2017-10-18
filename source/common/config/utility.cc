@@ -89,12 +89,13 @@ void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::f
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
 
   const std::string name = json_rds.getString("route_config_name", "");
-  checkObjNameLength("Invalid route_config_name", name);
+  checkObjNameLength("Invalid route_config name", name);
+  rds.set_route_config_name(name);
+
   translateApiConfigSource(json_rds.getString("cluster"),
                            json_rds.getInteger("refresh_delay_ms", 30000),
                            json_rds.getString("api_type", ApiType::get().RestLegacy),
                            *rds.mutable_config_source()->mutable_api_config_source());
-  rds.set_route_config_name(name);
 }
 
 void Utility::translateLdsConfig(const Json::Object& json_lds,

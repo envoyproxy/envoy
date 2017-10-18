@@ -31,7 +31,9 @@ Cluster
 name
   *(required, string)* Supplies the name of the cluster which must be unique across all clusters.
   The cluster name is used when emitting :ref:`statistics <config_cluster_manager_cluster_stats>`.
-  The cluster name can be at most 60 characters long.
+  By default, the maximum length of a cluster name is limited to 60 characters. This limit can be
+  increased by setting the :ref:`--max-obj-name-len <operations_cli_max_obj_name_len>` command line
+  argument to the desired value.
 
 .. _config_cluster_manager_type:
 

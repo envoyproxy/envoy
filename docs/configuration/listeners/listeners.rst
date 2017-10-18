@@ -34,6 +34,9 @@ name
   *(optional, string)* The unique name by which this listener is known. If no name is provided,
   Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
   updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
+  By default, the maximum length of a listener's name is limited to 60 characters. This limit can be
+  increased by setting the :ref:`--max-obj-name-len <operations_cli_max_obj_name_len>` command line
+  argument to the desired value.
 
 address
   *(required, string)* The address that the listener should listen on. Currently only TCP

@@ -117,6 +117,8 @@ following are the command line options that Envoy supports.
   during a hot restart. See the :ref:`hot restart overview <arch_overview_hot_restart>` for more
   information. Defaults to 900 seconds (15 minutes).
 
+.. _operations_cli_max_obj_name_len:
+
 .. option:: --max-obj-name-len <uint64_t>
 
   *(optional)* The maximum name length (in bytes) of the name field in a cluster/route_config/listener.

@@ -1,10 +1,14 @@
+#include "common/config/cds_json.h"
 #include "common/config/lds_json.h"
+#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/mocks/local_info/mocks.h"
 
 #include "api/eds.pb.h"
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -71,23 +75,54 @@ TEST(UtilityTest, TranslateApiConfigSource) {
 }
 
 TEST(UtilityTest, ObjNameLength) {
-  EXPECT_THROW(Utility::checkObjNameLength(
-                   "test", "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"),
-               EnvoyException);
-}
 
-TEST(LdsJsonTest, TranslateListenerWithLongName) {
-  std::string lds_json = R"EOF(
-    {
-      "name": "listenerwithareallyreallylongnamemorethanmaxcharsallowedbyschema",
-      "address": "tcp://0.0.0.0:1",
-      "filters": []
-    }
-  )EOF";
+  std::string name = "listenerwithareallyreallylongnamemorethanmaxcharsallowedbyschema";
+  std::string err_prefix;
+  std::string err_suffix = fmt::format(": Length of {} ({}) exceeds allowed maximum length ({})",
+                                       name, name.length(), Stats::RawStatData::maxObjNameLength());
+  {
+    err_prefix = "test";
+    EXPECT_THROW_WITH_MESSAGE(Utility::checkObjNameLength(err_prefix, name), EnvoyException,
+                              err_prefix + err_suffix);
+  }
 
-  envoy::api::v2::Listener listener;
-  auto json_object_ptr = Json::Factory::loadFromString(lds_json);
-  EXPECT_THROW(Config::LdsJson::translateListener(*json_object_ptr, listener), EnvoyException);
+  {
+    err_prefix = "Invalid listener name";
+    std::string json = "{ 'name': " + name + "'address': 'foo', 'filters': [] }";
+    auto json_object_ptr = Json::Factory::loadFromString(json);
+
+    envoy::api::v2::Listener listener;
+    EXPECT_THROW_WITH_MESSAGE(Config::LdsJson::translateListener(*json_object_ptr, listener),
+                              EnvoyException, err_prefix + err_suffix);
+  }
+
+  {
+    err_prefix = "Invalid virtual host name";
+    std::string json = "{ 'name': " + name + "'domains': [], 'routes': [] }";
+    auto json_object_ptr = Json::Factory::loadFromString(json);
+    envoy::api::v2::VirtualHost vhost;
+    EXPECT_THROW_WITH_MESSAGE(Config::RdsJson::translateVirtualHost(*json_object_ptr, vhost),
+                              EnvoyException, err_prefix + err_suffix);
+  }
+
+  {
+    err_prefix = "Invalid cluster name";
+    std::string json =
+        "{ 'name': " + name + "'type': 'static', 'lb_type': 'random', 'connect_timeout_ms' : 1}";
+    auto json_object_ptr = Json::Factory::loadFromString(json);
+    envoy::api::v2::Cluster cluster;
+    EXPECT_THROW_WITH_MESSAGE(Config::CdsJson::translateCluster(*json_object_ptr, cluster),
+                              EnvoyException, err_prefix + err_suffix);
+  }
+
+  {
+    err_prefix = "Invalid route_config name";
+    std::string json = "{ 'route_config_name': " + name + "'cluster': 'foo'}";
+    auto json_object_ptr = Json::Factory::loadFromString(json);
+    envoy::api::v2::filter::Rds rds;
+    EXPECT_THROW_WITH_MESSAGE(Config::Utility::translateRdsConfig(*json_object_ptr, rds),
+                              EnvoyException, err_prefix + err_suffix);
+  }
 }
 
 } // namespace Config
