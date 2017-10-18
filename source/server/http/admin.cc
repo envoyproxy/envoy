@@ -32,7 +32,7 @@
 
 #include "fmt/format.h"
 
-//TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
+// TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/prettywriter.h"
