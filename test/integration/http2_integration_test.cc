@@ -200,7 +200,7 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
                                           *response1);
 
   fake_upstream_connection1 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request1 = fake_upstream_connection1->waitForNewStream();
+  upstream_request1 = fake_upstream_connection1->waitForNewStream(*dispatcher_);
 
   // Start request 2
   response2.reset(new IntegrationStreamDecoder(*dispatcher_));
@@ -210,7 +210,7 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
                                                                   {":authority", "host"}},
                                           *response2);
   fake_upstream_connection2 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request2 = fake_upstream_connection2->waitForNewStream();
+  upstream_request2 = fake_upstream_connection2->waitForNewStream(*dispatcher_);
 
   // Finish request 1
   codec_client_->sendData(*encoder1, request1_bytes, true);
@@ -311,7 +311,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
         FakeUpstream::waitForHttpConnection(*dispatcher_, fake_upstreams_);
     // As data and streams are interwoven, make sure waitForNewStream()
     // ignores incoming data and waits for actual stream establishment.
-    upstream_requests.push_back(fake_upstream_connection->waitForNewStream(true));
+    upstream_requests.push_back(fake_upstream_connection->waitForNewStream(*dispatcher_, true));
     upstream_requests.back()->setAddServedByHeader(true);
     fake_upstream_connections_.push_back(std::move(fake_upstream_connection));
   }
