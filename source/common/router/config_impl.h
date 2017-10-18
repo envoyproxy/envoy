@@ -274,6 +274,9 @@ public:
   // Decorator::apply
   void apply(Tracing::Span& span) const override;
 
+  // Decorator::getOperation
+  const std::string& getOperation() const override;
+
 private:
   const std::string operation_;
 };

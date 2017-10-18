@@ -241,7 +241,7 @@ void HttpIntegrationTest::waitForNextUpstreamRequest() {
     fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   }
   // Wait for the next stream on the upstream connection.
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   // Wait for the stream to be completely received.
   upstream_request_->waitForEndStream(*dispatcher_);
 }
@@ -370,7 +370,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
 
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForHeadersComplete();
   fake_upstream_connection_->close();
   fake_upstream_connection_->waitForDisconnect();
@@ -432,7 +432,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
                                                       {":authority", "host"}},
                               *response_);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForHeadersComplete();
   codec_client_->close();
 
@@ -491,7 +491,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
                                                       {":authority", "host"}},
                               *response_);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForHeadersComplete();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(512, true);
