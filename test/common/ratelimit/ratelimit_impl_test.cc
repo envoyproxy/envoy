@@ -70,7 +70,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT);
-    EXPECT_CALL(span_, setTag("ratelimit-status", "over-limit"));
+    EXPECT_CALL(span_, setTag("ratelimit_status", "over_limit"));
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::OverLimit));
     client_.onSuccess(std::move(response), span_);
   }
@@ -89,7 +89,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
     response.reset(new pb::lyft::ratelimit::RateLimitResponse());
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OK);
-    EXPECT_CALL(span_, setTag("ratelimit-status", "ok"));
+    EXPECT_CALL(span_, setTag("ratelimit_status", "ok"));
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::OK));
     client_.onSuccess(std::move(response), span_);
   }

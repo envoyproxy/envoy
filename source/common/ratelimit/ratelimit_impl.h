@@ -26,8 +26,8 @@ typedef std::unique_ptr<RateLimitAsyncClient> RateLimitAsyncClientPtr;
 typedef Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
 
 struct ConstantValues {
-  const std::string TraceStatus = "ratelimit-status";
-  const std::string TraceOverLimit = "over-limit";
+  const std::string TraceStatus = "ratelimit_status";
+  const std::string TraceOverLimit = "over_limit";
   const std::string TraceOk = "ok";
 };
 

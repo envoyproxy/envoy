@@ -146,7 +146,7 @@ public:
     http_callbacks_->onData(reply_buffer, false);
 
     Http::HeaderMapPtr reply_trailers{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}};
-    EXPECT_CALL(*child_span_, setTag("grpc-status", "0"));
+    EXPECT_CALL(*child_span_, setTag("grpc.status_code", "0"));
     EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _));
     EXPECT_CALL(*child_span_, finishSpan());
     EXPECT_CALL(*http_stream_, reset());
@@ -220,7 +220,7 @@ public:
 
     EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
         .WillOnce(Return(request->child_span_));
-    EXPECT_CALL(*request->child_span_, setTag("upstream-cluster-name", "test_cluster"));
+    EXPECT_CALL(*request->child_span_, setTag("upstream_cluster_name", "test_cluster"));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
@@ -337,8 +337,8 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag("upstream-cluster-name", "test_cluster"));
-  EXPECT_CALL(*child_span, setTag("grpc-status", "14"));
+  EXPECT_CALL(*child_span, setTag("upstream_cluster_name", "test_cluster"));
+  EXPECT_CALL(*child_span, setTag("grpc.status_code", "14"));
   EXPECT_CALL(*child_span, setTag("error", "true"));
   EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(*child_span, injectContext(_)).Times(0);
@@ -402,9 +402,9 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag("upstream-cluster-name", "test_cluster"));
+  EXPECT_CALL(*child_span, setTag("upstream_cluster_name", "test_cluster"));
   EXPECT_CALL(*child_span, injectContext(_));
-  EXPECT_CALL(*child_span, setTag("grpc-status", "13"));
+  EXPECT_CALL(*child_span, setTag("grpc.status_code", "13"));
   EXPECT_CALL(*child_span, setTag("error", "true"));
   EXPECT_CALL(*child_span, finishSpan());
 
@@ -571,7 +571,7 @@ TEST_F(GrpcAsyncClientImplTest, RequestTrailersOnly) {
   auto request = createRequest(empty_metadata);
   Http::HeaderMapPtr reply_headers{
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
-  EXPECT_CALL(*request->child_span_, setTag("grpc-status", "0"));
+  EXPECT_CALL(*request->child_span_, setTag("grpc.status_code", "0"));
   EXPECT_CALL(*request->child_span_, setTag("error", "true"));
   EXPECT_CALL(*request, onFailure(Status::Internal, "", _));
   EXPECT_CALL(*request->child_span_, finishSpan());

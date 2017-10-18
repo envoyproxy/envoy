@@ -269,11 +269,11 @@ public:
 
   struct {
     const std::string STATUS = "status";
-    const std::string GRPC_STATUS = "grpc-status";
+    const std::string GRPC_STATUS = "grpc.status_code";
     const std::string CANCELED = "canceled";
     const std::string ERROR = "error";
     const std::string TRUE = "true";
-    const std::string UPSTREAM_CLUSTER_NAME = "upstream-cluster-name";
+    const std::string UPSTREAM_CLUSTER_NAME = "upstream_cluster_name";
   } TagStrings;
 
 private:
