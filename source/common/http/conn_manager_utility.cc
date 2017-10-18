@@ -93,7 +93,6 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
-    request_headers.removeEnvoyDecoratorOperation();
 
     for (const Http::LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);
