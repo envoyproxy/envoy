@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/grpc/async_client.h"
-#include "envoy/grpc/rpc_channel.h"
 
 #include "gmock/gmock.h"
 
@@ -69,28 +68,6 @@ public:
                                      const Optional<std::chrono::milliseconds>& timeout));
   MOCK_METHOD2_T(start, AsyncStream<RequestType>*(const Protobuf::MethodDescriptor& service_method,
                                                   AsyncStreamCallbacks<ResponseType>& callbacks));
-};
-
-class MockRpcChannelCallbacks : public RpcChannelCallbacks {
-public:
-  MockRpcChannelCallbacks();
-  ~MockRpcChannelCallbacks();
-
-  MOCK_METHOD1(onPreRequestCustomizeHeaders, void(Http::HeaderMap& headers));
-  MOCK_METHOD0(onSuccess, void());
-  MOCK_METHOD2(onFailure, void(const Optional<uint64_t>& grpc_status, const std::string& message));
-};
-
-class MockRpcChannel : public RpcChannel {
-public:
-  MockRpcChannel();
-  ~MockRpcChannel();
-
-  MOCK_METHOD0(cancel, void());
-  MOCK_METHOD5(CallMethod,
-               void(const Protobuf::MethodDescriptor* method, Protobuf::RpcController* controller,
-                    const Protobuf::Message* request, Protobuf::Message* response,
-                    Protobuf::Closure* done));
 };
 
 } // namespace Grpc
