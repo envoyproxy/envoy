@@ -27,29 +27,16 @@ SubsetLoadBalancer::SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_s
   ASSERT(subsets.isEnabled());
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
-  update(host_set.hosts(), {}, false);
+  update(host_set.hosts(), {});
 
   // Configure future updates.
   host_set.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed) {
-    update(hosts_added, hosts_removed, false);
+    update(hosts_added, hosts_removed);
   });
-
-  if (local_host_set) {
-    // No need to invoke update with local = true: subset creation handles the local hosts.
-    local_host_set_member_update_cb_handle_ =
-        local_host_set->addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
-                                                 const std::vector<HostSharedPtr>& hosts_removed) {
-          update(hosts_added, hosts_removed, true);
-        });
-  }
 }
 
-SubsetLoadBalancer::~SubsetLoadBalancer() {
-  if (local_host_set_member_update_cb_handle_ != nullptr) {
-    local_host_set_member_update_cb_handle_->remove();
-  }
-}
+SubsetLoadBalancer::~SubsetLoadBalancer() {}
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
@@ -138,9 +125,7 @@ SubsetLoadBalancer::SubsetPtr SubsetLoadBalancer::findSubset(
 // Given the addition and/or removal of hosts, update all subsets,
 // creating new subsets as necessary.
 void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
-                                const std::vector<HostSharedPtr>& hosts_removed, bool local) {
-  ASSERT(!local || original_local_host_set_);
-
+                                const std::vector<HostSharedPtr>& hosts_removed) {
   if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
     if (default_host_subset_ == nullptr) {
       // First update: create the default host subset with all hosts
@@ -148,11 +133,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
       default_host_subset_->lb_.reset(newLoadBalancer(default_host_subset_));
     } else {
       // Subsequent updates: add/remove hosts
-      if (local) {
-        default_host_subset_->local_host_set_.update(hosts_added, hosts_removed);
-      } else {
-        default_host_subset_->host_set_.update(hosts_added, hosts_removed);
-      }
+      default_host_subset_->host_set_.update(hosts_added, hosts_removed);
     }
   } else if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET) {
     if (default_host_subset_ == nullptr) {
@@ -171,11 +152,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
       }
 
       if (!subset_hosts_added.empty() || !hosts_removed.empty()) {
-        if (local) {
-          default_host_subset_->local_host_set_.update(subset_hosts_added, hosts_removed);
-        } else {
-          default_host_subset_->host_set_.update(subset_hosts_added, hosts_removed);
-        }
+        default_host_subset_->host_set_.update(subset_hosts_added, hosts_removed);
       }
     }
   }
@@ -224,7 +201,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
 
   // Iterate over subsets with added hosts.
   for (const auto& added : subset_hosts_added) {
-    HostSubsetImpl& host_subset = local ? added.first->local_host_set_ : added.first->host_set_;
+    HostSubsetImpl& host_subset = added.first->host_set_;
 
     // Check if there were any hosts removed from this subset.
     const auto& removed_it = subset_hosts_removed.find(added.first);
@@ -241,11 +218,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
   for (const auto& removed : subset_hosts_removed) {
     const SubsetPtr& subset = removed.first;
     bool previously_empty = subset->empty();
-    if (local) {
-      subset->local_host_set_.update({}, removed.second);
-    } else {
-      subset->host_set_.update({}, removed.second);
-    }
+    subset->host_set_.update({}, removed.second);
 
     if (subset->empty() && !previously_empty) {
       stats_.lb_subsets_active_.dec();
@@ -389,43 +362,27 @@ SubsetLoadBalancer::newSubset(std::function<bool(const Host&)> predicate) {
     }
   }
 
-  SubsetPtr subset;
-  std::vector<HostSharedPtr> local_hosts;
-  if (original_local_host_set_) {
-    for (const auto& host : original_local_host_set_->hosts()) {
-      if (predicate(*host)) {
-        local_hosts.emplace_back(host);
-      }
-    }
-
-    subset.reset(new Subset(original_host_set_, *original_local_host_set_));
-  } else {
-    subset.reset(new Subset(original_host_set_, emptyHostSet()));
-  }
-
+  SubsetPtr subset(new Subset(original_host_set_));
   subset->host_set_.update(hosts, {});
-  subset->local_host_set_.update(local_hosts, {});
   return subset;
 }
 
 LoadBalancer* SubsetLoadBalancer::newLoadBalancer(const SubsetPtr& subset) {
-  const HostSet* local_host_set = nullptr;
-  if (original_local_host_set_ != nullptr) {
-    local_host_set = &subset->local_host_set_;
-  }
-
   LoadBalancer* lb = nullptr;
   switch (lb_type_) {
   case LoadBalancerType::LeastRequest:
-    lb = new LeastRequestLoadBalancer(subset->host_set_, local_host_set, stats_, runtime_, random_);
+    lb = new LeastRequestLoadBalancer(subset->host_set_, original_local_host_set_, stats_, runtime_,
+                                      random_);
     break;
 
   case LoadBalancerType::Random:
-    lb = new RandomLoadBalancer(subset->host_set_, local_host_set, stats_, runtime_, random_);
+    lb = new RandomLoadBalancer(subset->host_set_, original_local_host_set_, stats_, runtime_,
+                                random_);
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb = new RoundRobinLoadBalancer(subset->host_set_, local_host_set, stats_, runtime_, random_);
+    lb = new RoundRobinLoadBalancer(subset->host_set_, original_local_host_set_, stats_, runtime_,
+                                    random_);
     break;
 
   case LoadBalancerType::RingHash:
@@ -437,20 +394,16 @@ LoadBalancer* SubsetLoadBalancer::newLoadBalancer(const SubsetPtr& subset) {
   }
 
   subset->host_set_.triggerCallbacks();
-  if (local_host_set) {
-    subset->local_host_set_.triggerCallbacks();
-  }
   return lb;
 }
 
 // Find the index in which the original HostSet's hostsPerLocality vector
 // contains the given host.
-Optional<uint32_t>
-SubsetLoadBalancer::HostSubsetImpl::findLocalityIndex(const HostSharedPtr& host) {
+Optional<uint32_t> SubsetLoadBalancer::HostSubsetImpl::findLocalityIndex(const Host& host) {
   uint32_t idx = 0;
   for (const auto locality_hosts : original_host_set_.hostsPerLocality()) {
     for (const auto locality_host : locality_hosts) {
-      if (locality_host == host) {
+      if (locality_host.get() == &host) {
         return Optional<uint32_t>(idx);
       }
     }
@@ -467,7 +420,7 @@ SubsetLoadBalancer::HostSubsetImpl::findLocalityIndex(const HostSharedPtr& host)
 void SubsetLoadBalancer::HostSubsetImpl::update(const std::vector<HostSharedPtr>& hosts_added,
                                                 const std::vector<HostSharedPtr>& hosts_removed) {
   for (const auto host : hosts_added) {
-    const Optional<uint32_t> locality_index = findLocalityIndex(host);
+    const Optional<uint32_t> locality_index = findLocalityIndex(*host);
     host_to_locality_.emplace(host, locality_index);
   }
 

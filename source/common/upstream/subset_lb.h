@@ -32,7 +32,6 @@ private:
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
-  Common::CallbackHandle* local_host_set_member_update_cb_handle_{};
 
   envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   ProtobufWkt::Struct default_subset_;
@@ -55,7 +54,7 @@ private:
     bool empty() { return empty_; };
 
   private:
-    Optional<uint32_t> findLocalityIndex(const HostSharedPtr& host);
+    Optional<uint32_t> findLocalityIndex(const Host& host);
     void addKnownHosts(HostVectorSharedPtr known_hosts, HostVectorConstSharedPtr hosts);
 
     const HostSet& original_host_set_;
@@ -63,18 +62,14 @@ private:
     bool empty_;
   };
 
-  // Subset maintains a LoadBalancer and HostSubsetImpls for a
-  // subset's filtered hosts and filtered local hosts.
+  // Subset maintains a LoadBalancer and HostSubsetImpl for a subset's filtered hosts.
   class Subset {
   public:
-    Subset(const HostSet& original_host_set, const HostSet& original_local_host_set)
-        : host_set_(HostSubsetImpl(original_host_set)),
-          local_host_set_(HostSubsetImpl(original_local_host_set)) {}
+    Subset(const HostSet& original_host_set) : host_set_(HostSubsetImpl(original_host_set)) {}
 
-    bool empty() { return host_set_.empty() && local_host_set_.empty(); }
+    bool empty() { return host_set_.empty(); }
 
     HostSubsetImpl host_set_;
-    HostSubsetImpl local_host_set_;
     LoadBalancerPtr lb_;
   };
   typedef std::shared_ptr<Subset> SubsetPtr;
@@ -104,7 +99,7 @@ private:
   LbSubsetMap subsets_;
 
   void update(const std::vector<HostSharedPtr>& hosts_added,
-              const std::vector<HostSharedPtr>& hosts_removed, bool local);
+              const std::vector<HostSharedPtr>& hosts_removed);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
