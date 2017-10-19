@@ -26,11 +26,14 @@ TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark
 TEST_F(WatermarkBufferTest, CopyOut) {
   buffer_.add("hello world");
   std::array<char, 5> out;
-  buffer_.copyOut(out.data(), out.size(), 0);
+  buffer_.copyOut(0, out.size(), out.data());
   EXPECT_EQ(std::string(out.data(), out.size()), "hello");
 
-  buffer_.copyOut(out.data(), out.size(), 6);
+  buffer_.copyOut(6, out.size(), out.data());
   EXPECT_EQ(std::string(out.data(), out.size()), "world");
+
+  // Copy out zero bytes.
+  buffer_.copyOut(4, 0, out.data());
 }
 
 TEST_F(WatermarkBufferTest, AddChar) {

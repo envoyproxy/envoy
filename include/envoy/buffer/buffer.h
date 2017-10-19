@@ -54,11 +54,11 @@ public:
 
   /**
    * Copy out a section of the buffer.
-   * @param data supplies the output buffer to fill.
-   * @param size supplies the size of the output buffer.
    * @param start supplies the buffer index to start copying from.
+   * @param size supplies the size of the output buffer.
+   * @param data supplies the output buffer to fill.
    */
-  virtual void copyOut(void* data, uint64_t size, size_t start) const PURE;
+  virtual void copyOut(size_t start, uint64_t size, void* data) const PURE;
 
   /**
    * Drain data from the buffer.
