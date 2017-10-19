@@ -282,7 +282,7 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
-  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
@@ -298,11 +298,10 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
   } else {
-    std::string format_key = params.begin()->first;
-    std::string format_value = params.begin()->second;
+    const std::string format_key = params.begin()->first;
+    const std::string format_value = params.begin()->second;
     if (format_key == "format" && format_value == "json") {
-      std::string json_stats = statsAsJson(all_stats);
-      response.add(json_stats);
+      response.add(statsAsJson(all_stats));
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
