@@ -18,6 +18,7 @@ public:
   int shmUnlink(const char* name) override;
   int ftruncate(int fd, off_t length) override;
   void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) override;
+  int stat(const char* pathname, struct stat* buf) override;
 };
 
 typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;

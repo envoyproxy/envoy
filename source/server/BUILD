@@ -149,6 +149,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 
