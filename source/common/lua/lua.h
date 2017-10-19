@@ -130,6 +130,7 @@ public:
     ENVOY_LOG(info, "registering new type: {}", typeid(T).name());
     int rc = luaL_newmetatable(state, typeid(T).name());
     ASSERT(rc == 1);
+    UNREFERENCED_PARAMETER(rc);
 
     lua_pushvalue(state, -1);
     lua_setfield(state, -2, "__index");
