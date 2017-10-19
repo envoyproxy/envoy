@@ -37,28 +37,26 @@ SubsetLoadBalancer::SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_s
 
   if (local_host_set) {
     // No need to invoke update with local = true: subset creation handles the local hosts.
-    local_host_set->addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
-                                             const std::vector<HostSharedPtr>& hosts_removed) {
-      update(hosts_added, hosts_removed, true);
-    });
+    local_host_set_member_update_cb_handle_ =
+        local_host_set->addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
+                                                 const std::vector<HostSharedPtr>& hosts_removed) {
+          update(hosts_added, hosts_removed, true);
+        });
+  }
+}
+
+SubsetLoadBalancer::~SubsetLoadBalancer() {
+  if (local_host_set_member_update_cb_handle_ != nullptr) {
+    local_host_set_member_update_cb_handle_->remove();
   }
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
-    const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
-    if (match_criteria) {
-      // Route has metadata match criteria defined, see if we have a matching subset.
-      SubsetPtr subset = findSubset(match_criteria->metadataMatchCriteria());
-      if (subset != nullptr && subset->lb_ != nullptr) {
-        HostConstSharedPtr host = subset->lb_->chooseHost(context);
-        // Fallback if the subset was empty (inactive), but not, for
-        // example, if all its hosts are unhealthy.
-        if (host || !subset->empty()) {
-          stats_.lb_subsets_selected_.inc();
-          return host;
-        }
-      }
+    bool host_chosen;
+    HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
+    if (host_chosen) {
+      return host;
     }
   }
 
@@ -70,28 +68,64 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
   return default_host_subset_->lb_->chooseHost(context);
 }
 
+HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerContext* context,
+                                                                bool& host_chosen) {
+  host_chosen = false;
+  const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
+  if (!match_criteria) {
+    return nullptr;
+  }
+
+  // Route has metadata match criteria defined, see if we have a matching subset.
+  SubsetPtr subset = findSubset(match_criteria->metadataMatchCriteria());
+  if (subset == nullptr || subset->lb_ == nullptr) {
+    return nullptr;
+  }
+
+  if (subset->empty()) {
+    // Fallback if the subset was empty (inactive)
+    return nullptr;
+  }
+
+  host_chosen = true;
+  stats_.lb_subsets_selected_.inc();
+  return subset->lb_->chooseHost(context);
+}
+
 // Iterates over the given metadata match criteria (which must be
 // lexically sorted by key) and find a matching SubsetPtr, if any.
 SubsetLoadBalancer::SubsetPtr SubsetLoadBalancer::findSubset(
     const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& match_criteria) {
-  LbSubsetMap* subsets = &subsets_;
+  const LbSubsetMap* subsets = &subsets_;
+
+  // Because the match_criteria and the host metadata used to populate
+  // subsets_ are sorted in the same order, we can iterate over the
+  // criteria and perform a lookup for each key and value, starting
+  // with the root LbSubsetMap and using the previous iteration's
+  // LbSubsetMap thereafter (tracked in subsets). If ever a
+  // criterion's key or value is not found, there is no subset for
+  // this criteria. If we reach the last criterion, we've found the
+  // LbSubsetEntry for the criteria, which may or may not have a
+  // subset attached to it.
   for (uint32_t i = 0; i < match_criteria.size(); i++) {
-    const Router::MetadataMatchCriterion* match_criterion = match_criteria[i].get();
-    const auto& subset_it = subsets->find(match_criterion->name());
+    const Router::MetadataMatchCriterion& match_criterion = *match_criteria[i];
+    const auto& subset_it = subsets->find(match_criterion.name());
     if (subset_it == subsets->end()) {
       // No subsets with this key (at this level in the hierarchy).
       break;
     }
 
     const ValueSubsetMap& vs_map = subset_it->second;
-    const auto& vs_it = vs_map.find(match_criterion->value());
+    const auto& vs_it = vs_map.find(match_criterion.value());
     if (vs_it == vs_map.end()) {
       // No subsets with this value.
       break;
     }
 
     const LbSubsetEntryPtr& entry = vs_it->second;
-    if (entry->host_subset_ != nullptr && i + 1 == match_criteria.size()) {
+    if (i + 1 == match_criteria.size()) {
+      // We've reached the end of the criteria, and they all
+      // matched. Return the subset, if any.
       return entry->host_subset_;
     }
 
@@ -110,7 +144,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
   if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
     if (default_host_subset_ == nullptr) {
       // First update: create the default host subset with all hosts
-      default_host_subset_ = newSubset([](const HostSharedPtr&) -> bool { return true; });
+      default_host_subset_ = newSubset([](const Host&) -> bool { return true; });
       default_host_subset_->lb_.reset(newLoadBalancer(default_host_subset_));
     } else {
       // Subsequent updates: add/remove hosts
@@ -131,7 +165,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
       // Don't filter removals -- if they're not in the subset they are ignored.
       std::vector<HostSharedPtr> subset_hosts_added;
       for (const auto& host : hosts_added) {
-        if (hostMatchesDefaultSubset(host)) {
+        if (hostMatchesDefaultSubset(*host)) {
           subset_hosts_added.emplace_back(host);
         }
       }
@@ -155,7 +189,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
     for (const auto& keys : subset_keys_) {
       // For each added host, for each subset key, attempt to extract the metadata
       // corresponding to the key from the host.
-      if (extractSubsetMetadata(keys, host, kvs)) {
+      if (extractSubsetMetadata(keys, *host, kvs)) {
         // The host has metadata for each key, find or create its subset.
         LbSubsetEntryPtr entry = findOrCreateSubset(subsets_, kvs, 0, true);
         if (entry->host_subset_->lb_ == nullptr) {
@@ -173,7 +207,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
     for (const auto& keys : subset_keys_) {
       // For each removed host, for each subset key, attempt to extract the metadata
       // corresponding to the key from the host.
-      if (extractSubsetMetadata(keys, host, kvs)) {
+      if (extractSubsetMetadata(keys, *host, kvs)) {
         // The host has metadata for each key, find it's subset.
         LbSubsetEntryPtr entry = findOrCreateSubset(subsets_, kvs, 0, false);
         if (entry == nullptr || entry->host_subset_->lb_ == nullptr) {
@@ -229,8 +263,8 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
   }
 }
 
-bool SubsetLoadBalancer::hostMatchesDefaultSubset(const HostSharedPtr& host) {
-  const envoy::api::v2::Metadata& host_metadata = host->metadata();
+bool SubsetLoadBalancer::hostMatchesDefaultSubset(const Host& host) {
+  const envoy::api::v2::Metadata& host_metadata = host.metadata();
 
   for (const auto& it : default_subset_.fields()) {
     const ProtobufWkt::Value& host_value = Config::Metadata::metadataValue(
@@ -244,8 +278,8 @@ bool SubsetLoadBalancer::hostMatchesDefaultSubset(const HostSharedPtr& host) {
   return true;
 }
 
-bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const HostSharedPtr& host) {
-  const envoy::api::v2::Metadata& host_metadata = host->metadata();
+bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
+  const envoy::api::v2::Metadata& host_metadata = host.metadata();
 
   for (const auto& kv : kvs) {
     const ProtobufWkt::Value& host_value = Config::Metadata::metadataValue(
@@ -264,10 +298,10 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const HostShared
 // the host has a value for each key. The kvs vector is cleared before
 // use.
 bool SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_keys,
-                                               const HostSharedPtr& host, SubsetMetadata& kvs) {
+                                               const Host& host, SubsetMetadata& kvs) {
   kvs.clear();
 
-  const envoy::api::v2::Metadata& metadata = host->metadata();
+  const envoy::api::v2::Metadata& metadata = host.metadata();
   const auto& filter_it = metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
   if (filter_it == metadata.filter_metadata().end()) {
     return false;
@@ -347,10 +381,10 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
 // Create a new Subset from the current HostSets, filtering hosts with
 // the given predicate.
 SubsetLoadBalancer::SubsetPtr
-SubsetLoadBalancer::newSubset(std::function<bool(const HostSharedPtr&)> predicate) {
+SubsetLoadBalancer::newSubset(std::function<bool(const Host&)> predicate) {
   std::vector<HostSharedPtr> hosts;
   for (const auto& host : original_host_set_.hosts()) {
-    if (predicate(host)) {
+    if (predicate(*host)) {
       hosts.emplace_back(host);
     }
   }
@@ -359,7 +393,7 @@ SubsetLoadBalancer::newSubset(std::function<bool(const HostSharedPtr&)> predicat
   std::vector<HostSharedPtr> local_hosts;
   if (original_local_host_set_) {
     for (const auto& host : original_local_host_set_->hosts()) {
-      if (predicate(host)) {
+      if (predicate(*host)) {
         local_hosts.emplace_back(host);
       }
     }

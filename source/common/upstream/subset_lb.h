@@ -22,6 +22,7 @@ public:
   SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets);
+  ~SubsetLoadBalancer();
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -31,6 +32,7 @@ private:
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  Common::CallbackHandle* local_host_set_member_update_cb_handle_{};
 
   envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   ProtobufWkt::Struct default_subset_;
@@ -104,17 +106,19 @@ private:
   void update(const std::vector<HostSharedPtr>& hosts_added,
               const std::vector<HostSharedPtr>& hosts_removed, bool local);
 
-  bool hostMatchesDefaultSubset(const HostSharedPtr& host);
-  bool hostMatches(const SubsetMetadata& kvs, const HostSharedPtr& host);
+  HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
+
+  bool hostMatchesDefaultSubset(const Host& host);
+  bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 
   SubsetPtr findSubset(const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& matches);
 
   LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs, uint32_t idx,
                                       bool allow_create);
 
-  SubsetPtr newSubset(std::function<bool(const HostSharedPtr&)> predicate);
+  SubsetPtr newSubset(std::function<bool(const Host&)> predicate);
 
-  bool extractSubsetMetadata(const std::set<std::string>& subset_keys, const HostSharedPtr& host,
+  bool extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host,
                              SubsetMetadata& kvs);
 
   LoadBalancer* newLoadBalancer(const SubsetPtr& subset);

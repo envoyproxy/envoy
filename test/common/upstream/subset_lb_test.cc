@@ -484,7 +484,7 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
 
-  std::vector<std::set<std::string>> subset_keys = {{"stage", "version"}};
+  std::vector<std::set<std::string>> subset_keys = {{"stage", "version"}, {"version"}};
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
 
   init({
@@ -496,7 +496,7 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
 
   EXPECT_EQ(cluster_.hosts_[0], lb_->chooseHost(&context));
 
-  modifyHosts({}, {makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}),
+  modifyHosts({}, {makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
                    makeHost("tcp://127.0.0.1:8001", {{"stage", "prod"}, {"version", "1.2"}})});
 
   EXPECT_EQ(cluster_.hosts_[0], lb_->chooseHost(&context));

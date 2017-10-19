@@ -145,9 +145,9 @@ with zone aware routing, but be aware that the use of subsets may easily violate
 condition described above.
 
 If subsets are `configured
-<https://github.com/envoyproxy/data-plane-api/blob/master/api/cds.proto#L237>` and a route specifies
-no metadata or no subset matching the metadata exists, the subset load balancer initiates its
-fallback policy. The default policy is `NO_ENDPOINT`, in which case the request fails as if the
+<https://github.com/envoyproxy/data-plane-api/blob/9897e3f/api/cds.proto#L237>` and a route
+specifies no metadata or no subset matching the metadata exists, the subset load balancer initiates
+its fallback policy. The default policy is `NO_ENDPOINT`, in which case the request fails as if the
 cluster had no hosts. Conversely, the `ANY_ENDPOINT` fallback policy load balances across all hosts
 in the cluster, without regard to host metadata. Finally, the `DEFAULT_SUBSET` causes fallback to
 load balance among hosts that match a specific set of metadata.
