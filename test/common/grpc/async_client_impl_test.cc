@@ -26,6 +26,12 @@ template class AsyncStreamImpl<helloworld::HelloRequest, helloworld::HelloReply>
 
 namespace {
 
+TEST(AsyncClientTracingConfigTest, All) {
+  AsyncClientTracingConfig config;
+  EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
+  EXPECT_TRUE(config.requestHeadersForTags().empty());
+}
+
 const std::string HELLO_REQUEST = "ABC";
 // We expect the 5 byte header to only have a length of 5 indicating the size of the protobuf. The
 // protobuf begins with 0x0a, indicating this is the first field of type string. This is followed
