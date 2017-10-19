@@ -137,3 +137,7 @@ The fields are:
   output as Envoy currently has no built in histogram support and relies on statsd for
   aggregation. This command is very useful for local debugging. See :ref:`here <operations_stats>`
   for more information.
+
+  .. http:get:: /stats?format=json
+
+  Outputs /stats in JSON format. This can be used for programmatic access of stats.
