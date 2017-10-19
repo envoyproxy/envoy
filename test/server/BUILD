@@ -59,6 +59,7 @@ envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
+        "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
         "//test/mocks/server:server_mocks",
     ],

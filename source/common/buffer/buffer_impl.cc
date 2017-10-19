@@ -41,6 +41,19 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   UNREFERENCED_PARAMETER(rc);
 }
 
+void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
+  ASSERT(start + size <= length());
+
+  evbuffer_ptr start_ptr;
+  int rc = evbuffer_ptr_set(buffer_.get(), &start_ptr, start, EVBUFFER_PTR_SET);
+  ASSERT(rc != -1);
+  UNREFERENCED_PARAMETER(rc);
+
+  ev_ssize_t copied = evbuffer_copyout_from(buffer_.get(), &start_ptr, data, size);
+  ASSERT(static_cast<uint64_t>(copied) == size);
+  UNREFERENCED_PARAMETER(copied);
+}
+
 void OwnedImpl::drain(uint64_t size) {
   ASSERT(size <= length());
   int rc = evbuffer_drain(buffer_.get(), size);

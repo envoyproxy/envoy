@@ -183,6 +183,7 @@ envoy_cc_library(
         ":address_json_lib",
         ":json_utility_lib",
         ":tls_context_json_lib",
+        ":utility_lib",
         ":well_known_names",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
@@ -231,6 +232,7 @@ envoy_cc_library(
         ":well_known_names",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/json:config_schemas_lib",
     ],
 )
@@ -290,6 +292,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 
