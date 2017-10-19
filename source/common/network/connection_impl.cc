@@ -385,9 +385,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
-  // Read may become ready if there is an error connecting. If still connecting, skip straight
-  // to write ready which is where the connection logic is.
-  if (!(state_ & InternalState::Connecting) && (events & Event::FileReadyType::Read)) {
+  if (events & Event::FileReadyType::Read) {
     onReadReady();
   }
 
@@ -435,7 +433,11 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
 }
 
 void ConnectionImpl::onReadReady() {
-  ASSERT(!(state_ & InternalState::Connecting));
+  ENVOY_CONN_LOG(trace, "read ready", *this);
+
+  if ((state_ & InternalState::Connecting) && !checkConnection()) {
+    return;
+  }
 
   IoResult result = doReadFromSocket();
   uint64_t new_buffer_size = read_buffer_.length();
@@ -481,27 +483,8 @@ void ConnectionImpl::onConnected() { raiseEvent(ConnectionEvent::Connected); }
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
 
-  if (state_ & InternalState::Connecting) {
-    int error;
-    socklen_t error_size = sizeof(error);
-    int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
-    ASSERT(0 == rc);
-    UNREFERENCED_PARAMETER(rc);
-
-    if (error == 0) {
-      ENVOY_CONN_LOG(debug, "connected", *this);
-      state_ &= ~InternalState::Connecting;
-      onConnected();
-      // It's possible that we closed during the connect callback.
-      if (state() != State::Open) {
-        ENVOY_CONN_LOG(debug, "close during connected callback", *this);
-        return;
-      }
-    } else {
-      ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
-      closeSocket(ConnectionEvent::RemoteClose);
-      return;
-    }
+  if ((state_ & InternalState::Connecting) && !checkConnection()) {
+    return;
   }
 
   IoResult result = doWriteToSocket();
@@ -537,6 +520,30 @@ void ConnectionImpl::doConnect() {
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
+}
+
+bool ConnectionImpl::checkConnection() {
+  int error;
+  socklen_t error_size = sizeof(error);
+  int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
+  ASSERT(0 == rc);
+  UNREFERENCED_PARAMETER(rc);
+
+  if (error == 0) {
+    ENVOY_CONN_LOG(debug, "connected", *this);
+    state_ &= ~InternalState::Connecting;
+    onConnected();
+    // It's possible that we closed during the connect callback.
+    if (state() != State::Open) {
+      ENVOY_CONN_LOG(debug, "close during connected callback", *this);
+      return false;
+    }
+  } else {
+    ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
+    closeSocket(ConnectionEvent::RemoteClose);
+    return false;
+  }
+  return true;
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
