@@ -28,18 +28,18 @@ public:
   const Ssl::Connection* ssl() const override { return this; }
 
   // Ssl::Connection
-  bool peerCertificatePresented() override;
-  std::string uriSanLocalCertificate() override;
-  std::string sha256PeerCertificateDigest() override;
-  std::string subjectPeerCertificate() override;
-  std::string uriSanPeerCertificate() override;
+  bool peerCertificatePresented() const override;
+  std::string uriSanLocalCertificate() const override;
+  std::string sha256PeerCertificateDigest() const override;
+  std::string subjectPeerCertificate() const override;
+  std::string uriSanPeerCertificate() const override;
 
   SSL* rawSslForTest() { return ssl_.get(); }
 
 private:
   PostIoAction doHandshake();
   void drainErrorQueue();
-  std::string getUriSanFromCertificate(X509* cert);
+  std::string getUriSanFromCertificate(X509* cert) const;
 
   // Network::ConnectionImpl
   void closeSocket(Network::ConnectionEvent close_type) override;
