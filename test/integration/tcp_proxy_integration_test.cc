@@ -19,6 +19,22 @@ namespace {
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+// Test upstream writing before downstream downstream does.
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+
+  fake_upstream_connection->write("hello");
+  tcp_client->waitForData("hello");
+
+  tcp_client->write("hello");
+  fake_upstream_connection->waitForData(5);
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForDisconnect();
+}
+
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
