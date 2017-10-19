@@ -1,8 +1,7 @@
+#include "common/api/os_sys_calls_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "server/hot_restart_impl.h"
-
-#include "common/api/os_sys_calls_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"

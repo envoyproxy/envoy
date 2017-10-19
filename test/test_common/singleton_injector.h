@@ -9,10 +9,9 @@ public:
     latched_instance_ = &ThreadSafeSingleton<T>::get();
     ThreadSafeSingleton<T>::instance_ = instance;
   }
-  ~TestThreadsafeSingletonInjector() {
-    ThreadSafeSingleton<T>::instance_ = latched_instance_;
-  }
- private:
+  ~TestThreadsafeSingletonInjector() { ThreadSafeSingleton<T>::instance_ = latched_instance_; }
+
+private:
   T* latched_instance_;
 };
 

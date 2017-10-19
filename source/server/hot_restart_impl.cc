@@ -109,9 +109,9 @@ std::string SharedMemory::version() {
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), shmem_(SharedMemory::initialize(options)),
-      log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
-      stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
+    : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
+      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
+      init_lock_(shmem_.init_lock_) {
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   if (options.restartEpoch() != 0) {

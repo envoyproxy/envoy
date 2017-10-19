@@ -19,11 +19,9 @@ public:
   }
 
 protected:
-  template<typename A> friend class TestThreadsafeSingletonInjector;
+  template <typename A> friend class TestThreadsafeSingletonInjector;
 
-  static void Create() {
-    instance_ = new T();
-  }
+  static void Create() { instance_ = new T(); }
 
   static absl::once_flag create_once_;
   static T* instance_;
@@ -31,17 +29,15 @@ protected:
 
 /* Mutable singleton.  All functions in the singleton class *must* be threadsafe.*/
 template <class T> class ThreadSafeSingleton : public ConstSingleton<T> {
- public:
+public:
   static T& get() {
     absl::call_once(ConstSingleton<T>::create_once_, &ConstSingleton<T>::Create);
     return *ConstSingleton<T>::instance_;
   }
 };
 
-template <class T>
-absl::once_flag ConstSingleton<T>::create_once_;
+template <class T> absl::once_flag ConstSingleton<T>::create_once_;
 
-template <class T>
-T* ConstSingleton<T>::instance_ = nullptr;
+template <class T> T* ConstSingleton<T>::instance_ = nullptr;
 
-}  // namespace Envoy
+} // namespace Envoy

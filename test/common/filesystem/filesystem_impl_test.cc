@@ -32,8 +32,7 @@ TEST(FileSystemImpl, BadFile) {
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl store;
   EXPECT_CALL(dispatcher, createTimer_(_));
-  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, store,
-                                    std::chrono::milliseconds(10000)),
+  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, store, std::chrono::milliseconds(10000)),
                EnvoyException);
 }
 
@@ -88,8 +87,7 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
-                            std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
@@ -142,8 +140,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
-                            std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
 
@@ -217,8 +214,7 @@ TEST(FileSystemImpl, reopenFile) {
 
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
-                            std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .InSequence(sq)
@@ -287,8 +283,7 @@ TEST(FilesystemImpl, reopenThrows) {
   Sequence sq;
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(5));
 
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
-                            std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
   EXPECT_CALL(os_sys_calls, close(5)).InSequence(sq);
   EXPECT_CALL(os_sys_calls, open_(_, _, _)).InSequence(sq).WillOnce(Return(-1));
 
@@ -324,8 +319,7 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  Filesystem::FileImpl file("", dispatcher, mutex, stats_store,
-                            std::chrono::milliseconds(40));
+  Filesystem::FileImpl file("", dispatcher, mutex, stats_store, std::chrono::milliseconds(40));
 
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int fd, const void* buffer, size_t num_bytes) -> ssize_t {
