@@ -156,16 +156,11 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
 
   Tracing::SpanPtr first_span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  Tracing::MockFinalizer finalizer;
-
-  EXPECT_CALL(finalizer, finalize(_));
-  first_span->finishSpan(finalizer);
+  first_span->finishSpan();
 
   Tracing::SpanPtr second_span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-
-  EXPECT_CALL(finalizer, finalize(_));
-  second_span->finishSpan(finalizer);
+  second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
@@ -208,10 +203,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 
   Tracing::SpanPtr span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  Tracing::MockFinalizer finalizer;
-
-  EXPECT_CALL(finalizer, finalize(_));
-  span->finishSpan(finalizer);
+  span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "404"}}}));
@@ -236,10 +228,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
 
   Tracing::SpanPtr span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  Tracing::MockFinalizer finalizer;
-
-  EXPECT_CALL(finalizer, finalize(_));
-  span->finishSpan(finalizer);
+  span->finishSpan();
 
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));

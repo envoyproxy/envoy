@@ -385,16 +385,14 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
-  // Read may become ready if there is an error connecting. If still connecting, skip straight
-  // to write ready which is where the connection logic is.
-  if (!(state_ & InternalState::Connecting) && (events & Event::FileReadyType::Read)) {
-    onReadReady();
+  if (events & Event::FileReadyType::Write) {
+    onWriteReady();
   }
 
-  // It's possible for a read event callback to close the socket (which will cause fd_ to be -1).
+  // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore write event processing.
-  if (fd_ != -1 && (events & Event::FileReadyType::Write)) {
-    onWriteReady();
+  if (fd_ != -1 && (events & Event::FileReadyType::Read)) {
+    onReadReady();
   }
 }
 
@@ -435,6 +433,8 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
 }
 
 void ConnectionImpl::onReadReady() {
+  ENVOY_CONN_LOG(trace, "read ready", *this);
+
   ASSERT(!(state_ & InternalState::Connecting));
 
   IoResult result = doReadFromSocket();

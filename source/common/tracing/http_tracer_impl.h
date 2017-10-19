@@ -54,7 +54,7 @@ public:
    * 1) Fill in span tags based on the response headers.
    * 2) Finish active span.
    */
-  static void finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
+  static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
                            const Http::AccessLog::RequestInfo& request_info,
                            const Config& tracing_config);
 
@@ -64,36 +64,19 @@ public:
 
 class NullSpan : public Span {
 public:
+  static NullSpan& instance() {
+    static NullSpan* instance = new NullSpan();
+    return *instance;
+  }
+
   // Tracing::Span
   void setOperation(const std::string&) override {}
   void setTag(const std::string&, const std::string&) override {}
-  void finishSpan(SpanFinalizer&) override {}
+  void finishSpan() override {}
   void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }
-};
-
-class NullFinalizer : public SpanFinalizer {
-public:
-  // Tracing::SpanFinalizer
-  void finalize(Span&) override {}
-};
-
-/**
- * Finalizer for Spans covering standard request ingress.
- */
-class HttpConnManFinalizerImpl : public SpanFinalizer {
-public:
-  HttpConnManFinalizerImpl(Http::HeaderMap* request_headers,
-                           Http::AccessLog::RequestInfo& request_info, Config& tracing_config);
-
-  void finalize(Span& span) override;
-
-private:
-  Http::HeaderMap* request_headers_;
-  Http::AccessLog::RequestInfo& request_info_;
-  Config& tracing_config_;
 };
 
 class HttpNullTracer : public HttpTracer {

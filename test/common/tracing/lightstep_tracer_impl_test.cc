@@ -168,19 +168,14 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
       .WillOnce(Return(5000U));
 
   SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  Tracing::MockFinalizer finalizer;
 
   // Currently not possible to access the operation from the span, but this
   // invocation will make sure setting the operation does not cause a crash!
   first_span->setOperation("myOperation");
-
-  EXPECT_CALL(finalizer, finalize(_));
-  first_span->finishSpan(finalizer);
+  first_span->finishSpan();
 
   SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-
-  EXPECT_CALL(finalizer, finalize(_));
-  second_span->finishSpan(finalizer);
+  second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -214,10 +209,7 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
       .WillOnce(Return(5));
 
   SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  Tracing::MockFinalizer finalizer;
-
-  EXPECT_CALL(finalizer, finalize(_));
-  span->finishSpan(finalizer);
+  span->finishSpan();
 
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
@@ -258,10 +250,7 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
       .WillOnce(Return(5000U));
 
   SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  Tracing::MockFinalizer finalizer;
-
-  EXPECT_CALL(finalizer, finalize(_));
-  span->finishSpan(finalizer);
+  span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
