@@ -1,3 +1,5 @@
+#include <array>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
