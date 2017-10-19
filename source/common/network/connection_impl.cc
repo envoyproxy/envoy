@@ -385,14 +385,14 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
-  if (events & Event::FileReadyType::Read) {
-    onReadReady();
+  if (events & Event::FileReadyType::Write) {
+    onWriteReady();
   }
 
-  // It's possible for a read event callback to close the socket (which will cause fd_ to be -1).
+  // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore write event processing.
-  if (fd_ != -1 && (events & Event::FileReadyType::Write)) {
-    onWriteReady();
+  if (fd_ != -1 && (events & Event::FileReadyType::Read)) {
+    onReadReady();
   }
 }
 
@@ -435,9 +435,7 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
 void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
-  if ((state_ & InternalState::Connecting) && !checkConnection()) {
-    return;
-  }
+  ASSERT(!(state_ & InternalState::Connecting));
 
   IoResult result = doReadFromSocket();
   uint64_t new_buffer_size = read_buffer_.length();
@@ -483,8 +481,27 @@ void ConnectionImpl::onConnected() { raiseEvent(ConnectionEvent::Connected); }
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
 
-  if ((state_ & InternalState::Connecting) && !checkConnection()) {
-    return;
+  if (state_ & InternalState::Connecting) {
+    int error;
+    socklen_t error_size = sizeof(error);
+    int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
+    ASSERT(0 == rc);
+    UNREFERENCED_PARAMETER(rc);
+
+    if (error == 0) {
+      ENVOY_CONN_LOG(debug, "connected", *this);
+      state_ &= ~InternalState::Connecting;
+      onConnected();
+      // It's possible that we closed during the connect callback.
+      if (state() != State::Open) {
+        ENVOY_CONN_LOG(debug, "close during connected callback", *this);
+        return;
+      }
+    } else {
+      ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
+      closeSocket(ConnectionEvent::RemoteClose);
+      return;
+    }
   }
 
   IoResult result = doWriteToSocket();
@@ -520,30 +537,6 @@ void ConnectionImpl::doConnect() {
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
-}
-
-bool ConnectionImpl::checkConnection() {
-  int error;
-  socklen_t error_size = sizeof(error);
-  int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
-  ASSERT(0 == rc);
-  UNREFERENCED_PARAMETER(rc);
-
-  if (error == 0) {
-    ENVOY_CONN_LOG(debug, "connected", *this);
-    state_ &= ~InternalState::Connecting;
-    onConnected();
-    // It's possible that we closed during the connect callback.
-    if (state() != State::Open) {
-      ENVOY_CONN_LOG(debug, "close during connected callback", *this);
-      return false;
-    }
-  } else {
-    ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
-    closeSocket(ConnectionEvent::RemoteClose);
-    return false;
-  }
-  return true;
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {

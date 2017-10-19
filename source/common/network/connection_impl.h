@@ -108,7 +108,6 @@ protected:
 
   void onLowWatermark();
   void onHighWatermark();
-  bool checkConnection();
 
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
