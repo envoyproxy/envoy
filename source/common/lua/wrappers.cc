@@ -18,7 +18,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
 
   // TODO(mattklein123): Reduce copies here by using Lua direct buffer builds.
   std::unique_ptr<char[]> data(new char[length]);
-  data_.copyOut(data.get(), length, index);
+  data_.copyOut(index, length, data.get());
   lua_pushlstring(state, data.get(), length);
   return 1;
 }

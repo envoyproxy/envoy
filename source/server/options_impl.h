@@ -36,7 +36,7 @@ public:
   const std::string& serviceNodeName() override { return service_node_; }
   const std::string& serviceZone() override { return service_zone_; }
   uint64_t maxStats() override { return max_stats_; }
-  uint64_t maxStatNameLength() override { return max_stat_name_length_; }
+  uint64_t maxObjNameLength() override { return max_obj_name_length_; }
 
 private:
   uint64_t base_id_;
@@ -55,6 +55,6 @@ private:
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
   uint64_t max_stats_;
-  uint64_t max_stat_name_length_;
+  uint64_t max_obj_name_length_;
 };
 } // namespace Envoy

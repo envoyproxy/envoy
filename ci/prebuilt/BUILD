@@ -56,6 +56,13 @@ cc_library(
 )
 
 cc_library(
+    name = "luajit",
+    srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
+    hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
     name = "nghttp2",
     srcs = ["thirdparty_build/lib/libnghttp2.a"],
     hdrs = glob(["thirdparty_build/include/nghttp2/**/*.h"]),
@@ -108,11 +115,4 @@ cc_library(
         "thirdparty_build/include/zconf.h",
         "thirdparty_build/include/zlib.h",
     ],
-)
-
-cc_library(
-    name = "luajit",
-    srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
-    hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
-    includes = ["thirdparty_build/include"],
 )

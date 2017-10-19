@@ -30,25 +30,25 @@ size_t RawStatData::size() {
   return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + nameSize());
 }
 
-size_t& RawStatData::initializeAndGetMutableMaxNameLength(size_t configured_size) {
+size_t& RawStatData::initializeAndGetMutableMaxObjNameLength(size_t configured_size) {
   // Like CONSTRUCT_ON_FIRST_USE, but non-const so that the value can be changed by tests
   static size_t size = configured_size;
   return size;
 }
 
 void RawStatData::configure(Server::Options& options) {
-  const size_t configured = options.maxStatNameLength();
+  const size_t configured = options.maxObjNameLength();
   RELEASE_ASSERT(configured > 0);
-  size_t max_name_length = initializeAndGetMutableMaxNameLength(configured);
+  size_t max_obj_name_length = initializeAndGetMutableMaxObjNameLength(configured);
 
   // If this fails, it means that this function was called too late during
   // startup because things were already using this size before it was set.
-  RELEASE_ASSERT(max_name_length == configured);
+  RELEASE_ASSERT(max_obj_name_length == configured);
 }
 
 void RawStatData::configureForTestsOnly(Server::Options& options) {
-  const size_t configured = options.maxStatNameLength();
-  initializeAndGetMutableMaxNameLength(configured) = configured;
+  const size_t configured = options.maxObjNameLength();
+  initializeAndGetMutableMaxObjNameLength(configured) = configured;
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {

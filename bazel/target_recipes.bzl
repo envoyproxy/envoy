@@ -12,6 +12,7 @@ TARGET_RECIPES = {
     "googletest": "googletest",
     "tcmalloc_and_profiler": "gperftools",
     "http_parser": "http-parser",
+    "luajit": "luajit",
     "nghttp2": "nghttp2",
     "rapidjson": "rapidjson",
     "ssl": "boringssl",
@@ -19,5 +20,4 @@ TARGET_RECIPES = {
     "xxhash": "xxhash",
     "yaml_cpp": "yaml-cpp",
     "zlib": "zlib",
-    "luajit": "luajit",
 }
