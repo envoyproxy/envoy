@@ -80,6 +80,25 @@ public:
 };
 
 /**
+ * AuthConfig for Route and VirtualHost.
+ */
+class AuthConfig {
+public:
+  virtual ~AuthConfig() {}
+
+  struct X509 {
+    std::string certificate_hash_;
+    std::unordered_set<std::string> subjects_;
+    std::unordered_set<std::string> subject_alt_names_;
+  };
+
+  /**
+   * @return const Optional<X509>& x509 auth config.
+   */
+  virtual const Optional<X509>& x509() const PURE;
+};
+
+/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -200,6 +219,11 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
+   * @return const AuthConfig* the auth config for this virtual host.
+   */
+  virtual const AuthConfig* authConfig() const PURE;
+
+  /**
    * @return const std::string& the name of the virtual host.
    */
   virtual const std::string& name() const PURE;
@@ -284,9 +308,14 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
-   * @return const CorsPolicy* the CORS policy for this virtual host.
+   * @return const CorsPolicy* the CORS policy for this route.
    */
   virtual const CorsPolicy* corsPolicy() const PURE;
+
+  /**
+   * @return const AuthConfig* the auth config this route.
+   */
+  virtual const AuthConfig* authConfig() const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For

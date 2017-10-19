@@ -47,6 +47,19 @@ void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::CorsP
   JSON_UTIL_SET_BOOL(json_cors, cors, enabled);
 }
 
+void RdsJson::translateAuth(const Json::Object& json_auth,
+                            envoy::api::v2::AuthConfig& auth_config) {
+  const auto json_x509 = json_auth.getObject("x509");
+  auto x509 = auth_config.mutable_x509();
+  JSON_UTIL_SET_STRING(*json_x509, *x509, certificate_hash);
+  for (const std::string& san : json_x509->getStringArray("subjects", true)) {
+    x509->add_subjects(san);
+  }
+  for (const std::string& san : json_x509->getStringArray("subject_alt_names", true)) {
+    x509->add_subject_alt_names(san);
+  }
+}
+
 void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
                                  envoy::api::v2::RateLimit& rate_limit) {
   json_rate_limit.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
@@ -166,6 +179,12 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     auto* cors = virtual_host.mutable_cors();
     const auto json_cors = json_virtual_host.getObject("cors");
     translateCors(*json_cors, *cors);
+  }
+
+  if (json_virtual_host.hasObject("auth")) {
+    auto* auth_config = virtual_host.mutable_auth_config();
+    const auto json_auth = json_virtual_host.getObject("auth");
+    translateAuth(*json_auth, *auth_config);
   }
 }
 
@@ -298,6 +317,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       auto* cors = action->mutable_cors();
       const auto json_cors = json_route.getObject("cors");
       translateCors(*json_cors, *cors);
+    }
+
+    if (json_route.hasObject("auth")) {
+      auto* auth_config = action->mutable_auth_config();
+      const auto json_auth = json_route.getObject("auth");
+      translateAuth(*json_auth, *auth_config);
     }
   }
 

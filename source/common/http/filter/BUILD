@@ -9,6 +9,16 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "auth_filter_lib",
+    srcs = ["auth_filter.cc"],
+    hdrs = ["auth_filter.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//source/common/http:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "buffer_filter_lib",
     srcs = ["buffer_filter.cc"],
     hdrs = ["buffer_filter.h"],

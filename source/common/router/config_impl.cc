@@ -61,6 +61,22 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
+AuthConfigImpl::AuthConfigImpl(const envoy::api::v2::AuthConfig& config) {
+  if (!config.has_x509()) {
+    return;
+  }
+
+  X509 x509;
+  x509.certificate_hash_ = config.x509().certificate_hash();
+  for (const auto& san : config.x509().subjects()) {
+    x509.subjects_.insert(san);
+  }
+  for (const auto& san : config.x509().subject_alt_names()) {
+    x509.subject_alt_names_.insert(san);
+  }
+  x509_.value(x509);
+}
+
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
   if (!config.has_request_mirror_policy()) {
     return;
@@ -300,6 +316,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (route.route().has_cors()) {
     cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
+  }
+
+  if (route.route().has_auth_config()) {
+    auth_config_.reset(new AuthConfigImpl(route.route().auth_config()));
   }
 }
 
@@ -641,6 +661,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 
   if (virtual_host.has_cors()) {
     cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
+  }
+
+  if (virtual_host.has_auth_config()) {
+    auth_config_.reset(new AuthConfigImpl(virtual_host.auth_config()));
   }
 }
 

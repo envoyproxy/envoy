@@ -2610,6 +2610,85 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
                EnvoyException);
 }
 
+TEST(RoutePropertyTest, TestVHostAuthConfigX509) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "auth" : {
+        "x509" : {
+          "certificate_hash": "01234567890123456789012345678901",
+          "subjects": ["test-subject"],
+          "subject_alt_names": ["test-san"]
+        }
+      },
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats"
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+  EXPECT_EQ(auth_config->x509().value().certificate_hash_, "01234567890123456789012345678901");
+  EXPECT_THAT(auth_config->x509().value().subjects_, ElementsAreArray({"test-subject"}));
+  EXPECT_THAT(auth_config->x509().value().subject_alt_names_, ElementsAreArray({"test-san"}));
+}
+
+TEST(RoutePropertyTest, TestRouteAuthConfigX509) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats",
+          "auth" : {
+            "x509" : {
+              "certificate_hash": "01234567890123456789012345678901",
+              "subjects": ["test-subject"],
+              "subject_alt_names": ["test-san"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+  EXPECT_EQ(auth_config->x509().value().certificate_hash_, "01234567890123456789012345678901");
+  EXPECT_THAT(auth_config->x509().value().subjects_, ElementsAreArray({"test-subject"}));
+  EXPECT_THAT(auth_config->x509().value().subject_alt_names_, ElementsAreArray({"test-san"}));
+}
+
 TEST(RouterMatcherTest, Decorator) {
   std::string json = R"EOF(
 {

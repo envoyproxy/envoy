@@ -93,6 +93,8 @@ typedef ConstSingleton<AddressResolverNameValues> AddressResolverNames;
  */
 class HttpFilterNameValues {
 public:
+  // Auth filter
+  const std::string AUTH = "envoy.auth";
   // Buffer filter
   const std::string BUFFER = "envoy.buffer";
   // CORS filter

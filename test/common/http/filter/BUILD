@@ -8,6 +8,17 @@ load(
 
 envoy_package()
 
+#envoy_cc_test(
+#    name = "auth_filter_test",
+#    srcs = ["auth_filter_test.cc"],
+#    deps = [
+#        "//source/common/http/filter:auth_filter_lib",
+#        "//test/mocks/buffer:buffer_mocks",
+#        "//test/mocks/http:http_mocks",
+#        "//test/mocks/upstream:upstream_mocks",
+#    ],
+#)
+
 envoy_cc_test(
     name = "buffer_filter_test",
     srcs = ["buffer_filter_test.cc"],

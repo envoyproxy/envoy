@@ -157,6 +157,7 @@ public:
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
+  MOCK_CONST_METHOD0(authConfig, const AuthConfig*());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -209,6 +210,7 @@ public:
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
+  MOCK_CONST_METHOD0(authConfig, const AuthConfig*());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
