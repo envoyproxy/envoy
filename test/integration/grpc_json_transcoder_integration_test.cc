@@ -61,7 +61,7 @@ protected:
     }
 
     fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream();
+    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
     if (!grpc_request_messages.empty()) {
       upstream_request_->waitForEndStream(*dispatcher_);
 

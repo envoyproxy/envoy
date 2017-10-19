@@ -1397,8 +1397,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     "properties" : {
       "name" : {
         "type" : "string",
-        "minLength" : 1,
-        "maxLength" : 60
+        "minLength" : 1
       },
       "type" : {
         "type" : "string",

@@ -228,7 +228,7 @@ public:
   ~MockDecorator();
 
   // Router::Decorator
-  MOCK_CONST_METHOD0(operation, const std::string&());
+  MOCK_CONST_METHOD0(getOperation, const std::string&());
   MOCK_CONST_METHOD1(apply, void(Tracing::Span& span));
 
   std::string operation_{"fake_operation"};
@@ -259,7 +259,6 @@ public:
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
-  MOCK_CONST_METHOD0(usesRuntime, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;

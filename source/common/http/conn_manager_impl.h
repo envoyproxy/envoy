@@ -520,6 +520,8 @@ private:
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
 
+    void traceRequest();
+
     // Pass on watermark callbacks to watermark subscribers.  This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
     void callHighWatermarkCallbacks();

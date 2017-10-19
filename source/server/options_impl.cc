@@ -7,6 +7,7 @@
 
 #include "common/common/macros.h"
 #include "common/common/version.h"
+#include "common/stats/stats_impl.h"
 
 #include "fmt/format.h"
 #include "spdlog/spdlog.h"
@@ -18,12 +19,14 @@
 #endif
 
 // Can be overridden at compile time
-#ifndef ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH
-#define ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH 127
+// See comment in common/stat/stat_impl.h for rationale behind
+// this constant.
+#ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH
+#define ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH 60
 #endif
 
-#if ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH < 127
-#error "ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH must be >= 127"
+#if ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH < 60
+#error "ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH must be >= 60"
 #endif
 
 namespace Envoy {
@@ -82,9 +85,12 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                       "Maximum number of stats guages and counters "
                                       "that can be allocated in shared memory.",
                                       false, ENVOY_DEFAULT_MAX_STATS, "uint64_t", cmd);
-  TCLAP::ValueArg<uint64_t> max_stat_name_len("", "max-stat-name-len",
-                                              "Maximum name length for a stat", false,
-                                              ENVOY_DEFAULT_MAX_STAT_NAME_LENGTH, "uint64_t", cmd);
+  TCLAP::ValueArg<uint64_t> max_obj_name_len("", "max-obj-name-len",
+                                             "Maximum name length for a field in the config "
+                                             "(applies to listener name, route config name and"
+                                             " the cluster name)",
+                                             false, ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH, "uint64_t",
+                                             cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -93,14 +99,16 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
     exit(1);
   }
 
-  if (max_stat_name_len.getValue() < 127) {
-    std::cerr << "error: the 'max-stat-name-len' value specified (" << max_stat_name_len.getValue()
-              << ") is less than the minimum value of 127" << std::endl;
+  if (max_obj_name_len.getValue() < 60) {
+    std::cerr << "error: the 'max-obj-name-len' value specified (" << max_obj_name_len.getValue()
+              << ") is less than the minimum value of 60" << std::endl;
     exit(1);
   }
 
   if (hot_restart_version_option.getValue()) {
-    std::cerr << hot_restart_version_cb(max_stats.getValue(), max_stat_name_len.getValue());
+    std::cerr << hot_restart_version_cb(max_stats.getValue(),
+                                        max_obj_name_len.getValue() +
+                                            Stats::RawStatData::maxStatSuffixLength());
     exit(0);
   }
 
@@ -144,6 +152,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
-  max_stat_name_length_ = max_stat_name_len.getValue();
+  max_obj_name_length_ = max_obj_name_len.getValue();
 }
 } // namespace Envoy

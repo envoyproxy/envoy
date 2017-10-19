@@ -48,17 +48,6 @@ public:
   std::string empty_node_{""};
 };
 
-TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
-  InSequence s;
-
-  EXPECT_CALL(route_config_, usesRuntime()).WillOnce(Return(false));
-  ConnectionManagerUtility::generateStreamId(route_config_, random_);
-
-  EXPECT_CALL(route_config_, usesRuntime()).WillOnce(Return(true));
-  EXPECT_CALL(random_, random()).WillOnce(Return(5));
-  EXPECT_EQ(5UL, ConnectionManagerUtility::generateStreamId(route_config_, random_));
-}
-
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
   Network::Address::Ipv4Instance not_local_host_remote_address("12.12.12.12");
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));

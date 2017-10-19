@@ -44,7 +44,7 @@ TEST_P(ProtoIntegrationTest, TestBind) {
   std::string address =
       fake_upstream_connection_->connection().remoteAddress().ip()->addressAsString();
   EXPECT_EQ(address, address_string);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForEndStream(*dispatcher_);
   // Cleanup both downstream and upstream
   codec_client_->close();

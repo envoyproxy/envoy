@@ -450,7 +450,9 @@ Specifies the route's decorator.
 
 operation
   *(required, string)* The operation name associated with the request matched to this route. If tracing is
-  enabled, this information will be used as the span name reported for this request.
+  enabled, this information will be used as the span name reported for this request. NOTE: For ingress
+  (inbound) requests this value may be overridden by the
+  :ref:`x-envoy-decorator-operation <config_http_filters_router_x-envoy-decorator-operation>` request header.
 
 .. _config_http_conn_man_route_table_route_add_req_headers:
 

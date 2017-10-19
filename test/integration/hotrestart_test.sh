@@ -80,8 +80,8 @@ do
       exit 2
   fi
 
-  echo "Checking max-stat-name-len"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stat-name-len 1234 2>&1)
+  echo "Checking max-obj-name-len"
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
            "${CLI_HOT_RESTART_VERSION}"

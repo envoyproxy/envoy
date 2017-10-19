@@ -382,6 +382,12 @@ public:
    * @param Tracing::Span& the span.
    */
   virtual void apply(Tracing::Span& span) const PURE;
+
+  /**
+   * This method returns the operation name.
+   * @return the operation name
+   */
+  virtual const std::string& getOperation() const PURE;
 };
 
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
@@ -447,13 +453,6 @@ public:
    * router.
    */
   virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
-
-  /**
-   * Return whether the configuration makes use of runtime or not. Callers can use this to
-   * determine whether they should use a fast or slow source of randomness when calling route
-   * functions.
-   */
-  virtual bool usesRuntime() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
