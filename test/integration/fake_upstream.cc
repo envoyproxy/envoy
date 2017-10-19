@@ -268,9 +268,7 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr
   server_initialized_.waitReady();
 }
 
-FakeUpstream::~FakeUpstream() {
-  cleanUp();
-};
+FakeUpstream::~FakeUpstream() { cleanUp(); };
 
 void FakeUpstream::cleanUp() {
   if (thread_.get()) {
