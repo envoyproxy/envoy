@@ -8,6 +8,7 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/stats_impl.h"
 
 #include "fmt/format.h"
 
@@ -86,11 +87,15 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
 
 void Utility::translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::Rds& rds) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
+
+  const std::string name = json_rds.getString("route_config_name", "");
+  checkObjNameLength("Invalid route_config name", name);
+  rds.set_route_config_name(name);
+
   translateApiConfigSource(json_rds.getString("cluster"),
                            json_rds.getInteger("refresh_delay_ms", 30000),
                            json_rds.getString("api_type", ApiType::get().RestLegacy),
                            *rds.mutable_config_source()->mutable_api_config_source());
-  JSON_UTIL_SET_STRING(json_rds, rds, route_config_name);
 }
 
 void Utility::translateLdsConfig(const Json::Object& json_lds,
@@ -117,6 +122,14 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
   }
   throw EnvoyException(
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
+}
+
+void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {
+  if (name.length() > Stats::RawStatData::maxObjNameLength()) {
+    throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
+                                     error_prefix, name, name.length(),
+                                     Stats::RawStatData::maxObjNameLength()));
+  }
 }
 
 } // namespace Config
