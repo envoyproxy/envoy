@@ -6,14 +6,14 @@ namespace Envoy {
 template <class T> class TestThreadsafeSingletonInjector {
 public:
   TestThreadsafeSingletonInjector(T* instance) {
-    latched_instance_ = ThreadSafeSingleton<T>::get();
+    latched_instance_ = &ThreadSafeSingleton<T>::get();
     ThreadSafeSingleton<T>::instance_ = instance;
   }
   ~TestThreadsafeSingletonInjector() {
     ThreadSafeSingleton<T>::instance_ = latched_instance_;
   }
  private:
-  static T* latched_instance_;
+  T* latched_instance_;
 };
 
 } // namespace Envoy
