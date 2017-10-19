@@ -311,7 +311,7 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
   return rc;
 }
 
-std::string AdminImpl::statsAsJson(std::map<std::string, uint64_t> all_stats) {
+std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
