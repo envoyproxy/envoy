@@ -269,8 +269,15 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr
 }
 
 FakeUpstream::~FakeUpstream() {
-  dispatcher_->exit();
-  thread_->join();
+  cleanUp();
+};
+
+void FakeUpstream::cleanUp() {
+  if (thread_.get()) {
+    dispatcher_->exit();
+    thread_->join();
+    thread_.reset();
+  }
 }
 
 bool FakeUpstream::createFilterChain(Network::Connection& connection) {

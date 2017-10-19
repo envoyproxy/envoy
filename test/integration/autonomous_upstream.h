@@ -47,6 +47,7 @@ public:
   AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
                      Network::Address::IpVersion version)
       : FakeUpstream(port, type, version) {}
+  ~AutonomousUpstream();
   bool createFilterChain(Network::Connection& connection) override;
 
 private:

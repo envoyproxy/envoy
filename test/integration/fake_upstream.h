@@ -299,6 +299,7 @@ protected:
   std::mutex lock_;
   Stats::IsolatedStoreImpl stats_store_;
   FakeHttpConnection::Type http_type_;
+  void cleanUp();
 
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,

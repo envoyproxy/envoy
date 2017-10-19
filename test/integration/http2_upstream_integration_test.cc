@@ -254,8 +254,8 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
         {":path", "/test/long/url"},
         {":scheme", "http"},
         {":authority", "host"},
-        {AutonomousStream::RESPONSE_SIZE_BYTES, fmt::format("{}", response_bytes.back())},
-        {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, fmt::format("{}", request_bytes)}};
+        {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(response_bytes[i])},
+        {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_bytes)}};
     if (i % 2 == 0) {
       headers.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
     }

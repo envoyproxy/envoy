@@ -58,6 +58,12 @@ Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& re
   return *(stream);
 }
 
+AutonomousUpstream::~AutonomousUpstream() {
+  // Make sure the dispatcher is stopped before the connections are destroyed.
+  cleanUp();
+  http_connections_.clear();
+}
+
 bool AutonomousUpstream::createFilterChain(Network::Connection& connection) {
   std::unique_lock<std::mutex> lock(lock_);
   AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
