@@ -62,19 +62,37 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
 }
 
 AuthConfigImpl::AuthConfigImpl(const envoy::api::v2::AuthConfig& config) {
-  if (!config.has_x509()) {
-    return;
+  if (config.has_x509()) {
+    x509_.value(std::make_shared<X509Impl>(config.x509()));
+  }
+}
+
+AuthConfigImpl::X509Impl::X509Impl(const envoy::api::v2::AuthConfig::X509& config) {
+  verify_type_ = config.verify_type();
+
+  if (config.has_sha256_hashes()) {
+    std::unordered_set<std::string> hashes;
+    for (const auto& hash : config.sha256_hashes().sha256_hashes()) {
+      hashes.insert(hash);
+    }
+    sha256_hashes_.value(hashes);
   }
 
-  X509 x509;
-  x509.certificate_hash_ = config.x509().certificate_hash();
-  for (const auto& san : config.x509().subjects()) {
-    x509.subjects_.insert(san);
+  if (config.has_subjects()) {
+    std::unordered_set<std::string> subjects;
+    for (const auto& subject : config.subjects().subjects()) {
+      subjects.insert(subject);
+    }
+    subjects_.value(subjects);
   }
-  for (const auto& san : config.x509().subject_alt_names()) {
-    x509.subject_alt_names_.insert(san);
+
+  if (config.has_subject_alt_names()) {
+    std::unordered_set<std::string> sans;
+    for (const auto& san : config.subject_alt_names().subject_alt_names()) {
+      sans.insert(san);
+    }
+    subject_alt_names_.value(sans);
   }
-  x509_.value(x509);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {

@@ -18,20 +18,28 @@ FilterHeadersStatus AuthFilter::decodeHeaders(HeaderMap&, bool) {
       auto ssl_connection = callbacks_->connection()->ssl();
 
       if (ssl_connection == nullptr) {
-        Http::Utility::sendLocalReply(*callbacks_, stream_reset_, Code::Unauthorized, "");
+        Http::Utility::sendLocalReply(*callbacks_, stream_reset_, Code::Unauthorized,
+                                      "ssl required");
         return FilterHeadersStatus::StopIteration;
       }
 
       const auto x509 = auth_config->x509().value();
 
-      if ((!x509.certificate_hash_.empty() &&
-           ssl_connection->sha256PeerCertificateDigest() != x509.certificate_hash_) ||
-          (!x509.subjects_.empty() &&
-           x509.subjects_.find(ssl_connection->subjectPeerCertificate()) == x509.subjects_.end()) ||
-          (!x509.subject_alt_names_.empty() &&
-           x509.subject_alt_names_.find(ssl_connection->uriSanPeerCertificate()) ==
-               x509.subject_alt_names_.end())) {
-        Http::Utility::sendLocalReply(*callbacks_, stream_reset_, Code::Unauthorized, "");
+      if ((x509->sha256Hashes().valid() &&
+           x509->sha256Hashes().value().find(ssl_connection->sha256PeerCertificateDigest()) ==
+               x509->sha256Hashes().value().end()) ||
+          (x509->subjects().valid() &&
+           x509->subjects().value().find(ssl_connection->subjectPeerCertificate()) ==
+               x509->subjects().value().end()) ||
+          (x509->subjectAltNames().valid() &&
+           x509->subjectAltNames().value().find(ssl_connection->uriSanPeerCertificate()) ==
+               x509->subjectAltNames().value().end())) {
+        Http::Utility::sendLocalReply(
+            *callbacks_, stream_reset_, Code::Unauthorized,
+            fmt::format("ceritificate sha256={}/subject={}/subjectAltName={} not allowed",
+                        ssl_connection->sha256PeerCertificateDigest(),
+                        ssl_connection->subjectPeerCertificate(),
+                        ssl_connection->uriSanPeerCertificate()));
         return FilterHeadersStatus::StopIteration;
       }
     }

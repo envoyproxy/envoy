@@ -582,24 +582,34 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
           "x509" : {
             "type" : "object",
             "properties" : {
-              "certificate_hash" : {
+              "verify_type" : {
                 "type" : "string",
-                "minLength" : 32,
-                "maxLength" : 32
+                "enum" : ["all", "any"]
+              },
+              "sha256_hashes" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string",
+                  "minLength" : 32,
+                  "maxLength" : 32
+                },
+                "uniqueItems" : true
               },
               "subjects" : {
                 "type" : "array",
                 "items" : {
                   "type" : "string",
-                  "uniqueItems" : true
-                }
+                  "minLength" : 1
+                },
+                "uniqueItems" : true
               },
               "subject_alt_names" : {
                 "type" : "array",
                 "items" : {
                   "type" : "string",
-                  "uniqueItems" : true
-                }
+                  "minLength" : 1
+                },
+                "uniqueItems" : true
               }
             },
             "additionalProperties" : false
@@ -693,24 +703,34 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
           "x509" : {
             "type" : "object",
             "properties" : {
-              "certificate_hash" : {
+              "verify_type" : {
                 "type" : "string",
-                "minLength" : 32,
-                "maxLength" : 32
+                "enum" : ["all", "any"]
+              },
+              "sha256_hashes" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string",
+                  "minLength" : 32,
+                  "maxLength" : 32
+                },
+                "uniqueItems" : true
               },
               "subjects" : {
                 "type" : "array",
                 "items" : {
                   "type" : "string",
-                  "uniqueItems" : true
-                }
+                  "minLength" : 1
+                },
+                "uniqueItems" : true
               },
               "subject_alt_names" : {
                 "type" : "array",
                 "items" : {
                   "type" : "string",
-                  "uniqueItems" : true
-                }
+                  "minLength" : 1
+                },
+                "uniqueItems" : true
               }
             },
             "additionalProperties" : false

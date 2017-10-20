@@ -34,6 +34,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
+    external_deps = ["envoy_auth"],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/http:access_log_interface",

@@ -98,11 +98,36 @@ class AuthConfigImpl : public AuthConfig {
 public:
   AuthConfigImpl(const envoy::api::v2::AuthConfig& config);
 
+  class X509Impl : public X509 {
+  public:
+    X509Impl(const envoy::api::v2::AuthConfig::X509& config);
+
+    // Router::AuthConfig::X509
+    virtual envoy::api::v2::AuthConfig::X509::VerifyType verifyType() const override {
+      return verify_type_;
+    }
+    virtual const Optional<std::unordered_set<std::string>>& sha256Hashes() const override {
+      return sha256_hashes_;
+    };
+    virtual const Optional<std::unordered_set<std::string>>& subjects() const override {
+      return subjects_;
+    };
+    virtual const Optional<std::unordered_set<std::string>>& subjectAltNames() const override {
+      return subject_alt_names_;
+    };
+
+  private:
+    envoy::api::v2::AuthConfig::X509::VerifyType verify_type_{};
+    Optional<std::unordered_set<std::string>> sha256_hashes_{};
+    Optional<std::unordered_set<std::string>> subjects_{};
+    Optional<std::unordered_set<std::string>> subject_alt_names_{};
+  };
+
   // Router::AuthConfig
-  const Optional<X509>& x509() const override { return x509_; };
+  const Optional<std::shared_ptr<X509>>& x509() const override { return x509_; };
 
 private:
-  Optional<X509> x509_{};
+  Optional<std::shared_ptr<X509>> x509_{};
 };
 
 class ConfigImpl;

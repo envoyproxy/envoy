@@ -49,14 +49,33 @@ void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::CorsP
 
 void RdsJson::translateAuth(const Json::Object& json_auth,
                             envoy::api::v2::AuthConfig& auth_config) {
-  const auto json_x509 = json_auth.getObject("x509");
-  auto x509 = auth_config.mutable_x509();
-  JSON_UTIL_SET_STRING(*json_x509, *x509, certificate_hash);
-  for (const std::string& san : json_x509->getStringArray("subjects", true)) {
-    x509->add_subjects(san);
-  }
-  for (const std::string& san : json_x509->getStringArray("subject_alt_names", true)) {
-    x509->add_subject_alt_names(san);
+  if (json_auth.hasObject("x509")) {
+    const auto json_x509 = json_auth.getObject("x509");
+    auto x509 = auth_config.mutable_x509();
+
+    envoy::api::v2::AuthConfig::X509::VerifyType verify_type{};
+    envoy::api::v2::AuthConfig::X509::VerifyType_Parse(
+        StringUtil::toUpper(json_x509->getString("verify_type", "all")), &verify_type);
+    x509->set_verify_type(verify_type);
+
+    if (json_x509->hasObject("sha256_hashes")) {
+      x509->mutable_sha256_hashes();
+      for (const std::string& hash : json_x509->getStringArray("sha256_hashes")) {
+        x509->mutable_sha256_hashes()->add_sha256_hashes(hash);
+      }
+    }
+    if (json_x509->hasObject("subjects")) {
+      x509->mutable_subjects();
+      for (const std::string& subject : json_x509->getStringArray("subjects")) {
+        x509->mutable_subjects()->add_subjects(subject);
+      }
+    }
+    if (json_x509->hasObject("subject_alt_names")) {
+      x509->mutable_subject_alt_names();
+      for (const std::string& san : json_x509->getStringArray("subject_alt_names")) {
+        x509->mutable_subject_alt_names()->add_subject_alt_names(san);
+      }
+    }
   }
 }
 

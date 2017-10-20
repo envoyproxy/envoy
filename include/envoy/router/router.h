@@ -18,6 +18,8 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
+#include "api/auth.pb.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -86,16 +88,36 @@ class AuthConfig {
 public:
   virtual ~AuthConfig() {}
 
-  struct X509 {
-    std::string certificate_hash_;
-    std::unordered_set<std::string> subjects_;
-    std::unordered_set<std::string> subject_alt_names_;
+  class X509 {
+  public:
+    virtual ~X509() {}
+
+    /**
+     * @return envoy::api::v2::AuthConfig::X509::VerifyType Whether all or any condition(s) should
+     * match.
+     */
+    virtual envoy::api::v2::AuthConfig::X509::VerifyType verifyType() const PURE;
+
+    /**
+     * @return const Optional<std::string>& Whether verify certificate hash and allowed values.
+     */
+    virtual const Optional<std::unordered_set<std::string>>& sha256Hashes() const PURE;
+    /**
+     * @return const Optional<std::unordered_set<std::string>>& Whether verify subject and allowed
+     * values.
+     */
+    virtual const Optional<std::unordered_set<std::string>>& subjects() const PURE;
+    /**
+     * @return const Optional<std::unordered_set<std::string>>& Whether verify subject alt name and
+     * allowed values.
+     */
+    virtual const Optional<std::unordered_set<std::string>>& subjectAltNames() const PURE;
   };
 
   /**
-   * @return const Optional<X509>& x509 auth config.
+   * @return const Optional<X509>& Whether verify x509 and verify config.
    */
-  virtual const Optional<X509>& x509() const PURE;
+  virtual const Optional<std::shared_ptr<X509>>& x509() const PURE;
 };
 
 /**
