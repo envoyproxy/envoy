@@ -24,13 +24,11 @@ privacy concerns, sanitize the data prior to sharing the tarball/pasting.
 
 Admin and Stats Output: <Include the admin output for the following
 endpoints: /stats, /clusters, /routes, /server_info. For more 
-information, refer to the [admin endpoint documentation.]
-(https://envoyproxy.github.io/envoy/operations/admin.html)>
+information, refer to the [admin endpoint documentation.](https://envoyproxy.github.io/envoy/operations/admin.html)>
 
 Config:<Include the config used to configure Envoy.>
 
 Logs:<Include the access logs and the envoy logs>
 
 Call Stack:<If the envoy binary is crashing, a call stack is required.
-Please refer to the [Bazel Stack trace documentation]
-(https://github.com/envoyproxy/envoy/tree/master/bazel#stack-trace-symbol-resolution) >
+Please refer to the [Bazel Stack trace documentation](https://github.com/envoyproxy/envoy/tree/master/bazel#stack-trace-symbol-resolution) >
