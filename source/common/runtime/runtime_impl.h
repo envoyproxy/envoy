@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
@@ -62,7 +63,7 @@ class SnapshotImpl : public Snapshot,
                      Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(const std::string& root_path, const std::string& override_path, RuntimeStats& stats,
-               RandomGenerator& generator);
+               RandomGenerator& generator, Api::OsSysCalls& os_sys_calls);
 
   // Runtime::Snapshot
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
@@ -114,6 +115,7 @@ private:
 
   std::unordered_map<std::string, Entry> values_;
   RandomGenerator& generator_;
+  Api::OsSysCalls& os_sys_calls_;
 };
 
 /**
@@ -126,7 +128,8 @@ class LoaderImpl : public Loader {
 public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const std::string& root_symlink_path, const std::string& subdir,
-             const std::string& override_dir, Stats::Store& store, RandomGenerator& generator);
+             const std::string& override_dir, Stats::Store& store, RandomGenerator& generator,
+             Api::OsSysCallsPtr os_sys_calls);
 
   // Runtime::Loader
   Snapshot& snapshot() override;
@@ -142,6 +145,7 @@ private:
   std::string override_path_;
   std::shared_ptr<SnapshotImpl> current_snapshot_;
   RuntimeStats stats_;
+  Api::OsSysCallsPtr os_sys_calls_;
 };
 
 /**

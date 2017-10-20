@@ -7,6 +7,8 @@ set -e
 # openssl genrsa -out fake_ca_key.pem 1024
 # openssl genrsa -out no_san_key.pem 1024
 # openssl genrsa -out san_dns_key.pem 1024
+# openssl genrsa -out san_dns_key2.pem 1024
+# openssl genrsa -out san_multiple_dns_key.pem 1024
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
 
@@ -29,12 +31,25 @@ openssl x509 -req -days 730 -in no_san_cert.csr -sha256 -CA ca_cert.pem -CAkey c
 openssl req -new -key san_dns_key.pem -out san_dns_cert.csr -config san_dns_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_dns_cert.pem -extensions v3_ca -extfile san_dns_cert.cfg
 
+# Generate san_dns_cert2.pem.
+openssl req -new -key san_dns_key2.pem -out san_dns_cert2.csr -config san_dns_cert.cfg -batch -sha256
+openssl x509 -req -days 730 -in san_dns_cert2.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_dns_cert2.pem -extensions v3_ca -extfile san_dns_cert.cfg
+
+# Generate san_multiple_dns_cert.pem.
+openssl req -new -key san_multiple_dns_key.pem -out san_multiple_dns_cert.csr -config san_multiple_dns_cert.cfg -batch -sha256
+openssl x509 -req -days 730 -in san_multiple_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_multiple_dns_cert.pem -extensions v3_ca -extfile san_multiple_dns_cert.cfg
+
 # Generate san_uri_cert.pem.
 openssl req -new -key san_uri_key.pem -out san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg
 
 # Generate selfsigned_cert.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
+
+# Write session ticket key files
+openssl rand 80 > ticket_key_a
+openssl rand 80 > ticket_key_b
+openssl rand 79 > ticket_key_wrong_len
 
 rm *csr
 rm *srl

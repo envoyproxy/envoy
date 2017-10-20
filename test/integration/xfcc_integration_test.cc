@@ -141,7 +141,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(Network::ClientCo
   codec_client_ = makeHttpConnection(std::move(conn));
   codec_client_->makeHeaderOnlyRequest(header_map, *response_);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForEndStream(*dispatcher_);
   if (expected_xfcc.empty()) {
     EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());

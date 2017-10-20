@@ -4,6 +4,7 @@
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/tls_context_json.h"
+#include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
@@ -14,6 +15,10 @@ namespace Config {
 void LdsJson::translateListener(const Json::Object& json_listener,
                                 envoy::api::v2::Listener& listener) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
+
+  const std::string name = json_listener.getString("name", "");
+  Utility::checkObjNameLength("Invalid listener name", name);
+  listener.set_name(name);
 
   AddressJson::translateAddress(json_listener.getString("address"), true, true,
                                 *listener.mutable_address());
@@ -42,12 +47,9 @@ void LdsJson::translateListener(const Json::Object& json_listener,
   }
 
   JSON_UTIL_SET_BOOL(json_listener, *filter_chain, use_proxy_proto);
-
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
-  JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
-  JSON_UTIL_SET_STRING(json_listener, listener, name);
-
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);
+  JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
 }
 
 } // namespace Config

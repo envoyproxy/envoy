@@ -72,8 +72,8 @@ TEST(OptionsImplTest, BadCliOption) {
                "error: unknown IP address version 'foo'");
 }
 
-TEST(OptionsImplTest, BadStatNameLenOption) {
-  EXPECT_DEATH(createOptionsImpl("envoy --max-stat-name-len 1"),
-               "error: the 'max-stat-name-len' value specified");
+TEST(OptionsImplTest, BadObjNameLenOption) {
+  EXPECT_DEATH(createOptionsImpl("envoy --max-obj-name-len 1"),
+               "error: the 'max-obj-name-len' value specified");
 }
 } // namespace Envoy

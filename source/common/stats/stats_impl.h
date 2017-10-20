@@ -63,9 +63,21 @@ struct RawStatData {
    * Returns the maximum length of the name of a stat.  This length
    * does not include a trailing NULL-terminator.
    */
-  static size_t maxNameLength() {
-    return initializeAndGetMutableMaxNameLength(DEFAULT_MAX_NAME_SIZE);
+  static size_t maxNameLength() { return maxObjNameLength() + MAX_STAT_SUFFIX_LENGTH; }
+
+  /**
+   * Returns the maximum length of a user supplied object (route/cluster/listener)
+   * name field in a stat. This length does not include a trailing NULL-terminator.
+   */
+  static size_t maxObjNameLength() {
+    return initializeAndGetMutableMaxObjNameLength(DEFAULT_MAX_OBJ_NAME_LENGTH);
   }
+
+  /**
+   * Returns the maximum length of a stat suffix that Envoy generates (over the user supplied name).
+   * This length does not include a trailing NULL-terminator.
+   */
+  static size_t maxStatSuffixLength() { return MAX_STAT_SUFFIX_LENGTH; }
 
   /**
    * size in bytes of name_
@@ -102,9 +114,22 @@ struct RawStatData {
   char name_[];
 
 private:
-  static const size_t DEFAULT_MAX_NAME_SIZE = 127;
+  // The max name length is based on current set of stats.
+  // As of now, the longest stat is
+  // cluster.<cluster_name>.outlier_detection.ejections_consecutive_5xx
+  // which is 52 characters long without the cluster name.
+  // The max stat name length is 127 (default). So, in order to give room
+  // for growth to both the envoy generated stat characters
+  // (e.g., outlier_detection...) and user supplied names (e.g., cluster name),
+  // we set the max user supplied name length to 60, and the max internally
+  // generated stat suffixes to 67 (15 more characters to grow).
+  // If you want to increase the max user supplied name length, use the compiler
+  // option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
+  // max-obj-name-len
+  static const size_t DEFAULT_MAX_OBJ_NAME_LENGTH = 60;
+  static const size_t MAX_STAT_SUFFIX_LENGTH = 67;
 
-  static size_t& initializeAndGetMutableMaxNameLength(size_t configured_size);
+  static size_t& initializeAndGetMutableMaxObjNameLength(size_t configured_size);
 };
 
 /**

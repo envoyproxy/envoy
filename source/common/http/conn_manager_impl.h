@@ -520,6 +520,8 @@ private:
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
 
+    void traceRequest();
+
     // Pass on watermark callbacks to watermark subscribers.  This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
     void callHighWatermarkCallbacks();
@@ -560,7 +562,7 @@ private:
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
-    Tracing::SpanPtr active_span_{new Tracing::NullSpan()};
+    Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;

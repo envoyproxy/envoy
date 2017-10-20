@@ -115,7 +115,7 @@ public:
 
   void waitForLoadStatsStream() {
     fake_loadstats_connection_ = load_report_upstream_->waitForHttpConnection(*dispatcher_);
-    loadstats_stream_ = fake_loadstats_connection_->waitForNewStream();
+    loadstats_stream_ = fake_loadstats_connection_->waitForNewStream(*dispatcher_);
   }
 
   void waitForLoadStatsRequest(
@@ -146,7 +146,7 @@ public:
   void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
     fake_upstream_connection_ =
         service_upstream_[endpoint_index]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream();
+    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
     upstream_request_->waitForEndStream(*dispatcher_);
 
     upstream_request_->encodeHeaders(

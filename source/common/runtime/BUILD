@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["runtime_impl.h"],
     external_deps = ["ssl"],
     deps = [
+        "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/runtime:runtime_interface",

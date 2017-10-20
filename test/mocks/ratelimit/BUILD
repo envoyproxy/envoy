@@ -14,6 +14,5 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/tracing:context_interface",
     ],
 )

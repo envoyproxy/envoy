@@ -36,6 +36,7 @@ public:
   void add(const std::string& data) override;
   void add(const Instance& data) override;
   void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
+  void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const override;
   uint64_t length() const override;
