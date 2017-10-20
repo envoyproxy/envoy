@@ -1,7 +1,8 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-#include "common/ratelimit/ratelimit.pb.h"
+
+#include "source/common/ratelimit/ratelimit.pb.h"
 
 #include "test/integration/http_integration.h"
 

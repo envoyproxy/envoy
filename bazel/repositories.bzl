@@ -105,7 +105,7 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "67ceb6429aca38aecd722494baa0e499dadd3caf",
+        commit = "d4988844024d0bcff4bcd030552eabe3396203fa",
     )
     api_bind_targets = [
         "address",
@@ -139,19 +139,19 @@ def envoy_api_deps(skip_targets):
         actual = "@googleapis//:http_api_protos",
     )
     native.bind(
-        name = "http_api_protos_genproto",
-        actual = "@googleapis//:http_api_protos_genproto",
+        name = "http_api_protos_lib",
+        actual = "@googleapis//:http_api_protos_lib",
     )
 
-def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = [],
+def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False, skip_targets = [],
                        repository = ""):
     native.bind(
         name = "cc_wkt_protos",
-        actual = "@protobuf_bzl//:cc_wkt_protos",
+        actual = "@com_google_protobuf//:cc_wkt_protos",
     )
     native.bind(
         name = "cc_wkt_protos_genproto",
-        actual = "@protobuf_bzl//:cc_wkt_protos_genproto",
+        actual = "@com_google_protobuf//:cc_wkt_protos_genproto",
     )
 
     envoy_repository = repository_rule(
@@ -196,8 +196,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
         com_github_gabime_spdlog(repository)
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
         com_github_lightstep_lightstep_tracer_cpp(repository)
-    if not (skip_protobuf_bzl or "protobuf_bzl" in existing_rule_keys):
-        protobuf_bzl(repository)
+    if not (skip_com_google_protobuf or "com_google_protobuf" in existing_rule_keys):
+        com_google_protobuf(repository)
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
@@ -259,23 +259,30 @@ def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
       actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
   )
 
-def protobuf_bzl(repository = ""):
-  patched_http_archive(
-      name = "protobuf_bzl",
-      urls = [
-          "https://github.com/google/protobuf/releases/download/v3.4.0/protobuf-cpp-3.4.0.tar.gz",
-      ],
-      sha256 = "71434f6f836a1e479c44008bb033b2a8b2560ff539374dcdefb126be739e1635",
-      strip_prefix = "protobuf-3.4.0",
-      patches = [
-          repository + "//bazel/external:protobuf-memory-errors.patch",
-      ],
+def com_google_protobuf(repository = ""):
+  # TODO(htuch): This can switch back to a point release http_archive at the next
+  # release (> 3.4.1), we need HEAD proto_library support and
+  # https://github.com/google/protobuf/pull/3761.
+  native.http_archive(
+      name = "com_google_protobuf",
+      strip_prefix = "protobuf-c4f59dcc5c13debc572154c8f636b8a9361aacde",
+      sha256 = "5d4551193416861cb81c3bc0a428f22a6878148c57c31fb6f8f2aa4cf27ff635",
+      url = "https://github.com/google/protobuf/archive/c4f59dcc5c13debc572154c8f636b8a9361aacde.tar.gz",
+  )
+  # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
+  # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
+  # https://github.com/bazelbuild/bazel/issues/3219.
+  native.http_archive(
+      name = "com_google_protobuf_cc",
+      strip_prefix = "protobuf-c4f59dcc5c13debc572154c8f636b8a9361aacde",
+      sha256 = "5d4551193416861cb81c3bc0a428f22a6878148c57c31fb6f8f2aa4cf27ff635",
+      url = "https://github.com/google/protobuf/archive/c4f59dcc5c13debc572154c8f636b8a9361aacde.tar.gz",
   )
   native.bind(
-      name="protobuf",
-      actual="@protobuf_bzl//:protobuf",
+      name = "protobuf",
+      actual = "@com_google_protobuf//:protobuf",
   )
   native.bind(
-      name="protoc",
-      actual="@protobuf_bzl//:protoc",
+      name = "protoc",
+      actual = "@com_google_protobuf//:protoc",
   )
