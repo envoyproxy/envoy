@@ -196,7 +196,8 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
 TEST(HttpFilterConfigTest, RouterFilter) {
   std::string json_string = R"EOF(
   {
-    "dynamic_stats" : true
+    "dynamic_stats" : true,
+    "start_child_span" : true
   }
   )EOF";
 

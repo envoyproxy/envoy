@@ -85,10 +85,11 @@ public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats)
+               bool emit_dynamic_stats, bool start_child_span)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
-        emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
+        emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
+        shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
@@ -99,6 +100,7 @@ public:
   Runtime::RandomGenerator& random_;
   FilterStats stats_;
   const bool emit_dynamic_stats_;
+  const bool start_child_span_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -181,11 +183,7 @@ private:
   struct UpstreamRequest : public Http::StreamDecoder,
                            public Http::StreamCallbacks,
                            public Http::ConnectionPool::Callbacks {
-    UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
-        : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
-          calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-          encode_trailers_(false) {}
-
+    UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
     ~UpstreamRequest();
 
     void encodeHeaders(bool end_stream);
@@ -250,6 +248,7 @@ private:
     Buffer::WatermarkBufferPtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
+    Tracing::SpanPtr span_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;

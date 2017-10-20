@@ -25,6 +25,7 @@
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/retry_state_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -736,8 +737,24 @@ void Filter::doRetry() {
   }
 }
 
+Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
+    : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
+      calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
+      encode_trailers_(false) {
+
+  if (parent_.config_.start_child_span_) {
+    span_ = parent_.callbacks_->activeSpan().spawnChild(
+        Tracing::EgressConfig::get(), "router " + parent.cluster_->name() + " egress",
+        ProdSystemTimeSource::instance_.currentTime());
+  }
+}
+
 Filter::UpstreamRequest::~UpstreamRequest() {
-  if (per_try_timeout_) {
+  if (span_ != nullptr) {
+    // TODO(mattklein123): Add tags based on what happened to this request (retries, reset, etc.).
+    span_->finishSpan();
+  }
+  if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
@@ -874,6 +891,10 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->Host()->value(host->hostname());
+  }
+
+  if (span_ != nullptr) {
+    span_->injectContext(*parent_.downstream_headers_);
   }
 
   request_encoder.encodeHeaders(*parent_.downstream_headers_,

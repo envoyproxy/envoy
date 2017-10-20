@@ -21,7 +21,8 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& 
       stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
       context.runtime(), context.random(),
       Router::ShadowWriterPtr{new Router::ShadowWriterImpl(context.clusterManager())},
-      json_config.getBoolean("dynamic_stats", true)));
+      json_config.getBoolean("dynamic_stats", true),
+      json_config.getBoolean("start_child_span", false)));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*config));
