@@ -31,9 +31,9 @@ fault
 Fault configuration
 -------------------
 
-Configuration for MongoDB fixed duration delays. Delays are applied to the following MongoDB
-operations: Query, Insert, GetMore, and KillCursors. Once an active delay is in progress, all
-incoming data up until the timer event fires will be a part of the delay.
+Configuration for MongoDB fixed duration delays. Delays are applied to the following MongoDB operations: Query, Insert,
+GetMore, and KillCursors. Once an active delay is in progress, all incoming data up until the timer event fires
+will be a part of the delay.
 
 .. code-block:: json
 
@@ -83,7 +83,6 @@ following statistics:
   op_reply_valid_cursor, Counter, Number of OP_REPLY with a valid cursor
   cx_destroy_local_with_active_rq, Counter, Connections destroyed locally with an active query
   cx_destroy_remote_with_active_rq, Counter, Connections destroyed remotely with an active query
-  cx_drain_close, Counter, Connections gracefully closed on reply boundaries during server drain
 
 Scatter gets
 ^^^^^^^^^^^^
