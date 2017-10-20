@@ -38,9 +38,11 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         const FaultConfigSharedPtr& fault_config)
+                         const FaultConfigSharedPtr& fault_config,
+                         const Network::DrainDecision& drain_decision)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
-      runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
+      runtime_(runtime), drain_decision_(drain_decision), access_log_(access_log),
+      fault_config_(fault_config) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -181,6 +183,12 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 
     active_query_list_.erase(i);
     break;
+  }
+
+  if (active_query_list_.empty() && drain_decision_.drainClose()) {
+    ENVOY_LOG(debug, "drain closing mongo connection");
+    stats_.cx_drain_close_.inc();
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 

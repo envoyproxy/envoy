@@ -11,6 +11,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/mongo/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -61,7 +62,8 @@ typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
   COUNTER(op_reply_query_failure)                                                                  \
   COUNTER(op_reply_valid_cursor)                                                                   \
   COUNTER(cx_destroy_local_with_active_rq)                                                         \
-  COUNTER(cx_destroy_remote_with_active_rq)
+  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
+  COUNTER(cx_drain_close)
 // clang-format on
 
 /**
@@ -118,7 +120,8 @@ class ProxyFilter : public Network::Filter,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-              AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config);
+              AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
+              const Network::DrainDecision& drain_decision);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -183,6 +186,7 @@ private:
   Stats::Scope& scope_;
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
+  const Network::DrainDecision& drain_decision_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   bool sniffing_{true};
