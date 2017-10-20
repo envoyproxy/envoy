@@ -8,7 +8,7 @@ the original issue is and how the change resolves it. How does this
 feature get enabled? By default, config change, etc..>
 
 [Optional Fixes #issue]
-[Optional API Changes: Link to github.com/envoyproxy/data-plane-api PR]
+[Optional API Changes: Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
 
 Risk Level: Low | Medium | High
 <Low: Small bug fix or small optional feature
