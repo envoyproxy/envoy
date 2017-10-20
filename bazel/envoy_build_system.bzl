@@ -42,6 +42,8 @@ def envoy_linkopts():
             # TODO(zuercher): should be able to remove this after the next gperftools release after
             # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
             "-Wl,-U,___lsan_ignore_object",
+            # See note here: http://luajit.org/install.html
+            "-pagezero_size 10000", "-image_base 100000000",
         ],
         "//conditions:default": [
             "-pthread",
@@ -69,6 +71,8 @@ def envoy_test_linkopts():
             # TODO(zuercher): should be able to remove this after the next gperftools release after
             # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
             "-Wl,-U,___lsan_ignore_object",
+            # See note here: http://luajit.org/install.html
+            "-pagezero_size 10000", "-image_base 100000000",
         ],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
