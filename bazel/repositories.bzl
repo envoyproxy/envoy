@@ -147,11 +147,11 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
                        repository = ""):
     native.bind(
         name = "cc_wkt_protos",
-        actual = "@com_google_protobuf//:cc_wkt_protos",
+        actual = "@com_google_protobuf_cc//:cc_wkt_protos",
     )
     native.bind(
         name = "cc_wkt_protos_genproto",
-        actual = "@com_google_protobuf//:cc_wkt_protos_genproto",
+        actual = "@com_google_protobuf_cc//:cc_wkt_protos_genproto",
     )
 
     envoy_repository = repository_rule(
@@ -197,7 +197,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
         com_github_lightstep_lightstep_tracer_cpp(repository)
     if not (skip_com_google_protobuf or "com_google_protobuf" in existing_rule_keys):
-        com_google_protobuf(repository)
+        com_google_protobuf()
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
@@ -259,7 +259,7 @@ def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
       actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
   )
 
-def com_google_protobuf(repository = ""):
+def com_google_protobuf():
   # TODO(htuch): This can switch back to a point release http_archive at the next
   # release (> 3.4.1), we need HEAD proto_library support and
   # https://github.com/google/protobuf/pull/3761.
@@ -280,9 +280,9 @@ def com_google_protobuf(repository = ""):
   )
   native.bind(
       name = "protobuf",
-      actual = "@com_google_protobuf//:protobuf",
+      actual = "@com_google_protobuf_cc//:protobuf",
   )
   native.bind(
       name = "protoc",
-      actual = "@com_google_protobuf//:protoc",
+      actual = "@com_google_protobuf_cc//:protoc",
   )
