@@ -48,6 +48,7 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/mongo:codec_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
