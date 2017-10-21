@@ -73,7 +73,6 @@ ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 # Replace the existing Bazel output cache with a copy of the image's prebuilt deps.
 if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
   BAZEL_OUTPUT_BASE="$(bazel info output_base)"
-  rm -rf "${BAZEL_OUTPUT_BASE}"
   mkdir -p "${TEST_TMPDIR}/_bazel_${USER}/install"
   rsync -a /bazel-prebuilt-root/install/* "${TEST_TMPDIR}/_bazel_${USER}/install/"
   rsync -a /bazel-prebuilt-output "${BAZEL_OUTPUT_BASE}"
