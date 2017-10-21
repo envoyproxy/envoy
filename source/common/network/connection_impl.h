@@ -41,9 +41,16 @@ public:
  * Implementation of Network::Connection.
  */
 class ConnectionImpl : public virtual Connection,
+                       public virtual SecureLayerCallbacks,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                 Address::InstanceConstSharedPtr remote_address,
+                 Address::InstanceConstSharedPtr local_address,
+                 Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
+                 bool connected, SecureLayerPtr secure_layer);
+
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
@@ -84,19 +91,11 @@ public:
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
-protected:
-  enum class PostIoAction { Close, KeepOpen };
-
-  struct IoResult {
-    PostIoAction action_;
-    uint64_t bytes_processed_;
-  };
-
-  virtual void closeSocket(ConnectionEvent close_type);
-  void doConnect();
-  void raiseEvent(ConnectionEvent event);
+  // Network::SecureLayerCallbacks
+  virtual void closeSocket(ConnectionEvent close_type) override;
+  virtual void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
-  bool shouldDrainReadBuffer() {
+  virtual bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
@@ -104,7 +103,12 @@ protected:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
+  virtual void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  virtual int fd() override { return fd_; }
+  virtual Buffer::Instance& readBuffer() override { return read_buffer_; }
+  virtual Buffer::Instance& writeBuffer() override { return *write_buffer_; }
+ protected:
+  void doConnect();
 
   void onLowWatermark();
   void onHighWatermark();
@@ -158,6 +162,7 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
+  SecureLayerPtr secure_layer_;
 };
 
 /**
@@ -171,6 +176,17 @@ public:
 
   // Network::ClientConnection
   void connect() override { doConnect(); }
+};
+
+class Plaintext : public SecureLayer,
+                  protected Logger::Loggable<Logger::Id::connection> {
+public:
+  explicit Plaintext(SecureLayerCallbacks& callbacks);
+  virtual Connection::IoResult doReadFromSocket() override;
+  virtual Connection::IoResult doWriteToSocket() override;
+  virtual void onConnected() override;
+private:
+  SecureLayerCallbacks& callbacks_;
 };
 
 } // namespace Network

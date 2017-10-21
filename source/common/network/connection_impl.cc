@@ -58,13 +58,13 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
-                               bool using_original_dst, bool connected)
+                               bool using_original_dst, bool connected, SecureLayerPtr secure_layer)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
-      using_original_dst_(using_original_dst) {
+      using_original_dst_(using_original_dst), secure_layer_(std::move(secure_layer)) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -93,6 +93,15 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
+}
+
+ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                               Address::InstanceConstSharedPtr remote_address,
+                               Address::InstanceConstSharedPtr local_address,
+                               Address::InstanceConstSharedPtr bind_to_address,
+                               bool using_original_dst, bool connected)
+    : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
+                     using_original_dst, connected, SecureLayerPtr{new Plaintext(*this)}) {
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -397,39 +406,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
-  PostIoAction action = PostIoAction::KeepOpen;
-  uint64_t bytes_read = 0;
-  do {
-    // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
-    // use an ioctl() before every read to figure out how much data there is to read.
-    //
-    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
-    // ioctl(). The extra syscall is not worth it.
-    int rc = read_buffer_.read(fd_, 16384);
-    ENVOY_CONN_LOG(trace, "read returns: {}", *this, rc);
-
-    // Remote close. Might need to raise data before raising close.
-    if (rc == 0) {
-      action = PostIoAction::Close;
-      break;
-    } else if (rc == -1) {
-      // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", *this, errno);
-      if (errno != EAGAIN) {
-        action = PostIoAction::Close;
-      }
-
-      break;
-    } else {
-      bytes_read += rc;
-      if (shouldDrainReadBuffer()) {
-        setReadBufferReady();
-        break;
-      }
-    }
-  } while (true);
-
-  return {action, bytes_read};
+  return secure_layer_->doReadFromSocket();
 }
 
 void ConnectionImpl::onReadReady() {
@@ -450,33 +427,10 @@ void ConnectionImpl::onReadReady() {
 }
 
 ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
-  PostIoAction action;
-  uint64_t bytes_written = 0;
-  do {
-    if (write_buffer_->length() == 0) {
-      action = PostIoAction::KeepOpen;
-      break;
-    }
-    int rc = write_buffer_->write(fd_);
-    ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
-    if (rc == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
-      if (errno == EAGAIN) {
-        action = PostIoAction::KeepOpen;
-      } else {
-        action = PostIoAction::Close;
-      }
-
-      break;
-    } else {
-      bytes_written += rc;
-    }
-  } while (true);
-
-  return {action, bytes_written};
+  return secure_layer_->doWriteToSocket();
 }
 
-void ConnectionImpl::onConnected() { raiseEvent(ConnectionEvent::Connected); }
+void ConnectionImpl::onConnected() { secure_layer_->onConnected(); }
 
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
@@ -569,6 +523,76 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::Address::InstanceConstSharedPtr source_address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
                      getNullLocalAddress(*address), source_address, false, false) {}
+
+
+Plaintext::Plaintext(SecureLayerCallbacks& callbacks) : callbacks_(callbacks) {}
+
+void Plaintext::onConnected() {
+  callbacks_.raiseEvent(ConnectionEvent::Connected);
+}
+
+Connection::IoResult Plaintext::doReadFromSocket() {
+  Connection::PostIoAction action = Connection::PostIoAction::KeepOpen;
+  uint64_t bytes_read = 0;
+  do {
+    // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
+    // use an ioctl() before every read to figure out how much data there is to read.
+    //
+    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
+    // ioctl(). The extra syscall is not worth it.
+    int rc = callbacks_.readBuffer().read(callbacks_.fd(), 16384);
+    ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_, rc);
+
+    // Remote close. Might need to raise data before raising close.
+    if (rc == 0) {
+      action = Connection::PostIoAction::Close;
+      break;
+    } else if (rc == -1) {
+      // Remote error (might be no data).
+      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_, errno);
+      if (errno != EAGAIN) {
+        action = Connection::PostIoAction::Close;
+      }
+
+      break;
+    } else {
+      bytes_read += rc;
+      if (callbacks_.shouldDrainReadBuffer()) {
+        callbacks_.setReadBufferReady();
+        break;
+      }
+    }
+  } while (true);
+
+  return {action, bytes_read};
+}
+
+Connection::IoResult Plaintext::doWriteToSocket() {
+  Connection::PostIoAction action;
+  uint64_t bytes_written = 0;
+  do {
+    if (callbacks_.writeBuffer().length() == 0) {
+      action = Connection::PostIoAction::KeepOpen;
+      break;
+    }
+    int rc = callbacks_.writeBuffer().write(callbacks_.fd());
+    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_, rc);
+    if (rc == -1) {
+      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_, errno);
+      if (errno == EAGAIN) {
+        action = Connection::PostIoAction::KeepOpen;
+      } else {
+        action = Connection::PostIoAction::Close;
+      }
+
+      break;
+    } else {
+      bytes_written += rc;
+    }
+  } while (true);
+
+  return {action, bytes_written};
+}
 
 } // namespace Network
 } // namespace Envoy
