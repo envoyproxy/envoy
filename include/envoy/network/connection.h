@@ -220,8 +220,6 @@ public:
 
   virtual uint64_t id() const PURE;
 
-  virtual void closeSocket(ConnectionEvent close_type) PURE;
-
   virtual void raiseEvent(ConnectionEvent event) PURE;
 
   virtual bool shouldDrainReadBuffer() PURE;
@@ -243,6 +241,7 @@ class SecureLayer {
   virtual Connection::IoResult doReadFromSocket() PURE;
   virtual Connection::IoResult doWriteToSocket() PURE;
   virtual void onConnected() PURE;
+  virtual void closeSocket(Network::ConnectionEvent close_type) {};
 };
 
 typedef std::unique_ptr<SecureLayer> SecureLayerPtr;

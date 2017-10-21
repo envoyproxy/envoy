@@ -161,6 +161,8 @@ Connection::State ConnectionImpl::state() const {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
+  secure_layer_->closeSocket(close_type);
+
   if (fd_ == -1) {
     return;
   }

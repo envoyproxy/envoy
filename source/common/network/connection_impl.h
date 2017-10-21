@@ -92,7 +92,6 @@ public:
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
   // Network::SecureLayerCallbacks
-  virtual void closeSocket(ConnectionEvent close_type) override;
   virtual void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
   virtual bool shouldDrainReadBuffer() override {
@@ -110,6 +109,7 @@ public:
  protected:
   void doConnect();
 
+  virtual void closeSocket(ConnectionEvent close_type);
   void onLowWatermark();
   void onHighWatermark();
 

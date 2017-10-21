@@ -335,5 +335,20 @@ std::string ConnectionImpl::nextProtocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
+Tls::Tls(Network::SecureLayerCallbacks &callbacks, Context &ctx, InitialState state)
+    : callbacks_(callbacks),
+      ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+  BIO* bio = BIO_new_socket(callbacks.fd(), 0);
+  SSL_set_bio(ssl_.get(), bio, bio);
+
+  SSL_set_mode(ssl_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+  if (state == InitialState::Client) {
+    SSL_set_connect_state(ssl_.get());
+  } else {
+    ASSERT(state == InitialState::Server);
+    SSL_set_accept_state(ssl_.get());
+  }
+}
+
 } // namespace Ssl
 } // namespace Envoy

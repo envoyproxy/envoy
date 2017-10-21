@@ -62,5 +62,27 @@ public:
   void connect() override;
 };
 
+class Tls : public Network::SecureLayer,
+            public Connection,
+            protected Logger::Loggable<Logger::Id::connection> {
+ public:
+  enum class InitialState { Client, Server };
+
+  explicit Tls(Network::SecureLayerCallbacks& callbacks, Context& ctx, InitialState state);
+
+  // Network::SecureLayer
+  virtual Network::Connection::IoResult doReadFromSocket() override;
+  virtual Network::Connection::IoResult doWriteToSocket() override;
+  virtual void onConnected() override;
+
+  // Ssl::Connection
+
+ private:
+  Network::SecureLayerCallbacks& callbacks_;
+  ContextImpl& ctx_;
+  bssl::UniquePtr<SSL> ssl_;
+  bool handshake_complete_{};
+};
+
 } // namespace Ssl
 } // namespace Envoy
