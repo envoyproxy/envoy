@@ -218,7 +218,7 @@ class SecureLayerCallbacks {
 public:
   virtual ~SecureLayerCallbacks() {};
 
-  virtual uint64_t id() const PURE;
+  virtual const Connection& connection() const PURE;
 
   virtual void raiseEvent(ConnectionEvent event) PURE;
 
@@ -238,13 +238,16 @@ typedef std::unique_ptr<Connection> ConnectionPtr;
 class SecureLayer {
  public:
   virtual ~SecureLayer() {}
+  virtual std::string nextProtocol() const PURE;
   virtual Connection::IoResult doReadFromSocket() PURE;
   virtual Connection::IoResult doWriteToSocket() PURE;
   virtual void onConnected() PURE;
-  virtual void closeSocket(Network::ConnectionEvent close_type) {};
+  virtual void closeSocket(Network::ConnectionEvent) {};
 };
 
 typedef std::unique_ptr<SecureLayer> SecureLayerPtr;
+
+typedef std::function<SecureLayerPtr()> SecureLayerFactoryCb;
 
 /**
  * Connections capable of outbound connects.

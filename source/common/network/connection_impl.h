@@ -49,7 +49,7 @@ public:
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
-                 bool connected, SecureLayerPtr secure_layer);
+                 bool connected, SecureLayerFactoryCb secure_layer_factory);
 
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
@@ -70,7 +70,7 @@ public:
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
-  std::string nextProtocol() const override { return ""; }
+  std::string nextProtocol() const override { return secure_layer_->nextProtocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
@@ -78,8 +78,8 @@ public:
   const Address::Instance& remoteAddress() const override { return *remote_address_; }
   const Address::Instance& localAddress() const override { return *local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
-  Ssl::Connection* ssl() override { return nullptr; }
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  Ssl::Connection* ssl() override { return dynamic_cast<Ssl::Connection*>(secure_layer_.get()); }
+  const Ssl::Connection* ssl() const override { return dynamic_cast<const Ssl::Connection*>(secure_layer_.get()); }
   State state() const override;
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
@@ -92,9 +92,10 @@ public:
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
   // Network::SecureLayerCallbacks
-  virtual void raiseEvent(ConnectionEvent event) override;
+  const Connection& connection() const override { return *this; }
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
-  virtual bool shouldDrainReadBuffer() override {
+  bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
@@ -102,10 +103,10 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  virtual void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
-  virtual int fd() override { return fd_; }
-  virtual Buffer::Instance& readBuffer() override { return read_buffer_; }
-  virtual Buffer::Instance& writeBuffer() override { return *write_buffer_; }
+  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  int fd() override { return fd_; }
+  Buffer::Instance& readBuffer() override { return read_buffer_; }
+  Buffer::Instance& writeBuffer() override { return *write_buffer_; }
  protected:
   void doConnect();
 
@@ -182,9 +183,13 @@ class Plaintext : public SecureLayer,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   explicit Plaintext(SecureLayerCallbacks& callbacks);
-  virtual Connection::IoResult doReadFromSocket() override;
-  virtual Connection::IoResult doWriteToSocket() override;
-  virtual void onConnected() override;
+
+  std::string nextProtocol() const override {
+    return "";
+  }
+  Connection::IoResult doReadFromSocket() override;
+  Connection::IoResult doWriteToSocket() override;
+  void onConnected() override;
 private:
   SecureLayerCallbacks& callbacks_;
 };

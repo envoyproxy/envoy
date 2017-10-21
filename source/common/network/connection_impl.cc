@@ -58,13 +58,14 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
-                               bool using_original_dst, bool connected, SecureLayerPtr secure_layer)
+                               bool using_original_dst, bool connected,
+                               SecureLayerFactoryCb secure_layer_factory)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
-      using_original_dst_(using_original_dst), secure_layer_(std::move(secure_layer)) {
+      using_original_dst_(using_original_dst), secure_layer_(secure_layer_factory()) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -101,7 +102,9 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
     : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                     using_original_dst, connected, SecureLayerPtr{new Plaintext(*this)}) {
+                     using_original_dst, connected, [&]() -> SecureLayerPtr {
+      return SecureLayerPtr{new Plaintext(*this)};
+    }) {
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -543,7 +546,7 @@ Connection::IoResult Plaintext::doReadFromSocket() {
     // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
     // ioctl(). The extra syscall is not worth it.
     int rc = callbacks_.readBuffer().read(callbacks_.fd(), 16384);
-    ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_, rc);
+    ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_.connection(), rc);
 
     // Remote close. Might need to raise data before raising close.
     if (rc == 0) {
@@ -551,7 +554,7 @@ Connection::IoResult Plaintext::doReadFromSocket() {
       break;
     } else if (rc == -1) {
       // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_, errno);
+      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_.connection(), errno);
       if (errno != EAGAIN) {
         action = Connection::PostIoAction::Close;
       }
@@ -578,9 +581,9 @@ Connection::IoResult Plaintext::doWriteToSocket() {
       break;
     }
     int rc = callbacks_.writeBuffer().write(callbacks_.fd());
-    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_, rc);
+    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_.connection(), rc);
     if (rc == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_, errno);
+      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_.connection(), errno);
       if (errno == EAGAIN) {
         action = Connection::PostIoAction::KeepOpen;
       } else {

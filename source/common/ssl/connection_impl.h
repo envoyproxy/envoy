@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Ssl {
 
-class ConnectionImpl : public Network::ConnectionImpl, public Connection {
+class ConnectionImpl : public Network::ConnectionImpl {
 public:
   enum class InitialState { Client, Server };
 
@@ -20,36 +20,6 @@ public:
                  Network::Address::InstanceConstSharedPtr local_address,
                  Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected, Context& ctx, InitialState state);
-  ~ConnectionImpl();
-
-  // Network::Connection
-  std::string nextProtocol() const override;
-  Ssl::Connection* ssl() override { return this; }
-  const Ssl::Connection* ssl() const override { return this; }
-
-  // Ssl::Connection
-  bool peerCertificatePresented() override;
-  std::string uriSanLocalCertificate() override;
-  std::string sha256PeerCertificateDigest() override;
-  std::string subjectPeerCertificate() override;
-  std::string uriSanPeerCertificate() override;
-
-  SSL* rawSslForTest() { return ssl_.get(); }
-
-private:
-  PostIoAction doHandshake();
-  void drainErrorQueue();
-  std::string getUriSanFromCertificate(X509* cert);
-
-  // Network::ConnectionImpl
-  void closeSocket(Network::ConnectionEvent close_type) override;
-  IoResult doReadFromSocket() override;
-  IoResult doWriteToSocket() override;
-  void onConnected() override;
-
-  ContextImpl& ctx_;
-  bssl::UniquePtr<SSL> ssl_;
-  bool handshake_complete_{};
 };
 
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
@@ -68,16 +38,29 @@ class Tls : public Network::SecureLayer,
  public:
   enum class InitialState { Client, Server };
 
-  explicit Tls(Network::SecureLayerCallbacks& callbacks, Context& ctx, InitialState state);
+  Tls(Network::SecureLayerCallbacks& callbacks, Context& ctx, InitialState state);
 
   // Network::SecureLayer
-  virtual Network::Connection::IoResult doReadFromSocket() override;
-  virtual Network::Connection::IoResult doWriteToSocket() override;
-  virtual void onConnected() override;
+  std::string nextProtocol() const override;
+  Network::Connection::IoResult doReadFromSocket() override;
+  Network::Connection::IoResult doWriteToSocket() override;
+  void onConnected() override;
+  void closeSocket(Network::ConnectionEvent close_type) override;
 
   // Ssl::Connection
+  bool peerCertificatePresented() override;
+  std::string uriSanLocalCertificate() override;
+  std::string sha256PeerCertificateDigest() override;
+  std::string subjectPeerCertificate() override;
+  std::string uriSanPeerCertificate() override;
+
+  SSL* rawSslForTest() { return ssl_.get(); }
 
  private:
+  Network::Connection::PostIoAction doHandshake();
+  void drainErrorQueue();
+  std::string getUriSanFromCertificate(X509* cert);
+
   Network::SecureLayerCallbacks& callbacks_;
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
