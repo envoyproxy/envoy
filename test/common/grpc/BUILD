@@ -87,20 +87,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "rpc_channel_impl_test",
-    srcs = ["rpc_channel_impl_test.cc"],
-    deps = [
-        "//source/common/grpc:common_lib",
-        "//source/common/grpc:rpc_channel_lib",
-        "//source/common/http:message_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "transcoder_input_stream_test",
     srcs = ["transcoder_input_stream_test.cc"],
     deps = [
