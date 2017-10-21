@@ -49,7 +49,7 @@ public:
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
-                 bool connected, SecureLayerFactoryCb secure_layer_factory);
+                 bool connected, TransportSecurityFactoryCb secure_layer_factory);
 
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
@@ -166,7 +166,7 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
-  SecureLayerPtr secure_layer_;
+  TransportSecurityPtr secure_layer_;
 };
 
 /**

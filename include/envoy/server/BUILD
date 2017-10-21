@@ -121,6 +121,7 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/singleton:manager_interface",
+        "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -141,6 +142,16 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_security_config_interface",
+    hdrs = ["transport_security_config.h"],
+    deps = [
+        ":filter_config_interface",
+        "//include/envoy/network:connection_interface",
         "//source/common/protobuf",
     ],
 )

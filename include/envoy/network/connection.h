@@ -245,9 +245,9 @@ public:
   virtual void closeSocket(Network::ConnectionEvent){};
 };
 
-typedef std::unique_ptr<TransportSecurity> SecureLayerPtr;
+typedef std::unique_ptr<TransportSecurity> TransportSecurityPtr;
 
-typedef std::function<SecureLayerPtr()> SecureLayerFactoryCb;
+typedef std::function<TransportSecurityPtr()> TransportSecurityFactoryCb;
 
 /**
  * Connections capable of outbound connects.

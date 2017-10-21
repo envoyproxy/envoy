@@ -150,5 +150,6 @@ void ServerContextConfigImpl::validateAndAppendKey(
   ASSERT(key_data.begin() + pos == key_data.end());
 }
 
+
 } // namespace Ssl
 } // namespace Envoy

@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/server/transport_security_config.h"
+#include "envoy/registry/registry.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
@@ -11,6 +14,7 @@
 
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
+#include "common/ssl/context_config_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -36,8 +40,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                              using_original_dst, connected, [&]() -> Network::SecureLayerPtr {
-                                return Network::SecureLayerPtr{
+                              using_original_dst, connected, [&]() -> Network::TransportSecurityPtr {
+                                return Network::TransportSecurityPtr{
                                     new Tls(*this, ctx, static_cast<Tls::InitialState>(state))};
                               }) {}
 
@@ -334,5 +338,45 @@ void Tls::closeSocket(Network::ConnectionEvent) {
     drainErrorQueue();
   }
 }
+
+class TlsFactory : public Server::Configuration::NamedTransportSecurityConfigFactory {
+ public:
+  Server::Configuration::TransportSecurityFactoryCb createClientTransportSecurityFactory(
+      const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) override {
+    Ssl::ClientContextConfigImpl config(dynamic_cast<const envoy::api::v2::UpstreamTlsContext&>(proto_config));
+    ClientContextSharedPtr client_context{
+        context.sslContextManager().createSslClientContext(context.scope(), config).release()};
+
+    return [client_context](Network::TransportSecurityCallbacks& callbacks) -> Network::TransportSecurityPtr {
+      return Network::TransportSecurityPtr{new Tls(callbacks, *client_context, Tls::InitialState::Client)};
+    };
+  }
+
+  Server::Configuration::TransportSecurityFactoryCb createServerTransportSecurityFactory(
+      const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) override {
+
+    Ssl::ServerContextConfigImpl config(dynamic_cast<const envoy::api::v2::DownstreamTlsContext&>(proto_config));
+    ServerContextSharedPtr server_context{
+        context.sslContextManager().createSslServerContext(context.scope(), config).release()};
+
+    return [server_context](Network::TransportSecurityCallbacks& callbacks) -> Network::TransportSecurityPtr {
+      return Network::TransportSecurityPtr{new Tls(callbacks, *server_context, Tls::InitialState::Server)};
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyClientConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::UpstreamTlsContext};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyServerConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::DownstreamTlsContext};
+  }
+
+  std::string name() override {
+    return "boringssl";
+  }
+};
+
+static Registry::RegisterFactory<TlsFactory, Server::Configuration::NamedTransportSecurityConfigFactory> register_;
 } // namespace Ssl
 } // namespace Envoy

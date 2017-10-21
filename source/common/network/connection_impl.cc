@@ -7,10 +7,12 @@
 
 #include <atomic>
 #include <cstdint>
+#include <envoy/registry/registry.h>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/transport_security_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -59,7 +61,7 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected,
-                               SecureLayerFactoryCb secure_layer_factory)
+                               TransportSecurityFactoryCb secure_layer_factory)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
@@ -103,7 +105,7 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected)
     : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
                      using_original_dst, connected,
-                     [&]() -> SecureLayerPtr { return SecureLayerPtr{new Plaintext(*this)}; }) {}
+                     [&]() -> TransportSecurityPtr { return TransportSecurityPtr{new Plaintext(*this)}; }) {}
 
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(fd_ == -1);
@@ -593,6 +595,37 @@ Connection::IoResult Plaintext::doWriteToSocket() {
 
   return {action, bytes_written};
 }
+
+class PlaintextFactory : public Server::Configuration::NamedTransportSecurityConfigFactory {
+ public:
+  Server::Configuration::TransportSecurityFactoryCb createClientTransportSecurityFactory(
+      const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+    return [](TransportSecurityCallbacks& callbacks) -> TransportSecurityPtr {
+      return TransportSecurityPtr{new Plaintext(callbacks)};
+    };
+  }
+
+  Server::Configuration::TransportSecurityFactoryCb createServerTransportSecurityFactory(
+      const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+    return [](TransportSecurityCallbacks& callbacks) -> TransportSecurityPtr {
+      return TransportSecurityPtr{new Plaintext(callbacks)};
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyClientConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::Empty};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyServerConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::Empty};
+  }
+
+  std::string name() {
+    return "plaintext";
+  }
+};
+
+static Registry::RegisterFactory<PlaintextFactory, Server::Configuration::NamedTransportSecurityConfigFactory> register_;
 
 } // namespace Network
 } // namespace Envoy

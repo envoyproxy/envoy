@@ -208,6 +208,7 @@ public:
   }
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
+  Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Network::DrainDecision& drainDecision() override { return *this; }
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
