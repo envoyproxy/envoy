@@ -36,11 +36,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                              using_original_dst, connected,
-                              [&]() -> Network::SecureLayerPtr {
-                                return Network::SecureLayerPtr{new Tls(*this, ctx, static_cast<Tls::InitialState>(state))};
-                              }) {
-}
+                              using_original_dst, connected, [&]() -> Network::SecureLayerPtr {
+                                return Network::SecureLayerPtr{
+                                    new Tls(*this, ctx, static_cast<Tls::InitialState>(state))};
+                              }) {}
 
 Network::Connection::IoResult Tls::doReadFromSocket() {
   if (!handshake_complete_) {
@@ -106,8 +105,9 @@ Network::Connection::PostIoAction Tls::doHandshake() {
     callbacks_.raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
-    return callbacks_.connection().state() == Network::Connection::State::Open ?
-           Network::Connection::PostIoAction::KeepOpen : Network::Connection::PostIoAction::Close;
+    return callbacks_.connection().state() == Network::Connection::State::Open
+               ? Network::Connection::PostIoAction::KeepOpen
+               : Network::Connection::PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl_.get(), rc);
     ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_.connection(), err);
@@ -136,8 +136,9 @@ void Tls::drainErrorQueue() {
     }
     saw_error = true;
 
-    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_.connection(), err, ERR_lib_error_string(err),
-                   ERR_func_error_string(err), ERR_reason_error_string(err));
+    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_.connection(), err,
+                   ERR_lib_error_string(err), ERR_func_error_string(err),
+                   ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
   }
   if (saw_error && !saw_counted_error) {
@@ -305,9 +306,8 @@ std::string Tls::nextProtocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-Tls::Tls(Network::TransportSecurityCallbacks &callbacks, Context &ctx, InitialState state)
-    : callbacks_(callbacks),
-      ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+Tls::Tls(Network::TransportSecurityCallbacks& callbacks, Context& ctx, InitialState state)
+    : callbacks_(callbacks), ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(callbacks.fd(), 0);
   SSL_set_bio(ssl_.get(), bio, bio);
 
@@ -320,12 +320,11 @@ Tls::Tls(Network::TransportSecurityCallbacks &callbacks, Context &ctx, InitialSt
   }
 }
 
-void Tls::onConnected() {
-  ASSERT(!handshake_complete_);
-}
+void Tls::onConnected() { ASSERT(!handshake_complete_); }
 
 void Tls::closeSocket(Network::ConnectionEvent) {
-  if (handshake_complete_ && callbacks_.connection().state() != Network::Connection::State::Closed) {
+  if (handshake_complete_ &&
+      callbacks_.connection().state() != Network::Connection::State::Closed) {
     // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
     // there is no room on the socket. We can extend the state machine to handle this at some point
     // if needed.

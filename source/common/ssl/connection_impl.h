@@ -35,7 +35,7 @@ public:
 class Tls : public Network::TransportSecurity,
             public Connection,
             protected Logger::Loggable<Logger::Id::connection> {
- public:
+public:
   enum class InitialState { Client, Server };
 
   Tls(Network::TransportSecurityCallbacks& callbacks, Context& ctx, InitialState state);
@@ -56,7 +56,7 @@ class Tls : public Network::TransportSecurity,
 
   SSL* rawSslForTest() { return ssl_.get(); }
 
- private:
+private:
   Network::Connection::PostIoAction doHandshake();
   void drainErrorQueue();
   std::string getUriSanFromCertificate(X509* cert);

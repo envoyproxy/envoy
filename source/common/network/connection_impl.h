@@ -79,7 +79,9 @@ public:
   const Address::Instance& localAddress() const override { return *local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
   Ssl::Connection* ssl() override { return dynamic_cast<Ssl::Connection*>(secure_layer_.get()); }
-  const Ssl::Connection* ssl() const override { return dynamic_cast<const Ssl::Connection*>(secure_layer_.get()); }
+  const Ssl::Connection* ssl() const override {
+    return dynamic_cast<const Ssl::Connection*>(secure_layer_.get());
+  }
   State state() const override;
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
@@ -107,7 +109,8 @@ public:
   int fd() override { return fd_; }
   Buffer::Instance& readBuffer() override { return read_buffer_; }
   Buffer::Instance& writeBuffer() override { return *write_buffer_; }
- protected:
+
+protected:
   void doConnect();
 
   virtual void closeSocket(ConnectionEvent close_type);
@@ -179,17 +182,15 @@ public:
   void connect() override { doConnect(); }
 };
 
-class Plaintext : public TransportSecurity,
-                  protected Logger::Loggable<Logger::Id::connection> {
+class Plaintext : public TransportSecurity, protected Logger::Loggable<Logger::Id::connection> {
 public:
   explicit Plaintext(TransportSecurityCallbacks& callbacks);
 
-  std::string nextProtocol() const override {
-    return "";
-  }
+  std::string nextProtocol() const override { return ""; }
   Connection::IoResult doReadFromSocket() override;
   Connection::IoResult doWriteToSocket() override;
   void onConnected() override;
+
 private:
   TransportSecurityCallbacks& callbacks_;
 };

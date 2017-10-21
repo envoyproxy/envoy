@@ -102,10 +102,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
     : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                     using_original_dst, connected, [&]() -> SecureLayerPtr {
-      return SecureLayerPtr{new Plaintext(*this)};
-    }) {
-}
+                     using_original_dst, connected,
+                     [&]() -> SecureLayerPtr { return SecureLayerPtr{new Plaintext(*this)}; }) {}
 
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(fd_ == -1);
@@ -529,12 +527,9 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
                      getNullLocalAddress(*address), source_address, false, false) {}
 
-
 Plaintext::Plaintext(TransportSecurityCallbacks& callbacks) : callbacks_(callbacks) {}
 
-void Plaintext::onConnected() {
-  callbacks_.raiseEvent(ConnectionEvent::Connected);
-}
+void Plaintext::onConnected() { callbacks_.raiseEvent(ConnectionEvent::Connected); }
 
 Connection::IoResult Plaintext::doReadFromSocket() {
   Connection::PostIoAction action = Connection::PostIoAction::KeepOpen;

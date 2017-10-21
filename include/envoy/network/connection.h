@@ -69,16 +69,16 @@ enum class ConnectionCloseType {
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
 class Connection : public Event::DeferredDeletable, public FilterManager {
- public:
+public:
   enum class State { Open, Closing, Closed };
 
   struct ConnectionStats {
-    Stats::Counter &read_total_;
-    Stats::Gauge &read_current_;
-    Stats::Counter &write_total_;
-    Stats::Gauge &write_current_;
+    Stats::Counter& read_total_;
+    Stats::Gauge& read_current_;
+    Stats::Counter& write_total_;
+    Stats::Gauge& write_current_;
     // Counter* as this is an optional counter.  Bind errors will not be tracked if this is nullptr.
-    Stats::Counter *bind_errors_;
+    Stats::Counter* bind_errors_;
   };
 
   virtual ~Connection() {}
@@ -86,7 +86,7 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
   /**
    * Register callbacks that fire when connection events occur.
    */
-  virtual void addConnectionCallbacks(ConnectionCallbacks &cb) PURE;
+  virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
 
   /**
    * Close the connection.
@@ -96,7 +96,7 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
    */
-  virtual Event::Dispatcher &dispatcher() PURE;
+  virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
    * @return uint64_t the unique local ID of this connection.
@@ -140,7 +140,7 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
   /**
    * @return The address of the remote client.
    */
-  virtual const Address::Instance &remoteAddress() const PURE;
+  virtual const Address::Instance& remoteAddress() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
@@ -148,24 +148,24 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
    * it can be different from the proxy address if the downstream connection has been redirected or
    * the proxy is operating in transparent mode.
    */
-  virtual const Address::Instance &localAddress() const PURE;
+  virtual const Address::Instance& localAddress() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons
    * these stats are eventually consistent and may not always accurately represent the connection
    * state at any given point in time.
    */
-  virtual void setConnectionStats(const ConnectionStats &stats) PURE;
+  virtual void setConnectionStats(const ConnectionStats& stats) PURE;
 
   /**
    * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual Ssl::Connection *ssl() PURE;
+  virtual Ssl::Connection* ssl() PURE;
 
   /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection *ssl() const PURE;
+  virtual const Ssl::Connection* ssl() const PURE;
 
   /**
    * @return State the current state of the connection.
@@ -176,7 +176,7 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
    */
-  virtual void write(Buffer::Instance &data) PURE;
+  virtual void write(Buffer::Instance& data) PURE;
 
   /**
    * Set a soft limit on the size of buffers for the connection.
@@ -216,7 +216,7 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
 
 class TransportSecurityCallbacks {
 public:
-  virtual ~TransportSecurityCallbacks() {};
+  virtual ~TransportSecurityCallbacks(){};
 
   virtual const Connection& connection() const PURE;
 
@@ -236,13 +236,13 @@ public:
 typedef std::unique_ptr<Connection> ConnectionPtr;
 
 class TransportSecurity {
- public:
+public:
   virtual ~TransportSecurity() {}
   virtual std::string nextProtocol() const PURE;
   virtual Connection::IoResult doReadFromSocket() PURE;
   virtual Connection::IoResult doWriteToSocket() PURE;
   virtual void onConnected() PURE;
-  virtual void closeSocket(Network::ConnectionEvent) {};
+  virtual void closeSocket(Network::ConnectionEvent){};
 };
 
 typedef std::unique_ptr<TransportSecurity> SecureLayerPtr;
