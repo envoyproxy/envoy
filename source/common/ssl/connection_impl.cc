@@ -40,9 +40,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                              using_original_dst, connected, [&]() -> Network::TransportSecurityPtr {
+                              using_original_dst, connected,
+                              [&](Network::TransportSecurityCallbacks& callbacks) -> Network::TransportSecurityPtr {
                                 return Network::TransportSecurityPtr{
-                                    new Tls(*this, ctx, static_cast<Tls::InitialState>(state))};
+                                    new Tls(callbacks, ctx, static_cast<Tls::InitialState>(state))};
                               }) {}
 
 Network::Connection::IoResult Tls::doReadFromSocket() {
@@ -341,7 +342,7 @@ void Tls::closeSocket(Network::ConnectionEvent) {
 
 class TlsFactory : public Server::Configuration::NamedTransportSecurityConfigFactory {
  public:
-  Server::Configuration::TransportSecurityFactoryCb createClientTransportSecurityFactory(
+  Network::TransportSecurityFactoryCb createClientTransportSecurityFactory(
       const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) override {
     Ssl::ClientContextConfigImpl config(dynamic_cast<const envoy::api::v2::UpstreamTlsContext&>(proto_config));
     ClientContextSharedPtr client_context{
@@ -352,7 +353,7 @@ class TlsFactory : public Server::Configuration::NamedTransportSecurityConfigFac
     };
   }
 
-  Server::Configuration::TransportSecurityFactoryCb createServerTransportSecurityFactory(
+  Network::TransportSecurityFactoryCb createServerTransportSecurityFactory(
       const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) override {
 
     Ssl::ServerContextConfigImpl config(dynamic_cast<const envoy::api::v2::DownstreamTlsContext&>(proto_config));

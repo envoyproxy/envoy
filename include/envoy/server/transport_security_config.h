@@ -8,16 +8,14 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-typedef std::function<Network::TransportSecurityPtr(Network::TransportSecurityCallbacks&)> TransportSecurityFactoryCb;
-
 class NamedTransportSecurityConfigFactory {
  public:
   virtual ~NamedTransportSecurityConfigFactory() {}
 
-  virtual TransportSecurityFactoryCb createClientTransportSecurityFactory(
+  virtual Network::TransportSecurityFactoryCb createClientTransportSecurityFactory(
       const Protobuf::Message& config,
       FactoryContext& context) PURE;
-  virtual TransportSecurityFactoryCb createServerTransportSecurityFactory(
+  virtual Network::TransportSecurityFactoryCb createServerTransportSecurityFactory(
       const Protobuf::Message& config,
       FactoryContext& context) PURE;
 

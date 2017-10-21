@@ -61,13 +61,13 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected,
-                               TransportSecurityFactoryCb secure_layer_factory)
+                               TransportSecurityFactoryCb transport_security_factory)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
-      using_original_dst_(using_original_dst), secure_layer_(secure_layer_factory()) {
+      using_original_dst_(using_original_dst), transport_security_(transport_security_factory(*this)) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -105,7 +105,9 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected)
     : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
                      using_original_dst, connected,
-                     [&]() -> TransportSecurityPtr { return TransportSecurityPtr{new Plaintext(*this)}; }) {}
+                     [](TransportSecurityCallbacks& callbacks) -> TransportSecurityPtr {
+                       return TransportSecurityPtr{new Plaintext(callbacks)};
+                     }) {}
 
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(fd_ == -1);
@@ -164,7 +166,7 @@ Connection::State ConnectionImpl::state() const {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  secure_layer_->closeSocket(close_type);
+  transport_security_->closeSocket(close_type);
 
   if (fd_ == -1) {
     return;
@@ -411,7 +413,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
-  return secure_layer_->doReadFromSocket();
+  return transport_security_->doReadFromSocket();
 }
 
 void ConnectionImpl::onReadReady() {
@@ -432,10 +434,10 @@ void ConnectionImpl::onReadReady() {
 }
 
 ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
-  return secure_layer_->doWriteToSocket();
+  return transport_security_->doWriteToSocket();
 }
 
-void ConnectionImpl::onConnected() { secure_layer_->onConnected(); }
+void ConnectionImpl::onConnected() { transport_security_->onConnected(); }
 
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
@@ -598,14 +600,14 @@ Connection::IoResult Plaintext::doWriteToSocket() {
 
 class PlaintextFactory : public Server::Configuration::NamedTransportSecurityConfigFactory {
  public:
-  Server::Configuration::TransportSecurityFactoryCb createClientTransportSecurityFactory(
+  TransportSecurityFactoryCb createClientTransportSecurityFactory(
       const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return [](TransportSecurityCallbacks& callbacks) -> TransportSecurityPtr {
       return TransportSecurityPtr{new Plaintext(callbacks)};
     };
   }
 
-  Server::Configuration::TransportSecurityFactoryCb createServerTransportSecurityFactory(
+  TransportSecurityFactoryCb createServerTransportSecurityFactory(
       const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return [](TransportSecurityCallbacks& callbacks) -> TransportSecurityPtr {
       return TransportSecurityPtr{new Plaintext(callbacks)};

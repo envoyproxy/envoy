@@ -247,7 +247,7 @@ public:
 
 typedef std::unique_ptr<TransportSecurity> TransportSecurityPtr;
 
-typedef std::function<TransportSecurityPtr()> TransportSecurityFactoryCb;
+typedef std::function<TransportSecurityPtr(TransportSecurityCallbacks&)> TransportSecurityFactoryCb;
 
 /**
  * Connections capable of outbound connects.

@@ -49,7 +49,7 @@ public:
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
-                 bool connected, TransportSecurityFactoryCb secure_layer_factory);
+                 bool connected, TransportSecurityFactoryCb transport_security_factory);
 
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
@@ -70,7 +70,7 @@ public:
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
-  std::string nextProtocol() const override { return secure_layer_->nextProtocol(); }
+  std::string nextProtocol() const override { return transport_security_->nextProtocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
@@ -78,9 +78,9 @@ public:
   const Address::Instance& remoteAddress() const override { return *remote_address_; }
   const Address::Instance& localAddress() const override { return *local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
-  Ssl::Connection* ssl() override { return dynamic_cast<Ssl::Connection*>(secure_layer_.get()); }
+  Ssl::Connection* ssl() override { return dynamic_cast<Ssl::Connection*>(transport_security_.get()); }
   const Ssl::Connection* ssl() const override {
-    return dynamic_cast<const Ssl::Connection*>(secure_layer_.get());
+    return dynamic_cast<const Ssl::Connection*>(transport_security_.get());
   }
   State state() const override;
   void write(Buffer::Instance& data) override;
@@ -166,7 +166,7 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
-  TransportSecurityPtr secure_layer_;
+  TransportSecurityPtr transport_security_;
 };
 
 /**
