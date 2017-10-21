@@ -214,9 +214,9 @@ class Connection : public Event::DeferredDeletable, public FilterManager {
   };
 };
 
-class SecureLayerCallbacks {
+class TransportSecurityCallbacks {
 public:
-  virtual ~SecureLayerCallbacks() {};
+  virtual ~TransportSecurityCallbacks() {};
 
   virtual const Connection& connection() const PURE;
 
@@ -235,9 +235,9 @@ public:
 
 typedef std::unique_ptr<Connection> ConnectionPtr;
 
-class SecureLayer {
+class TransportSecurity {
  public:
-  virtual ~SecureLayer() {}
+  virtual ~TransportSecurity() {}
   virtual std::string nextProtocol() const PURE;
   virtual Connection::IoResult doReadFromSocket() PURE;
   virtual Connection::IoResult doWriteToSocket() PURE;
@@ -245,7 +245,7 @@ class SecureLayer {
   virtual void closeSocket(Network::ConnectionEvent) {};
 };
 
-typedef std::unique_ptr<SecureLayer> SecureLayerPtr;
+typedef std::unique_ptr<TransportSecurity> SecureLayerPtr;
 
 typedef std::function<SecureLayerPtr()> SecureLayerFactoryCb;
 

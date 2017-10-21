@@ -530,7 +530,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      getNullLocalAddress(*address), source_address, false, false) {}
 
 
-Plaintext::Plaintext(SecureLayerCallbacks& callbacks) : callbacks_(callbacks) {}
+Plaintext::Plaintext(TransportSecurityCallbacks& callbacks) : callbacks_(callbacks) {}
 
 void Plaintext::onConnected() {
   callbacks_.raiseEvent(ConnectionEvent::Connected);

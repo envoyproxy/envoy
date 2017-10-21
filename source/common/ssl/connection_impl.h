@@ -32,15 +32,15 @@ public:
   void connect() override;
 };
 
-class Tls : public Network::SecureLayer,
+class Tls : public Network::TransportSecurity,
             public Connection,
             protected Logger::Loggable<Logger::Id::connection> {
  public:
   enum class InitialState { Client, Server };
 
-  Tls(Network::SecureLayerCallbacks& callbacks, Context& ctx, InitialState state);
+  Tls(Network::TransportSecurityCallbacks& callbacks, Context& ctx, InitialState state);
 
-  // Network::SecureLayer
+  // Network::TransportSecurity
   std::string nextProtocol() const override;
   Network::Connection::IoResult doReadFromSocket() override;
   Network::Connection::IoResult doWriteToSocket() override;
@@ -61,7 +61,7 @@ class Tls : public Network::SecureLayer,
   void drainErrorQueue();
   std::string getUriSanFromCertificate(X509* cert);
 
-  Network::SecureLayerCallbacks& callbacks_;
+  Network::TransportSecurityCallbacks& callbacks_;
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};

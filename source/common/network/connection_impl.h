@@ -41,7 +41,7 @@ public:
  * Implementation of Network::Connection.
  */
 class ConnectionImpl : public virtual Connection,
-                       public virtual SecureLayerCallbacks,
+                       public virtual TransportSecurityCallbacks,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -91,7 +91,7 @@ public:
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
-  // Network::SecureLayerCallbacks
+  // Network::TransportSecurityCallbacks
   const Connection& connection() const override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
@@ -179,10 +179,10 @@ public:
   void connect() override { doConnect(); }
 };
 
-class Plaintext : public SecureLayer,
+class Plaintext : public TransportSecurity,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  explicit Plaintext(SecureLayerCallbacks& callbacks);
+  explicit Plaintext(TransportSecurityCallbacks& callbacks);
 
   std::string nextProtocol() const override {
     return "";
@@ -191,7 +191,7 @@ public:
   Connection::IoResult doWriteToSocket() override;
   void onConnected() override;
 private:
-  SecureLayerCallbacks& callbacks_;
+  TransportSecurityCallbacks& callbacks_;
 };
 
 } // namespace Network

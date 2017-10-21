@@ -305,7 +305,7 @@ std::string Tls::nextProtocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-Tls::Tls(Network::SecureLayerCallbacks &callbacks, Context &ctx, InitialState state)
+Tls::Tls(Network::TransportSecurityCallbacks &callbacks, Context &ctx, InitialState state)
     : callbacks_(callbacks),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(callbacks.fd(), 0);
