@@ -147,12 +147,17 @@ public:
    * @param callbacks the callbacks to be notified of stream status.
    * @param timeout supplies the stream timeout, measured since when the frame with end_stream
    *        flag is sent until when the first frame is received.
+   * @param buffer_body_for_retry specifies whether the streamed body will be buffered so that
+   *        it can be retried. In general, this should be set to false for a true stream. However,
+   *        streaming is also used in certain cases such as gRPC unary calls, where retry can
+   *        still be useful.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.
    */
   virtual Stream* start(StreamCallbacks& callbacks,
-                        const Optional<std::chrono::milliseconds>& timeout) PURE;
+                        const Optional<std::chrono::milliseconds>& timeout,
+                        bool buffer_body_for_retry) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client.

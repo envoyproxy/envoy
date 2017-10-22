@@ -203,10 +203,9 @@ public:
           }
         }));
     const auto headers = expectedHeaders(initial_metadata);
-    EXPECT_CALL(http_client_, start(_, _))
+    EXPECT_CALL(http_client_, start(_, _, true))
         .WillOnce(Invoke([&request](Http::AsyncClient::StreamCallbacks& callbacks,
-                                    const Optional<std::chrono::milliseconds>& timeout) {
-          UNREFERENCED_PARAMETER(timeout);
+                                    const Optional<std::chrono::milliseconds>&, bool) {
           request->http_callbacks_ = &callbacks;
           return request->http_stream_;
         }));
@@ -248,10 +247,9 @@ public:
           }
         }));
     const auto headers = expectedHeaders(initial_metadata);
-    EXPECT_CALL(http_client_, start(_, _))
+    EXPECT_CALL(http_client_, start(_, _, false))
         .WillOnce(Invoke([&stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                   const Optional<std::chrono::milliseconds>& timeout) {
-          UNREFERENCED_PARAMETER(timeout);
+                                   const Optional<std::chrono::milliseconds>&, bool) {
           stream->http_callbacks_ = &callbacks;
           return stream->http_stream_;
         }));
@@ -325,7 +323,7 @@ TEST_F(GrpcAsyncClientImplTest, MultiRequest) {
 // UNAVAILABLE.
 TEST_F(GrpcAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
+  ON_CALL(http_client_, start(_, _, false)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
@@ -335,7 +333,7 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpStartFail) {
 // UNAVAILABLE.
 TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
+  ON_CALL(http_client_, start(_, _, true)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, "", _));
   helloworld::HelloRequest request_msg;
 
@@ -360,11 +358,10 @@ TEST_F(GrpcAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
-  EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const Optional<std::chrono::milliseconds>& timeout) {
-            UNREFERENCED_PARAMETER(timeout);
+  EXPECT_CALL(http_client_, start(_, _, false))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -386,11 +383,10 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
-  EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const Optional<std::chrono::milliseconds>& timeout) {
-            UNREFERENCED_PARAMETER(timeout);
+  EXPECT_CALL(http_client_, start(_, _, true))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));

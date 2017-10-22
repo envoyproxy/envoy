@@ -391,8 +391,9 @@ public:
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout));
 
-  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
-                              const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks,
+                              const Optional<std::chrono::milliseconds>& timeout,
+                              bool buffer_body_for_retry));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 

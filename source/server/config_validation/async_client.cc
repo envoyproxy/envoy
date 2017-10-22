@@ -8,8 +8,8 @@ AsyncClient::Request* ValidationAsyncClient::send(MessagePtr&&, Callbacks&,
   return nullptr;
 }
 
-AsyncClient::Stream* ValidationAsyncClient::start(StreamCallbacks&,
-                                                  const Optional<std::chrono::milliseconds>&) {
+AsyncClient::Stream*
+ValidationAsyncClient::start(StreamCallbacks&, const Optional<std::chrono::milliseconds>&, bool) {
   return nullptr;
 }
 

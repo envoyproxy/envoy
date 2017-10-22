@@ -32,3 +32,5 @@ cd /bazel-prebuilt
 for BAZEL_MODE in opt dbg fastbuild; do
   bazel ${BAZEL_OPTIONS} build -c "${BAZEL_MODE}" //bazel/external:all_external
 done
+# Allow access by non-root for building.
+chmod -R a+rX /bazel-prebuilt-root /bazel-prebuilt-output
