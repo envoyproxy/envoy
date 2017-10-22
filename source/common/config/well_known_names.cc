@@ -8,20 +8,22 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
 
   // Note: the default regexes are defined below in the order that they will typically be matched
   // (see the TagExtractor class definition for an explanation of the iterative matching process).
-  // Despite the fact that these regexes are defined with a particular ordering in mind, users can
-  // customize the ordering of the processing of the default tag extraction regexes and include
-  // custom tags with regexes via the bootstrap configuration.  Because of this flexibility, these
-  // regexes are designed to not interfere with one another no matter the ordering.  They are tested
-  // in forward and reverse ordering to ensure they will be safe in most ordering configurations.
-  // Below, they are roughly ordered from most specific to least specific.
+  // This ordering is roughly from most specific to least specific. Despite the fact that these
+  // regexes are defined with a particular ordering in mind, users can customize the ordering of the
+  // processing of the default tag extraction regexes and include custom tags with regexes via the
+  // bootstrap configuration. Because of this flexibility, these regexes are designed to not
+  // interfere with one another no matter the ordering. They are tested in forward and reverse
+  // ordering to ensure they will be safe in most ordering configurations.
 
   // To give a more user-friendly explanation of the intended behavior of each regex, each is
   // preceded by a comment with a simplified notation to explain what the regex is designed to
-  // match: The text that the regex is intended to capture will be enclosed in (). Other default
-  // tags that are expected to exist in the name (and may or may not have been removed before this
-  // regex has been applied) are enclosed in []. Stand-ins for a variable segment of the name
-  // (including inside capture groups) will be enclosed in <>. Typical * notation will be used to
-  // denote an arbitrary set of characters.
+  // match:
+  // - The text that the regex is intended to capture will be enclosed in ().
+  // - Other default tags that are expected to exist in the name (and may or may not have been
+  // removed before this regex has been applied) are enclosed in [].
+  // - Stand-ins for a variable segment of the name (including inside capture groups) will be
+  // enclosed in <>.
+  // - Typical * notation will be used to denote an arbitrary set of characters.
 
   // *_rq(_<response_code>
   name_regex_pairs.push_back({RESPONSE_CODE, "_rq(_(\\d{3}))$"});
