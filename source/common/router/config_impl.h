@@ -103,7 +103,6 @@ public:
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
-  bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
     return request_headers_to_add_;
@@ -199,19 +198,70 @@ public:
 
   // Router::HashPolicy
   Optional<uint64_t> generateHash(const std::string& downstream_addr,
-                                  const Http::HeaderMap& headers) const override;
+                                  const Http::HeaderMap& headers,
+                                  const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() {}
     virtual Optional<uint64_t> evaluate(const std::string& downstream_addr,
-                                        const Http::HeaderMap& headers) const PURE;
+                                        const Http::HeaderMap& headers,
+                                        const AddCookieCallback add_cookie) const PURE;
   };
 
   typedef std::unique_ptr<HashMethod> HashMethodPtr;
 
 private:
   std::vector<HashMethodPtr> hash_impls_;
+};
+
+class MetadataMatchCriterionImpl : public MetadataMatchCriterion {
+public:
+  MetadataMatchCriterionImpl(const std::string& name, const HashedValue& value)
+      : name_(name), value_(value) {}
+
+  const std::string& name() const override { return name_; }
+  const HashedValue& value() const override { return value_; }
+
+private:
+  const std::string name_;
+  const HashedValue value_;
+};
+
+class MetadataMatchCriteriaImpl;
+typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
+
+class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
+public:
+  MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
+      : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
+
+  /**
+   * Creates a new MetadataMatchCriteriaImpl, merging existing
+   * metadata criteria this criteria. The result criteria is the
+   * combination of both sets of criteria, with those from the
+   * ProtobufWkt::Struct taking precedence.
+   */
+  MetadataMatchCriteriaImplConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const {
+    return MetadataMatchCriteriaImplConstPtr(
+        new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
+  }
+
+  // MetadataMatchCriteria
+  const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
+    return metadata_match_criteria_;
+  }
+
+private:
+  MetadataMatchCriteriaImpl(const std::vector<MetadataMatchCriterionConstSharedPtr>& criteria)
+      : metadata_match_criteria_(criteria){};
+
+  static std::vector<MetadataMatchCriterionConstSharedPtr>
+  extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
+                               const ProtobufWkt::Struct& metadata_matches);
+
+  const std::vector<MetadataMatchCriterionConstSharedPtr> metadata_match_criteria_;
 };
 
 /**
@@ -223,6 +273,9 @@ public:
 
   // Decorator::apply
   void apply(Tracing::Span& span) const override;
+
+  // Decorator::getOperation
+  const std::string& getOperation() const override;
 
 private:
   const std::string operation_;
@@ -241,7 +294,6 @@ public:
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
-  bool usesRuntime() const { return runtime_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
@@ -255,7 +307,10 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const Http::AccessLog::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
-  const MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
+
+  const MetadataMatchCriteria* metadataMatchCriteria() const override {
+    return metadata_match_criteria_.get();
+  }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
@@ -316,7 +371,9 @@ private:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
-    const MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
+    const MetadataMatchCriteria* metadataMatchCriteria() const override {
+      return parent_->metadataMatchCriteria();
+    }
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
       return parent_->virtualCluster(headers);
@@ -347,17 +404,26 @@ private:
    * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
    * one or more weighted cluster objects, where each object has a back pointer to the parent
    * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
-   * parent, with the exception of clusterName and routeEntry.
+   * parent, with the exception of clusterName, routeEntry, and metadataMatchCriteria.
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
-                         Runtime::Loader& loader, const std::string& name, uint64_t weight)
+                         Runtime::Loader& loader, const std::string& name, uint64_t weight,
+                         MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria)
         : DynamicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
-          cluster_weight_(weight) {}
+          cluster_weight_(weight),
+          cluster_metadata_match_criteria_(std::move(cluster_metadata_match_criteria)) {}
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    }
+
+    const MetadataMatchCriteria* metadataMatchCriteria() const override {
+      if (cluster_metadata_match_criteria_) {
+        return cluster_metadata_match_criteria_.get();
+      }
+      return DynamicRouteEntry::metadataMatchCriteria();
     }
 
     static const uint64_t MAX_CLUSTER_WEIGHT;
@@ -366,6 +432,7 @@ private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
+    MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria_;
   };
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
@@ -399,6 +466,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 
@@ -476,7 +544,6 @@ public:
                Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
-  bool usesRuntime() const { return uses_runtime_; }
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
@@ -495,7 +562,6 @@ private:
   std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<int64_t>>
       wildcard_virtual_host_suffixes_;
   VirtualHostSharedPtr default_virtual_host_;
-  bool uses_runtime_{};
 };
 
 /**
@@ -530,8 +596,6 @@ public:
     return response_headers_to_remove_;
   }
 
-  bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
-
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -561,8 +625,6 @@ public:
   const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
     return response_headers_to_remove_;
   }
-
-  bool usesRuntime() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

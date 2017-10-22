@@ -7,6 +7,7 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
+#include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/sds_subscription.h"
 
@@ -60,7 +61,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       new_hosts.emplace_back(new HostImpl(
-          info_, "", Network::Utility::fromProtoAddress(lb_endpoint.endpoint().address()),
+          info_, "", Network::Address::resolveProtoAddress(lb_endpoint.endpoint().address()),
           lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
           locality_lb_endpoint.locality()));
     }
@@ -76,6 +77,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
     // If local locality is not defined then skip populating per locality hosts.
     const Locality local_locality(local_info_.node().locality());
+    ENVOY_LOG(trace, "Local locality: {}", local_info_.node().locality().DebugString());
     if (!local_locality.empty()) {
       std::map<Locality, std::vector<HostSharedPtr>> hosts_per_locality;
 

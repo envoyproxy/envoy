@@ -65,6 +65,39 @@ do
   kill -SIGHUP ${FIRST_SERVER_PID}
   sleep 3
 
+  # The heapchecker outputs some data to stderr on every execution.  This gets intermingled
+  # with the output from --hot-restart-version, so disable the heap-checker for these runs.
+  SAVED_HEAPCHECK=${HEAPCHECK}
+  unset HEAPCHECK
+
+  echo "Checking for match of --hot-restart-version and admin /hot_restart_version"
+  ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
+  ADMIN_HOT_RESTART_VERSION=$(curl -s http://${ADMIN_ADDRESS_0}/hot_restart_version)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version 2>&1)
+  if [[ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]]; then
+      echo "Hot restart version mismatch: ${ADMIN_HOT_RESTART_VERSION} != " \
+           "${CLI_HOT_RESTART_VERSION}"
+      exit 2
+  fi
+
+  echo "Checking max-obj-name-len"
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 2>&1)
+  if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
+      echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
+           "${CLI_HOT_RESTART_VERSION}"
+      exit 2
+  fi
+
+  echo "Checking max-stats"
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stats 12345 2>&1)
+  if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
+      echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
+           "${CLI_HOT_RESTART_VERSION}"
+      exit 2
+  fi
+
+  HEAPCHECK=${SAVED_HEAPCHECK}
+
   echo "Starting epoch 1"
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \

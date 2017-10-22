@@ -53,6 +53,10 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
   std::shared_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+  if (add_served_by_header_) {
+    headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
+                          parent_.connection().localAddress().asString());
+  }
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
     encoder_.encodeHeaders(*headers_copy, end_stream);
   });
@@ -201,15 +205,21 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   ASSERT(disconnected_);
 }
 
-FakeStreamPtr FakeHttpConnection::waitForNewStream(bool ignore_spurious_events) {
+FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
+                                                   bool ignore_spurious_events) {
   std::unique_lock<std::mutex> lock(lock_);
   while (new_streams_.empty()) {
-    connection_event_.wait(lock);
+    std::cv_status status = connection_event_.wait_until(lock, std::chrono::system_clock::now() +
+                                                                   std::chrono::milliseconds(5));
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
     // If the caller explicitly notes other events should be ignored, it will instead actually
     // wait for the next new stream, ignoring other events such as onData()
-    if (!ignore_spurious_events) {
+    if (status == std::cv_status::no_timeout && !ignore_spurious_events) {
       break;
+    }
+    if (new_streams_.empty()) {
+      // Run the client dispatcher since we may need to process window updates, etc.
+      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     }
   }
 
@@ -304,6 +314,34 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
   new_connections_.pop_front();
   connection->readDisable(false);
   return connection;
+}
+
+FakeHttpConnectionPtr
+FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
+                                    std::vector<std::unique_ptr<FakeUpstream>>& upstreams) {
+  for (;;) {
+    for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
+      FakeUpstream& upstream = **it;
+      std::unique_lock<std::mutex> lock(upstream.lock_);
+      if (upstream.new_connections_.empty()) {
+        upstream.new_connection_event_.wait_until(lock, std::chrono::system_clock::now() +
+                                                            std::chrono::milliseconds(5));
+      }
+
+      if (upstream.new_connections_.empty()) {
+        // Run the client dispatcher since we may need to process window updates, etc.
+        client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+      } else {
+        FakeHttpConnectionPtr connection(
+            new FakeHttpConnection(std::move(upstream.new_connections_.front()),
+                                   upstream.stats_store_, upstream.http_type_));
+        connection->initialize();
+        upstream.new_connections_.pop_front();
+        connection->readDisable(false);
+        return connection;
+      }
+    }
+  }
 }
 
 FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {

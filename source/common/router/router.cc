@@ -598,6 +598,11 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     handleNon5xxResponseHeaders(*headers, end_stream);
   }
 
+  // Append routing cookies
+  for (const auto& header_value : downstream_set_cookies_) {
+    headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
+  }
+
   downstream_response_started_ = true;
   if (end_stream) {
     onUpstreamComplete();

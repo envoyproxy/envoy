@@ -18,6 +18,7 @@
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
+#include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
 #include "server/lds_api.h"

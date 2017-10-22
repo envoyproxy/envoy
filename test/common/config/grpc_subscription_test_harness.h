@@ -74,8 +74,8 @@ public:
     subscription_->grpcMux().onCreateInitialMetadata(request_headers);
   }
 
-  void deliverConfigUpdate(const std::vector<std::string> cluster_names, const std::string& version,
-                           bool accept) override {
+  void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
+                           const std::string& version, bool accept) override {
     std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
         new envoy::api::v2::DiscoveryResponse());
     response->set_version_info(version);

@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/stats:statsd_lib",
         "//source/server:configuration_lib",
     ],

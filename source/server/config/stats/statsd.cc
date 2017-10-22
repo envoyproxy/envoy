@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
+#include "common/network/resolver_impl.h"
 #include "common/stats/statsd.h"
 
 #include "api/bootstrap.pb.h"
@@ -20,7 +21,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
   switch (statsd_sink.statsd_specifier_case()) {
   case envoy::api::v2::StatsdSink::kAddress: {
     Network::Address::InstanceConstSharedPtr address =
-        Network::Utility::fromProtoAddress(statsd_sink.address());
+        Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(info, "statsd UDP ip address: {}", address->asString());
     return Stats::SinkPtr(
         new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address)));

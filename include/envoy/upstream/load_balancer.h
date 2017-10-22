@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/router/router.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -18,9 +19,18 @@ public:
   virtual ~LoadBalancerContext() {}
 
   /**
-   * @return Optional<uint64_t> the optional hash key to use during load balancing.
+   * Compute and return an optional hash key to use during load balancing. This
+   * method may modify internal state so it should only be called once per
+   * routing attempt.
+   * @return Optional<uint64_t> the optional hash key to use.
    */
-  virtual Optional<uint64_t> hashKey() const PURE;
+  virtual Optional<uint64_t> computeHashKey() PURE;
+
+  /**
+   * @return Router::MetadataMatchCriteria* metadata for use in selecting a subset of hosts
+   *         during load balancing.
+   */
+  virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 
   /**
    * @return const Network::Connection* the incoming connection or nullptr to use during load
@@ -42,7 +52,7 @@ public:
    *        context information. Load balancers should be written to assume that context information
    *        is missing and use sensible defaults.
    */
-  virtual HostConstSharedPtr chooseHost(const LoadBalancerContext* context) PURE;
+  virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 };
 
 typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;

@@ -1,3 +1,5 @@
+#include "common/stats/stats_impl.h"
+
 #include "server/hot_restart_impl.h"
 
 #include "test/mocks/api/mocks.h"
@@ -50,8 +52,10 @@ public:
 
 TEST_F(HotRestartImplTest, versionString) {
   setup();
-  EXPECT_EQ(hot_restart_->version(), Envoy::Server::SharedMemory::version(
-                                         options_.maxStats(), options_.maxStatNameLength()));
+  EXPECT_EQ(hot_restart_->version(),
+            Envoy::Server::SharedMemory::version(options_.maxStats(),
+                                                 options_.maxObjNameLength() +
+                                                     Stats::RawStatData::maxStatSuffixLength()));
 }
 
 TEST_F(HotRestartImplTest, crossAlloc) {
@@ -101,8 +105,9 @@ class HotRestartImplAlignmentTest : public HotRestartImplTest,
 public:
   HotRestartImplAlignmentTest() : name_len_(8 + GetParam()) {
     EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(num_stats_));
-    EXPECT_CALL(options_, maxStatNameLength()).WillRepeatedly(Return(name_len_));
+    EXPECT_CALL(options_, maxObjNameLength()).WillRepeatedly(Return(name_len_));
     setup();
+    EXPECT_EQ(name_len_, Stats::RawStatData::maxObjNameLength());
   }
 
   static const uint64_t num_stats_ = 8;
@@ -130,7 +135,10 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   };
   std::vector<TestStat> stats;
   for (uint64_t i = 0; i < num_stats_; i++) {
-    std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzz", i)
+    std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+                                   "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+                                   "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+                                   i)
                            .substr(0, Stats::RawStatData::maxNameLength());
     TestStat ts;
     ts.stat_ = hot_restart_->alloc(name);

@@ -1,3 +1,5 @@
+#include <array>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
@@ -18,7 +20,21 @@ public:
   uint32_t times_low_watermark_called_{0};
   uint32_t times_high_watermark_called_{0};
 };
+
 TEST_F(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
+
+TEST_F(WatermarkBufferTest, CopyOut) {
+  buffer_.add("hello world");
+  std::array<char, 5> out;
+  buffer_.copyOut(0, out.size(), out.data());
+  EXPECT_EQ(std::string(out.data(), out.size()), "hello");
+
+  buffer_.copyOut(6, out.size(), out.data());
+  EXPECT_EQ(std::string(out.data(), out.size()), "world");
+
+  // Copy out zero bytes.
+  buffer_.copyOut(4, 0, out.data());
+}
 
 TEST_F(WatermarkBufferTest, AddChar) {
   buffer_.add(TEN_BYTES, 10);

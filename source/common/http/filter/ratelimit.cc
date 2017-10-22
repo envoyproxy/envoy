@@ -6,7 +6,6 @@
 #include "envoy/http/codes.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
@@ -63,10 +62,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(
-        *this, config_->domain(), descriptors,
-        {headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING,
-         headers.OtSpanContext() ? headers.OtSpanContext()->value().c_str() : EMPTY_STRING});
+    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan());
     initiating_call_ = false;
   }
 }

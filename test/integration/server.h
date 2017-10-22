@@ -51,7 +51,7 @@ public:
   const std::string& serviceNodeName() override { return service_node_name_; }
   const std::string& serviceZone() override { return service_zone_; }
   uint64_t maxStats() override { return 16384; }
-  uint64_t maxStatNameLength() override { return 127; }
+  uint64_t maxObjNameLength() override { return 60; }
 
 private:
   const std::string config_path_;

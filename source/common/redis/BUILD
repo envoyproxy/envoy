@@ -41,6 +41,7 @@ envoy_cc_library(
     deps = [
         ":codec_lib",
         "//include/envoy/redis:conn_pool_interface",
+        "//include/envoy/router:router_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",

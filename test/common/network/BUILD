@@ -139,6 +139,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "resolver_test",
+    srcs = ["resolver_impl_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
+        "//source/common/protobuf",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [

@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/router/router.h"
+
 #include "common/network/utility.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/upstream_impl.h"
@@ -24,7 +26,8 @@ public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() const override { return hash_key_; }
+  Optional<uint64_t> computeHashKey() override { return hash_key_; }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 
   Optional<uint64_t> hash_key_;

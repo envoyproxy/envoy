@@ -46,7 +46,7 @@ public:
    * @param version version_info to provide in the response.
    * @param accept will the onConfigUpdate() callback accept the response?
    */
-  virtual void deliverConfigUpdate(const std::vector<std::string> cluster_names,
+  virtual void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                                    const std::string& version, bool accept) PURE;
 
   virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,

@@ -5,6 +5,7 @@
 #include "common/config/base_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/metadata.h"
+#include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 
@@ -130,7 +131,10 @@ void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
 void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
                                    envoy::api::v2::VirtualHost& virtual_host) {
   json_virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
-  JSON_UTIL_SET_STRING(json_virtual_host, virtual_host, name);
+
+  const std::string name = json_virtual_host.getString("name", "");
+  Utility::checkObjNameLength("Invalid virtual host name", name);
+  virtual_host.set_name(name);
 
   for (const std::string& domain : json_virtual_host.getStringArray("domains", true)) {
     virtual_host.add_domains(domain);

@@ -53,6 +53,7 @@ envoy_cc_library(
     deps = [
         ":cds_api_lib",
         ":load_balancer_lib",
+        ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codes_interface",
@@ -70,6 +71,7 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
@@ -126,6 +128,20 @@ envoy_cc_library(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "load_stats_reporter_lib",
+    srcs = ["load_stats_reporter.cc"],
+    hdrs = ["load_stats_reporter.h"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/grpc:async_client_lib",
     ],
 )
 
@@ -218,6 +234,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
     ],
 )
@@ -265,6 +282,7 @@ envoy_cc_library(
         "//source/common/config:tls_context_json_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

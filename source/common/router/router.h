@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -15,7 +16,10 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/hash.h"
+#include "common/common/hex.h"
 #include "common/common/logger.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -125,17 +129,49 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> hashKey() const override {
+  Optional<uint64_t> computeHashKey() override {
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
-        return hash_policy->generateHash(callbacks_->downstreamAddress(), *downstream_headers_);
+        return hash_policy->generateHash(
+            callbacks_->downstreamAddress(), *downstream_headers_,
+            [this](const std::string& key, std::chrono::seconds max_age) {
+              return addDownstreamSetCookie(key, max_age);
+            });
       }
     }
     return {};
   }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+    if (route_entry_) {
+      return route_entry_->metadataMatchCriteria();
+    }
+    return nullptr;
+  }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
+  }
+
+  /**
+   * Set a computed cookie to be sent with the downstream headers.
+   * @param key supplies the size of the cookie
+   * @param max_age the lifetime of the cookie
+   * @return std::string the value of the new cookie
+   */
+  std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) {
+    // The cookie value should be the same per connection so that if multiple
+    // streams race on the same path, they all receive the same cookie.
+    // Since the downstream port is part of the hashed value, multiple HTTP1
+    // connections can receive different cookies if they race on requests.
+    std::string value;
+    const Network::Connection* conn = downstreamConnection();
+    // need to check for null conn if this is ever used by Http::AsyncClient in the fiture
+    value = conn->remoteAddress().asString() + conn->localAddress().asString();
+
+    const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
+    downstream_set_cookies_.emplace_back(
+        Http::Utility::makeSetCookieValue(key, cookie_value, max_age));
+    return cookie_value;
   }
 
 protected:
@@ -275,6 +311,9 @@ private:
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   bool stream_destroyed_{};
+
+  // list of cookies to add to upstream headers
+  std::vector<std::string> downstream_set_cookies_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;

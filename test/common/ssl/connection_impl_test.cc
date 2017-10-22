@@ -379,6 +379,389 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   EXPECT_EQ(1UL, stats_store.counter("ssl.handshake").value());
 }
 
+namespace {
+
+// Test connecting with a client to server1, then trying to reuse the session on server2
+void testTicketSessionResumption(const std::string& server_ctx_json1,
+                                 const std::string& server_ctx_json2,
+                                 const std::string& client_ctx_json, bool expect_reuse,
+                                 const Network::Address::IpVersion ip_version) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+
+  Json::ObjectSharedPtr server_ctx_loader1 = TestEnvironment::jsonLoadFromString(server_ctx_json1);
+  Json::ObjectSharedPtr server_ctx_loader2 = TestEnvironment::jsonLoadFromString(server_ctx_json2);
+  ServerContextConfigImpl server_ctx_config1(*server_ctx_loader1);
+  ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2);
+  ContextManagerImpl manager(runtime);
+  ServerContextPtr server_ctx1(manager.createSslServerContext(stats_store, server_ctx_config1));
+  ServerContextPtr server_ctx2(manager.createSslServerContext(stats_store, server_ctx_config2));
+
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
+  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
+  NiceMock<Network::MockListenerCallbacks> callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener1 = dispatcher.createSslListener(
+      connection_handler, *server_ctx1, socket1, callbacks, stats_store,
+      Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener2 = dispatcher.createSslListener(
+      connection_handler, *server_ctx2, socket2, callbacks, stats_store,
+      Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
+  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket1.localAddress(), Network::Address::InstanceConstSharedPtr());
+
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->connect();
+
+  SSL_SESSION* ssl_session = nullptr;
+  Network::ConnectionPtr server_connection;
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke(
+          [&](Network::ConnectionPtr& conn) -> void { server_connection = std::move(conn); }));
+
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        Ssl::ConnectionImpl* ssl_connection =
+            dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+        ssl_session = SSL_get1_session(ssl_connection->rawSslForTest());
+        EXPECT_FALSE(ssl_session->not_resumable);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(0UL, stats_store.counter("ssl.session_reused").value());
+
+  client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket2.localAddress(), Network::Address::InstanceConstSharedPtr());
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  Ssl::ConnectionImpl* ssl_connection =
+      dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+  SSL_set_session(ssl_connection->rawSslForTest(), ssl_session);
+  SSL_SESSION_free(ssl_session);
+
+  client_connection->connect();
+
+  Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+
+  // Different tests have different order of whether client or server gets Connected event
+  // first, so always wait until both have happened.
+  unsigned connect_count = 0;
+  auto stopSecondTime = [&]() {
+    connect_count++;
+    if (connect_count == 2) {
+      client_connection->close(Network::ConnectionCloseType::NoFlush);
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+      dispatcher.exit();
+    }
+  };
+
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  // One for client, one for server
+  EXPECT_EQ(expect_reuse ? 2UL : 0UL, stats_store.counter("ssl.session_reused").value());
+}
+} // namespace
+
+TEST_P(SslConnectionImplTest, TicketSessionResumption) {
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json, server_ctx_json, client_ctx_json, true, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, TicketSessionResumptionWithClientCA) {
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"],
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json, server_ctx_json, client_ctx_json, true, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, TicketSessionResumptionRotateKey) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b",
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, true,
+                              GetParam());
+}
+
+TEST_P(SslConnectionImplTest, TicketSessionResumptionWrongKey) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, false,
+                              GetParam());
+}
+
+// Sessions can be resumed because the server certificates are different but the CN/SANs and
+// issuer are identical
+TEST_P(SslConnectionImplTest, TicketSessionResumptionDifferentServerCert) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, true,
+                              GetParam());
+}
+
+// Sessions cannot be resumed because the server certificates are different and the SANs
+// are not identical
+TEST_P(SslConnectionImplTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, false,
+                              GetParam());
+}
+
+// Test that if two listeners use the same cert and session ticket key, but
+// different client CA, that sessions cannot be resumed.
+TEST_P(SslConnectionImplTest, ClientAuthCrossListenerSessionResumption) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"],
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "require_client_certificate": true
+  }
+  )EOF";
+
+  std::string server2_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": ["{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"],
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem",
+    "require_client_certificate": true
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  Json::ObjectSharedPtr server2_ctx_loader = TestEnvironment::jsonLoadFromString(server2_ctx_json);
+  ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader);
+  ContextManagerImpl manager(runtime);
+  ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
+  ServerContextPtr server2_ctx(manager.createSslServerContext(stats_store, server2_ctx_config));
+
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::MockListenerCallbacks callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener =
+      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
+                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener2 = dispatcher.createSslListener(
+      connection_handler, *server2_ctx, socket2, callbacks, stats_store,
+      Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
+  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket.localAddress(), Network::Address::InstanceConstSharedPtr());
+
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->connect();
+
+  SSL_SESSION* ssl_session = nullptr;
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        Ssl::ConnectionImpl* ssl_connection =
+            dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+        ssl_session = SSL_get1_session(ssl_connection->rawSslForTest());
+        EXPECT_FALSE(ssl_session->not_resumable);
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  // 1 for client, 1 for server
+  EXPECT_EQ(2UL, stats_store.counter("ssl.handshake").value());
+
+  client_connection = dispatcher.createSslClientConnection(
+      *client_ctx, socket2.localAddress(), Network::Address::InstanceConstSharedPtr());
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+  Ssl::ConnectionImpl* ssl_connection =
+      dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+  SSL_set_session(ssl_connection->rawSslForTest(), ssl_session);
+  SSL_SESSION_free(ssl_session);
+
+  client_connection->connect();
+
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+      }));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher.exit(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(1UL, stats_store.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, stats_store.counter("ssl.session_reused").value());
+}
+
 TEST_P(SslConnectionImplTest, SslError) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;

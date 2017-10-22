@@ -169,8 +169,19 @@ public:
   ~MockHashPolicy();
 
   // Router::HashPolicy
-  MOCK_CONST_METHOD2(generateHash, Optional<uint64_t>(const std::string& downstream_address,
-                                                      const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD3(generateHash, Optional<uint64_t>(const std::string& downstream_address,
+                                                      const Http::HeaderMap& headers,
+                                                      const AddCookieCallback add_cookie));
+};
+
+class MockMetadataMatchCriteria : public MetadataMatchCriteria {
+public:
+  MockMetadataMatchCriteria();
+  ~MockMetadataMatchCriteria();
+
+  // Router::MetadataMatchCriteria
+  MOCK_CONST_METHOD0(metadataMatchCriteria,
+                     const std::vector<MetadataMatchCriterionConstSharedPtr>&());
 };
 
 class MockRouteEntry : public RouteEntry {
@@ -207,6 +218,7 @@ public:
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
   MockHashPolicy hash_policy_;
+  MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
 };
 
@@ -216,7 +228,7 @@ public:
   ~MockDecorator();
 
   // Router::Decorator
-  MOCK_CONST_METHOD0(operation, const std::string&());
+  MOCK_CONST_METHOD0(getOperation, const std::string&());
   MOCK_CONST_METHOD1(apply, void(Tracing::Span& span));
 
   std::string operation_{"fake_operation"};
@@ -247,7 +259,6 @@ public:
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
-  MOCK_CONST_METHOD0(usesRuntime, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;

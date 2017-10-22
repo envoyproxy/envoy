@@ -1,5 +1,6 @@
 #include "common/router/config_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -73,7 +74,8 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers) const override {
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
 
     const Http::HeaderEntry* header = headers.get(header_name_);
@@ -87,10 +89,34 @@ private:
   const Http::LowerCaseString header_name_;
 };
 
+class CookieHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
+
+  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                              const HashPolicy::AddCookieCallback add_cookie) const override {
+    Optional<uint64_t> hash;
+    std::string value = Http::Utility::parseCookieValue(headers, key_);
+
+    if (value.empty() && ttl_ != std::chrono::seconds(0)) {
+      value = add_cookie(key_, ttl_);
+      hash.value(HashUtil::xxHash64(value));
+
+    } else if (!value.empty()) {
+      hash.value(HashUtil::xxHash64(value));
+    }
+    return hash;
+  }
+
+private:
+  const std::string key_;
+  const std::chrono::seconds ttl_;
+};
+
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  Optional<uint64_t> evaluate(const std::string& downstream_addr,
-                              const Http::HeaderMap&) const override {
+  Optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+                              const HashPolicy::AddCookieCallback) const override {
     Optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
       hash.value(HashUtil::xxHash64(downstream_addr));
@@ -109,6 +135,10 @@ HashPolicyImpl::HashPolicyImpl(
     case envoy::api::v2::RouteAction::HashPolicy::kHeader:
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
+    case envoy::api::v2::RouteAction::HashPolicy::kCookie:
+      hash_impls_.emplace_back(
+          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().ttl().seconds()));
+      break;
     case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod());
@@ -122,18 +152,56 @@ HashPolicyImpl::HashPolicyImpl(
 }
 
 Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                const Http::HeaderMap& headers) const {
+                                                const Http::HeaderMap& headers,
+                                                const AddCookieCallback add_cookie) const {
   Optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers);
+    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers, add_cookie);
     if (new_hash.valid()) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy
-      uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
+      const uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
       hash.value(old_value ^ new_hash.value());
     }
   }
   return hash;
+}
+
+std::vector<MetadataMatchCriterionConstSharedPtr>
+MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
+                                                        const ProtobufWkt::Struct& matches) {
+  std::vector<MetadataMatchCriterionConstSharedPtr> v;
+
+  // Track locations of each name (from the parent) in v to make it
+  // easier to replace them when the same name exists in matches.
+  std::unordered_map<std::string, std::size_t> existing;
+
+  if (parent) {
+    for (const auto& it : parent->metadata_match_criteria_) {
+      // v.size() is the index of the emplaced name.
+      existing.emplace(it->name(), v.size());
+      v.emplace_back(it);
+    }
+  }
+
+  // Add values from matches, replacing name/values copied from parent.
+  for (const auto it : matches.fields()) {
+    const auto index_it = existing.find(it.first);
+    if (index_it != existing.end()) {
+      v[index_it->second] = std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second);
+    } else {
+      v.emplace_back(std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second));
+    }
+  }
+
+  // Sort criteria by name to speed matching in the subset load balancer.
+  // See source/docs/subset_load_balancer.md.
+  std::sort(
+      v.begin(), v.end(),
+      [](const MetadataMatchCriterionConstSharedPtr& a,
+         const MetadataMatchCriterionConstSharedPtr& b) -> bool { return a->name() < b->name(); });
+
+  return v;
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::api::v2::Decorator& decorator)
@@ -144,6 +212,8 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
     span.setOperation(operation_);
   }
 }
+
+const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
@@ -163,18 +233,44 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
+  if (route.route().has_metadata_match()) {
+    const auto filter_it = route.route().metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
+      metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+    }
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
-  // single cluster, pointing back to the parent.
+  // single cluster, pointing back to the parent. Metadata criteria
+  // from the weighted cluster (if any) are merged with and override
+  // the criteria from the route.
   if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       const std::string& cluster_name = cluster.name();
+
+      MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria;
+      if (cluster.has_metadata_match()) {
+        const auto filter_it = cluster.metadata_match().filter_metadata().find(
+            Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        if (filter_it != cluster.metadata_match().filter_metadata().end()) {
+          if (metadata_match_criteria_) {
+            cluster_metadata_match_criteria =
+                metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+          } else {
+            cluster_metadata_match_criteria.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+          }
+        }
+      }
+
       std::unique_ptr<WeightedClusterEntry> cluster_entry(
           new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
-                                   cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)));
+                                   cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight),
+                                   std::move(cluster_metadata_match_criteria)));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -550,16 +646,6 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
   }
 }
 
-bool VirtualHostImpl::usesRuntime() const {
-  bool uses = false;
-  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    // Currently a base runtime rule as well as a shadow rule can use runtime.
-    uses |= (route->usesRuntime() || !route->shadowPolicy().runtimeKey().empty());
-  }
-
-  return uses;
-}
-
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::VirtualCluster& virtual_cluster) {
   if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
@@ -597,8 +683,6 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
                                                           runtime, cm, validate_clusters));
-    uses_runtime_ |= virtual_host->usesRuntime();
-
     for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {

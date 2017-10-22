@@ -52,6 +52,9 @@ MockVirtualHost::~MockVirtualHost() {}
 MockHashPolicy::MockHashPolicy() {}
 MockHashPolicy::~MockHashPolicy() {}
 
+MockMetadataMatchCriteria::MockMetadataMatchCriteria() {}
+MockMetadataMatchCriteria::~MockMetadataMatchCriteria() {}
+
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
@@ -75,7 +78,9 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
 
 MockConfig::~MockConfig() {}
 
-MockDecorator::MockDecorator() { ON_CALL(*this, operation()).WillByDefault(ReturnRef(operation_)); }
+MockDecorator::MockDecorator() {
+  ON_CALL(*this, getOperation()).WillByDefault(ReturnRef(operation_));
+}
 MockDecorator::~MockDecorator() {}
 
 MockRoute::MockRoute() {

@@ -45,8 +45,8 @@ public:
   Request* send(MessagePtr&& request, Callbacks& callbacks,
                 const Optional<std::chrono::milliseconds>& timeout) override;
 
-  Stream* start(StreamCallbacks& callbacks,
-                const Optional<std::chrono::milliseconds>& timeout) override;
+  Stream* start(StreamCallbacks& callbacks, const Optional<std::chrono::milliseconds>& timeout,
+                bool buffer_body_for_retry) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -71,7 +71,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                  const Optional<std::chrono::milliseconds>& timeout);
+                  const Optional<std::chrono::milliseconds>& timeout, bool buffer_body_for_retry);
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -210,9 +210,7 @@ private:
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
-  const Buffer::Instance* decodingBuffer() override {
-    throw EnvoyException("buffering is not supported in streaming");
-  }
+  const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
@@ -231,7 +229,7 @@ private:
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};
-
+  Buffer::InstancePtr buffered_body_;
   friend class AsyncClientImpl;
 };
 

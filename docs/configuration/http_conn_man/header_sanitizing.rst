@@ -12,6 +12,7 @@ depends on the :ref:`use_remote_address <config_http_conn_man_use_remote_address
 
 Envoy will potentially sanitize the following headers:
 
+* :ref:`x-envoy-decorator-operation <config_http_filters_router_x-envoy-decorator-operation>`
 * :ref:`x-envoy-downstream-service-cluster
   <config_http_conn_man_headers_downstream-service-cluster>`
 * :ref:`x-envoy-downstream-service-node <config_http_conn_man_headers_downstream-service-node>`

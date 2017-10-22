@@ -40,6 +40,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
+        "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
@@ -147,6 +148,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 

@@ -65,3 +65,11 @@ envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
 )
+
+envoy_cc_library(
+    name = "resolver_interface",
+    hdrs = ["resolver.h"],
+    deps = [
+        ":address_interface",
+    ],
+)

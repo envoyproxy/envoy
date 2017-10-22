@@ -168,5 +168,103 @@ TEST_F(SslContextImplTest, TestNoCert) {
   EXPECT_EQ("", context->getCertChainInformation());
 }
 
+class SslServerContextImplTicketTest : public SslContextImplTest {
+public:
+  static void loadConfig(ServerContextConfigImpl& cfg) {
+    Runtime::MockLoader runtime;
+    ContextManagerImpl manager(runtime);
+    Stats::IsolatedStoreImpl store;
+    ServerContextPtr server_ctx(manager.createSslServerContext(store, cfg));
+  }
+
+  static void loadConfigV2(envoy::api::v2::DownstreamTlsContext& cfg) {
+    // Must add a certificate for the config to be considered valid.
+    envoy::api::v2::TlsCertificate* server_cert =
+        cfg.mutable_common_tls_context()->add_tls_certificates();
+    server_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+    server_cert->mutable_private_key()->set_filename(
+        TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+
+    ServerContextConfigImpl server_context_config(cfg);
+    loadConfig(server_context_config);
+  }
+
+  static void loadConfigJson(const std::string& json) {
+    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
+    ServerContextConfigImpl cfg(*loader);
+    loadConfig(cfg);
+  }
+};
+
+TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
+  // Both keys are valid; no error should be thrown
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a",
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+    ]
+  }
+  )EOF";
+
+  EXPECT_NO_THROW(loadConfigJson(json));
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
+  // First key is valid, second key isn't.  Should throw if any keys are invalid.
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a",
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_wrong_len"
+    ]
+  }
+  )EOF";
+
+  EXPECT_THROW(loadConfigJson(json), EnvoyException);
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/this_file_does_not_exist"
+    ]
+  }
+  )EOF";
+
+  EXPECT_THROW(loadConfigJson(json), std::exception);
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
+  envoy::api::v2::DownstreamTlsContext cfg;
+  EXPECT_NO_THROW(loadConfigV2(cfg));
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInlineSuccess) {
+  envoy::api::v2::DownstreamTlsContext cfg;
+  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_(std::string(80, '\0'));
+  EXPECT_NO_THROW(loadConfigV2(cfg));
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInlineFailTooBig) {
+  envoy::api::v2::DownstreamTlsContext cfg;
+  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_(std::string(81, '\0'));
+  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+}
+
+TEST_F(SslServerContextImplTicketTest, TicketKeyInlineFailTooSmall) {
+  envoy::api::v2::DownstreamTlsContext cfg;
+  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_(std::string(79, '\0'));
+  EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+}
+
 } // namespace Ssl
 } // namespace Envoy

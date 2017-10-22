@@ -8,7 +8,7 @@ then
     export CPPFLAGS="$CPPFLAGS -D_DARWIN_C_SOURCE"
 fi
 
-COMMIT=14308731e5446a73ac2258688a9688b524483cb6  # chromium-61.0.3163.81
+COMMIT=ae9f0616c58bddcbe7a6d80d29d796bee9aaff2e  # chromium-62.0.3202.62
 
 git clone https://boringssl.googlesource.com/boringssl
 cd boringssl

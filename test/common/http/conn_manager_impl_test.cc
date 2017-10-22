@@ -76,8 +76,6 @@ public:
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
-    tracing_config_.reset(new TracingConnectionManagerConfig(
-        {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
 
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
     // method only.
@@ -88,7 +86,7 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  void setup(bool ssl, const std::string& server_name) {
+  void setup(bool ssl, const std::string& server_name, bool tracing = true) {
     if (ssl) {
       ssl_connection_.reset(new Ssl::MockConnection());
     }
@@ -102,6 +100,11 @@ public:
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
                                                   local_info_, cluster_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
+
+    if (tracing) {
+      tracing_config_.reset(new TracingConnectionManagerConfig(
+          {Tracing::OperationName::Ingress, {LowerCaseString(":method")}}));
+    }
   }
 
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters) {
@@ -279,7 +282,7 @@ public:
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
-  setup(false, "envoy-custom-server");
+  setup(false, "envoy-custom-server", false);
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -387,14 +390,74 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
-  EXPECT_CALL(*span, finishSpan(_))
-      .WillOnce(
-          Invoke([span](Tracing::SpanFinalizer& finalizer) -> void { finalizer.finalize(*span); }));
+  EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
   EXPECT_CALL(*span, setTag(":method", "GET"));
   // Verify if the activeSpan interface returns reference to the current span.
   EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*span, setOperation("testOp"));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":method", "GET"},
+                              {":authority", "host"},
+                              {":path", "/"},
+                              {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"},
+                              {"x-envoy-decorator-operation", "testOp"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+
+    HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+    filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+
+  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgress) {
+  setup(false, "");
+  tracing_config_.reset(new TracingConnectionManagerConfig(
+      {Tracing::OperationName::Egress, {LowerCaseString(":method")}}));
+
+  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(tracer_, startSpan_(_, _, _))
+      .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
+                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+        EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
+
+        return span;
+      }));
+  route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
+  EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
+      .WillOnce(
+          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
+  EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 
@@ -427,6 +490,13 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
     data.drain(4);
   }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_NE(nullptr, headers.EnvoyDecoratorOperation());
+        EXPECT_STREQ("testOp", headers.EnvoyDecoratorOperation()->value().c_str());
+        return FilterHeadersStatus::StopIteration;
+      }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
@@ -521,7 +591,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, finishSpan(_)).Times(0);
+  EXPECT_CALL(*span, finishSpan()).Times(0);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -1251,6 +1321,72 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
 
   decoder_filters_[1]->callbacks_->encodeTrailers(
       HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+}
+
+// Add*Data during the *Data callbacks.
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl data1("hello");
+    decoder->decodeData(data1, false);
+
+    Buffer::OwnedImpl data2("world");
+    decoder->decodeData(data2, true);
+  }));
+
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        decoder_filters_[0]->callbacks_->addDecodedData(data, true);
+        EXPECT_EQ(TestUtility::bufferToString(*decoder_filters_[0]->callbacks_->decodingBuffer()),
+                  "helloworld");
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        encoder_filters_[0]->callbacks_->addEncodedData(data, true);
+        EXPECT_EQ(TestUtility::bufferToString(*encoder_filters_[0]->callbacks_->encodingBuffer()),
+                  "goodbye");
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+  Buffer::OwnedImpl data1("good");
+  decoder_filters_[1]->callbacks_->encodeData(data1, false);
+  Buffer::OwnedImpl data2("bye");
+  decoder_filters_[1]->callbacks_->encodeData(data2, true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {

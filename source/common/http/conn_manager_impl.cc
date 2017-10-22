@@ -346,8 +346,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
-      stream_id_(ConnectionManagerUtility::generateStreamId(*snapped_route_config_,
-                                                            connection_manager.random_generator_)),
+      stream_id_(connection_manager.random_generator_.random()),
       request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_)),
       request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
@@ -370,9 +369,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 
   if (request_info_.healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
-  } else {
-    Tracing::HttpConnManFinalizerImpl finalizer(request_headers_.get(), request_info_, *this);
-    active_span_->finishSpan(finalizer);
+  } else if (active_span_) {
+    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), request_info_,
+                                             *this);
   }
 
   ASSERT(state_.filter_call_state_ == 0);
@@ -541,23 +540,56 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
-    Tracing::Decision tracing_decision =
-        Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
-    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
-                                              connection_manager_.config_.tracingStats());
-
-    if (tracing_decision.is_tracing) {
-      active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
-      if (cached_route_.value() && cached_route_.value()->decorator()) {
-        cached_route_.value()->decorator()->apply(*active_span_);
-      }
-      active_span_->injectContext(*request_headers_);
-    }
+    traceRequest();
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.
   request_info_.downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
+}
+
+void ConnectionManagerImpl::ActiveStream::traceRequest() {
+  Tracing::Decision tracing_decision =
+      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+  ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
+                                            connection_manager_.config_.tracingStats());
+
+  if (!tracing_decision.is_tracing) {
+    return;
+  }
+
+  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+
+  // If a decorator has been defined, apply it to the active span.
+  if (cached_route_.value() && cached_route_.value()->decorator()) {
+    cached_route_.value()->decorator()->apply(*active_span_);
+
+    // For egress (outbound) requests, pass the decorator's operation name (if defined)
+    // as a request header to enable the receiving service to use it in its server span.
+    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+            Tracing::OperationName::Egress &&
+        !cached_route_.value()->decorator()->getOperation().empty()) {
+      request_headers_->insertEnvoyDecoratorOperation().value(
+          cached_route_.value()->decorator()->getOperation());
+    }
+  }
+
+  const HeaderEntry* decorator_operation = request_headers_->EnvoyDecoratorOperation();
+
+  // For ingress (inbound) requests, if a decorator operation name has been provided, it
+  // should be used to override the active span's operation.
+  if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+          Tracing::OperationName::Ingress &&
+      decorator_operation) {
+    if (!decorator_operation->value().empty()) {
+      active_span_->setOperation(decorator_operation->value().c_str());
+    }
+    // Remove header so not propagated to service
+    request_headers_->removeEnvoyDecoratorOperation();
+  }
+
+  // Inject the active span's tracing context into the request headers.
+  active_span_->injectContext(*request_headers_);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
@@ -644,11 +676,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
-      (state_.filter_call_state_ & FilterCallState::DecodeHeaders)) {
+      (state_.filter_call_state_ & FilterCallState::DecodeHeaders) ||
+      (state_.filter_call_state_ & FilterCallState::DecodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.decoder_filters_streaming_ = streaming;
-    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
-    // processing happens in the decodeHeaders() callback if necessary.
+    // If no call is happening or we are in the decode headers/data callback, buffer the data.
+    // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -818,11 +851,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
-      (state_.filter_call_state_ & FilterCallState::EncodeHeaders)) {
+      (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
+      (state_.filter_call_state_ & FilterCallState::EncodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
-    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
-    // processing happens in the decodeHeaders() callback if necessary.
+    // If no call is happening or we are in the decode headers/data callback, buffer the data.
+    // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -1063,7 +1097,11 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
 }
 
 Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
-  return *parent_.active_span_;
+  if (parent_.active_span_) {
+    return *parent_.active_span_;
+  } else {
+    return Tracing::NullSpan::instance();
+  }
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {

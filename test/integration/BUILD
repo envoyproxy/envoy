@@ -306,6 +306,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "load_stats_integration_test",
+    srcs = ["load_stats_integration_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:resources_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "proxy_proto_integration_test",
     srcs = [
         "proxy_proto_integration_test.cc",

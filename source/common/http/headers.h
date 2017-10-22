@@ -51,6 +51,7 @@ public:
   const LowerCaseString EnvoyExpectedRequestTimeoutMs{"x-envoy-expected-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
+  const LowerCaseString EnvoyDecoratorOperation{"x-envoy-decorator-operation"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
@@ -70,6 +71,7 @@ public:
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};
+  const LowerCaseString SetCookie{"set-cookie"};
   const LowerCaseString Status{":status"};
   const LowerCaseString TransferEncoding{"transfer-encoding"};
   const LowerCaseString TE{"te"};

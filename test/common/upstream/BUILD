@@ -128,6 +128,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "load_stats_reporter_test",
+    srcs = ["load_stats_reporter_test.cc"],
+    external_deps = ["envoy_eds"],
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "logical_dns_cluster_test",
     srcs = ["logical_dns_cluster_test.cc"],
     deps = [

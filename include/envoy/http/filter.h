@@ -172,10 +172,14 @@ public:
    * decodeHeaders(..., false) followed by decodeData(..., true). This works both in the direct
    * iteration as well as the continuation case.
    *
-   * 2) If additional buffered body data needs to be added by a filter before continuation of
-   * data to further filters (outside of callback context).
+   * 2) If a filter is going to look at all buffered data from within a data callback with end
+   * stream set, this method can be called to immediately buffer the data. This avoids having
+   * to deal with the existing buffered data and the data from the current callback.
    *
-   * 3) If additional data needs to be added in the decodeTrailers() callback, this method can be
+   * 3) If additional buffered body data needs to be added by a filter before continuation of data
+   * to further filters (outside of callback context).
+   *
+   * 4) If additional data needs to be added in the decodeTrailers() callback, this method can be
    * called in the context of the callback. All further filters will receive decodeData(..., false)
    * followed by decodeTrailers().
    *
@@ -347,10 +351,14 @@ public:
    * encodeHeaders(..., false) followed by encodeData(..., true). This works both in the direct
    * iteration as well as the continuation case.
    *
-   * 2) If additional buffered body data needs to be added by a filter before continuation of
-   * data to further filters (outside of callback context).
+   * 2) If a filter is going to look at all buffered data from within a data callback with end
+   * stream set, this method can be called to immediately buffer the data. This avoids having
+   * to deal with the existing buffered data and the data from the current callback.
    *
-   * 3) If additional data needs to be added in the encodeTrailers() callback, this method can be
+   * 3) If additional buffered body data needs to be added by a filter before continuation of data
+   * to further filters (outside of callback context).
+   *
+   * 4) If additional data needs to be added in the encodeTrailers() callback, this method can be
    * called in the context of the callback. All further filters will receive encodeData(..., false)
    * followed by encodeTrailers().
    *
