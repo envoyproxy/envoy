@@ -145,15 +145,6 @@ def envoy_api_deps(skip_targets):
 
 def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False, skip_targets = [],
                        repository = ""):
-    native.bind(
-        name = "cc_wkt_protos",
-        actual = "@com_google_protobuf_cc//:cc_wkt_protos",
-    )
-    native.bind(
-        name = "cc_wkt_protos_genproto",
-        actual = "@com_google_protobuf_cc//:cc_wkt_protos_genproto",
-    )
-
     envoy_repository = repository_rule(
         implementation = _repository_impl,
         environ = [
@@ -280,7 +271,7 @@ def com_google_protobuf():
   )
   native.bind(
       name = "protobuf",
-      actual = "@com_google_protobuf_cc//:protobuf",
+      actual = "@com_google_protobuf//:protobuf",
   )
   native.bind(
       name = "protoc",

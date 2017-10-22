@@ -112,7 +112,5 @@ envoy_cc_library(
     srcs = ["transcoder_input_stream_impl.cc"],
     hdrs = ["transcoder_input_stream_impl.h"],
     external_deps = ["grpc_transcoding"],
-    deps = [
-        "//source/common/buffer:zero_copy_input_stream_lib",
-    ],
+    deps = ["//source/common/buffer:zero_copy_input_stream_lib"],
 )

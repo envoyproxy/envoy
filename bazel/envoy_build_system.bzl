@@ -304,13 +304,10 @@ def _proto_header(proto_path):
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
     internal_proto_lib_name = name + "_internal_proto_lib"
-    wkt_protos = [
-        "@com_google_protobuf//:empty_proto",
-    ]
     native.proto_library(
         name = internal_proto_lib_name,
         srcs = srcs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + wkt_protos,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
     )
     native.cc_proto_library(
         name = name,
