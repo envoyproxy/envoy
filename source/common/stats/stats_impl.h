@@ -30,6 +30,7 @@ public:
    * @param name name for tag extractor. Used to look up a default tag extractor if regex is empty.
    * @param regex optional regex expression. Can be specified as an empty string to trigger a
    * default regex lookup.
+   * @return TagExtractorPtr newly constructed TagExtractor.
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex);
 

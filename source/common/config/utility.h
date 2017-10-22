@@ -216,8 +216,8 @@ public:
   /**
    * Creates the set of stats tag extractors requested by the config and transfers ownership to the
    * caller.
-   * @param bootstrap bootstrap proto
-   * @return Owning vector of TagExtractors
+   * @param bootstrap bootstrap proto.
+   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
    */
   static std::vector<Stats::TagExtractorPtr>
   createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);

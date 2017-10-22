@@ -105,6 +105,11 @@ TEST(TagExtractorTest, SingleSubexpression) {
   EXPECT_EQ("listner_port", tags.at(0).name_);
 }
 
+TEST(TagExtractorTest, EmptyName) {
+  EXPECT_THROW_WITH_MESSAGE(TagExtractorImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"),
+                            EnvoyException, "tag_name cannot be empty");
+}
+
 class DefaultTagRegexTester {
 public:
   DefaultTagRegexTester() {
@@ -129,7 +134,8 @@ public:
     };
 
     EXPECT_EQ(expected_tag_extracted_name, tag_extracted_name);
-    ASSERT_EQ(expected_tags.size(), tags.size());
+    ASSERT_EQ(expected_tags.size(), tags.size())
+        << fmt::format("Stat name '{}' did not produce the expected number of tags", stat_name);
     EXPECT_TRUE(std::is_permutation(expected_tags.begin(), expected_tags.end(), tags.begin(), cmp))
         << fmt::format("Stat name '{}' did not produce the expected tags", stat_name);
 
@@ -141,7 +147,10 @@ public:
     }
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);
-    ASSERT_EQ(expected_tags.size(), rev_tags.size());
+    ASSERT_EQ(expected_tags.size(), rev_tags.size())
+        << fmt::format("Stat name '{}' did not produce the expected number of tags when regexes "
+                       "were run in reverse order",
+                       stat_name);
     EXPECT_TRUE(
         std::is_permutation(expected_tags.begin(), expected_tags.end(), rev_tags.begin(), cmp))
         << fmt::format("Stat name '{}' did not produce the expected tags when regexes were run in "

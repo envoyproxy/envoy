@@ -46,11 +46,12 @@ public:
    * copy of name. The portion removed from the name may be different than the value put into
    * the tag vector for readability purposes. Note: The extraction process is expected to be run
    * iteratively. For a list of TagExtractors, the original name is expected to be passed into
-   * extractTag for the fist, and then each iteration after the modified name returned from the
-   * previous iteration should be passed in. The same vector should be passed into all of the
+   * extractTag for the first, and then each iteration after the modified name returned from the
+   * previous iteration should be passed in. The same vector should be passed into each successive
+   * call for updating.
    * @param name name from which the tag will be extracted if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the name.
-   * @returns modified name with the tag removed.
+   * @return std::string modified name with the tag removed.
    */
   virtual std::string extractTag(const std::string& name, std::vector<Tag>& tags) const PURE;
 };
@@ -240,7 +241,7 @@ public:
   virtual void addSink(Sink& sink) PURE;
 
   /**
-   * Add an extractor to extract a portion of stats names as a tag.
+   * Set the set of extractors to extract a portions of stats names as tags.
    */
   virtual void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractor) PURE;
 

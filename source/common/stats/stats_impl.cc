@@ -94,7 +94,13 @@ std::string TagExtractorImpl::extractTag(const std::string& tag_extracted_name,
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(tag_extracted_name, match, regex_) && match.size() > 1) {
+    // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
     const auto& remove_subexpr = match[1];
+
+    // value_subexpr is the optional second submatch. It is usually inside the first submatch
+    // (remove_subexpr) to allow the expression to strip off extra characters that should be removed
+    // from the string but also not necessary in the tag value ("." for example). If there is no
+    // second submatch, then the value_subexpr is the same as the remove_subexpr.
     const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
 
     tags.emplace_back();
@@ -102,8 +108,7 @@ std::string TagExtractorImpl::extractTag(const std::string& tag_extracted_name,
     tag.name_ = name_;
     tag.value_ = value_subexpr.str();
 
-    // This call invalidates match and all derived objects because they contain references to
-    // tag_extracted_name.
+    // Reconstructs the tag_extracted_name without remove_subexpr.
     return std::string(match.prefix().first, remove_subexpr.first)
         .append(remove_subexpr.second, match.suffix().second);
   }
