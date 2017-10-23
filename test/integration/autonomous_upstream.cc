@@ -35,7 +35,7 @@ void AutonomousStream::sendResponse() {
 
   int32_t request_body_length = -1;
   HeaderToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
-  if (request_body_length > 0) {
+  if (request_body_length >= 0) {
     EXPECT_EQ(request_body_length, bodyLength());
   }
 
@@ -52,7 +52,6 @@ void AutonomousStream::sendResponse() {
 }
 
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
-  std::unique_lock<std::mutex> lock(lock_);
   auto stream = new AutonomousStream(*this, response_encoder);
   streams_.push_back(FakeStreamPtr{stream});
   return *(stream);
@@ -65,7 +64,6 @@ AutonomousUpstream::~AutonomousUpstream() {
 }
 
 bool AutonomousUpstream::createFilterChain(Network::Connection& connection) {
-  std::unique_lock<std::mutex> lock(lock_);
   AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
       QueuedConnectionWrapperPtr{new QueuedConnectionWrapper(connection, true)}, stats_store_,
       http_type_));

@@ -296,9 +296,8 @@ public:
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
 protected:
-  std::mutex lock_;
   Stats::IsolatedStoreImpl stats_store_;
-  FakeHttpConnection::Type http_type_;
+  const FakeHttpConnection::Type http_type_;
   void cleanUp();
 
 private:
@@ -309,12 +308,15 @@ private:
   Ssl::ServerContext* ssl_ctx_{};
   Network::ListenSocketPtr socket_;
   ConditionalInitializer server_initialized_;
+  // Guards any objects which can be altered both in the upstream thread and the
+  // main test thread.
+  std::mutex lock_;
   Thread::ThreadPtr thread_;
   std::condition_variable new_connection_event_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  std::list<QueuedConnectionWrapperPtr> new_connections_;
+  std::list<QueuedConnectionWrapperPtr> new_connections_;  // Guarded by lock_
   bool allow_unexpected_disconnects_;
 };
 } // namespace Envoy
