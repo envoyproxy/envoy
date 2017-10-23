@@ -1,4 +1,5 @@
 &lt;Title&gt; : &lt;One line description&gt;
+
 &lt;Title can be a one or two words to describe the subsystem or the aspect
  this pr applies to. Example: Build, Docs, HTTP, Upstream, SSl, ...&gt;
 
@@ -28,5 +29,6 @@ if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.&gt;
 
 [optional *Deprecated:* &lt;description of what is deprecated&gt;]
+
 [optional *Release notes:* &lt;description of what to add to next point 
 release notes&gt;]
