@@ -18,7 +18,7 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   ValidationAsyncClient client;
   EXPECT_EQ(nullptr,
             client.send(std::move(message), callbacks, Optional<std::chrono::milliseconds>()));
-  EXPECT_EQ(nullptr, client.start(stream_callbacks, Optional<std::chrono::milliseconds>()));
+  EXPECT_EQ(nullptr, client.start(stream_callbacks, Optional<std::chrono::milliseconds>(), false));
 }
 
 } // namespace Http

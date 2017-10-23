@@ -14,6 +14,5 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/grpc:rpc_channel_interface",
     ],
 )
