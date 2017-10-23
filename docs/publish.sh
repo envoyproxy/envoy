@@ -14,6 +14,7 @@ then
   git -C $PUBLISH_DIR fetch
   git -C $PUBLISH_DIR checkout -B master origin/master
   rm -fr $PUBLISH_DIR/envoy/*
+  mkdir -p $PUBLISH_DIR/envoy
   cp -r $DOCS_DIR/envoy/* $PUBLISH_DIR
   cd $PUBLISH_DIR
 
