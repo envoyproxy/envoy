@@ -11,7 +11,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#include "luajit-2.0/lua.hpp"
+#include "lua.hpp"
 
 namespace Envoy {
 namespace Lua {
@@ -192,6 +192,7 @@ private:
  * This is basically a Lua smart pointer. The idea is that given a Lua object, if we want to
  * guarantee that Lua won't destroy it, we need to reference it. This wraps the reference
  * functionality. While a LuaRef owns an object it's guaranteed that Lua will not GC it.
+ * TODO(mattklein123): Add dedicated unit tests. This will require mocking a Lua state.
  */
 template <typename T> class LuaRef {
 public:
@@ -260,6 +261,7 @@ protected:
 /**
  * This is a variant of LuaRef which also marks an object as dead during destruction. This is
  * useful if an object should not be used after the scope of the pcall() or resume().
+ * TODO(mattklein123): Add dedicated unit tests. This will require mocking a Lua state.
  */
 template <typename T> class LuaDeathRef : public LuaRef<T> {
 public:
