@@ -73,23 +73,6 @@ private:
     void initLoadBalancer(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
   };
 
-  const LoadBalancerType lb_type_;
-  ClusterStats& stats_;
-  Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
-
-  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
-  const ProtobufWkt::Struct default_subset_;
-  const std::vector<std::set<std::string>> subset_keys_;
-
-  const HostSet& original_host_set_;
-  const HostSet* original_local_host_set_;
-
-  LbSubsetEntryPtr fallback_subset_;
-
-  // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
-  LbSubsetMap subsets_;
-
   // Implements HostSet::MemberUpdateCb
   void update(const std::vector<HostSharedPtr>& hosts_added,
               const std::vector<HostSharedPtr>& hosts_removed);
@@ -111,6 +94,23 @@ private:
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
 
   const HostSetImpl& emptyHostSet() { CONSTRUCT_ON_FIRST_USE(HostSetImpl); };
+
+  const LoadBalancerType lb_type_;
+  ClusterStats& stats_;
+  Runtime::Loader& runtime_;
+  Runtime::RandomGenerator& random_;
+
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  const ProtobufWkt::Struct default_subset_;
+  const std::vector<std::set<std::string>> subset_keys_;
+
+  const HostSet& original_host_set_;
+  const HostSet* original_local_host_set_;
+
+  LbSubsetEntryPtr fallback_subset_;
+
+  // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
+  LbSubsetMap subsets_;
 };
 
 } // namespace Upstream
