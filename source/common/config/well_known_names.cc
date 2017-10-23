@@ -31,7 +31,7 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
   // *_rq(_<response_code_class>xx)
   name_regex_pairs.push_back({RESPONSE_CODE_CLASS, "_rq(_(\\dxx))$"});
 
-  // http.<stat_prefix>.dynamodb.table.<table_name>.capacity.<operation_name>.__partition_id=<last_seven_characters_from_partition_id>
+  // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
   name_regex_pairs.push_back({DYNAMO_PARTITION_ID, "^http(?=\\.).*?\\.dynamodb\\.table(?=\\.).*?\\."
                                                    "capacity(?=\\.).*?(\\.__partition_id=(\\w{7}))"
                                                    "$"});
