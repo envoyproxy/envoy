@@ -68,6 +68,7 @@ def ReorderHeaders(path):
       regex_filter('<.*>'),
       regex_filter('"envoy/.*"'),
       regex_filter('"common/.*"'),
+      regex_filter('"source/common/.*"'),
       regex_filter('"exe/.*"'),
       regex_filter('"server/.*"'),
       regex_filter('"test/.*"'),
