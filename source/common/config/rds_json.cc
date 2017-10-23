@@ -48,33 +48,22 @@ void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::CorsP
 }
 
 void RdsJson::translateAuth(const Json::Object& json_auth,
-                            envoy::api::v2::AuthConfig& auth_config) {
+                            envoy::api::v2::AuthAction& auth_action) {
   if (json_auth.hasObject("x509")) {
-    const auto json_x509 = json_auth.getObject("x509");
-    auto x509 = auth_config.mutable_x509();
+    const auto json_verify_x509 = json_auth.getObject("x509");
+    auto x509_verify = auth_action.mutable_x509_verify();
 
-    envoy::api::v2::AuthConfig::X509::VerifyType verify_type{};
-    envoy::api::v2::AuthConfig::X509::VerifyType_Parse(
-        StringUtil::toUpper(json_x509->getString("verify_type", "all")), &verify_type);
-    x509->set_verify_type(verify_type);
+    envoy::api::v2::AuthAction::VerifyType verify_type{};
+    envoy::api::v2::AuthAction::VerifyType_Parse(
+        StringUtil::toUpper(json_verify_x509->getString("verify_type", "white_list")),
+        &verify_type);
+    x509_verify->set_verify_type(verify_type);
 
-    if (json_x509->hasObject("sha256_hashes")) {
-      x509->mutable_sha256_hashes();
-      for (const std::string& hash : json_x509->getStringArray("sha256_hashes")) {
-        x509->mutable_sha256_hashes()->add_sha256_hashes(hash);
-      }
-    }
-    if (json_x509->hasObject("subjects")) {
-      x509->mutable_subjects();
-      for (const std::string& subject : json_x509->getStringArray("subjects")) {
-        x509->mutable_subjects()->add_subjects(subject);
-      }
-    }
-    if (json_x509->hasObject("subject_alt_names")) {
-      x509->mutable_subject_alt_names();
-      for (const std::string& san : json_x509->getStringArray("subject_alt_names")) {
-        x509->mutable_subject_alt_names()->add_subject_alt_names(san);
-      }
+    for (const auto& json_x509 : json_verify_x509->getObjectArray("x509s")) {
+      envoy::api::v2::AuthAction::X509* x509 = x509_verify->add_x509s();
+      x509->set_sha256_hash(json_x509->getString("sha256_hash", ""));
+      x509->set_subject(json_x509->getString("subject", ""));
+      x509->set_subject_alt_name(json_x509->getString("subject_alt_name", ""));
     }
   }
 }
@@ -201,9 +190,9 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
   }
 
   if (json_virtual_host.hasObject("auth")) {
-    auto* auth_config = virtual_host.mutable_auth_config();
+    auto* auth_action = virtual_host.mutable_auth();
     const auto json_auth = json_virtual_host.getObject("auth");
-    translateAuth(*json_auth, *auth_config);
+    translateAuth(*json_auth, *auth_action);
   }
 }
 
@@ -337,12 +326,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       const auto json_cors = json_route.getObject("cors");
       translateCors(*json_cors, *cors);
     }
+  }
 
-    if (json_route.hasObject("auth")) {
-      auto* auth_config = action->mutable_auth_config();
-      const auto json_auth = json_route.getObject("auth");
-      translateAuth(*json_auth, *auth_config);
-    }
+  if (json_route.hasObject("auth")) {
+    auto* auth_action = route.mutable_auth();
+    const auto json_auth = json_route.getObject("auth");
+    translateAuth(*json_auth, *auth_action);
   }
 
   if (json_route.hasObject("opaque_config")) {

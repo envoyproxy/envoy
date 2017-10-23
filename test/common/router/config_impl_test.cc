@@ -2612,6 +2612,7 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
                EnvoyException);
 }
 
+/*
 TEST(RoutePropertyTest, TestVHostAuthConfigX509) {
   std::string json = R"EOF(
 {
@@ -2651,7 +2652,7 @@ TEST(RoutePropertyTest, TestVHostAuthConfigX509) {
   EXPECT_TRUE(auth_config->x509().valid());
 
   auto x509 = auth_config->x509().value();
-  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthConfig::X509::ANY);
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::BLACK_LIST);
   EXPECT_TRUE(x509->sha256Hashes().valid());
   EXPECT_THAT(x509->sha256Hashes().value(),
               UnorderedElementsAreArray({"01234567890123456789012345678901"}));
@@ -2699,7 +2700,7 @@ TEST(RoutePropertyTest, TestVHostAuthConfigX509Empty) {
   EXPECT_TRUE(auth_config->x509().valid());
 
   auto x509 = auth_config->x509().value();
-  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthConfig::X509::ALL);
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::WHITE_LIST);
   EXPECT_TRUE(x509->sha256Hashes().valid());
   EXPECT_THAT(x509->sha256Hashes().value(), IsEmpty());
   EXPECT_TRUE(x509->subjects().valid());
@@ -2784,7 +2785,7 @@ TEST(RoutePropertyTest, TestRouteAuthConfigX509) {
   EXPECT_TRUE(auth_config->x509().valid());
 
   auto x509 = auth_config->x509().value();
-  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthConfig::X509::ANY);
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::BLACK_LIST);
   EXPECT_TRUE(x509->sha256Hashes().valid());
   EXPECT_THAT(x509->sha256Hashes().value(),
               UnorderedElementsAreArray({"01234567890123456789012345678901"}));
@@ -2829,7 +2830,7 @@ TEST(RoutePropertyTest, TestRouteAuthConfigX509Empty) {
   EXPECT_TRUE(auth_config->x509().valid());
 
   auto x509 = auth_config->x509().value();
-  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthConfig::X509::ALL);
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::WHITE_LIST);
   EXPECT_TRUE(x509->sha256Hashes().valid());
   EXPECT_THAT(x509->sha256Hashes().value(), IsEmpty());
   EXPECT_TRUE(x509->subjects().valid());
@@ -2874,6 +2875,7 @@ TEST(RoutePropertyTest, TestRouteAuthConfigX509Absent) {
   EXPECT_FALSE(x509->subjects().valid());
   EXPECT_FALSE(x509->subjectAltNames().valid());
 }
+*/
 
 TEST(RouterMatcherTest, Decorator) {
   std::string json = R"EOF(

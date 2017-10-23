@@ -584,33 +584,31 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
             "properties" : {
               "verify_type" : {
                 "type" : "string",
-                "enum" : ["all", "any"]
+                "enum" : ["white_list", "black_list"]
               },
-              "sha256_hashes" : {
+              "x509s" : {
                 "type" : "array",
                 "items" : {
-                  "type" : "string",
-                  "minLength" : 32,
-                  "maxLength" : 32
-                },
-                "uniqueItems" : true
+                  "type" : "object",
+                  "properties" : {
+                    "sha256_hash" : {
+                      "type" : "string",
+                      "minLength" : 32,
+                      "maxLength" : 32
+                    },
+                    "subjects" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    },
+                    "subject_alt_names" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    }
+                  },
+                  "additionalProperties" : false
+                }
               },
-              "subjects" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "string",
-                  "minLength" : 1
-                },
-                "uniqueItems" : true
-              },
-              "subject_alt_names" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "string",
-                  "minLength" : 1
-                },
-                "uniqueItems" : true
-              }
+              "additionalProperties" : false
             },
             "additionalProperties" : false
           }
@@ -705,33 +703,31 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
             "properties" : {
               "verify_type" : {
                 "type" : "string",
-                "enum" : ["all", "any"]
+                "enum" : ["white_list", "black_list"]
               },
-              "sha256_hashes" : {
+              "x509s" : {
                 "type" : "array",
                 "items" : {
-                  "type" : "string",
-                  "minLength" : 32,
-                  "maxLength" : 32
-                },
-                "uniqueItems" : true
+                  "type" : "object",
+                  "properties" : {
+                    "sha256_hash" : {
+                      "type" : "string",
+                      "minLength" : 32,
+                      "maxLength" : 32
+                    },
+                    "subjects" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    },
+                    "subject_alt_names" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    }
+                  },
+                  "additionalProperties" : false
+                }
               },
-              "subjects" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "string",
-                  "minLength" : 1
-                },
-                "uniqueItems" : true
-              },
-              "subject_alt_names" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "string",
-                  "minLength" : 1
-                },
-                "uniqueItems" : true
-              }
+              "additionalProperties" : false
             },
             "additionalProperties" : false
           }

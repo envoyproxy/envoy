@@ -92,42 +92,32 @@ private:
 };
 
 /**
- * Implementation of AuthConfig that reads from the proto route and virtual host config.
+ * Implementation of AuthAction that reads from the proto route and virtual host config.
  */
-class AuthConfigImpl : public AuthConfig {
+class AuthActionImpl : public AuthAction {
 public:
-  AuthConfigImpl(const envoy::api::v2::AuthConfig& config);
+  AuthActionImpl(const envoy::api::v2::AuthAction& config);
 
-  class X509Impl : public X509 {
+  class X509VerifyImpl : public X509Verify {
   public:
-    X509Impl(const envoy::api::v2::AuthConfig::X509& config);
+    X509VerifyImpl(const envoy::api::v2::AuthAction::X509Verify& config);
 
-    // Router::AuthConfig::X509
-    virtual envoy::api::v2::AuthConfig::X509::VerifyType verifyType() const override {
+    // Router::AuthAction::X509Verify
+    virtual envoy::api::v2::AuthAction::VerifyType verifyType() const override {
       return verify_type_;
     }
-    virtual const Optional<std::unordered_set<std::string>>& sha256Hashes() const override {
-      return sha256_hashes_;
-    };
-    virtual const Optional<std::unordered_set<std::string>>& subjects() const override {
-      return subjects_;
-    };
-    virtual const Optional<std::unordered_set<std::string>>& subjectAltNames() const override {
-      return subject_alt_names_;
-    };
+    virtual const std::list<X509>& x509s() const override { return x509s_; }
 
   private:
-    envoy::api::v2::AuthConfig::X509::VerifyType verify_type_{};
-    Optional<std::unordered_set<std::string>> sha256_hashes_{};
-    Optional<std::unordered_set<std::string>> subjects_{};
-    Optional<std::unordered_set<std::string>> subject_alt_names_{};
+    envoy::api::v2::AuthAction::VerifyType verify_type_{};
+    std::list<X509> x509s_{};
   };
 
-  // Router::AuthConfig
-  const Optional<std::shared_ptr<X509>>& x509() const override { return x509_; };
+  // Router::AuthAction
+  const Optional<std::shared_ptr<X509Verify>>& x509Verify() const override { return x509_verify_; };
 
 private:
-  Optional<std::shared_ptr<X509>> x509_{};
+  Optional<std::shared_ptr<X509Verify>> x509_verify_{};
 };
 
 class ConfigImpl;
@@ -152,7 +142,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
-  const AuthConfig* authConfig() const override { return auth_config_.get(); }
+  const AuthAction* authAction() const override { return auth_action_.get(); }
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
@@ -186,7 +176,7 @@ private:
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
-  std::unique_ptr<const AuthConfigImpl> auth_config_;
+  std::unique_ptr<const AuthActionImpl> auth_action_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
@@ -344,7 +334,7 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
-  const AuthConfig* authConfig() const override { return auth_config_.get(); }
+  const AuthAction* authAction() const override { return auth_action_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const Http::AccessLog::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
@@ -406,7 +396,7 @@ private:
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
-    const AuthConfig* authConfig() const override { return parent_->authConfig(); }
+    const AuthAction* authAction() const override { return parent_->authAction(); }
     const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
@@ -490,7 +480,7 @@ private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
-  std::unique_ptr<const AuthConfigImpl> auth_config_;
+  std::unique_ptr<const AuthActionImpl> auth_action_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;

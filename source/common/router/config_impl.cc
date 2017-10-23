@@ -61,37 +61,28 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
-AuthConfigImpl::AuthConfigImpl(const envoy::api::v2::AuthConfig& config) {
-  if (config.has_x509()) {
-    x509_.value(std::make_shared<X509Impl>(config.x509()));
+AuthActionImpl::AuthActionImpl(const envoy::api::v2::AuthAction& config) {
+  if (config.has_x509_verify()) {
+    x509_verify_.value(std::make_shared<X509VerifyImpl>(config.x509_verify()));
   }
 }
 
-AuthConfigImpl::X509Impl::X509Impl(const envoy::api::v2::AuthConfig::X509& config) {
+AuthActionImpl::X509VerifyImpl::X509VerifyImpl(
+    const envoy::api::v2::AuthAction::X509Verify& config) {
   verify_type_ = config.verify_type();
 
-  if (config.has_sha256_hashes()) {
-    std::unordered_set<std::string> hashes;
-    for (const auto& hash : config.sha256_hashes().sha256_hashes()) {
-      hashes.insert(hash);
+  for (const auto& x509_config : config.x509s()) {
+    X509 x509;
+    if (!x509_config.sha256_hash().empty()) {
+      x509.sha256_hash_.value(x509_config.sha256_hash());
     }
-    sha256_hashes_.value(hashes);
-  }
-
-  if (config.has_subjects()) {
-    std::unordered_set<std::string> subjects;
-    for (const auto& subject : config.subjects().subjects()) {
-      subjects.insert(subject);
+    if (!x509_config.subject().empty()) {
+      x509.subject_.value(x509_config.subject());
     }
-    subjects_.value(subjects);
-  }
-
-  if (config.has_subject_alt_names()) {
-    std::unordered_set<std::string> sans;
-    for (const auto& san : config.subject_alt_names().subject_alt_names()) {
-      sans.insert(san);
+    if (!x509_config.subject_alt_name().empty()) {
+      x509.subject_alt_name_.value(x509_config.subject_alt_name());
     }
-    subject_alt_names_.value(sans);
+    x509s_.push_back(x509);
   }
 }
 
@@ -336,8 +327,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     cors_policy_.reset(new CorsPolicyImpl(route.route().cors()));
   }
 
-  if (route.route().has_auth_config()) {
-    auth_config_.reset(new AuthConfigImpl(route.route().auth_config()));
+  if (route.has_auth()) {
+    auth_action_.reset(new AuthActionImpl(route.auth()));
   }
 }
 
@@ -681,8 +672,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
     cors_policy_.reset(new CorsPolicyImpl(virtual_host.cors()));
   }
 
-  if (virtual_host.has_auth_config()) {
-    auth_config_.reset(new AuthConfigImpl(virtual_host.auth_config()));
+  if (virtual_host.has_auth()) {
+    auth_action_.reset(new AuthActionImpl(virtual_host.auth()));
   }
 }
 

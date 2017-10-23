@@ -82,42 +82,38 @@ public:
 };
 
 /**
- * AuthConfig for Route and VirtualHost.
+ * AuthAction for Route and VirtualHost.
  */
-class AuthConfig {
+class AuthAction {
 public:
-  virtual ~AuthConfig() {}
+  virtual ~AuthAction() {}
 
-  class X509 {
+  struct X509 {
+    Optional<std::string> sha256_hash_;
+    Optional<std::string> subject_;
+    Optional<std::string> subject_alt_name_;
+  };
+
+  class X509Verify {
   public:
-    virtual ~X509() {}
+    virtual ~X509Verify() {}
 
     /**
-     * @return envoy::api::v2::AuthConfig::X509::VerifyType Whether all or any condition(s) should
+     * @return envoy::api::v2::AuthAction::VerifyType Whether all or any condition(s) should
      * match.
      */
-    virtual envoy::api::v2::AuthConfig::X509::VerifyType verifyType() const PURE;
+    virtual envoy::api::v2::AuthAction::VerifyType verifyType() const PURE;
 
     /**
-     * @return const Optional<std::string>& Whether verify certificate hash and allowed values.
+     * @return const std::list<X509>& List of X509 certificates to check against.
      */
-    virtual const Optional<std::unordered_set<std::string>>& sha256Hashes() const PURE;
-    /**
-     * @return const Optional<std::unordered_set<std::string>>& Whether verify subject and allowed
-     * values.
-     */
-    virtual const Optional<std::unordered_set<std::string>>& subjects() const PURE;
-    /**
-     * @return const Optional<std::unordered_set<std::string>>& Whether verify subject alt name and
-     * allowed values.
-     */
-    virtual const Optional<std::unordered_set<std::string>>& subjectAltNames() const PURE;
+    virtual const std::list<X509>& x509s() const PURE;
   };
 
   /**
    * @return const Optional<X509>& Whether verify x509 and verify config.
    */
-  virtual const Optional<std::shared_ptr<X509>>& x509() const PURE;
+  virtual const Optional<std::shared_ptr<X509Verify>>& x509Verify() const PURE;
 };
 
 /**
@@ -241,9 +237,9 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
-   * @return const AuthConfig* the auth config for this virtual host.
+   * @return const AuthAction* the auth config for this virtual host.
    */
-  virtual const AuthConfig* authConfig() const PURE;
+  virtual const AuthAction* authAction() const PURE;
 
   /**
    * @return const std::string& the name of the virtual host.
@@ -335,9 +331,9 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
-   * @return const AuthConfig* the auth config this route.
+   * @return const AuthAction* the auth config this route.
    */
-  virtual const AuthConfig* authConfig() const PURE;
+  virtual const AuthAction* authAction() const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
