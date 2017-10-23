@@ -68,6 +68,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(
         Headers::get().EnvoyInternalRequestValues.True);
   } else {
     if (edge_request) {
+      request_headers.removeEnvoyDecoratorOperation();
       request_headers.removeEnvoyDownstreamServiceCluster();
       request_headers.removeEnvoyDownstreamServiceNode();
     }

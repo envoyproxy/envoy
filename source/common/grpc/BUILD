@@ -108,30 +108,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "rpc_channel_lib",
-    srcs = ["rpc_channel_impl.cc"],
-    hdrs = ["rpc_channel_impl.h"],
-    deps = [
-        ":common_lib",
-        "//include/envoy/grpc:rpc_channel_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/common:utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:message_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "transcoder_input_stream_lib",
     srcs = ["transcoder_input_stream_impl.cc"],
     hdrs = ["transcoder_input_stream_impl.h"],
     external_deps = ["grpc_transcoding"],
-    deps = [
-        "//source/common/buffer:zero_copy_input_stream_lib",
-    ],
+    deps = ["//source/common/buffer:zero_copy_input_stream_lib"],
 )

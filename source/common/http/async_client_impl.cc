@@ -56,17 +56,23 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 }
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
-                                            const Optional<std::chrono::milliseconds>& timeout) {
-  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, timeout)};
+                                            const Optional<std::chrono::milliseconds>& timeout,
+                                            bool buffer_body_for_retry) {
+  std::unique_ptr<AsyncStreamImpl> new_stream{
+      new AsyncStreamImpl(*this, callbacks, timeout, buffer_body_for_retry)};
   new_stream->moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                                 const Optional<std::chrono::milliseconds>& timeout)
+                                 const Optional<std::chrono::milliseconds>& timeout,
+                                 bool buffer_body_for_retry)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), request_info_(Protocol::Http11),
       route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
+  if (buffer_body_for_retry) {
+    buffered_body_.reset(new Buffer::OwnedImpl());
+  }
 
   router_.setDecoderFilterCallbacks(*this);
   // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
@@ -119,6 +125,13 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
+  // TODO(mattklein123): We trust callers currently to not do anything insane here if they set up
+  // buffering on an async client call. We should potentially think about limiting the size of
+  // buffering that we allow here.
+  if (buffered_body_ != nullptr) {
+    buffered_body_->add(data);
+  }
+
   router_.decodeData(data, end_stream);
   closeLocal(end_stream);
 }
@@ -166,8 +179,10 @@ void AsyncStreamImpl::resetStream() {
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
                                    const Optional<std::chrono::milliseconds>& timeout)
-    : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {
-}
+    // We tell the underlying stream to not buffer because we already have the full request and
+    // and can handle any buffered body requests.
+    : AsyncStreamImpl(parent, *this, timeout, false), request_(std::move(request)),
+      callbacks_(callbacks) {}
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
