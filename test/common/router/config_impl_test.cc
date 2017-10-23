@@ -23,11 +23,13 @@
 
 using testing::ContainerEq;
 using testing::ElementsAreArray;
+using testing::IsEmpty;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrNe;
+using testing::UnorderedElementsAreArray;
 using testing::_;
 
 namespace Envoy {
@@ -2587,6 +2589,271 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
   EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
                EnvoyException);
 }
+
+/*
+TEST(RoutePropertyTest, TestVHostAuthConfigX509) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "auth" : {
+        "x509" : {
+          "verify_type" : "any",
+          "sha256_hashes": ["01234567890123456789012345678901"],
+          "subjects": ["test-subject"],
+          "subject_alt_names": ["test-san"]
+        }
+      },
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats"
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+
+  auto x509 = auth_config->x509().value();
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::BLACK_LIST);
+  EXPECT_TRUE(x509->sha256Hashes().valid());
+  EXPECT_THAT(x509->sha256Hashes().value(),
+              UnorderedElementsAreArray({"01234567890123456789012345678901"}));
+  EXPECT_TRUE(x509->subjects().valid());
+  EXPECT_THAT(x509->subjects().value(), UnorderedElementsAreArray({"test-subject"}));
+  EXPECT_TRUE(x509->subjectAltNames().valid());
+  EXPECT_THAT(x509->subjectAltNames().value(), UnorderedElementsAreArray({"test-san"}));
+}
+
+TEST(RoutePropertyTest, TestVHostAuthConfigX509Empty) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "auth" : {
+        "x509" : {
+          "sha256_hashes": [],
+          "subjects": [],
+          "subject_alt_names": []
+        }
+      },
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats"
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+
+  auto x509 = auth_config->x509().value();
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::WHITE_LIST);
+  EXPECT_TRUE(x509->sha256Hashes().valid());
+  EXPECT_THAT(x509->sha256Hashes().value(), IsEmpty());
+  EXPECT_TRUE(x509->subjects().valid());
+  EXPECT_THAT(x509->subjects().value(), IsEmpty());
+  EXPECT_TRUE(x509->subjectAltNames().valid());
+  EXPECT_THAT(x509->subjectAltNames().value(), IsEmpty());
+}
+
+TEST(RoutePropertyTest, TestVHostAuthConfigX509Absent) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "auth" : {
+        "x509" : {
+        }
+      },
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats"
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+
+  auto x509 = auth_config->x509().value();
+  EXPECT_FALSE(x509->sha256Hashes().valid());
+  EXPECT_FALSE(x509->subjects().valid());
+  EXPECT_FALSE(x509->subjectAltNames().valid());
+}
+
+TEST(RoutePropertyTest, TestRouteAuthConfigX509) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats",
+          "auth" : {
+            "x509" : {
+              "verify_type" : "any",
+              "sha256_hashes": ["01234567890123456789012345678901"],
+              "subjects": ["test-subject"],
+              "subject_alt_names": ["test-san"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+
+  auto x509 = auth_config->x509().value();
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::BLACK_LIST);
+  EXPECT_TRUE(x509->sha256Hashes().valid());
+  EXPECT_THAT(x509->sha256Hashes().value(),
+              UnorderedElementsAreArray({"01234567890123456789012345678901"}));
+  EXPECT_TRUE(x509->subjects().valid());
+  EXPECT_THAT(x509->subjects().value(), UnorderedElementsAreArray({"test-subject"}));
+  EXPECT_TRUE(x509->subjectAltNames().valid());
+  EXPECT_THAT(x509->subjectAltNames().value(), UnorderedElementsAreArray({"test-san"}));
+}
+
+TEST(RoutePropertyTest, TestRouteAuthConfigX509Empty) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats",
+          "auth" : {
+            "x509" : {
+              "sha256_hashes": [],
+              "subjects": [],
+              "subject_alt_names": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+
+  auto x509 = auth_config->x509().value();
+  EXPECT_EQ(x509->verifyType(), envoy::api::v2::AuthAction::WHITE_LIST);
+  EXPECT_TRUE(x509->sha256Hashes().valid());
+  EXPECT_THAT(x509->sha256Hashes().value(), IsEmpty());
+  EXPECT_TRUE(x509->subjects().valid());
+  EXPECT_THAT(x509->subjects().value(), IsEmpty());
+  EXPECT_TRUE(x509->subjectAltNames().valid());
+  EXPECT_THAT(x509->subjectAltNames().value(), IsEmpty());
+}
+
+TEST(RoutePropertyTest, TestRouteAuthConfigX509Absent) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/api",
+          "cluster": "ats",
+          "auth" : {
+            "x509" : {
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  const Router::AuthConfig* auth_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->authConfig();
+
+  EXPECT_TRUE(auth_config->x509().valid());
+
+  auto x509 = auth_config->x509().value();
+  EXPECT_FALSE(x509->sha256Hashes().valid());
+  EXPECT_FALSE(x509->subjects().valid());
+  EXPECT_FALSE(x509->subjectAltNames().valid());
+}
+*/
 
 TEST(RouterMatcherTest, Decorator) {
   std::string json = R"EOF(

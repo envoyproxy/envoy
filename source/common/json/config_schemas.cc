@@ -575,6 +575,45 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["pattern", "name"],
         "additionalProperties" : false
+      },
+      "auth" : {
+        "type" : "object",
+        "properties" : {
+          "x509" : {
+            "type" : "object",
+            "properties" : {
+              "verify_type" : {
+                "type" : "string",
+                "enum" : ["white_list", "black_list"]
+              },
+              "x509s" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "object",
+                  "properties" : {
+                    "sha256_hash" : {
+                      "type" : "string",
+                      "minLength" : 32,
+                      "maxLength" : 32
+                    },
+                    "subjects" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    },
+                    "subject_alt_names" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    }
+                  },
+                  "additionalProperties" : false
+                }
+              },
+              "additionalProperties" : false
+            },
+            "additionalProperties" : false
+          }
+        },
+        "additionalProperties" : false
       }
     },
     "properties" : {
@@ -624,7 +663,8 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : [],
         "additionalProperties" : false
-      }
+      },
+      "auth": {"$ref" : "#/definitions/auth"}
     },
     "required" : ["name", "domains", "routes"],
     "additionalProperties" : false
@@ -652,6 +692,45 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
             }
           },
           "runtime_key_prefix" : {"type" : "string"}
+        },
+        "additionalProperties" : false
+      },
+      "auth" : {
+        "type" : "object",
+        "properties" : {
+          "x509" : {
+            "type" : "object",
+            "properties" : {
+              "verify_type" : {
+                "type" : "string",
+                "enum" : ["white_list", "black_list"]
+              },
+              "x509s" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "object",
+                  "properties" : {
+                    "sha256_hash" : {
+                      "type" : "string",
+                      "minLength" : 32,
+                      "maxLength" : 32
+                    },
+                    "subjects" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    },
+                    "subject_alt_names" : {
+                      "type" : "string",
+                      "minLength" : 1
+                    }
+                  },
+                  "additionalProperties" : false
+                }
+              },
+              "additionalProperties" : false
+            },
+            "additionalProperties" : false
+          }
         },
         "additionalProperties" : false
       }
@@ -758,7 +837,8 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
             "type" : "array",
             "items" : {
               "type" : "string"
-          }},
+            }
+          },
           "allow_methods" : {"type" : "string"},
           "allow_headers" : {"type" : "string"},
           "expose_headers" : {"type" : "string"},
@@ -768,7 +848,8 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : [],
         "additionalProperties" : false
-      }
+      },
+      "auth": {"$ref" : "#/definitions/auth"}
     },
     "additionalProperties" : false
   }

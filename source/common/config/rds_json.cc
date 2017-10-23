@@ -48,6 +48,27 @@ void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::CorsP
   JSON_UTIL_SET_BOOL(json_cors, cors, enabled);
 }
 
+void RdsJson::translateAuth(const Json::Object& json_auth,
+                            envoy::api::v2::AuthAction& auth_action) {
+  if (json_auth.hasObject("x509")) {
+    const auto json_verify_x509 = json_auth.getObject("x509");
+    auto x509_verify = auth_action.mutable_x509_verify();
+
+    envoy::api::v2::AuthAction::VerifyType verify_type{};
+    envoy::api::v2::AuthAction::VerifyType_Parse(
+        StringUtil::toUpper(json_verify_x509->getString("verify_type", "white_list")),
+        &verify_type);
+    x509_verify->set_verify_type(verify_type);
+
+    for (const auto& json_x509 : json_verify_x509->getObjectArray("x509s")) {
+      envoy::api::v2::AuthAction::X509* x509 = x509_verify->add_x509s();
+      x509->set_sha256_hash(json_x509->getString("sha256_hash", ""));
+      x509->set_subject(json_x509->getString("subject", ""));
+      x509->set_subject_alt_name(json_x509->getString("subject_alt_name", ""));
+    }
+  }
+}
+
 void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
                                  envoy::api::v2::RateLimit& rate_limit) {
   json_rate_limit.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
@@ -170,6 +191,12 @@ void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
     auto* cors = virtual_host.mutable_cors();
     const auto json_cors = json_virtual_host.getObject("cors");
     translateCors(*json_cors, *cors);
+  }
+
+  if (json_virtual_host.hasObject("auth")) {
+    auto* auth_action = virtual_host.mutable_auth();
+    const auto json_auth = json_virtual_host.getObject("auth");
+    translateAuth(*json_auth, *auth_action);
   }
 }
 
@@ -303,6 +330,12 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       const auto json_cors = json_route.getObject("cors");
       translateCors(*json_cors, *cors);
     }
+  }
+
+  if (json_route.hasObject("auth")) {
+    auto* auth_action = route.mutable_auth();
+    const auto json_auth = json_route.getObject("auth");
+    translateAuth(*json_auth, *auth_action);
   }
 
   if (json_route.hasObject("opaque_config")) {

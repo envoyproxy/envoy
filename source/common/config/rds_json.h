@@ -33,6 +33,13 @@ public:
   static void translateCors(const Json::Object& json_cors, envoy::api::v2::CorsPolicy& cors);
 
   /**
+   * Translate a v2 JSON auth config object to v2 envoy::api::v2::AuthAction.
+   * @param json_auth source v2 JSON auth config object.
+   * @param auth_config destination v2 envoy::api::v2::AuthAction.
+   */
+  static void translateAuth(const Json::Object& json_auth, envoy::api::v2::AuthAction& auth_config);
+
+  /**
    * Translate a v1 JSON rate limit object to v2 envoy::api::v2::RateLimit.
    * @param json_rate_limit source v1 JSON rate limit object.
    * @param rate_limit destination v2 envoy::api::v2::RateLimit.

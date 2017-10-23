@@ -222,12 +222,12 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
 
-bool ConnectionImpl::peerCertificatePresented() {
+bool ConnectionImpl::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   return cert != nullptr;
 }
 
-std::string ConnectionImpl::uriSanLocalCertificate() {
+std::string ConnectionImpl::uriSanLocalCertificate() const {
   // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
@@ -236,7 +236,7 @@ std::string ConnectionImpl::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
-std::string ConnectionImpl::sha256PeerCertificateDigest() {
+std::string ConnectionImpl::sha256PeerCertificateDigest() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -249,7 +249,7 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string ConnectionImpl::subjectPeerCertificate() {
+std::string ConnectionImpl::subjectPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -269,7 +269,7 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
-std::string ConnectionImpl::uriSanPeerCertificate() {
+std::string ConnectionImpl::uriSanPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -277,7 +277,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
   return getUriSanFromCertificate(cert.get());
 }
 
-std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
+std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) const {
   STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
       X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
 
