@@ -221,7 +221,7 @@ public:
    */
   static std::vector<Stats::TagExtractorPtr>
   createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
-  
+
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.
    * It should be within the configured length limit. Throws on error.
