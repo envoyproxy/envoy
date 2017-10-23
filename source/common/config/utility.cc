@@ -127,7 +127,6 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
 
 std::vector<Stats::TagExtractorPtr>
 Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
-
   std::vector<Stats::TagExtractorPtr> tag_extractors;
 
   // Ensure no tag names are repeated.

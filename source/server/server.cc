@@ -63,14 +63,9 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       }
     }
 
-    uint64_t version_int;
-    if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
-    }
-
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, local_address, component_factory, version_int);
+    initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
@@ -157,7 +152,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 
 void InstanceImpl::initialize(Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, uint64_t version_int) {
+                              ComponentFactory& component_factory) {
   ENVOY_LOG(warn, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
@@ -183,6 +178,11 @@ void InstanceImpl::initialize(Options& options,
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
 
   failHealthcheck(false);
+
+  uint64_t version_int;
+  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+  }
 
   server_stats_->version_.set(version_int);
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());

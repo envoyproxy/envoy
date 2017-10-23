@@ -155,7 +155,7 @@ public:
 private:
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory, uint64_t version_int);
+                  ComponentFactory& component_factory);
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();

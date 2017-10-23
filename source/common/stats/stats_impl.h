@@ -40,8 +40,8 @@ public:
                          std::vector<Tag>& tags) const override;
 
 private:
-  std::string name_;
-  std::regex regex_;
+  const std::string name_;
+  const std::regex regex_;
 };
 
 /**
