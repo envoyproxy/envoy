@@ -143,7 +143,24 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
 }
 
 /**
- * This test is for simulation only and should not be run as part of unit tests.
+ * This test is for simulation only and should not be run as part of unit tests. In order to run the
+ * simulation remove the DISABLED_ prefix from the TEST_F invocation. Run bazel with
+ * "--test_output all" to see the output.
+ * 
+ * The test is designed to output hit rate and percentage of total hits per-host for different
+ * minimum ring sizes. Most testing should be done with a rough order of magnitude number of hosts
+ * as in a production environment, and testing different orders of magnitude for the min_ring_size.
+ * 
+ * The output looks like:
+ * 
+ * hits      hit%   server
+ * ===============================
+ * 60000     60.00  10.0.0.1:22120
+ * 40000     40.00  10.0.0.2:22120
+ * 
+ * Larger ring sizes will result in better distribution, but come at the cost of more memory, 
+ * more time to build the ring, and slightly slower lookup when determining the backend for a
+ * key.
  */
 class DISABLED_RingHashLoadBalancerTest : public RingHashLoadBalancerTest {
 public:
@@ -151,10 +168,9 @@ public:
 };
 
 TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
-
   uint64_t num_hosts = 100;
-  uint64_t keys_to_simulate = 1000;
-  uint64_t ring_size = 65536;
+  uint64_t keys_to_simulate = 10000;
+  uint64_t min_ring_size = 65536;
   std::unordered_map<std::string, uint64_t> hit_counter;
 
   // TODO(danielhochman): add support for more hosts if necessary with another loop for subnet
@@ -165,7 +181,7 @@ TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   cluster_.healthy_hosts_ = cluster_.hosts_;
 
   ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
-      .WillByDefault(Return(ring_size));
+      .WillByDefault(Return(min_ring_size));
   cluster_.runCallbacks({}, {});
 
   for (uint64_t i = 0; i < keys_to_simulate; i++) {
