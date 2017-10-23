@@ -168,9 +168,9 @@ public:
 };
 
 TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
-  uint64_t num_hosts = 100;
-  uint64_t keys_to_simulate = 10000;
-  uint64_t min_ring_size = 65536;
+  const uint64_t num_hosts = 100;
+  const uint64_t keys_to_simulate = 10000;
+  const uint64_t min_ring_size = 65536;
   std::unordered_map<std::string, uint64_t> hit_counter;
 
   // TODO(danielhochman): add support for more hosts if necessary with another loop for subnet
