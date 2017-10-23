@@ -142,5 +142,45 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   }
 }
 
+/**
+ * This test is for simulation only and should not be run as part of unit tests.
+ */
+class DISABLED_RingHashLoadBalancerTest : public RingHashLoadBalancerTest {
+public:
+  DISABLED_RingHashLoadBalancerTest() : RingHashLoadBalancerTest(){};
+};
+
+TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
+
+  uint64_t num_hosts = 100;
+  uint64_t keys_to_simulate = 1000;
+  uint64_t ring_size = 65536;
+  std::unordered_map<std::string, uint64_t> hit_counter;
+
+  // TODO(danielhochman): add support for more hosts if necessary with another loop for subnet
+  ASSERT_LT(num_hosts, 256);
+  for (uint64_t i = 0; i < num_hosts; i++) {
+    cluster_.hosts_.push_back(makeTestHost(cluster_.info_, fmt::format("tcp://10.0.0.{}:6379", i)));
+  }
+  cluster_.healthy_hosts_ = cluster_.hosts_;
+
+  ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
+      .WillByDefault(Return(ring_size));
+  cluster_.runCallbacks({}, {});
+
+  for (uint64_t i = 0; i < keys_to_simulate; i++) {
+    TestLoadBalancerContext context(std::hash<std::string>()(fmt::format("{}", i)));
+    hit_counter[lb_.chooseHost(&context)->address()->asString()] += 1;
+  }
+
+  std::cout << fmt::format("{:<9}  {:<4}  {:<20}", "hits", "%hit", "server") << std::endl;
+  std::cout << "===============================" << std::endl;
+  for (auto it = hit_counter.begin(); it != hit_counter.end(); it++) {
+    std::cout << fmt::format("{:<9}  {:03.2f}  {:<20}", it->second,
+                             100 * static_cast<double>(it->second) / keys_to_simulate, it->first)
+              << std::endl;
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy
