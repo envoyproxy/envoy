@@ -43,6 +43,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
     bool host_chosen;
     HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
     if (host_chosen) {
+      // Subset lookup succeeded, return this result even if it's nullptr.
       return host;
     }
   }
@@ -55,6 +56,12 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
   return fallback_subset_->lb_->chooseHost(context);
 }
 
+// Find a host from the subsets. Sets host_chosen to false and returns
+// nullptr if the context has no metadata match criteria, if there is
+// no matching subset, or if the matching subset contains no hosts
+// (ignoring health). Otherwise, host_chosen is true and the returns
+// HostConstSharedPtr is from the subset's load balancer (technically,
+// it may still be nullptr).
 HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerContext* context,
                                                                 bool& host_chosen) {
   host_chosen = false;
@@ -140,9 +147,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
       fallback_subset_.reset(new LbSubsetEntry());
       fallback_subset_->initLoadBalancer(*this, predicate);
     } else {
-      if (!hosts_added.empty() || !hosts_removed.empty()) {
-        fallback_subset_->host_subset_->update(hosts_added, hosts_removed, predicate);
-      }
+      fallback_subset_->host_subset_->update(hosts_added, hosts_removed, predicate);
     }
   }
 
@@ -156,19 +161,18 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
       if (!kvs.empty()) {
         // The host has metadata for each key, find or create its subset.
         LbSubsetEntryPtr entry = findOrCreateSubset(subsets_, kvs, 0);
-        if (entry != nullptr) {
-          HostPredicate predicate =
-              std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
-          if (!entry->initialized()) {
-            entry->initLoadBalancer(*this, predicate);
-            if (entry->active()) {
-              stats_.lb_subsets_active_.inc();
-            }
-            stats_.lb_subsets_created_.inc();
-          } else if (subsets_modified.find(entry) == subsets_modified.end()) {
-            entry->host_subset_->update(hosts_added, hosts_removed, predicate);
-            subsets_modified.emplace(entry);
+        ASSERT(entry != nullptr);
+        HostPredicate predicate =
+            std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
+        if (!entry->initialized()) {
+          entry->initLoadBalancer(*this, predicate);
+          if (entry->active()) {
+            stats_.lb_subsets_active_.inc();
           }
+          stats_.lb_subsets_created_.inc();
+        } else if (subsets_modified.find(entry) == subsets_modified.end()) {
+          entry->host_subset_->update(hosts_added, hosts_removed, predicate);
+          subsets_modified.emplace(entry);
         }
       }
     }
@@ -180,9 +184,10 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
       // corresponding to the key from the host.
       SubsetMetadata kvs = extractSubsetMetadata(keys, *host);
       if (!kvs.empty()) {
-        // The host has metadata for each key, find it's subset.
+        // The host has metadata for each key, find its subset.
         LbSubsetEntryPtr entry = findOrCreateSubset(subsets_, kvs, 0);
-        if (entry == nullptr || !entry->initialized()) {
+        ASSERT(entry != nullptr);
+        if (!entry->initialized()) {
           // Not found or not yet initialized: ignore this removed host since it
           // was never part of the set.
           continue;

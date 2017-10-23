@@ -28,14 +28,14 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
-  LoadBalancerType lb_type_;
+  const LoadBalancerType lb_type_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
-  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
-  ProtobufWkt::Struct default_subset_;
-  std::vector<std::set<std::string>> subset_keys_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  const ProtobufWkt::Struct default_subset_;
+  const std::vector<std::set<std::string>> subset_keys_;
 
   const HostSet& original_host_set_;
   const HostSet* original_local_host_set_;

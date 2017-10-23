@@ -193,29 +193,25 @@ The cluster may enable subset load balancing like this:
 
 ::
 
-  {
-    "name": "cluster-name",
-    "type": "EDS",
-    "eds_cluster_config": {
-      "eds_config": {
-        "path": ".../eds.conf"
-      }
-    },
-    "connect_timeout": {
-      "seconds": 10
-    },
-    "lb_policy": "LEAST_REQUEST",
-    "lb_subset_config": {
-      "fallback_policy": "DEFAULT_SUBSET",
-      "default_subset": {
-        "stage": "prod"
-      },
-      "subset_selectors": [
-        { "keys": [ "v", "stage" ]},
-        { "keys": [ "stage" ]}
-      ]
-    }
-  }
+  ---
+  name: cluster-name
+  type: EDS
+  eds_cluster_config:
+    eds_config:
+      path: '.../eds.conf'
+  connect_timeout:
+    seconds: 10
+  lb_policy: LEAST_REQUEST
+  lb_subset_config:
+    fallback_policy: DEFAULT_SUBSET
+    default_subset:
+      stage: prod
+    subset_selectors:
+    - keys:
+      - v
+      - stage
+    - keys:
+      - stage
 
 The following table describes some routes and the result of their application to the
 cluster. Typically the match criteria would be used with routes matching specific aspects of the
@@ -254,25 +250,18 @@ An EDS ``LbEndpoint`` with host metadata:
 
 ::
 
-  {
-    "endpoint": {
-      "address": {
-        "socket_address": {
-          "protocol": "TCP",
-          "address": "127.0.0.1",
-          "port_value": 8888
-        }
-      }
-    },
-    "metadata": {
-      "filter_metadata": {
-        "envoy.lb": {
-          "version": "1.0",
-          "stage": "prod"
-        }
-      }
-    }
-  }
+  ---
+  endpoint:
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 8888
+  metadata:
+    filter_metadata:
+      envoy.lb:
+        version: '1.0'
+        stage: 'prod'
 
 
 Example Route With Metadata Criteria
@@ -282,19 +271,13 @@ An RDS ``Route`` with metadata match criteria:
 
 ::
 
-  {
-    "match": {
-      "prefix": "/"
-    },
-    "route": {
-      "cluster": "cluster-name",
-      "metadata_match": {
-        "filter_metadata": {
-          "envoy.lb": {
-            "version": "1.0",
-            "stage": "prod"
-          }
-        }
-      }
-    }
-  }
+  ---
+  match:
+    prefix: /
+  route:
+    cluster: cluster-name
+    metadata_match:
+      filter_metadata:
+        envoy.lb:
+          version: '1.0'
+          stage: 'prod'
