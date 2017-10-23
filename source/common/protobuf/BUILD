@@ -8,10 +8,29 @@ load(
 
 envoy_package()
 
+proto_library(
+    name = "wkt_protos",
+    deps = [
+        "@com_google_protobuf//:any_proto",
+        "@com_google_protobuf//:descriptor_proto",
+        "@com_google_protobuf//:empty_proto",
+        "@com_google_protobuf//:struct_proto",
+        "@com_google_protobuf//:wrappers_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "cc_wkt_protos",
+    deps = [":wkt_protos"],
+)
+
 envoy_cc_library(
     name = "protobuf",
     hdrs = ["protobuf.h"],
-    external_deps = ["protobuf"],
+    external_deps = [
+        "protobuf",
+    ],
+    deps = [":cc_wkt_protos"],
 )
 
 envoy_cc_library(
