@@ -9,12 +9,13 @@ BUILD_SHA=`git rev-parse HEAD`
 if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
 then
   echo 'cloning'
-  git clone git@github.com:envoyproxy/envoy $PUBLISH_DIR
+  git clone git@github.com:envoyproxy/envoyproxy.github.io $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
-  git -C $PUBLISH_DIR checkout -B gh-pages origin/gh-pages
-  rm -fr $PUBLISH_DIR/*
-  cp -r $DOCS_DIR/* $PUBLISH_DIR
+  git -C $PUBLISH_DIR checkout -B master origin/master
+  rm -fr $PUBLISH_DIR/envoy/*
+  mkdir -p $PUBLISH_DIR/envoy
+  cp -r $DOCS_DIR/envoy/* $PUBLISH_DIR
   cd $PUBLISH_DIR
 
   git config user.name "envoy-docs(travis)"
@@ -24,7 +25,7 @@ then
   echo 'commit'
   git commit -m "docs @$BUILD_SHA"
   echo 'push'
-  git push origin gh-pages
+  git push origin master
 else
   echo "Ignoring PR branch for docs push"
 fi
