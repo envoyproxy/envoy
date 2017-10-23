@@ -146,19 +146,19 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
  * This test is for simulation only and should not be run as part of unit tests. In order to run the
  * simulation remove the DISABLED_ prefix from the TEST_F invocation. Run bazel with
  * "--test_output all" to see the output.
- * 
+ *
  * The test is designed to output hit rate and percentage of total hits per-host for different
  * minimum ring sizes. Most testing should be done with a rough order of magnitude number of hosts
  * as in a production environment, and testing different orders of magnitude for the min_ring_size.
- * 
+ *
  * The output looks like:
- * 
+ *
  * hits      hit%   server
  * ===============================
  * 60000     60.00  10.0.0.1:22120
  * 40000     40.00  10.0.0.2:22120
- * 
- * Larger ring sizes will result in better distribution, but come at the cost of more memory, 
+ *
+ * Larger ring sizes will result in better distribution, but come at the cost of more memory,
  * more time to build the ring, and slightly slower lookup when determining the backend for a
  * key.
  */
