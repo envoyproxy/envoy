@@ -10,17 +10,18 @@ What is the behavior with the PR? If fixing a bug, please describe what
 the original issue is and how the change resolves it. How does this
 feature get enabled? By default, config change, etc...
 
-[Optional *Fixes* : # issue]
+[Optional *Fixes* : #Issue]
+
 [Optional *API Changes* : Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
 
 *Risk Level*: Low | Medium | High
->Low: Small bug fix or small optional feature
+>Low: Small bug fix or small optional feature.
 Medium: New features that aren’t enabled(for example: new filter). Small-medium 
 features added to existing components(for example: modification to an existing 
 filter).
 High: Complicated changes such as flow control, rewrites of critical 
 components, etc.
-Please note: The above is only a rough guide for choosing a level, 
+Note: The above is only a rough guide for choosing a level,
 please ask if you have any concerns about the risk of the PR.
 
 *Testing* : 

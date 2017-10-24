@@ -42,4 +42,4 @@ sharing.
 
 *Call Stack* : 
 > If the Envoy binary is crashing, a call stack is **required**.
-Please refer to the [Bazel Stack trace documentation](https://github.com/envoyproxy/envoy/tree/master/bazel#stack-trace-symbol-resolution).&gt;
+Please refer to the [Bazel Stack trace documentation](https://github.com/envoyproxy/envoy/tree/master/bazel#stack-trace-symbol-resolution).
