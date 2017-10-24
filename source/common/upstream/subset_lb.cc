@@ -149,9 +149,13 @@ void SubsetLoadBalancer::processSubsets(
     const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
     std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> cb) {
   std::unordered_set<LbSubsetEntryPtr> subsets_modified;
-  bool adding = true;
 
-  for (const auto& hosts : {hosts_added, hosts_removed}) {
+  std::pair<const std::vector<HostSharedPtr>&, bool> steps[] = {{hosts_added, true},
+                                                                {hosts_removed, false}};
+  for (const auto& step : steps) {
+    const auto& hosts = step.first;
+    const bool adding_hosts = step.second;
+
     for (const auto& host : hosts) {
       for (const auto& keys : subset_keys_) {
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
@@ -169,12 +173,10 @@ void SubsetLoadBalancer::processSubsets(
           HostPredicate predicate =
               std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
 
-          cb(entry, predicate, adding);
+          cb(entry, predicate, adding_hosts);
         }
       }
     }
-
-    adding = false;
   }
 }
 
@@ -185,9 +187,9 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
   updateFallbackSubset(hosts_added, hosts_removed);
 
   processSubsets(hosts_added, hosts_removed,
-                 [&](LbSubsetEntryPtr entry, HostPredicate predicate, bool addingHost) {
+                 [&](LbSubsetEntryPtr entry, HostPredicate predicate, bool adding_host) {
                    if (entry->initialized()) {
-                     bool active_before = entry->active();
+                     const bool active_before = entry->active();
                      entry->host_subset_->update(hosts_added, hosts_removed, predicate);
 
                      if (active_before && !entry->active()) {
@@ -197,7 +199,7 @@ void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
                        stats_.lb_subsets_active_.inc();
                        stats_.lb_subsets_created_.inc();
                      }
-                   } else if (addingHost) {
+                   } else if (adding_host) {
                      // Initialize new entry with hosts and update stats. (An uninitialized entry
                      // with only removed hosts is a degenerate case and we leave the entry
                      // uninitialized.)
