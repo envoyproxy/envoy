@@ -33,18 +33,16 @@ private:
   class HostSubsetImpl : public HostSetImpl {
   public:
     HostSubsetImpl(const HostSet& original_host_set)
-        : HostSetImpl(), original_host_set_(original_host_set), empty_(true) {}
+        : HostSetImpl(), original_host_set_(original_host_set) {}
 
     void update(const std::vector<HostSharedPtr>& hosts_added,
                 const std::vector<HostSharedPtr>& hosts_removed, HostPredicate predicate);
 
     void triggerCallbacks() { HostSetImpl::runUpdateCallbacks({}, {}); }
-
-    bool empty() { return empty_; };
+    bool empty() { return hosts().empty(); }
 
   private:
     const HostSet& original_host_set_;
-    bool empty_;
   };
 
   typedef std::shared_ptr<HostSubsetImpl> HostSubsetImplPtr;
@@ -61,16 +59,16 @@ private:
   public:
     LbSubsetEntry() {}
 
+    bool initialized() const { return lb_ != nullptr && host_subset_ != nullptr; }
+    bool active() const { return initialized() && !host_subset_->empty(); }
+
+    void initLoadBalancer(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
+
     LbSubsetMap children_;
 
     // Only initialized if a match exists at this level.
     HostSubsetImplPtr host_subset_;
     LoadBalancerPtr lb_;
-
-    bool initialized() const { return lb_ != nullptr && host_subset_ != nullptr; }
-    bool active() const { return initialized() && !host_subset_->empty(); }
-
-    void initLoadBalancer(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
   };
 
   // Implements HostSet::MemberUpdateCb
@@ -79,6 +77,9 @@ private:
 
   void updateFallbackSubset(const std::vector<HostSharedPtr>& hosts_added,
                             const std::vector<HostSharedPtr>& hosts_removed);
+  void processSubsets(const std::vector<HostSharedPtr>& hosts_added,
+                      const std::vector<HostSharedPtr>& hosts_removed,
+                      std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
