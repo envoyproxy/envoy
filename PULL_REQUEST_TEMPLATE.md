@@ -1,7 +1,7 @@
 *Title* : *One line description*
 
 >Title can be a one or two words to describe the subsystem or the aspect
- this pr applies to. For example: Build, Docs, HTTP, Upstream, SSl, ...
+ this PR applies to. For example: Build, Docs, HTTP, Upstream, SSl, ...
 
 
 *Description:* 
