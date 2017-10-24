@@ -95,7 +95,6 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
       {HTTP_CONN_MANAGER_PREFIX, "^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)"});
 
   // listener.(<address>.)*
-  // name_regex_pairs.push_back({LISTENER_ADDRESS, "^listener\\.(([\\[\\]_.[:digit:]]*)\\.)"});
   name_regex_pairs.push_back(
       {LISTENER_ADDRESS, "^listener\\.(((?:[_.[:digit:]]*|[_\\[\\]aAbBcCdDeEfF[:digit:]]*))\\.)"});
 
