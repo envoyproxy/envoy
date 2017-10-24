@@ -71,6 +71,12 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
                                     envoy::api::v2::Locality())};
 }
 
+inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+                                  const envoy::api::v2::Metadata& metadata, uint32_t weight = 1) {
+  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata,
+                                    weight, envoy::api::v2::Locality())};
+}
+
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
                                                              const std::string& url) {
   return HostDescriptionConstSharedPtr{new HostDescriptionImpl(
