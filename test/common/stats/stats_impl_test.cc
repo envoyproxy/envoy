@@ -176,16 +176,30 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {cluster_tag});
 
   // Listener SSL
-  Tag listener_port;
-  listener_port.name_ = tag_names.LISTENER_PORT;
-  listener_port.value_ = "123";
+  Tag listener_address;
+  listener_address.name_ = tag_names.LISTENER_ADDRESS;
 
+  // ipv6 loopback address
+  listener_address.value_ = "[__1]_0";
+
+  // Cipher
   Tag cipher_name;
   cipher_name.name_ = tag_names.SSL_CIPHER;
   cipher_name.value_ = "AES256-SHA";
 
-  regex_tester.testRegex("listener.123.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
-                         {listener_port, cipher_name});
+  regex_tester.testRegex("listener.[__1]_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+                         {listener_address, cipher_name});
+
+  // ipv6 non-loopback (for alphabetical chars)
+  listener_address.value_ = "[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543";
+  regex_tester.testRegex(
+      "listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.cipher.AES256-SHA",
+      "listener.ssl.cipher", {listener_address, cipher_name});
+
+  // ipv4 address
+  listener_address.value_ = "127.0.0.1_0";
+  regex_tester.testRegex("listener.127.0.0.1_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+                         {listener_address, cipher_name});
 
   // Mongo
   Tag mongo_prefix;
@@ -288,6 +302,18 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "vhost.vcluster.upstream_rq", {vhost, vcluster, response_code_class});
   regex_tester.testRegex("vhost.vhost_1.vcluster.vcluster_1.upstream_rq_200",
                          "vhost.vcluster.upstream_rq", {vhost, vcluster, response_code});
+
+  // Listener http prefix
+  Tag listener_http_prefix;
+  listener_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  listener_http_prefix.value_ = "http_prefix";
+
+  listener_address.value_ = "127.0.0.1_3012";
+  response_code_class.value_ = "5xx";
+
+  regex_tester.testRegex("listener.127.0.0.1_3012.http.http_prefix.downstream_rq_5xx",
+                         "listener.http.downstream_rq",
+                         {listener_http_prefix, listener_address, response_code_class});
 
   // User agent
   Tag user_agent;

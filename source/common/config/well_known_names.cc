@@ -72,7 +72,7 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
   name_regex_pairs.push_back(
       {FAULT_DOWNSTREAM_CLUSTER, "^http(?=\\.).*?\\.fault\\.((.*?)\\.)\\w+?$"});
 
-  // listener.[<port>.]ssl.cipher.(<cipher>)
+  // listener.[<address>.]ssl.cipher.(<cipher>)
   name_regex_pairs.push_back({SSL_CIPHER, "^listener(?=\\.).*?\\.ssl\\.cipher(\\.(.*?))$"});
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
@@ -90,11 +90,14 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
   // cluster.(<cluster_name>.)*
   name_regex_pairs.push_back({CLUSTER_NAME, "^cluster\\.((.*?)\\.)"});
 
-  // listener.(<port>.)*
-  name_regex_pairs.push_back({LISTENER_PORT, "^listener\\.((\\d+?)\\.)"});
+  // http.(<stat_prefix>.)* or listener.[<address>.]http.(<stat_prefix>.)*
+  name_regex_pairs.push_back(
+      {HTTP_CONN_MANAGER_PREFIX, "^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)"});
 
-  // http.(<stat_prefix>.)*
-  name_regex_pairs.push_back({HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)"});
+  // listener.(<address>.)*
+  // name_regex_pairs.push_back({LISTENER_ADDRESS, "^listener\\.(([\\[\\]_.[:digit:]]*)\\.)"});
+  name_regex_pairs.push_back(
+      {LISTENER_ADDRESS, "^listener\\.(((?:[_.[:digit:]]*|[_\\[\\]aAbBcCdDeEfF[:digit:]]*))\\.)"});
 
   // vhost.(<virtual host name>.)*
   name_regex_pairs.push_back({VIRTUAL_HOST, "^vhost\\.((.*?)\\.)"});

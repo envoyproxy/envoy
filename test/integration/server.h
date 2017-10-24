@@ -227,6 +227,10 @@ public:
     return TestUtility::findGauge(*stat_store_, name);
   }
 
+  std::list<Stats::CounterSharedPtr> counters() { return stat_store_->counters(); }
+
+  std::list<Stats::GaugeSharedPtr> gauges() { return stat_store_->gauges(); }
+
   // TestHooks
   void onWorkerListenerAdded() override;
   void onWorkerListenerRemoved() override;

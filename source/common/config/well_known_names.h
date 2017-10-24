@@ -193,7 +193,7 @@ public:
   // Cluster name tag
   const std::string CLUSTER_NAME = "envoy.cluster_name";
   // Listener port tag
-  const std::string LISTENER_PORT = "envoy.listener_port";
+  const std::string LISTENER_ADDRESS = "envoy.listener_address";
   // Stats prefix for HttpConnectionManager
   const std::string HTTP_CONN_MANAGER_PREFIX = "envoy.http_conn_manager_prefix";
   // User agent for a connection
