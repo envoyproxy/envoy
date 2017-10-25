@@ -18,10 +18,7 @@ namespace Tracing {
 LightStepSpan::LightStepSpan(lightstep::Span& span, lightstep::Tracer& tracer)
     : span_(span), tracer_(tracer) {}
 
-void LightStepSpan::finishSpan(SpanFinalizer& finalizer) {
-  finalizer.finalize(*this);
-  span_.Finish();
-}
+void LightStepSpan::finishSpan() { span_.Finish(); }
 
 void LightStepSpan::setOperation(const std::string& operation) {
   span_.SetOperationName(operation);

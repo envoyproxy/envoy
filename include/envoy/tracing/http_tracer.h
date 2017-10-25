@@ -13,7 +13,7 @@ namespace Tracing {
 
 enum class OperationName { Ingress, Egress };
 
-/*
+/**
  * Tracing configuration, it carries additional data needed to populate the span.
  */
 class Config {
@@ -32,24 +32,9 @@ public:
 };
 
 class Span;
-
 typedef std::unique_ptr<Span> SpanPtr;
 
-/*
- * Interface to perform context-specific tasks when completing a Span.
- */
-class SpanFinalizer {
-public:
-  virtual ~SpanFinalizer() {}
-
-  /**
-   * Finalize the Span.
-   * @param span the Span to be finalized
-   */
-  virtual void finalize(Span& span) PURE;
-};
-
-/*
+/**
  * Basic abstraction for span.
  */
 class Span {
@@ -72,9 +57,8 @@ public:
   /**
    * Capture the final duration for this Span and carry out any work necessary to complete it.
    * Once this method is called, the Span may be safely discarded.
-   * @param finalizer callback for context-specific work to complete the Span
    */
-  virtual void finishSpan(SpanFinalizer& finalizer) PURE;
+  virtual void finishSpan() PURE;
 
   /**
    * Mutate the provided headers with the context necessary to propagate this

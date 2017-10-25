@@ -1,5 +1,3 @@
-load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
-
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
@@ -38,7 +36,11 @@ def envoy_linkopts():
         # TODO(zuercher): build id could be supported via "-sectcreate __TEXT __build_id <file>"
         # The file could should contain the current git SHA (or enough placeholder data to allow
         # it to be rewritten by tools/git_sha_rewriter.py).
-        "@bazel_tools//tools/osx:darwin": [],
+        "@bazel_tools//tools/osx:darwin": [
+            # TODO(zuercher): should be able to remove this after the next gperftools release after
+            # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
+            "-Wl,-U,___lsan_ignore_object",
+        ],
         "//conditions:default": [
             "-pthread",
             "-lrt",
@@ -60,7 +62,11 @@ def envoy_linkopts():
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
     return select({
-        "@bazel_tools//tools/osx:darwin": [],
+        "@bazel_tools//tools/osx:darwin": [
+            # TODO(zuercher): should be able to remove this after the next gperftools release after
+            # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
+            "-Wl,-U,___lsan_ignore_object",
+        ],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
@@ -297,24 +303,15 @@ def _proto_header(proto_path):
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
-    internal_name = name + "_internal"
-    cc_proto_library(
-        name = internal_name,
+    internal_proto_lib_name = name + "_internal_proto_lib"
+    native.proto_library(
+        name = internal_proto_lib_name,
         srcs = srcs,
-        default_runtime = "//external:protobuf",
-        protoc = "//external:protoc",
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
-        linkstatic = 1,
     )
-    # We can't use include_prefix directly in cc_proto_library, since it
-    # confuses protoc. Instead, we create a shim cc_library that performs the
-    # remap of .pb.h location to Envoy canonical header paths.
-    native.cc_library(
+    native.cc_proto_library(
         name = name,
-        hdrs = [_proto_header(s) for s in srcs if _proto_header(s)],
-        include_prefix = envoy_include_prefix(PACKAGE_NAME),
-        deps = [internal_name],
-        linkstatic = 1,
+        deps = [internal_proto_lib_name],
     )
 
 # Envoy proto descriptor targets should be specified with this function.
@@ -328,8 +325,8 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
         include_paths.append("external/googleapis")
 
     if "well_known_protos" in external_deps:
-        srcs.append("@protobuf_bzl//:well_known_protos")
-        include_paths.append("external/protobuf_bzl/src")
+        srcs.append("@com_google_protobuf//:well_known_protos")
+        include_paths.append("external/com_google_protobuf/src")
 
     options = ["--include_imports"]
     options.extend(["-I" + include_path for include_path in include_paths])

@@ -7,10 +7,10 @@ cat "$(location :lightstep_compiler_flags)"
 source "$(location :lightstep_compiler_flags)"
 
 CONFIGURE="$${PWD}/$(location :configure)"
-PROTOC="$${PWD}/$(location @protobuf_bzl//:protoc)"
-PROTOBUF_SRC="$${PWD}/external/protobuf_bzl/src/"
-PROTOBUF_LIBDIR="$${PWD}/$(BINDIR)/external/protobuf_bzl/"
-mkdir "$(@D)/build"
+PROTOC="$${PWD}/$(location @com_google_protobuf//:protoc)"
+PROTOBUF_SRC="$${PWD}/external/com_google_protobuf/src/"
+PROTOBUF_LIBDIR="$${PWD}/$(BINDIR)/external/com_google_protobuf/"
+mkdir -p "$(@D)/build"
 cd "$(@D)/build"
 "$${CONFIGURE}" \
   --prefix="$${PWD}/../_prefix" \

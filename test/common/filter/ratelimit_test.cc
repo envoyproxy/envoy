@@ -91,7 +91,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),
-                              Tracing::EMPTY_CONTEXT))
+                              testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
