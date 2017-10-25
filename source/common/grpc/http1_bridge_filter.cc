@@ -28,7 +28,10 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& head
     setupStatTracking(headers);
   }
 
-  if (decoder_callbacks_->requestInfo().protocol() != Http::Protocol::Http2 && grpc_request) {
+  Optional<Http::Protocol> protocol = decoder_callbacks_->requestInfo().protocol();
+  ASSERT(protocol.valid());
+  if (decoder_callbacks_->requestInfo().protocol().value() != Http::Protocol::Http2 &&
+      grpc_request) {
     do_bridging_ = true;
   }
 

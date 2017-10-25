@@ -13,7 +13,9 @@ namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
-const std::string ResponseFlagUtils::NONE = "-";
+static const std::string UnspecifiedValueString = "-";
+
+const std::string ResponseFlagUtils::NONE = UnspecifiedValueString;
 const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
 const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
 const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
@@ -104,14 +106,18 @@ static const std::string Http10String = "HTTP/1.0";
 static const std::string Http11String = "HTTP/1.1";
 static const std::string Http2String = "HTTP/2";
 
-const std::string& AccessLogFormatUtils::protocolToString(Protocol protocol) {
-  switch (protocol) {
-  case Protocol::Http10:
-    return Http10String;
-  case Protocol::Http11:
-    return Http11String;
-  case Protocol::Http2:
-    return Http2String;
+const std::string& AccessLogFormatUtils::protocolToString(Optional<Protocol> protocol) {
+  if (protocol.valid()) {
+    switch (protocol.value()) {
+    case Protocol::Http10:
+      return Http10String;
+    case Protocol::Http11:
+      return Http11String;
+    case Protocol::Http2:
+      return Http2String;
+    }
+  } else {
+    return UnspecifiedValueString;
   }
 
   NOT_REACHED;
@@ -233,15 +239,23 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                request_info.requestReceivedDuration())
-                                .count());
+      Optional<std::chrono::microseconds> duration = request_info.requestReceivedDuration();
+      if (duration.valid()) {
+        return std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
+      } else {
+        return UnspecifiedValueString;
+      }
     };
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                request_info.responseReceivedDuration())
-                                .count());
+      Optional<std::chrono::microseconds> duration = request_info.responseReceivedDuration();
+      if (duration.valid()) {
+        return std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
+      } else {
+        return UnspecifiedValueString;
+      }
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo& request_info) {
@@ -275,7 +289,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       if (request_info.upstreamHost()) {
         return request_info.upstreamHost()->address()->asString();
       } else {
-        return std::string("-");
+        return UnspecifiedValueString;
       }
     };
   } else if (field_name == "UPSTREAM_CLUSTER") {
@@ -285,7 +299,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
         upstream_cluster_name = request_info.upstreamHost()->cluster().name();
       }
 
-      return upstream_cluster_name.empty() ? "-" : upstream_cluster_name;
+      return upstream_cluster_name.empty() ? UnspecifiedValueString : upstream_cluster_name;
     };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));
@@ -318,7 +332,7 @@ std::string HeaderFormatter::format(const HeaderMap& headers) const {
 
   std::string header_value_string;
   if (!header) {
-    header_value_string = "-";
+    header_value_string = UnspecifiedValueString;
   } else {
     header_value_string = header->value().c_str();
   }

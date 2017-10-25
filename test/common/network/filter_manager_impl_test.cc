@@ -13,6 +13,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
@@ -97,9 +98,7 @@ TEST_F(NetworkFilterManagerTest, All) {
 // This is a very important flow so make sure it works correctly in aggregate.
 TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   InSequence s;
-  Stats::IsolatedStoreImpl stats_store;
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   NiceMock<MockConnection> connection;
   FilterManagerImpl manager(connection, *this);
 
@@ -113,15 +112,17 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
     }
     )EOF";
 
-  ON_CALL(runtime.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
+  ON_CALL(factory_context.runtime_loader_.snapshot_,
+          featureEnabled("ratelimit.tcp_filter_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(runtime.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
+  ON_CALL(factory_context.runtime_loader_.snapshot_,
+          featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
   Json::ObjectSharedPtr rl_config_loader = Json::Factory::loadFromString(rl_json);
 
-  RateLimit::TcpFilter::ConfigSharedPtr rl_config(
-      new RateLimit::TcpFilter::Config(*rl_config_loader, stats_store, runtime));
+  RateLimit::TcpFilter::ConfigSharedPtr rl_config(new RateLimit::TcpFilter::Config(
+      *rl_config_loader, factory_context.scope_, factory_context.runtime_loader_));
   RateLimit::MockClient* rl_client = new RateLimit::MockClient();
   manager.addReadFilter(ReadFilterSharedPtr{
       new RateLimit::TcpFilter::Instance(rl_config, RateLimit::ClientPtr{rl_client})});
@@ -141,8 +142,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   Json::ObjectSharedPtr tcp_proxy_config_loader = Json::Factory::loadFromString(tcp_proxy_json);
   Envoy::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
-      new Envoy::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
-  manager.addReadFilter(ReadFilterSharedPtr{new Envoy::Filter::TcpProxy(tcp_proxy_config, cm)});
+      new Envoy::Filter::TcpProxyConfig(*tcp_proxy_config_loader, factory_context));
+  manager.addReadFilter(ReadFilterSharedPtr{
+      new Envoy::Filter::TcpProxy(tcp_proxy_config, factory_context.cluster_manager_)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
@@ -159,9 +161,10 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = upstream_connection;
-  conn_info.host_description_ =
-      Upstream::makeTestHost(cm.thread_local_cluster_.cluster_.info_, "tcp://127.0.0.1:80");
-  EXPECT_CALL(cm, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  conn_info.host_description_ = Upstream::makeTestHost(
+      factory_context.cluster_manager_.thread_local_cluster_.cluster_.info_, "tcp://127.0.0.1:80");
+  EXPECT_CALL(factory_context.cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+      .WillOnce(Return(conn_info));
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);
 

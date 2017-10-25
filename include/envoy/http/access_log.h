@@ -69,7 +69,7 @@ public:
    * @return duration from request start to when the entire request was received from the
    * downstream client in microseconds. Note: if unset, will return 0 microseconds.
    */
-  virtual std::chrono::microseconds requestReceivedDuration() const PURE;
+  virtual Optional<std::chrono::microseconds> requestReceivedDuration() const PURE;
 
   /**
    * Set the duration from request start to when the entire request was received from the
@@ -82,7 +82,7 @@ public:
    * @return the duration from request start to when the entire response was received from the
    * upstream host in microseconds. Note: if unset, will return 0 microseconds.
    */
-  virtual std::chrono::microseconds responseReceivedDuration() const PURE;
+  virtual Optional<std::chrono::microseconds> responseReceivedDuration() const PURE;
 
   /**
    * Set the duration from request start to when the entire response was received from the
@@ -99,7 +99,7 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual Protocol protocol() const PURE;
+  virtual Optional<Protocol> protocol() const PURE;
 
   /**
    * Set the request's protocol.

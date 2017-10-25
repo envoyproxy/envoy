@@ -12,9 +12,12 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/config/filter_json.h"
+#include "common/http/access_log/access_log_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
+#include "api/filter/http_connection_manager.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -43,18 +46,24 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
 }
 
 TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
-                               Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
-    : stats_(generateStats(config.getString("stat_prefix"), scope)) {
+                               Server::Configuration::FactoryContext& context)
+    : stats_(generateStats(config.getString("stat_prefix"), context.scope())) {
   config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   for (const Json::ObjectSharedPtr& route_desc :
        config.getObject("route_config")->getObjectArray("routes")) {
     routes_.emplace_back(Route(*route_desc));
 
-    if (!cluster_manager.get(route_desc->getString("cluster"))) {
+    if (!context.clusterManager().get(route_desc->getString("cluster"))) {
       throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}' in TCP route",
                                        route_desc->getString("cluster")));
     }
+  }
+
+  for (const Json::ObjectSharedPtr& json_access_log : config.getObjectArray("access_log", true)) {
+    envoy::api::v2::filter::AccessLog v2_access_log;
+    Config::FilterJson::translateAccessLog(*json_access_log, v2_access_log);
+    access_logs_.emplace_back(Http::AccessLog::AccessLogFactory::fromProto(v2_access_log, context));
   }
 }
 
@@ -93,6 +102,12 @@ TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& clu
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
 
 TcpProxy::~TcpProxy() {
+  if (config_ != nullptr) {
+    for (const auto& access_log : config_->accessLogs()) {
+      access_log->log(nullptr, nullptr, request_info_);
+    }
+  }
+
   if (upstream_connection_) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_.inc();
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.dec();
@@ -193,12 +208,14 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     if (config_) {
       config_->stats().downstream_cx_no_route_.inc();
     }
+    request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
     onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
+    request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure();
     return Network::FilterStatus::StopIteration;
@@ -209,10 +226,12 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
+    request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
     onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
 
+  request_info_.onUpstreamHostSelected(conn_info.host_description_);
   onUpstreamHostReady();
   cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
   upstream_connection_->addReadFilter(upstream_callbacks_);
@@ -252,6 +271,7 @@ void TcpProxy::onConnectTimeout() {
 
 Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
+  request_info_.bytes_received_ += data.length();
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
   return Network::FilterStatus::StopIteration;
@@ -270,6 +290,7 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 void TcpProxy::onUpstreamData(Buffer::Instance& data) {
+  request_info_.bytes_sent_ += data.length();
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
 }
@@ -285,6 +306,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose) {
     if (connect_timeout_timer_) {
+      request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure);
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
     }

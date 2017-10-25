@@ -53,14 +53,14 @@ TEST(RequestInfoImplTest, TimingTest) {
   wrapper.checkTimingBounds(
       [](RequestInfoImpl& request_info) {
         request_info.requestReceivedDuration(std::chrono::steady_clock::now());
-        return request_info.requestReceivedDuration();
+        return request_info.requestReceivedDuration().value();
       },
       "request received");
 
   wrapper.checkTimingBounds(
       [](RequestInfoImpl& request_info) {
         request_info.responseReceivedDuration(std::chrono::steady_clock::now());
-        return request_info.responseReceivedDuration();
+        return request_info.responseReceivedDuration().value();
       },
       "response received");
 
@@ -107,10 +107,10 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
 
 TEST(RequestInfoImplTest, MiscSettersAndGetters) {
   RequestInfoImpl request_info(Protocol::Http2);
-  EXPECT_EQ(Protocol::Http2, request_info.protocol());
+  EXPECT_EQ(Protocol::Http2, request_info.protocol().value());
 
   request_info.protocol(Protocol::Http10);
-  EXPECT_EQ(Protocol::Http10, request_info.protocol());
+  EXPECT_EQ(Protocol::Http10, request_info.protocol().value());
 
   EXPECT_FALSE(request_info.responseCode().valid());
   request_info.response_code_ = 200;

@@ -464,6 +464,62 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
       "$schema": "http://json-schema.org/schema#",
       "type" : "object",
+      "definitions": {
+        "duration" : {
+          "type" : "object",
+          "properties" : {
+            "type" : {
+              "type" : "string",
+              "enum" : ["duration"]
+            },
+            "op" : {
+              "type" : "string",
+              "enum" : [">=", "="]
+            },
+            "value" : {
+              "type" : "integer",
+              "minimum" : 0
+            },
+            "runtime_key" : {"type" : "string"}
+          },
+          "required" : ["type", "op", "value"],
+          "additionalProperties" : false
+        },
+        "runtime" : {
+          "type" : "object",
+          "properties" : {
+            "type" : {
+              "type" : "string",
+              "enum" : ["runtime"]
+            },
+            "key" : {"type" : "string"}
+          },
+          "required" : ["type", "key"],
+          "additionalProperties" : false
+        },
+        "logical_filter" : {
+          "type" : "object",
+          "properties" : {
+            "type" : {
+              "type" : "string",
+              "enum" : ["logical_and", "logical_or"]
+            },
+            "filters" : {
+              "type" : "array",
+              "minItems" : 2,
+              "items" : {
+                "oneOf" : [
+                  {"$ref" : "#/definitions/duration"},
+                  {"$ref" : "#/definitions/logical_filter"},
+                  {"$ref" : "#/definitions/runtime"}
+                ]
+              }
+            }
+          },
+          "required" : ["type", "filters"],
+          "additionalProperties" : false
+        }
+      },
       "properties": {
         "stat_prefix": {"type" : "string"},
         "route_config": {
@@ -505,6 +561,26 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
             }
           },
           "additionalProperties": false
+        },
+        "access_log" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "properties" : {
+              "path" : {"type" : "string"},
+              "format" : {"type" : "string"},
+              "filter" : {
+                "type" : "object",
+                "oneOf" : [
+                  {"$ref" : "#/definitions/duration"},
+                  {"$ref" : "#/definitions/runtime"},
+                  {"$ref" : "#/definitions/logical_filter"}
+                ]
+              }
+            },
+            "required" : ["path"],
+            "additionalProperties" : false
+          }
         }
       },
       "required": ["stat_prefix", "route_config"],

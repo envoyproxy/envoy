@@ -62,16 +62,16 @@ public:
   }
 
   SystemTime startTime() const override { return start_time_; }
-  std::chrono::microseconds requestReceivedDuration() const override {
+  Optional<std::chrono::microseconds> requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
-  std::chrono::microseconds responseReceivedDuration() const override {
+  Optional<std::chrono::microseconds> responseReceivedDuration() const override {
     return request_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
   uint64_t bytesReceived() const override { return 1; }
-  Protocol protocol() const override { return protocol_; }
+  Optional<Protocol> protocol() const override { return protocol_; }
   void protocol(Protocol protocol) override { protocol_ = protocol; }
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
