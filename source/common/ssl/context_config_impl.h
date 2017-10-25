@@ -22,6 +22,7 @@ public:
   const std::string& caCertFile() const override { return ca_cert_file_; }
   const std::string& certChainFile() const override { return cert_chain_file_; }
   const std::string& privateKeyFile() const override { return private_key_file_; }
+  const std::string& certificateRevocationList() const override { return certificate_revocation_list_; }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
   };
@@ -41,6 +42,7 @@ private:
   const std::string ca_cert_file_;
   const std::string cert_chain_file_;
   const std::string private_key_file_;
+  const std::string certificate_revocation_list_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::string verify_certificate_hash_;
 };

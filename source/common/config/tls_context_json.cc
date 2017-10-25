@@ -49,6 +49,8 @@ void TlsContextJson::translateCommonTlsContext(
   for (const auto& san : json_tls_context.getStringArray("verify_subject_alt_name", true)) {
     validation_context->add_verify_subject_alt_name(san);
   }
+  validation_context->mutable_crl()->set_filename(
+      json_tls_context.getString("crl", ""));
 
   const std::vector<std::string> cipher_suites =
       StringUtil::split(json_tls_context.getString("cipher_suites", ""), ":");

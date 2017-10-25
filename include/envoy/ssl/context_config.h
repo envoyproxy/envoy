@@ -54,6 +54,11 @@ public:
   virtual const std::string& privateKeyFile() const PURE;
 
   /**
+   * @return The CRL to check if a cert is revoked.
+   */
+  virtual const std::string& certificateRevocationList() const PURE;
+
+  /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""
    */
   virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;

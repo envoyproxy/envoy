@@ -46,6 +46,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
       private_key_file_(config.tls_certificates().empty()
                             ? ""
                             : config.tls_certificates()[0].private_key().filename()),
+      certificate_revocation_list_(config.validation_context().crl().filename()),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
