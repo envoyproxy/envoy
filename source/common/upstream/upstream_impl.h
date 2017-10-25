@@ -17,19 +17,23 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_config.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
+#include "common/upstream/cluster_config_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/http/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
+#include "common/upstream/overridable_cluster_config.h"
 #include "common/upstream/resource_manager_impl.h"
 
 #include "api/base.pb.h"
@@ -224,7 +228,7 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
-class ClusterInfoImpl : public ClusterInfo {
+class ClusterInfoImpl : public virtual ClusterInfo, public virtual OverridableClusterConfig {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const Network::Address::InstanceConstSharedPtr source_address,
@@ -236,32 +240,22 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
-  std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
-  uint32_t perConnectionBufferLimitBytes() const override {
-    return per_connection_buffer_limit_bytes_;
+
+  void overrideWithHeaders(const Http::HeaderMap& headers) override {
+    OverridableClusterConfig::overrideWithHeaders(headers);
   }
-  uint64_t features() const override { return features_; }
-  const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
-  LoadBalancerType lbType() const override { return lb_type_; }
+
   bool maintenanceMode() const override;
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
-  const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  };
-  const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
 
 private:
   struct ResourceManagers {
-    ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name);
-    ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name,
+    ResourceManagers(const ClusterConfig& config, Runtime::Loader& runtime);
+    ResourceManagerImplPtr load(const ClusterConfig& config, Runtime::Loader& runtime,
                                 const envoy::api::v2::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
@@ -269,26 +263,15 @@ private:
     Managers managers_;
   };
 
-  static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
-
   Runtime::Loader& runtime_;
-  const std::string name_;
-  const uint64_t max_requests_per_connection_;
-  const std::chrono::milliseconds connect_timeout_;
-  const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
   Ssl::ClientContextPtr ssl_ctx_;
-  const uint64_t features_;
-  const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
-  LoadBalancerType lb_type_;
   const bool added_via_api_;
-  LoadBalancerSubsetInfoImpl lb_subset_;
 };
 
 /**

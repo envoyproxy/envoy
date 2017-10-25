@@ -46,6 +46,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cluster_config_lib",
+    srcs = [
+        "cluster_config_impl.cc",
+    ],
+    hdrs = [
+        "cluster_config_impl.h",
+        "overridable_cluster_config.h",
+    ],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":cds_api_lib",
+        ":load_balancer_lib",
+        "//include/envoy/upstream:cluster_config_interface",
+        "//source/common/http:utility_lib",
+        "//source/common/network:resolver_lib",
+        "//source/common/ssl:context_config_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
@@ -317,6 +337,7 @@ envoy_cc_library(
     hdrs = ["upstream_impl.h"],
     external_deps = ["envoy_base"],
     deps = [
+        ":cluster_config_lib",
         ":load_balancer_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",

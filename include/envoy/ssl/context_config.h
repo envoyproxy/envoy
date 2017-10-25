@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -72,6 +73,8 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& serverNameIndication() const PURE;
+
+  typedef std::shared_ptr<const ClientContextConfig> ConstSharedPtr;
 };
 
 class ServerContextConfig : public virtual ContextConfig {
@@ -93,6 +96,8 @@ public:
    * are candidates for decrypting received tickets.
    */
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
+
+  typedef std::shared_ptr<const ServerContextConfig> ConstSharedPtr;
 };
 
 } // namespace Ssl

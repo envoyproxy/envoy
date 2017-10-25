@@ -38,6 +38,15 @@ public:
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
+  const LowerCaseString EnvoyOutlierIntervalMs{"x-envoy-outlier-interval_ms"};
+  const LowerCaseString EnvoyOutlierBaseEjectionTimeMs{"x-envoy-outlier-base-ejection-time_ms"};
+  const LowerCaseString EnvoyOutlierConsecutive5xx{"x-envoy-outlier-consecutive-5xx"};
+  const LowerCaseString EnvoyOutlierMaxEjectionPercent{"x-envoy-outlier-max-ejection-percent"};
+  const LowerCaseString EnvoyOutlierSuccessRateMinimumHosts{"x-envoy-outlier-success-rate-minimum-hosts"};
+  const LowerCaseString EnvoyOutlierSuccessRateRequestVolume{"x-envoy-outlier-success-rate-request-volume"};
+  const LowerCaseString EnvoyOutlierSuccessRateStdevFactor{"x-envoy-outlier-success-rate-stdev-factor"};
+  const LowerCaseString EnvoyOutlierEnforcingConsecutive5xx{"x-envoy-outlier-enforcing-consecutive-5xx"};
+  const LowerCaseString EnvoyOutlierEnforcingSuccessRate{"x-envoy-outlier-enforcing-success-rate"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};

@@ -20,13 +20,13 @@ public:
    * Builds a ClientContext from a ClientContextConfig.
    */
   virtual ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                                  ClientContextConfig& config) PURE;
+                                                  const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
    */
   virtual ServerContextPtr createSslServerContext(Stats::Scope& scope,
-                                                  ServerContextConfig& config) PURE;
+                                                  const ServerContextConfig& config) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire.
