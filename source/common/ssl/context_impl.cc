@@ -92,6 +92,14 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     }
   }
 
+  if (!config.certificateRevocationList().empty()) {
+    crl_ = loadCRL(config.certificateRevocationList());
+
+    X509_STORE *cs = SSL_CTX_get_cert_store(ctx_.get());
+    X509_STORE_add_crl(cs, crl_.get());
+    X509_STORE_set_flags(cs, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+  }
+
   SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv3);
 
   // use the server's cipher list preferences
@@ -328,6 +336,15 @@ bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
     throw EnvoyException(fmt::format("Failed to load certificate '{}'", cert_file.c_str()));
   }
   return bssl::UniquePtr<X509>(cert);
+};
+
+bssl::UniquePtr<X509_CRL> ContextImpl::loadCRL(const std::string& crl_file) {
+  X509_CRL* crl = nullptr;
+  std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(crl_file.c_str(), "r"), &fclose);
+  if (!fp.get() || !PEM_read_X509_CRL(fp.get(), &crl, nullptr, nullptr)) {
+    throw EnvoyException(fmt::format("Failed to load CRL '{}'", crl_file.c_str()));
+  }
+  return bssl::UniquePtr<X509_CRL>(crl);
 };
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
