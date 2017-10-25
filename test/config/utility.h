@@ -43,6 +43,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Set the connect timeout on upstream connections.
+  void setConnectTimeout(std::chrono::milliseconds timeout);
+
   // Add an additional route to the configuration.
   void addRoute(
       const std::string& host, const std::string& route, const std::string& cluster,
