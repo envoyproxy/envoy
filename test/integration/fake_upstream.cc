@@ -32,20 +32,20 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
 void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   std::unique_lock<std::mutex> lock(lock_);
   headers_ = std::move(headers);
-  end_stream_ = end_stream;
+  setEndStream(end_stream);
   decoder_event_.notify_one();
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   std::unique_lock<std::mutex> lock(lock_);
-  end_stream_ = end_stream;
   body_.add(data);
+  setEndStream(end_stream);
   decoder_event_.notify_one();
 }
 
 void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   std::unique_lock<std::mutex> lock(lock_);
-  end_stream_ = true;
+  setEndStream(true);
   trailers_ = std::move(trailers);
   decoder_event_.notify_one();
 }
@@ -259,18 +259,23 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,
                            FakeHttpConnection::Type type)
-    : ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)),
+    : http_type_(type), ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)),
       api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
-      handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)), http_type_(type),
+      handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
 }
 
-FakeUpstream::~FakeUpstream() {
-  dispatcher_->exit();
-  thread_->join();
+FakeUpstream::~FakeUpstream() { cleanUp(); };
+
+void FakeUpstream::cleanUp() {
+  if (thread_.get()) {
+    dispatcher_->exit();
+    thread_->join();
+    thread_.reset();
+  }
 }
 
 bool FakeUpstream::createFilterChain(Network::Connection& connection) {
