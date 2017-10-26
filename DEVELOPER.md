@@ -18,4 +18,13 @@ Below is a list of additional documentation to aid the development process:
 
 - [Guide to contributing to Envoy](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md)
 
+- [Overview of how to write integration tests for new code](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
+
 - [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/envoyproxy/envoy-filter-example)
+
+And some documents on components of Envoy architecture:
+
+- [Envoy flow control](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md)
+
+- [Envoy's subset load balancer](https://github.com/envoyproxy/envoy/blob/master/source/docs/subset_load_balancer.md)
+
