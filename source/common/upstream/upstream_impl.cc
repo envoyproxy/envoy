@@ -177,6 +177,10 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
       throw EnvoyException(fmt::format(
           "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
     }
+    if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() != 0) {
+      throw EnvoyException(fmt::format(
+          "cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
+    }
     new_cluster.reset(new OriginalDstCluster(cluster, runtime, stats, ssl_context_manager, cm,
                                              dispatcher, added_via_api));
     break;

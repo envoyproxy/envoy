@@ -27,6 +27,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
+#include "common/upstream/subset_lb.h"
 
 #include "fmt/format.h"
 
@@ -543,33 +544,38 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
-
-  switch (cluster->lbType()) {
-  case LoadBalancerType::LeastRequest: {
-    lb_.reset(new LeastRequestLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
+  if (cluster->lbSubsetInfo().isEnabled()) {
+    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), host_set_, parent.local_host_set_,
+                                     cluster->stats(), parent.parent_.runtime_,
+                                     parent.parent_.random_, cluster->lbSubsetInfo()));
+  } else {
+    switch (cluster->lbType()) {
+    case LoadBalancerType::LeastRequest: {
+      lb_.reset(new LeastRequestLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
+                                             parent.parent_.runtime_, parent.parent_.random_));
+      break;
+    }
+    case LoadBalancerType::Random: {
+      lb_.reset(new RandomLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
+                                       parent.parent_.runtime_, parent.parent_.random_));
+      break;
+    }
+    case LoadBalancerType::RoundRobin: {
+      lb_.reset(new RoundRobinLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
                                            parent.parent_.runtime_, parent.parent_.random_));
-    break;
-  }
-  case LoadBalancerType::Random: {
-    lb_.reset(new RandomLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
-                                     parent.parent_.runtime_, parent.parent_.random_));
-    break;
-  }
-  case LoadBalancerType::RoundRobin: {
-    lb_.reset(new RoundRobinLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
-                                         parent.parent_.runtime_, parent.parent_.random_));
-    break;
-  }
-  case LoadBalancerType::RingHash: {
-    lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
-                                       parent.parent_.random_));
-    break;
-  }
-  case LoadBalancerType::OriginalDst: {
-    lb_.reset(new OriginalDstCluster::LoadBalancer(
-        host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
-    break;
-  }
+      break;
+    }
+    case LoadBalancerType::RingHash: {
+      lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
+                                         parent.parent_.random_));
+      break;
+    }
+    case LoadBalancerType::OriginalDst: {
+      lb_.reset(new OriginalDstCluster::LoadBalancer(
+          host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
+      break;
+    }
+    }
   }
 
   host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
