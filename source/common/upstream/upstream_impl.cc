@@ -262,6 +262,15 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
+void ClusterImplBase::blockHcUpdates(bool block) {
+  ASSERT(block_hc_updates_ == !block);
+  block_hc_updates_ = block;
+
+  if (!block_hc_updates_) {
+    reloadHealthyHosts();
+  }
+}
+
 void ClusterImplBase::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
   if (!hosts_added.empty() || !hosts_removed.empty()) {
@@ -280,7 +289,7 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool changed_state) -> void {
     // If we get a health check completion that resulted in a state change, signal to
     // update the host sets on all threads.
-    if (changed_state) {
+    if (!block_hc_updates_ && changed_state) {
       reloadHealthyHosts();
     }
   });

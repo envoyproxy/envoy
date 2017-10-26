@@ -103,8 +103,18 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     if (initialize_callback_ && health_checker_ && pending_health_checks_ == 0) {
       pending_health_checks_ = hosts().size();
       ASSERT(pending_health_checks_ > 0);
+
+      // Every time a host changes HC state we cause a full healthy host recalculation which
+      // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
+      // can also block worker threads by doing this repeatedly. There is no reason to do this
+      // as we will not start taking traffic until we are initialized. By blocking HC updates
+      // while initializing we can avoid this. We turn HC updates on which forces a healthy host
+      // recalculation before initializing.
+      // TODO(mattklein123): Add similar logic for the DNS clusters.
+      blockHcUpdates(true);
       health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool) -> void {
         if (pending_health_checks_ > 0 && --pending_health_checks_ == 0) {
+          blockHcUpdates(false);
           initialize_callback_();
           initialize_callback_ = nullptr;
         }
