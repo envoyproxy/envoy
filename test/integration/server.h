@@ -164,6 +164,7 @@ public:
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
+  void setTagExtractors(const std::vector<TagExtractorPtr>&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
 
@@ -225,6 +226,10 @@ public:
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(*stat_store_, name);
   }
+
+  std::list<Stats::CounterSharedPtr> counters() { return stat_store_->counters(); }
+
+  std::list<Stats::GaugeSharedPtr> gauges() { return stat_store_->gauges(); }
 
   // TestHooks
   void onWorkerListenerAdded() override;
