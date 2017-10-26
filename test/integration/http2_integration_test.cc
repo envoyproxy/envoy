@@ -333,15 +333,16 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
 }
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
-    auto* hash_policy = hcm.mutable_route_config()
-                            ->mutable_virtual_hosts(0)
-                            ->mutable_routes(0)
-                            ->mutable_route()
-                            ->add_hash_policy();
-    auto* cookie = hash_policy->mutable_cookie();
-    cookie->set_name("foo");
-  });
+  config_helper_.addConfigModifier(
+      [&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+      });
 
   // This test is non-deterministic, so make it extremely unlikely that not all
   // upstreams get hit.
@@ -363,16 +364,17 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
 }
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithTtlSet) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
-    auto* hash_policy = hcm.mutable_route_config()
-                            ->mutable_virtual_hosts(0)
-                            ->mutable_routes(0)
-                            ->mutable_route()
-                            ->add_hash_policy();
-    auto* cookie = hash_policy->mutable_cookie();
-    cookie->set_name("foo");
-    cookie->mutable_ttl()->set_seconds(15);
-  });
+  config_helper_.addConfigModifier(
+      [&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+        cookie->mutable_ttl()->set_seconds(15);
+      });
 
   std::set<std::string> set_cookies;
   sendMultipleRequests(
@@ -391,15 +393,16 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithTtlSet) {
 }
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
-    auto* hash_policy = hcm.mutable_route_config()
-                            ->mutable_virtual_hosts(0)
-                            ->mutable_routes(0)
-                            ->mutable_route()
-                            ->add_hash_policy();
-    auto* cookie = hash_policy->mutable_cookie();
-    cookie->set_name("foo");
-  });
+  config_helper_.addConfigModifier(
+      [&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+      });
 
   std::set<std::string> served_by;
   sendMultipleRequests(
@@ -419,16 +422,17 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
 }
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::filter::HttpConnectionManager& hcm) -> void {
-    auto* hash_policy = hcm.mutable_route_config()
-                            ->mutable_virtual_hosts(0)
-                            ->mutable_routes(0)
-                            ->mutable_route()
-                            ->add_hash_policy();
-    auto* cookie = hash_policy->mutable_cookie();
-    cookie->set_name("foo");
-    cookie->mutable_ttl()->set_seconds(15);
-  });
+  config_helper_.addConfigModifier(
+      [&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+        cookie->mutable_ttl()->set_seconds(15);
+      });
 
   std::set<std::string> served_by;
   sendMultipleRequests(

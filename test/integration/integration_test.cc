@@ -174,7 +174,7 @@ TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
-void setRouteUsingWebsocket(envoy::api::v2::filter::HttpConnectionManager& hcm) {
+void setRouteUsingWebsocket(envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
   auto route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
   route->mutable_match()->set_prefix("/websocket/test");
   route->mutable_route()->set_prefix_rewrite("/websocket");
