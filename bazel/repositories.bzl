@@ -137,13 +137,13 @@ def envoy_api_deps(skip_targets):
         )
     http_filter_bind_targets = [
         "http_connection_manager",
-    	"router",
-    	"buffer",
-    	"transcoder",
-    	"rate_limit",
-    	"ip_tagging",
-    	"health_check",
-    	"fault",
+        "router",
+        "buffer",
+        "transcoder",
+        "rate_limit",
+        "ip_tagging",
+        "health_check",
+        "fault",
     ]
     for t in http_filter_bind_targets:
         native.bind(
@@ -152,10 +152,10 @@ def envoy_api_deps(skip_targets):
         )
     network_filter_bind_targets = [
         "tcp_proxy",
-    	"mongo_proxy",
-    	"redis_proxy",
-    	"rate_limit",
-    	"client_ssl_auth",
+        "mongo_proxy",
+        "redis_proxy",
+        "rate_limit",
+        "client_ssl_auth",
     ]
     for t in network_filter_bind_targets:
         native.bind(
