@@ -17,7 +17,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -61,7 +61,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
   }
 
   for (const Json::ObjectSharedPtr& json_access_log : config.getObjectArray("access_log", true)) {
-    envoy::api::v2::filter::AccessLog v2_access_log;
+    envoy::api::v2::filter::http::AccessLog v2_access_log;
     Config::FilterJson::translateAccessLog(*json_access_log, v2_access_log);
     access_logs_.emplace_back(Http::AccessLog::AccessLogFactory::fromProto(v2_access_log, context));
   }

@@ -38,6 +38,7 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
