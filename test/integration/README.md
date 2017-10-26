@@ -6,7 +6,7 @@ communication.  In the common case, one
 - Sends a request from downstream through Envoy
 - Verifies the request is received upstream, and possibly inspects elements of the headers or body
 - Sends a response from upstream through Envoy
-- Verifies the request is received downstream, again possibly inspecting headers and body.
+- Verifies the request is received downstream, again possibly inspecting headers and body
 
 For the simplest variant of this, one could do the following.
 
