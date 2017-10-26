@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
@@ -20,6 +21,44 @@ class Instance;
 namespace Stats {
 
 /**
+ * General representation of a tag.
+ */
+struct Tag {
+  std::string name_;
+  std::string value_;
+};
+
+/**
+ * Class to extract tags from the stat names.
+ */
+class TagExtractor {
+public:
+  virtual ~TagExtractor() {}
+
+  /**
+   * Identifier for the tag extracted by this object.
+   */
+  virtual std::string name() const PURE;
+
+  /**
+   * Returns a modified name with the tag removed and added to the tags vector. If the tag is not
+   * represented in the name, the tags vector will remain unmodified and the return value will be a
+   * copy of name. The portion removed from the name may be different than the value put into
+   * the tag vector for readability purposes. Note: The extraction process is expected to be run
+   * iteratively. For a list of TagExtractors, the original name is expected to be passed into
+   * extractTag for the first, and then each iteration after the modified name returned from the
+   * previous iteration should be passed in. The same vector should be passed into each successive
+   * call for updating.
+   * @param name name from which the tag will be extracted if found to exist.
+   * @param tags list of tags updated with the tag name and value if found in the name.
+   * @return std::string modified name with the tag removed.
+   */
+  virtual std::string extractTag(const std::string& name, std::vector<Tag>& tags) const PURE;
+};
+
+typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
+
+/**
  * General interface for all stats objects.
  */
 class Metric {
@@ -29,6 +68,16 @@ public:
    * Returns the full name of the Metric.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * Returns a vector of configurable tags to identify this Metric.
+   */
+  virtual const std::vector<Tag>& tags() const PURE;
+
+  /**
+   * Returns the name of the Metric with the portions designated as tags removed.
+   */
+  virtual const std::string& tagExtractedName() const PURE;
 };
 
 /**
@@ -179,6 +228,8 @@ public:
   virtual std::list<GaugeSharedPtr> gauges() const PURE;
 };
 
+typedef std::unique_ptr<Store> StorePtr;
+
 /**
  * The root of the stat store.
  */
@@ -188,6 +239,11 @@ public:
    * Add a sink that is used for stat flushing.
    */
   virtual void addSink(Sink& sink) PURE;
+
+  /**
+   * Set the set of extractors to extract a portions of stats names as tags.
+   */
+  virtual void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractor) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have
