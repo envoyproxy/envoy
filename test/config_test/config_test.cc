@@ -35,15 +35,18 @@ public:
 
     envoy::api::v2::Bootstrap bootstrap;
     try {
+      printf("NM: calling loadFromFile\n");
       MessageUtil::loadFromFile(file_path, bootstrap);
     } catch (const EnvoyException& e) {
       // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
       Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
       bootstrap = TestUtility::parseBootstrapFromJson(config_json->asJsonString());
     }
+    printf("NM: creating initial_config\n");
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
+    printf("NM: resetting cluster_manager_factory\n");
     cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo()));
@@ -60,6 +63,7 @@ public:
         }));
 
     try {
+      printf("NM: main_config.initialize\n");
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
@@ -81,6 +85,7 @@ public:
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, true)) {
+    printf("NM: loading config file %s\n", filename.c_str());
     ConfigTest config(filename);
     num_tested++;
   }

@@ -35,20 +35,14 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
-const Network::Address::InstanceConstSharedPtr
-getSourceAddress(const envoy::api::v2::Cluster& cluster,
-                 const Network::Address::InstanceConstSharedPtr source_address) {
-  // The source address from cluster config takes precedence.
-  if (cluster.upstream_bind_config().has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(
-        cluster.upstream_bind_config().source_address());
-  }
-  // If there's no source address in the cluster config, use any default from the bootstrap proto.
-  return source_address;
+ClusterConfig::ConstSharedPtr createClusterConfig(const envoy::api::v2::Cluster& config) {
+  std::string config_text;
+  Protobuf::TextFormat::PrintToString(config, &config_text);
+  printf("NM: in createClusterConfig: %s\n", config_text.c_str());
+  return std::static_pointer_cast<ClusterConfig>(std::make_shared<ClusterConfigImpl>(
+      config));
 }
-} // namespace
 
 Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
   return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
@@ -79,51 +73,24 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                                  const Network::Address::InstanceConstSharedPtr source_address,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
-    : runtime_(runtime), name_(config.name()),
-      max_requests_per_connection_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
-      connect_timeout_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
-      per_connection_buffer_limit_bytes_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
+    : OverridableClusterConfig(createClusterConfig(config)),
+      runtime_(runtime),
+      stats_scope_(stats.createScope(fmt::format("cluster.{}.", config.name()))),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      features_(parseFeatures(config)),
-      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
-      resource_managers_(config, runtime, name_),
-      maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      source_address_(getSourceAddress(config, source_address)), added_via_api_(added_via_api),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())) {
+      resource_managers_(*this, runtime),
+      maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", config.name())),
+      added_via_api_(added_via_api) {
+  printf("NM: ClusterConfigImpl constructor ENTER\n");
+  // If there's no source address in the cluster config, use the default from the bootstrap proto.
+  if (sourceAddress() == nullptr) {
+    sourceAddress(source_address);
+  }
   ssl_ctx_ = nullptr;
-  if (config.has_tls_context()) {
-    Ssl::ClientContextConfigImpl context_config(config.tls_context());
-    ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, context_config);
+  if (tlsContextConfig() != nullptr) {
+    ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, *tlsContextConfig().get());
   }
-
-  switch (config.lb_policy()) {
-  case envoy::api::v2::Cluster::ROUND_ROBIN:
-    lb_type_ = LoadBalancerType::RoundRobin;
-    break;
-  case envoy::api::v2::Cluster::LEAST_REQUEST:
-    lb_type_ = LoadBalancerType::LeastRequest;
-    break;
-  case envoy::api::v2::Cluster::RANDOM:
-    lb_type_ = LoadBalancerType::Random;
-    break;
-  case envoy::api::v2::Cluster::RING_HASH:
-    lb_type_ = LoadBalancerType::RingHash;
-    break;
-  case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
-    if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
-      throw EnvoyException(fmt::format(
-          "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'"));
-    }
-    lb_type_ = LoadBalancerType::OriginalDst;
-    break;
-  default:
-    NOT_REACHED;
-  }
+  printf("NM: ClusterConfigImpl constructor LEAVING\n");
 }
 
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
@@ -249,14 +216,6 @@ bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
 }
 
-uint64_t ClusterInfoImpl::parseFeatures(const envoy::api::v2::Cluster& config) {
-  uint64_t features = 0;
-  if (config.has_http2_protocol_options()) {
-    features |= Features::HTTP2;
-  }
-  return features;
-}
-
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {
   ASSERT(enumToInt(priority) < resource_managers_.managers_.size());
   return *resource_managers_.managers_[enumToInt(priority)];
@@ -303,37 +262,35 @@ void ClusterImplBase::reloadHealthyHosts() {
               createHealthyHostLists(hostsPerLocality()), {}, {});
 }
 
-ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
-                                                    Runtime::Loader& runtime,
-                                                    const std::string& cluster_name) {
+ClusterInfoImpl::ResourceManagers::ResourceManagers(const ClusterConfig& config,
+                                                    Runtime::Loader& runtime) {
   managers_[enumToInt(ResourcePriority::Default)] =
-      load(config, runtime, cluster_name, envoy::api::v2::RoutingPriority::DEFAULT);
+      load(config, runtime, envoy::api::v2::RoutingPriority::DEFAULT);
   managers_[enumToInt(ResourcePriority::High)] =
-      load(config, runtime, cluster_name, envoy::api::v2::RoutingPriority::HIGH);
+      load(config, runtime, envoy::api::v2::RoutingPriority::HIGH);
 }
 
 ResourceManagerImplPtr
-ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
-                                        Runtime::Loader& runtime, const std::string& cluster_name,
+ClusterInfoImpl::ResourceManagers::load(const ClusterConfig& config,
+                                        Runtime::Loader& runtime,
                                         const envoy::api::v2::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
-  const std::string runtime_prefix = fmt::format("circuit_breakers.{}.{}.", cluster_name, priority);
+  const std::string runtime_prefix = fmt::format("circuit_breakers.{}.{}.", config.name(), priority);
 
-  const auto& thresholds = config.circuit_breakers().thresholds();
+  const auto& thresholds = config.circuitBreakerConfig().thresholds();
   const auto it =
       std::find_if(thresholds.cbegin(), thresholds.cend(),
-                   [priority](const envoy::api::v2::CircuitBreakers::Thresholds& threshold) {
-                     return threshold.priority() == priority;
+                   [priority](const ClusterConfig::CircuitBreakerConfig::Thresholds::ConstSharedPtr& threshold) {
+                     return threshold.get()->priority() == priority;
                    });
   if (it != thresholds.cend()) {
-    max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
-    max_pending_requests =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_pending_requests, max_pending_requests);
-    max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
-    max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
+    max_connections = (*it).get()->maxConnections();
+    max_pending_requests = (*it).get()->maxPendingRequests();
+    max_requests = (*it).get()->maxRequests();
+    max_retries = (*it).get()->maxRetries();
   }
   return ResourceManagerImplPtr{new ResourceManagerImpl(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};

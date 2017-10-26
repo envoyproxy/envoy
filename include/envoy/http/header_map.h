@@ -225,6 +225,15 @@ private:
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOutlierIntervalMs)                                                              \
+  HEADER_FUNC(EnvoyOutlierBaseEjectionTimeMs)                                                      \
+  HEADER_FUNC(EnvoyOutlierConsecutive5xx)                                                          \
+  HEADER_FUNC(EnvoyOutlierMaxEjectionPercent)                                                      \
+  HEADER_FUNC(EnvoyOutlierSuccessRateMinimumHosts)                                                 \
+  HEADER_FUNC(EnvoyOutlierSuccessRateRequestVolume)                                                \
+  HEADER_FUNC(EnvoyOutlierSuccessRateStdevFactor)                                                  \
+  HEADER_FUNC(EnvoyOutlierEnforcingConsecutive5xx)                                                 \
+  HEADER_FUNC(EnvoyOutlierEnforcingSuccessRate)                                                    \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \

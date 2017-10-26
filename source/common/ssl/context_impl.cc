@@ -27,7 +27,7 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
+ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, const ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
       stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
@@ -331,7 +331,7 @@ bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
 };
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ClientContextConfig& config)
+                                     const ClientContextConfig& config)
     : ContextImpl(parent, scope, config) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
@@ -356,7 +356,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 }
 
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ServerContextConfig& config, Runtime::Loader& runtime)
+                                     const ServerContextConfig& config, Runtime::Loader& runtime)
     : ContextImpl(parent, scope, config), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (!config.caCertFile().empty()) {

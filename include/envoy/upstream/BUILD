@@ -9,6 +9,19 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "cluster_config_interface",
+    hdrs = ["cluster_config.h"],
+    external_deps = [
+        "envoy_cds",
+    ],
+    deps = [
+        ":load_balancer_type_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/ssl:context_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
     external_deps = [
@@ -92,6 +105,7 @@ envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
     deps = [
+        ":cluster_config_interface",
         ":health_check_host_monitor_interface",
         ":load_balancer_type_interface",
         ":resource_manager_interface",

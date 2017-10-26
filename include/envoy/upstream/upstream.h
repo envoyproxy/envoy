@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context.h"
+#include "envoy/upstream/cluster_config.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -271,7 +272,7 @@ struct ClusterLoadReportStats {
 /**
  * Information about a given upstream cluster.
  */
-class ClusterInfo {
+class ClusterInfo : public virtual ClusterConfig {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
@@ -287,30 +288,9 @@ public:
   virtual bool addedViaApi() const PURE;
 
   /**
-   * @return the connect timeout for upstream hosts that belong to this cluster.
+   * Overrides the configuration with values from the request headers.
    */
-  virtual std::chrono::milliseconds connectTimeout() const PURE;
-
-  /**
-   * @return soft limit on size of the cluster's connections read and write buffers.
-   */
-  virtual uint32_t perConnectionBufferLimitBytes() const PURE;
-
-  /**
-   * @return uint64_t features supported by the cluster. @see Features.
-   */
-  virtual uint64_t features() const PURE;
-
-  /**
-   * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.
-   *         @see Http::Http2Settings.
-   */
-  virtual const Http::Http2Settings& http2Settings() const PURE;
-
-  /**
-   * @return the type of load balancing that the cluster should use.
-   */
-  virtual LoadBalancerType lbType() const PURE;
+  virtual void overrideWithHeaders(const Http::HeaderMap& headers) PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -319,18 +299,6 @@ public:
    *         on each call.
    */
   virtual bool maintenanceMode() const PURE;
-
-  /**
-   * @return uint64_t the maximum number of outbound requests that a connection pool will make on
-   *         each upstream connection. This can be used to increase spread if the backends cannot
-   *         tolerate imbalance. 0 indicates no maximum.
-   */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
-
-  /**
-   * @return the human readable name of the cluster.
-   */
-  virtual const std::string& name() const PURE;
 
   /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at
@@ -358,18 +326,6 @@ public:
    * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
-
-  /**
-   * Returns an optional source address for upstream connections to bind to.
-   *
-   * @return a source address to bind to or nullptr if no bind need occur.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
-
-  /**
-   * @return the configuration for load balancer subsets.
-   */
-  virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

@@ -20,19 +20,19 @@ public:
   ~MockContextManager();
 
   ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                          ClientContextConfig& config) override {
+                                          const ClientContextConfig& config) override {
     return ClientContextPtr{createSslClientContext_(scope, config)};
   }
 
   ServerContextPtr createSslServerContext(Stats::Scope& scope,
-                                          ServerContextConfig& config) override {
+                                          const ServerContextConfig& config) override {
     return ServerContextPtr{createSslServerContext_(scope, config)};
   }
 
   MOCK_METHOD2(createSslClientContext_,
-               ClientContext*(Stats::Scope& scope, ClientContextConfig& config));
+               ClientContext*(Stats::Scope& scope, const ClientContextConfig& config));
   MOCK_METHOD2(createSslServerContext_,
-               ServerContext*(Stats::Scope& stats, ServerContextConfig& config));
+               ServerContext*(Stats::Scope& stats, const ServerContextConfig& config));
   MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(Context&)> callback));
 };
