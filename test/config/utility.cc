@@ -41,7 +41,6 @@ static_resources:
             name: route_config_0
   clusters:
     name: cluster_0
-    connect_timeout: 5s
     hosts:
       socket_address:
         address: 127.0.0.1
@@ -115,11 +114,16 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
   ASSERT(port_idx == ports.size());
 
+  if (!connect_timeout_set_) {
 #ifdef __APPLE__
-  // Under heavy load (and in particular in CI), macOS connections can take inordinately long to
-  // complete.
-  setConnectTimeout(std::chrono::seconds(30));
+    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
+    // connections can take inordinately long to complete.
+    setConnectTimeout(std::chrono::seconds(30));
+#else
+    // Set a default connect timeout.
+    setConnectTimeout(std::chrono::seconds(5));
 #endif
+  }
 
   finalized_ = true;
 }
@@ -180,6 +184,7 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
     connect_timeout->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(timeout - seconds).count());
   }
+  connect_timeout_set_ = true;
 }
 
 void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,

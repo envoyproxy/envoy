@@ -85,6 +85,10 @@ private:
   // The config modifiers added via addConfigModifier() which will be applied in finalize()
   std::vector<ConfigModifierFunction> config_modifiers_;
 
+  // Track if the connect timeout has been set (to avoid clobbering a custom setting with the
+  // default).
+  bool connect_timeout_set_{false};
+
   // A sanity check guard to make sure config is not modified after handing it to Envoy.
   bool finalized_{false};
 };
