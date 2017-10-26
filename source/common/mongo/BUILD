@@ -58,6 +58,7 @@ envoy_cc_library(
         "//source/common/common:singleton",
         "//source/common/common:utility_lib",
         "//source/common/network:filter_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

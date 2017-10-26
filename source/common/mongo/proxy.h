@@ -19,9 +19,11 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 #include "common/common/singleton.h"
-#include "common/json/json_loader.h"
 #include "common/mongo/utility.h"
 #include "common/network/filter_impl.h"
+#Include "common/protobuf/utility.h"
+
+#include "api/filter/network/mongo_proxy.pb.h"
 
 namespace Envoy {
 namespace Mongo {
@@ -92,12 +94,9 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
  */
 class FaultConfig {
 public:
-  FaultConfig(const Json::Object& fault_config)
-      : delay_percent_(
-            static_cast<uint32_t>(fault_config.getObject("fixed_delay")->getInteger("percent"))),
-        duration_ms_(static_cast<uint64_t>(
-            fault_config.getObject("fixed_delay")->getInteger("duration_ms"))) {}
-
+  FaultConfig(const envoy::api::v2::filter::FaultDelay& fault_config)
+      : delay_percent_(fault_config.percent()),
+        duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
   uint32_t delayPercent() const { return delay_percent_; }
   uint64_t delayDuration() const { return duration_ms_; }
 

@@ -67,7 +67,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
-        "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/mongo:proxy_lib",
     ],

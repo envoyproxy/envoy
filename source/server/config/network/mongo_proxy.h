@@ -18,6 +18,8 @@ public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                      FactoryContext& context) override;
 
   std::string name() override { return Config::NetworkFilterNames::get().MONGO_PROXY; }
 };
