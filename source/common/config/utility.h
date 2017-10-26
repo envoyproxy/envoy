@@ -214,6 +214,15 @@ public:
   static std::string resourceName(const ProtobufWkt::Any& resource);
 
   /**
+   * Creates the set of stats tag extractors requested by the config and transfers ownership to the
+   * caller.
+   * @param bootstrap bootstrap proto.
+   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
+   */
+  static std::vector<Stats::TagExtractorPtr>
+  createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
+
+  /**
    * Check user supplied name in RDS/CDS/LDS for sanity.
    * It should be within the configured length limit. Throws on error.
    * @param error_prefix supplies the prefix to use in error messages.

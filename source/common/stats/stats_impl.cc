@@ -2,10 +2,14 @@
 
 #include <string.h>
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 
+#include "envoy/common/exception.h"
+
 #include "common/common/utility.h"
+#include "common/config/well_known_names.h"
 
 namespace Envoy {
 namespace Stats {
@@ -55,6 +59,60 @@ std::string Utility::sanitizeStatsName(const std::string& name) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), ':', '_');
   return stats_name;
+}
+
+TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex)
+    : name_(name), regex_(regex) {}
+
+TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
+                                                     const std::string& regex) {
+
+  if (name.empty()) {
+    throw EnvoyException("tag_name cannot be empty");
+  }
+
+  if (!regex.empty()) {
+    return TagExtractorPtr{new TagExtractorImpl(name, regex)};
+  } else {
+    // Look up the default for that name.
+    const auto& name_regex_pairs = Config::TagNames::get().name_regex_pairs_;
+    auto it = std::find_if(name_regex_pairs.begin(), name_regex_pairs.end(),
+                           [&name](const std::pair<std::string, std::string>& name_regex_pair) {
+                             return name == name_regex_pair.first;
+                           });
+    if (it != name_regex_pairs.end()) {
+      return TagExtractorPtr{new TagExtractorImpl(name, it->second)};
+    } else {
+      throw EnvoyException(fmt::format(
+          "No regex specified for tag specifier and no default regex for name: '{}'", name));
+    }
+  }
+}
+
+std::string TagExtractorImpl::extractTag(const std::string& tag_extracted_name,
+                                         std::vector<Tag>& tags) const {
+  std::smatch match;
+  // The regex must match and contain one or more subexpressions (all after the first are ignored).
+  if (std::regex_search(tag_extracted_name, match, regex_) && match.size() > 1) {
+    // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
+    const auto& remove_subexpr = match[1];
+
+    // value_subexpr is the optional second submatch. It is usually inside the first submatch
+    // (remove_subexpr) to allow the expression to strip off extra characters that should be removed
+    // from the string but also not necessary in the tag value ("." for example). If there is no
+    // second submatch, then the value_subexpr is the same as the remove_subexpr.
+    const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
+
+    tags.emplace_back();
+    Tag& tag = tags.back();
+    tag.name_ = name_;
+    tag.value_ = value_subexpr.str();
+
+    // Reconstructs the tag_extracted_name without remove_subexpr.
+    return std::string(match.prefix().first, remove_subexpr.first)
+        .append(remove_subexpr.second, match.suffix().second);
+  }
+  return tag_extracted_name;
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
