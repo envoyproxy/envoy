@@ -22,7 +22,7 @@
 #include "common/mongo/utility.h"
 #include "common/network/filter_impl.h"
 
-#Include "common/protobuf/utility.h"
+#include "common/protobuf/utility.h"
 
 #include "api/filter/network/mongo_proxy.pb.h"
 
