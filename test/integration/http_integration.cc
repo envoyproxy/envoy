@@ -40,19 +40,19 @@ std::string normalizeDate(const std::string& s) {
   return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
 }
 
-void setAllowAbsoluteUrl(envoy::api::v2::filter::HttpConnectionManager& hcm) {
+void setAllowAbsoluteUrl(envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
   envoy::api::v2::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
 
-envoy::api::v2::filter::HttpConnectionManager::CodecType
+envoy::api::v2::filter::http::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
   case Http::CodecClient::Type::HTTP1:
-    return envoy::api::v2::filter::HttpConnectionManager::HTTP1;
+    return envoy::api::v2::filter::http::HttpConnectionManager::HTTP1;
   case Http::CodecClient::Type::HTTP2:
-    return envoy::api::v2::filter::HttpConnectionManager::HTTP2;
+    return envoy::api::v2::filter::http::HttpConnectionManager::HTTP2;
   default:
     RELEASE_ASSERT(0);
   }
