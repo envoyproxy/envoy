@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/server/transport_security_config.h"
+#include "envoy/registry/registry.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
@@ -11,6 +14,7 @@
 
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
+#include "common/ssl/context_config_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -36,47 +40,32 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                bool using_original_dst, bool connected, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                              using_original_dst, connected),
-      ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
-  BIO* bio = BIO_new_socket(fd, 0);
-  SSL_set_bio(ssl_.get(), bio, bio);
+                              using_original_dst, connected,
+                              [&](Network::TransportSecurityCallbacks& callbacks) -> Network::TransportSecurityPtr {
+                                return Network::TransportSecurityPtr{
+                                    new Tls(callbacks, ctx, static_cast<Tls::InitialState>(state))};
+                              }) {}
 
-  SSL_set_mode(ssl_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-  if (state == InitialState::Client) {
-    SSL_set_connect_state(ssl_.get());
-  } else {
-    ASSERT(state == InitialState::Server);
-    SSL_set_accept_state(ssl_.get());
-  }
-}
-
-ConnectionImpl::~ConnectionImpl() {
-  // Filters may care about whether this connection is an SSL connection or not in their
-  // destructors for stat reasons. We destroy the filters here vs. the base class destructors
-  // to make sure they have the chance to still inspect SSL specific data via virtual functions.
-  filter_manager_.destroyFilters();
-}
-
-Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
+Network::Connection::IoResult Tls::doReadFromSocket() {
   if (!handshake_complete_) {
-    PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || !handshake_complete_) {
+    Network::Connection::PostIoAction action = doHandshake();
+    if (action == Network::Connection::PostIoAction::Close || !handshake_complete_) {
       return {action, 0};
     }
   }
 
   bool keep_reading = true;
-  PostIoAction action = PostIoAction::KeepOpen;
+  Network::Connection::PostIoAction action = Network::Connection::PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   while (keep_reading) {
     // We use 2 slices here so that we can use the remainder of an existing buffer chain element
     // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer_.reserve(16384, slices, 2);
+    uint64_t num_slices = callbacks_.readBuffer().reserve(16384, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
       int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
-      ENVOY_CONN_LOG(trace, "ssl read returns: {}", *this, rc);
+      ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_.connection(), rc);
       if (rc > 0) {
         slices[i].len_ = rc;
         slices_to_commit++;
@@ -91,7 +80,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
         // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
-          action = PostIoAction::Close;
+          action = Network::Connection::PostIoAction::Close;
           break;
         }
 
@@ -100,9 +89,9 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     }
 
     if (slices_to_commit > 0) {
-      read_buffer_.commit(slices, slices_to_commit);
-      if (shouldDrainReadBuffer()) {
-        setReadBufferReady();
+      callbacks_.readBuffer().commit(slices, slices_to_commit);
+      if (callbacks_.shouldDrainReadBuffer()) {
+        callbacks_.setReadBufferReady();
         keep_reading = false;
       }
     }
@@ -111,32 +100,34 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
   return {action, bytes_read};
 }
 
-Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
+Network::Connection::PostIoAction Tls::doHandshake() {
   ASSERT(!handshake_complete_);
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
-    ENVOY_CONN_LOG(debug, "handshake complete", *this);
+    ENVOY_CONN_LOG(debug, "handshake complete", callbacks_.connection());
     handshake_complete_ = true;
     ctx_.logHandshake(ssl_.get());
-    raiseEvent(Network::ConnectionEvent::Connected);
+    callbacks_.raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
-    return state() == State::Open ? PostIoAction::KeepOpen : PostIoAction::Close;
+    return callbacks_.connection().state() == Network::Connection::State::Open
+               ? Network::Connection::PostIoAction::KeepOpen
+               : Network::Connection::PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl_.get(), rc);
-    ENVOY_CONN_LOG(debug, "handshake error: {}", *this, err);
+    ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_.connection(), err);
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
-      return PostIoAction::KeepOpen;
+      return Network::Connection::PostIoAction::KeepOpen;
     default:
       drainErrorQueue();
-      return PostIoAction::Close;
+      return Network::Connection::PostIoAction::Close;
     }
   }
 }
 
-void ConnectionImpl::drainErrorQueue() {
+void Tls::drainErrorQueue() {
   bool saw_error = false;
   bool saw_counted_error = false;
   while (uint64_t err = ERR_get_error()) {
@@ -150,8 +141,9 @@ void ConnectionImpl::drainErrorQueue() {
     }
     saw_error = true;
 
-    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
-                   ERR_func_error_string(err), ERR_reason_error_string(err));
+    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_.connection(), err,
+                   ERR_lib_error_string(err), ERR_func_error_string(err),
+                   ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
   }
   if (saw_error && !saw_counted_error) {
@@ -159,15 +151,15 @@ void ConnectionImpl::drainErrorQueue() {
   }
 }
 
-Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
+Network::Connection::IoResult Tls::doWriteToSocket() {
   if (!handshake_complete_) {
-    PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || !handshake_complete_) {
+    Network::Connection::PostIoAction action = doHandshake();
+    if (action == Network::Connection::PostIoAction::Close || !handshake_complete_) {
       return {action, 0};
     }
   }
 
-  uint64_t original_buffer_length = write_buffer_->length();
+  uint64_t original_buffer_length = callbacks_.writeBuffer().length();
   uint64_t total_bytes_written = 0;
   bool keep_writing = true;
   while ((original_buffer_length != total_bytes_written) && keep_writing) {
@@ -178,7 +170,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // of iterations of this loop, either by pure iterations, bytes written, etc.
     const uint64_t MAX_SLICES = 32;
     Buffer::RawSlice slices[MAX_SLICES];
-    uint64_t num_slices = write_buffer_->getRawSlices(slices, MAX_SLICES);
+    uint64_t num_slices = callbacks_.writeBuffer().getRawSlices(slices, MAX_SLICES);
 
     uint64_t inner_bytes_written = 0;
     for (uint64_t i = 0; (i < num_slices) && (original_buffer_length != total_bytes_written); i++) {
@@ -189,7 +181,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
       // particular chain to increase in size. So as long as we start writing where we left off we
       // are guaranteed to call SSL_write() with the same parameters.
       int rc = SSL_write(ssl_.get(), slices[i].mem_, slices[i].len_);
-      ENVOY_CONN_LOG(trace, "ssl write returns: {}", *this, rc);
+      ENVOY_CONN_LOG(trace, "ssl write returns: {}", callbacks_.connection(), rc);
       if (rc > 0) {
         inner_bytes_written += rc;
         total_bytes_written += rc;
@@ -203,7 +195,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
         // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
-          return {PostIoAction::Close, total_bytes_written};
+          return {Network::Connection::PostIoAction::Close, total_bytes_written};
         }
 
         break;
@@ -213,21 +205,19 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // Draining must be done within the inner loop, otherwise we will keep getting the same slices
     // at the beginning of the buffer.
     if (inner_bytes_written > 0) {
-      write_buffer_->drain(inner_bytes_written);
+      callbacks_.writeBuffer().drain(inner_bytes_written);
     }
   }
 
-  return {PostIoAction::KeepOpen, total_bytes_written};
+  return {Network::Connection::PostIoAction::KeepOpen, total_bytes_written};
 }
 
-void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
-
-bool ConnectionImpl::peerCertificatePresented() {
+bool Tls::peerCertificatePresented() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   return cert != nullptr;
 }
 
-std::string ConnectionImpl::uriSanLocalCertificate() {
+std::string Tls::uriSanLocalCertificate() {
   // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
@@ -236,7 +226,7 @@ std::string ConnectionImpl::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
-std::string ConnectionImpl::sha256PeerCertificateDigest() {
+std::string Tls::sha256PeerCertificateDigest() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -249,7 +239,7 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string ConnectionImpl::subjectPeerCertificate() {
+std::string Tls::subjectPeerCertificate() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -269,7 +259,7 @@ std::string ConnectionImpl::subjectPeerCertificate() {
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 
-std::string ConnectionImpl::uriSanPeerCertificate() {
+std::string Tls::uriSanPeerCertificate() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -277,7 +267,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
   return getUriSanFromCertificate(cert.get());
 }
 
-std::string ConnectionImpl::getUriSanFromCertificate(X509* cert) {
+std::string Tls::getUriSanFromCertificate(X509* cert) {
   STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
       X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
 
@@ -314,26 +304,80 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Co
 
 void ClientConnectionImpl::connect() { doConnect(); }
 
-void ConnectionImpl::closeSocket(Network::ConnectionEvent close_type) {
-  if (handshake_complete_ && state() != State::Closed) {
-    // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
-    // there is no room on the socket. We can extend the state machine to handle this at some point
-    // if needed.
-    int rc = SSL_shutdown(ssl_.get());
-    ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", *this, rc);
-    UNREFERENCED_PARAMETER(rc);
-    drainErrorQueue();
-  }
-
-  Network::ConnectionImpl::closeSocket(close_type);
-}
-
-std::string ConnectionImpl::nextProtocol() const {
+std::string Tls::nextProtocol() const {
   const unsigned char* proto;
   unsigned int proto_len;
   SSL_get0_alpn_selected(ssl_.get(), &proto, &proto_len);
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
+Tls::Tls(Network::TransportSecurityCallbacks& callbacks, Context& ctx, InitialState state)
+    : callbacks_(callbacks), ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+  BIO* bio = BIO_new_socket(callbacks.fd(), 0);
+  SSL_set_bio(ssl_.get(), bio, bio);
+
+  SSL_set_mode(ssl_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+  if (state == InitialState::Client) {
+    SSL_set_connect_state(ssl_.get());
+  } else {
+    ASSERT(state == InitialState::Server);
+    SSL_set_accept_state(ssl_.get());
+  }
+}
+
+void Tls::onConnected() { ASSERT(!handshake_complete_); }
+
+void Tls::closeSocket(Network::ConnectionEvent) {
+  if (handshake_complete_ &&
+      callbacks_.connection().state() != Network::Connection::State::Closed) {
+    // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
+    // there is no room on the socket. We can extend the state machine to handle this at some point
+    // if needed.
+    int rc = SSL_shutdown(ssl_.get());
+    ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_.connection(), rc);
+    UNREFERENCED_PARAMETER(rc);
+    drainErrorQueue();
+  }
+}
+
+class TlsFactory : public Server::Configuration::NamedTransportSecurityConfigFactory {
+ public:
+  Network::TransportSecurityFactoryCb createClientTransportSecurityFactory(
+      const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) override {
+    Ssl::ClientContextConfigImpl config(dynamic_cast<const envoy::api::v2::UpstreamTlsContext&>(proto_config));
+    ClientContextSharedPtr client_context{
+        context.sslContextManager().createSslClientContext(context.scope(), config).release()};
+
+    return [client_context](Network::TransportSecurityCallbacks& callbacks) -> Network::TransportSecurityPtr {
+      return Network::TransportSecurityPtr{new Tls(callbacks, *client_context, Tls::InitialState::Client)};
+    };
+  }
+
+  Network::TransportSecurityFactoryCb createServerTransportSecurityFactory(
+      const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) override {
+
+    Ssl::ServerContextConfigImpl config(dynamic_cast<const envoy::api::v2::DownstreamTlsContext&>(proto_config));
+    ServerContextSharedPtr server_context{
+        context.sslContextManager().createSslServerContext(context.scope(), config).release()};
+
+    return [server_context](Network::TransportSecurityCallbacks& callbacks) -> Network::TransportSecurityPtr {
+      return Network::TransportSecurityPtr{new Tls(callbacks, *server_context, Tls::InitialState::Server)};
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyClientConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::UpstreamTlsContext};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyServerConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::DownstreamTlsContext};
+  }
+
+  std::string name() override {
+    return "boringssl";
+  }
+};
+
+static Registry::RegisterFactory<TlsFactory, Server::Configuration::NamedTransportSecurityConfigFactory> register_;
 } // namespace Ssl
 } // namespace Envoy

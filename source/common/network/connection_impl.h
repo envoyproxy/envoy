@@ -41,9 +41,16 @@ public:
  * Implementation of Network::Connection.
  */
 class ConnectionImpl : public virtual Connection,
+                       public virtual TransportSecurityCallbacks,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                 Address::InstanceConstSharedPtr remote_address,
+                 Address::InstanceConstSharedPtr local_address,
+                 Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
+                 bool connected, TransportSecurityFactoryCb transport_security_factory);
+
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
@@ -63,7 +70,7 @@ public:
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
-  std::string nextProtocol() const override { return ""; }
+  std::string nextProtocol() const override { return transport_security_->nextProtocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
@@ -71,8 +78,10 @@ public:
   const Address::Instance& remoteAddress() const override { return *remote_address_; }
   const Address::Instance& localAddress() const override { return *local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
-  Ssl::Connection* ssl() override { return nullptr; }
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  Ssl::Connection* ssl() override { return dynamic_cast<Ssl::Connection*>(transport_security_.get()); }
+  const Ssl::Connection* ssl() const override {
+    return dynamic_cast<const Ssl::Connection*>(transport_security_.get());
+  }
   State state() const override;
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
@@ -84,19 +93,11 @@ public:
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
-protected:
-  enum class PostIoAction { Close, KeepOpen };
-
-  struct IoResult {
-    PostIoAction action_;
-    uint64_t bytes_processed_;
-  };
-
-  virtual void closeSocket(ConnectionEvent close_type);
-  void doConnect();
-  void raiseEvent(ConnectionEvent event);
+  // Network::TransportSecurityCallbacks
+  const Connection& connection() const override { return *this; }
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
-  bool shouldDrainReadBuffer() {
+  bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
@@ -104,8 +105,15 @@ protected:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
+  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  int fd() override { return fd_; }
+  Buffer::Instance& readBuffer() override { return read_buffer_; }
+  Buffer::Instance& writeBuffer() override { return *write_buffer_; }
 
+protected:
+  void doConnect();
+
+  virtual void closeSocket(ConnectionEvent close_type);
   void onLowWatermark();
   void onHighWatermark();
 
@@ -158,6 +166,7 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
+  TransportSecurityPtr transport_security_;
 };
 
 /**
@@ -171,6 +180,19 @@ public:
 
   // Network::ClientConnection
   void connect() override { doConnect(); }
+};
+
+class Plaintext : public TransportSecurity, protected Logger::Loggable<Logger::Id::connection> {
+public:
+  explicit Plaintext(TransportSecurityCallbacks& callbacks);
+
+  std::string nextProtocol() const override { return ""; }
+  Connection::IoResult doReadFromSocket() override;
+  Connection::IoResult doWriteToSocket() override;
+  void onConnected() override;
+
+private:
+  TransportSecurityCallbacks& callbacks_;
 };
 
 } // namespace Network

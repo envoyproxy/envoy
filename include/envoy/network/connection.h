@@ -205,9 +205,49 @@ public:
    * @return boolean telling if the connection is currently above the high watermark.
    */
   virtual bool aboveHighWatermark() const PURE;
+
+  enum class PostIoAction { Close, KeepOpen };
+
+  struct IoResult {
+    PostIoAction action_;
+    uint64_t bytes_processed_;
+  };
+};
+
+class TransportSecurityCallbacks {
+public:
+  virtual ~TransportSecurityCallbacks(){};
+
+  virtual const Connection& connection() const PURE;
+
+  virtual void raiseEvent(ConnectionEvent event) PURE;
+
+  virtual bool shouldDrainReadBuffer() PURE;
+
+  virtual void setReadBufferReady() PURE;
+
+  virtual int fd() PURE;
+
+  virtual Buffer::Instance& readBuffer() PURE;
+
+  virtual Buffer::Instance& writeBuffer() PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;
+
+class TransportSecurity {
+public:
+  virtual ~TransportSecurity() {}
+  virtual std::string nextProtocol() const PURE;
+  virtual Connection::IoResult doReadFromSocket() PURE;
+  virtual Connection::IoResult doWriteToSocket() PURE;
+  virtual void onConnected() PURE;
+  virtual void closeSocket(Network::ConnectionEvent){};
+};
+
+typedef std::unique_ptr<TransportSecurity> TransportSecurityPtr;
+
+typedef std::function<TransportSecurityPtr(TransportSecurityCallbacks&)> TransportSecurityFactoryCb;
 
 /**
  * Connections capable of outbound connects.

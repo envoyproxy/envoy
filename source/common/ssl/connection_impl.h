@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Ssl {
 
-class ConnectionImpl : public Network::ConnectionImpl, public Connection {
+class ConnectionImpl : public Network::ConnectionImpl {
 public:
   enum class InitialState { Client, Server };
 
@@ -20,12 +20,32 @@ public:
                  Network::Address::InstanceConstSharedPtr local_address,
                  Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected, Context& ctx, InitialState state);
-  ~ConnectionImpl();
+};
 
-  // Network::Connection
+class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
+public:
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
+                       Network::Address::InstanceConstSharedPtr address,
+                       Network::Address::InstanceConstSharedPtr source_address);
+
+  // Network::ClientConnection
+  void connect() override;
+};
+
+class Tls : public Network::TransportSecurity,
+            public Connection,
+            protected Logger::Loggable<Logger::Id::connection> {
+public:
+  enum class InitialState { Client, Server };
+
+  Tls(Network::TransportSecurityCallbacks& callbacks, Context& ctx, InitialState state);
+
+  // Network::TransportSecurity
   std::string nextProtocol() const override;
-  Ssl::Connection* ssl() override { return this; }
-  const Ssl::Connection* ssl() const override { return this; }
+  Network::Connection::IoResult doReadFromSocket() override;
+  Network::Connection::IoResult doWriteToSocket() override;
+  void onConnected() override;
+  void closeSocket(Network::ConnectionEvent close_type) override;
 
   // Ssl::Connection
   bool peerCertificatePresented() override;
@@ -37,29 +57,14 @@ public:
   SSL* rawSslForTest() { return ssl_.get(); }
 
 private:
-  PostIoAction doHandshake();
+  Network::Connection::PostIoAction doHandshake();
   void drainErrorQueue();
   std::string getUriSanFromCertificate(X509* cert);
 
-  // Network::ConnectionImpl
-  void closeSocket(Network::ConnectionEvent close_type) override;
-  IoResult doReadFromSocket() override;
-  IoResult doWriteToSocket() override;
-  void onConnected() override;
-
+  Network::TransportSecurityCallbacks& callbacks_;
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
-};
-
-class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
-public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                       Network::Address::InstanceConstSharedPtr address,
-                       Network::Address::InstanceConstSharedPtr source_address);
-
-  // Network::ClientConnection
-  void connect() override;
 };
 
 } // namespace Ssl
