@@ -1,5 +1,7 @@
 #include "common/config/utility.h"
 
+#include <unordered_set>
+
 #include "common/common/assert.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
