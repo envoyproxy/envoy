@@ -105,8 +105,9 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "d4988844024d0bcff4bcd030552eabe3396203fa",
+        commit = "f2c1dc99df64144f76107725bde870dd6827e044",
     )
+
     api_bind_targets = [
         "address",
         "base",
@@ -127,13 +128,40 @@ def envoy_api_deps(skip_targets):
             actual = "@envoy_api//api:" + t + "_cc",
         )
     filter_bind_targets = [
-        "http_connection_manager",
+        "fault",
     ]
     for t in filter_bind_targets:
         native.bind(
             name = "envoy_filter_" + t,
             actual = "@envoy_api//api/filter:" + t + "_cc",
         )
+    http_filter_bind_targets = [
+        "http_connection_manager",
+    	"router",
+    	"buffer",
+    	"transcoder",
+    	"rate_limit",
+    	"ip_tagging",
+    	"health_check",
+    	"fault",
+    ]
+    for t in http_filter_bind_targets:
+        native.bind(
+            name = "envoy_filter_" + t,
+            actual = "@envoy_api//api/filter/http:" + t + "_cc",
+        )
+    network_filter_bind_targets = [
+        "tcp_proxy",
+    	"mongo_proxy",
+    	"redis_proxy",
+    	"rate_limit",
+    	"client_ssl_auth",
+    ]
+    for t in network_filter_bind_targets:
+        native.bind(
+            name = "envoy_filter_" + t,
+            actual = "@envoy_api//api/filter/network:" + t + "_cc",
+        )    
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",

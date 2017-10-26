@@ -17,13 +17,13 @@ namespace Config {
 namespace {
 
 void translateComparisonFilter(const Json::Object& config,
-                               envoy::api::v2::filter::ComparisonFilter& filter) {
+                               envoy::api::v2::filter::http::ComparisonFilter& filter) {
   const std::string op = config.getString("op");
   if (op == ">=") {
-    filter.set_op(envoy::api::v2::filter::ComparisonFilter::GE);
+    filter.set_op(envoy::api::v2::filter::http::ComparisonFilter::GE);
   } else {
     ASSERT(op == "=");
-    filter.set_op(envoy::api::v2::filter::ComparisonFilter::EQ);
+    filter.set_op(envoy::api::v2::filter::http::ComparisonFilter::EQ);
   }
 
   auto* runtime = filter.mutable_value();
@@ -32,33 +32,33 @@ void translateComparisonFilter(const Json::Object& config,
 }
 
 void translateStatusCodeFilter(const Json::Object& config,
-                               envoy::api::v2::filter::StatusCodeFilter& filter) {
+                               envoy::api::v2::filter::http::StatusCodeFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateDurationFilter(const Json::Object& config,
-                             envoy::api::v2::filter::DurationFilter& filter) {
+                             envoy::api::v2::filter::http::DurationFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateRuntimeFilter(const Json::Object& config,
-                            envoy::api::v2::filter::RuntimeFilter& filter) {
+                            envoy::api::v2::filter::http::RuntimeFilter& filter) {
   filter.set_runtime_key(config.getString("key"));
 }
 
 void translateRepeatedFilter(
     const Json::Object& config,
-    Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLogFilter>& filters) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::filter::http::AccessLogFilter>& filters) {
   for (const auto& json_filter : config.getObjectArray("filters")) {
     FilterJson::translateAccessLogFilter(*json_filter, *filters.Add());
   }
 }
 
-void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::OrFilter& filter) {
+void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::http::OrFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
-void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndFilter& filter) {
+void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::http::AndFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
@@ -66,7 +66,7 @@ void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndF
 
 void FilterJson::translateAccessLogFilter(
     const Json::Object& json_access_log_filter,
-    envoy::api::v2::filter::AccessLogFilter& access_log_filter) {
+    envoy::api::v2::filter::http::AccessLogFilter& access_log_filter) {
   const std::string type = json_access_log_filter.getString("type");
   if (type == "status_code") {
     translateStatusCodeFilter(json_access_log_filter,
@@ -88,8 +88,8 @@ void FilterJson::translateAccessLogFilter(
 }
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
-                                    envoy::api::v2::filter::AccessLog& access_log) {
-  envoy::api::v2::filter::FileAccessLog file_access_log;
+                                    envoy::api::v2::filter::http::AccessLog& access_log) {
+  envoy::api::v2::filter::http::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);
@@ -108,11 +108,11 @@ void FilterJson::translateAccessLog(const Json::Object& json_access_log,
 
 void FilterJson::translateHttpConnectionManager(
     const Json::Object& json_http_connection_manager,
-    envoy::api::v2::filter::HttpConnectionManager& http_connection_manager) {
+    envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager) {
   json_http_connection_manager.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
-  envoy::api::v2::filter::HttpConnectionManager::CodecType codec_type{};
-  envoy::api::v2::filter::HttpConnectionManager::CodecType_Parse(
+  envoy::api::v2::filter::http::HttpConnectionManager::CodecType codec_type{};
+  envoy::api::v2::filter::http::HttpConnectionManager::CodecType_Parse(
       StringUtil::toUpper(json_http_connection_manager.getString("codec_type")), &codec_type);
   http_connection_manager.set_codec_type(codec_type);
 
@@ -155,8 +155,8 @@ void FilterJson::translateHttpConnectionManager(
     const auto json_tracing = json_http_connection_manager.getObject("tracing");
     auto* tracing = http_connection_manager.mutable_tracing();
 
-    envoy::api::v2::filter::HttpConnectionManager::Tracing::OperationName operation_name{};
-    envoy::api::v2::filter::HttpConnectionManager::Tracing::OperationName_Parse(
+    envoy::api::v2::filter::http::HttpConnectionManager::Tracing::OperationName operation_name{};
+    envoy::api::v2::filter::http::HttpConnectionManager::Tracing::OperationName_Parse(
         StringUtil::toUpper(json_tracing->getString("operation_name")), &operation_name);
     tracing->set_operation_name(operation_name);
 
@@ -192,8 +192,8 @@ void FilterJson::translateHttpConnectionManager(
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, use_remote_address);
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, generate_request_id);
 
-  envoy::api::v2::filter::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
-  envoy::api::v2::filter::HttpConnectionManager::ForwardClientCertDetails_Parse(
+  envoy::api::v2::filter::http::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
+  envoy::api::v2::filter::http::HttpConnectionManager::ForwardClientCertDetails_Parse(
       StringUtil::toUpper(
           json_http_connection_manager.getString("forward_client_cert", "sanitize")),
       &fcc_details);
