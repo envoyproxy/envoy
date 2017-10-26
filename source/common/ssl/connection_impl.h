@@ -28,10 +28,10 @@ public:
   const Ssl::Connection* ssl() const override { return this; }
 
   // Ssl::Connection
-  bool peerCertificatePresented() override;
+  bool peerCertificatePresented() const override;
   std::string uriSanLocalCertificate() override;
   std::string sha256PeerCertificateDigest() override;
-  std::string subjectPeerCertificate() override;
+  std::string subjectPeerCertificate() const override;
   std::string uriSanPeerCertificate() override;
 
   SSL* rawSslForTest() { return ssl_.get(); }

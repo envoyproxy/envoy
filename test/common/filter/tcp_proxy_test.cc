@@ -428,6 +428,29 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
+  setup(true);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connection_, write(BufferEqual(&buffer)));
+  filter_->onData(buffer);
+
+  EXPECT_CALL(*connect_timer_, disableTimer());
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
+  upstream_read_filter_->onData(response);
+
+  EXPECT_CALL(*upstream_connection_, readDisable(true));
+  filter_callbacks_.connection_.runHighWatermarkCallbacks();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  filter_callbacks_.connection_.runLowWatermarkCallbacks();
+}
+
 TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   setup(true);
 

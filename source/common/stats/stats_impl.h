@@ -6,6 +6,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <regex>
 #include <string>
 #include <unordered_map>
 
@@ -14,9 +15,34 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
+#include "common/common/singleton.h"
+#include "common/protobuf/protobuf.h"
+
+#include "api/bootstrap.pb.h"
 
 namespace Envoy {
 namespace Stats {
+
+class TagExtractorImpl : public TagExtractor {
+public:
+  /**
+   * Creates a tag extractor from the regex provided or looks up a default regex.
+   * @param name name for tag extractor. Used to look up a default tag extractor if regex is empty.
+   * @param regex optional regex expression. Can be specified as an empty string to trigger a
+   * default regex lookup.
+   * @return TagExtractorPtr newly constructed TagExtractor.
+   */
+  static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex);
+
+  TagExtractorImpl(const std::string& name, const std::string& regex);
+  std::string name() const override { return name_; }
+  std::string extractTag(const std::string& tag_extracted_name,
+                         std::vector<Tag>& tags) const override;
+
+private:
+  const std::string name_;
+  const std::regex regex_;
+};
 
 /**
  * Common stats utility routines.
@@ -160,12 +186,17 @@ public:
  */
 class MetricImpl : public virtual Metric {
 public:
-  MetricImpl(const std::string& name) : name_(name) {}
+  MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+      : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
   const std::string& name() const override { return name_; }
+  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
+  const std::vector<Tag>& tags() const override { return tags_; }
 
 private:
   const std::string name_;
+  const std::string tag_extracted_name_;
+  const std::vector<Tag> tags_;
 };
 
 /**
@@ -173,8 +204,10 @@ private:
  */
 class CounterImpl : public Counter, public MetricImpl {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc)
-      : MetricImpl(data.name_), data_(data), alloc_(alloc) {}
+  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+              std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
   ~CounterImpl() { alloc_.free(data_); }
 
   // Stats::Counter
@@ -200,8 +233,10 @@ private:
  */
 class GaugeImpl : public Gauge, public MetricImpl {
 public:
-  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc)
-      : MetricImpl(data.name_), data_(data), alloc_(alloc) {}
+  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+            std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
   ~GaugeImpl() { alloc_.free(data_); }
 
   // Stats::Gauge
@@ -233,7 +268,9 @@ private:
  */
 class HistogramImpl : public Histogram, public MetricImpl {
 public:
-  HistogramImpl(const std::string& name, Store& parent) : MetricImpl(name), parent_(parent) {}
+  HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                std::vector<Tag>&& tags)
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {}
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
@@ -293,13 +330,14 @@ class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
       : counters_([this](const std::string& name) -> CounterImpl* {
-          return new CounterImpl(*alloc_.alloc(name), alloc_);
+          return new CounterImpl(*alloc_.alloc(name), alloc_, std::string(name),
+                                 std::vector<Tag>());
         }),
         gauges_([this](const std::string& name) -> GaugeImpl* {
-          return new GaugeImpl(*alloc_.alloc(name), alloc_);
+          return new GaugeImpl(*alloc_.alloc(name), alloc_, std::string(name), std::vector<Tag>());
         }),
         histograms_([this](const std::string& name) -> HistogramImpl* {
-          return new HistogramImpl(name, *this);
+          return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());
         }) {}
 
   // Stats::Scope
