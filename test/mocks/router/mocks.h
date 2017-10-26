@@ -273,7 +273,7 @@ public:
 
   MOCK_METHOD0(routeConfigProviders, std::vector<RdsRouteConfigProviderSharedPtr>());
   MOCK_METHOD5(getRouteConfigProvider,
-               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::Rds& rds,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::http::Rds& rds,
                                             Upstream::ClusterManager& cm, Stats::Scope& scope,
                                             const std::string& stat_prefix,
                                             Init::Manager& init_manager));
