@@ -125,6 +125,13 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 }
 
 void TcpProxy::readDisableUpstream(bool disable) {
+  if (upstream_connection_->state() != Network::Connection::State::Open) {
+    // Because we flush write downstream, we can have a case where upstream has already disconnected
+    // and we are waiting to flush. If we had a watermark event during this time we should no
+    // longer touch the upstream connection.
+    return;
+  }
+
   upstream_connection_->readDisable(disable);
   if (disable) {
     read_callbacks_->upstreamHost()
@@ -163,14 +170,6 @@ void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
 void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
-
-  if (parent_.upstream_connection_->state() != Network::Connection::State::Open) {
-    // Because we flush write downstream, we can have a case where upstream has already disconnected
-    // and we are waiting to flush. If we had a watermark event during this time we should no
-    // longer touch the upstream connection.
-    return;
-  }
-
   // The downstream buffer has been drained.  Resume reading from upstream.
   parent_.readDisableUpstream(false);
 }
@@ -291,13 +290,9 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     }
 
     onConnectionFailure();
-  }
-
-  if (event == Network::ConnectionEvent::LocalClose) {
+  } else if (event == Network::ConnectionEvent::LocalClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
-  }
-
-  if (event == Network::ConnectionEvent::Connected) {
+  } else if (event == Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
     onConnectionSuccess();
   }
