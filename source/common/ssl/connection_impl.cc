@@ -222,7 +222,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
 
-bool ConnectionImpl::peerCertificatePresented() {
+bool ConnectionImpl::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   return cert != nullptr;
 }
@@ -249,7 +249,7 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string ConnectionImpl::subjectPeerCertificate() {
+std::string ConnectionImpl::subjectPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
