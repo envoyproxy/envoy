@@ -214,9 +214,8 @@ void FilterJson::translateHttpConnectionManager(
   }
 }
 
-void FilterJson::translateMongoProxy(
-    const Json::Object& json_mongo_proxy,
-    envoy::api::v2::filter::network::MongoProxy& mongo_proxy) {
+void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
+                                     envoy::api::v2::filter::network::MongoProxy& mongo_proxy) {
   json_mongo_proxy.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, stat_prefix);
@@ -227,7 +226,8 @@ void FilterJson::translateMongoProxy(
 
     delay->set_type(envoy::api::v2::filter::FaultDelay::FaultDelayType::FIXED);
     delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
-    delay->mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(json_fault->getInteger("duration_ms")));
+    delay->mutable_fixed_delay()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(json_fault->getInteger("duration_ms")));
   }
 }
 
