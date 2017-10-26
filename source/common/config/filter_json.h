@@ -10,12 +10,14 @@ namespace Config {
 class FilterJson {
 public:
   /**
-   * Translate a v1 JSON access log filter object to v2 envoy::api::v2::filter::http::AccessLogFilter.
+   * Translate a v1 JSON access log filter object to v2
+   * envoy::api::v2::filter::http::AccessLogFilter.
    * @param json_access_log_filter source v1 JSON access log object.
    * @param access_log_filter destination v2 envoy::api::v2::filter::http::AccessLog.
    */
-  static void translateAccessLogFilter(const Json::Object& json_access_log_filter,
-                                       envoy::api::v2::filter::http::AccessLogFilter& access_log_filter);
+  static void
+  translateAccessLogFilter(const Json::Object& json_access_log_filter,
+                           envoy::api::v2::filter::http::AccessLogFilter& access_log_filter);
 
   /**
    * Translate a v1 JSON access log object to v2 envoy::api::v2::filter::http::AccessLog.
@@ -29,7 +31,8 @@ public:
    * Translate a v1 JSON HTTP connection manager object to v2
    * envoy::api::v2::filter::http::HttpConnectionManager.
    * @param json_http_connection_manager source v1 JSON HTTP connection manager object.
-   * @param http_connection_manager destination v2 envoy::api::v2::filter::http::HttpConnectionManager.
+   * @param http_connection_manager destination v2
+   * envoy::api::v2::filter::http::HttpConnectionManager.
    */
   static void translateHttpConnectionManager(
       const Json::Object& json_http_connection_manager,

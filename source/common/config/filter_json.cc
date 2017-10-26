@@ -58,7 +58,8 @@ void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::http:
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
-void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::http::AndFilter& filter) {
+void translateAndFilter(const Json::Object& config,
+                        envoy::api::v2::filter::http::AndFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 

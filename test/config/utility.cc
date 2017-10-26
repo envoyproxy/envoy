@@ -193,7 +193,8 @@ void ConfigHelper::addFilter(const std::string& config) {
   storeHttpConnectionManager(hcm_config);
 }
 
-void ConfigHelper::setClientCodec(envoy::api::v2::filter::http::HttpConnectionManager::CodecType type) {
+void ConfigHelper::setClientCodec(
+    envoy::api::v2::filter::http::HttpConnectionManager::CodecType type) {
   RELEASE_ASSERT(!finalized_);
   envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -226,7 +227,8 @@ void ConfigHelper::addSslConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 }
 
-void ConfigHelper::loadHttpConnectionManager(envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+void ConfigHelper::loadHttpConnectionManager(
+    envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_chain = listener->mutable_filter_chains(0);

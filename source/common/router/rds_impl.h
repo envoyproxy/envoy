@@ -34,9 +34,10 @@ public:
    *         configuration.
    */
   static RouteConfigProviderSharedPtr
-  create(const envoy::api::v2::filter::http::HttpConnectionManager& config, Runtime::Loader& runtime,
-         Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
-         Init::Manager& init_manager, RouteConfigProviderManager& route_config_provider_manager);
+  create(const envoy::api::v2::filter::http::HttpConnectionManager& config,
+         Runtime::Loader& runtime, Upstream::ClusterManager& cm, Stats::Scope& scope,
+         const std::string& stat_prefix, Init::Manager& init_manager,
+         RouteConfigProviderManager& route_config_provider_manager);
 };
 
 /**

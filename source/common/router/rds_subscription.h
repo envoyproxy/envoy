@@ -21,9 +21,10 @@ class RdsSubscription : public Http::RestApiFetcher,
                         public Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
-  RdsSubscription(Envoy::Config::SubscriptionStats stats, const envoy::api::v2::filter::http::Rds& rds,
-                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+  RdsSubscription(Envoy::Config::SubscriptionStats stats,
+                  const envoy::api::v2::filter::http::Rds& rds, Upstream::ClusterManager& cm,
+                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                  const LocalInfo::LocalInfo& local_info);
 
 private:
   // Config::Subscription

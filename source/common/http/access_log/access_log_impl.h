@@ -25,7 +25,7 @@ public:
   /**
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
-static FilterPtr fromProto(const envoy::api::v2::filter::http::AccessLogFilter& config,
+  static FilterPtr fromProto(const envoy::api::v2::filter::http::AccessLogFilter& config,
                              Runtime::Loader& runtime);
 };
 
@@ -48,7 +48,8 @@ protected:
  */
 class StatusCodeFilter : public ComparisonFilter {
 public:
-  StatusCodeFilter(const envoy::api::v2::filter::http::StatusCodeFilter& config, Runtime::Loader& runtime)
+  StatusCodeFilter(const envoy::api::v2::filter::http::StatusCodeFilter& config,
+                   Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // Http::AccessLog::Filter
@@ -60,7 +61,8 @@ public:
  */
 class DurationFilter : public ComparisonFilter {
 public:
-  DurationFilter(const envoy::api::v2::filter::http::DurationFilter& config, Runtime::Loader& runtime)
+  DurationFilter(const envoy::api::v2::filter::http::DurationFilter& config,
+                 Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // Http::AccessLog::Filter
@@ -72,8 +74,9 @@ public:
  */
 class OperatorFilter : public Filter {
 public:
-  OperatorFilter(const Protobuf::RepeatedPtrField<envoy::api::v2::filter::http::AccessLogFilter>& configs,
-                 Runtime::Loader& runtime);
+  OperatorFilter(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::filter::http::AccessLogFilter>& configs,
+      Runtime::Loader& runtime);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -126,7 +129,8 @@ public:
  */
 class RuntimeFilter : public Filter {
 public:
-  RuntimeFilter(const envoy::api::v2::filter::http::RuntimeFilter& config, Runtime::Loader& runtime);
+  RuntimeFilter(const envoy::api::v2::filter::http::RuntimeFilter& config,
+                Runtime::Loader& runtime);
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;

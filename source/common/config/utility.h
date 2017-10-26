@@ -138,7 +138,8 @@ public:
    * @param json_rds source v1 RDS JSON config.
    * @param rds destination v2 RDS envoy::api::v2::filter::http::Rds.
    */
-  static void translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::http::Rds& rds);
+  static void translateRdsConfig(const Json::Object& json_rds,
+                                 envoy::api::v2::filter::http::Rds& rds);
 
   /**
    * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::ConfigSource.

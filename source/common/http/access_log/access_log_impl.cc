@@ -112,7 +112,8 @@ OperatorFilter::OperatorFilter(
 OrFilter::OrFilter(const envoy::api::v2::filter::http::OrFilter& config, Runtime::Loader& runtime)
     : OperatorFilter(config.filters(), runtime) {}
 
-AndFilter::AndFilter(const envoy::api::v2::filter::http::AndFilter& config, Runtime::Loader& runtime)
+AndFilter::AndFilter(const envoy::api::v2::filter::http::AndFilter& config,
+                     Runtime::Loader& runtime)
     : OperatorFilter(config.filters(), runtime) {}
 
 bool OrFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {

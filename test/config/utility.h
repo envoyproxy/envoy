@@ -21,7 +21,8 @@ public:
   ConfigHelper(const Network::Address::IpVersion version);
 
   typedef std::function<void(envoy::api::v2::Bootstrap&)> ConfigModifierFunction;
-  typedef std::function<void(envoy::api::v2::filter::http::HttpConnectionManager&)> HttpModifierFunction;
+  typedef std::function<void(envoy::api::v2::filter::http::HttpConnectionManager&)>
+      HttpModifierFunction;
 
   // A string for a basic buffer filter, which can be used with addFilter()
   static const std::string DEFAULT_BUFFER_FILTER;
