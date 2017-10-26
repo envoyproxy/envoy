@@ -101,12 +101,16 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  virtual void setEndStream(bool end) { end_stream_ = end; }
+
+protected:
+  Http::HeaderMapPtr headers_;
+
 private:
   FakeHttpConnection& parent_;
   Http::StreamEncoder& encoder_;
   std::mutex lock_;
   std::condition_variable decoder_event_;
-  Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
@@ -291,6 +295,11 @@ public:
   bool createFilterChain(Network::Connection& connection) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+protected:
+  Stats::IsolatedStoreImpl stats_store_;
+  const FakeHttpConnection::Type http_type_;
+  void cleanUp();
+
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
                FakeHttpConnection::Type type);
@@ -299,15 +308,15 @@ private:
   Ssl::ServerContext* ssl_ctx_{};
   Network::ListenSocketPtr socket_;
   ConditionalInitializer server_initialized_;
-  Thread::ThreadPtr thread_;
+  // Guards any objects which can be altered both in the upstream thread and the
+  // main test thread.
   std::mutex lock_;
+  Thread::ThreadPtr thread_;
   std::condition_variable new_connection_event_;
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  std::list<QueuedConnectionWrapperPtr> new_connections_;
-  FakeHttpConnection::Type http_type_;
+  std::list<QueuedConnectionWrapperPtr> new_connections_; // Guarded by lock_
   bool allow_unexpected_disconnects_;
 };
 } // namespace Envoy
