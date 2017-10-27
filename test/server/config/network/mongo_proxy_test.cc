@@ -5,10 +5,9 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/network/mongo_proxy.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "api/filter/network/mongo_proxy.pb.h"
 
 using testing::NiceMock;
 using testing::_;
@@ -56,12 +55,12 @@ void handleInvalidConfiguration(const std::string& json_string) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
-    void handleInvalidProto(const envoy::api::v2::filter::network::MongoProxy& config) {
-      NiceMock<MockFactoryContext> context;
-      MongoProxyFilterConfigFactory factory;
+void handleInvalidProto(const envoy::api::v2::filter::network::MongoProxy& config) {
+  NiceMock<MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
 
-      EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), MissingFieldException);
-    }
+  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), MissingFieldException);
+}
 
 TEST(MongoFilterConfigTest, InvalidExtraProperty) {
   std::string json_string = R"EOF(
@@ -78,9 +77,9 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
 TEST(MongoFilterConfigTest, EmptyConfig) { handleInvalidConfiguration("{}"); }
 
 TEST(MongoFilterConfigTest, EmptyProto) {
-envoy::api::v2::filter::network::MongoProxy config{};
-      handleInvalidProto(config);
-    }
+  envoy::api::v2::filter::network::MongoProxy config{};
+  handleInvalidProto(config);
+}
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
   std::string json_string = R"EOF(
@@ -123,14 +122,14 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
   handleInvalidConfiguration(json_string);
 }
 
-    TEST(MongoFilterConfigTest, InvalidFaultsMissingDurationInProto) {
-      envoy::api::v2::filter::network::MongoProxy config{};
-      config.set_stat_prefix("my_stat_prefix");
-      config.mutable_delay()->set_percent(50);
-      handleInvalidProto(config);
-    }
+TEST(MongoFilterConfigTest, InvalidFaultsMissingDurationInProto) {
+  envoy::api::v2::filter::network::MongoProxy config{};
+  config.set_stat_prefix("my_stat_prefix");
+  config.mutable_delay()->set_percent(50);
+  handleInvalidProto(config);
+}
 
-    TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
+TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -252,19 +251,19 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   cb(connection);
 }
 
-    TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
-      envoy::api::v2::filter::network::MongoProxy config{};
-      config.set_stat_prefix("my_stat_prefix");
-      config.mutable_delay()->set_percent(50);
-      config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
+TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
+  envoy::api::v2::filter::network::MongoProxy config{};
+  config.set_stat_prefix("my_stat_prefix");
+  config.mutable_delay()->set_percent(50);
+  config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
 
-      NiceMock<MockFactoryContext> context;
-      MongoProxyFilterConfigFactory factory;
-      NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
-      Network::MockConnection connection;
-      EXPECT_CALL(connection, addFilter(_));
-      cb(connection);
-    }
+  NiceMock<MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
 
 } // namespace Configuration
 } // namespace Server
