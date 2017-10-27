@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Set the connect timeout on upstream connections.
+  void setConnectTimeout(std::chrono::milliseconds timeout);
+
   // Add an additional route to the configuration.
   void addRoute(
       const std::string& host, const std::string& route, const std::string& cluster,
@@ -81,6 +85,10 @@ private:
 
   // The config modifiers added via addConfigModifier() which will be applied in finalize()
   std::vector<ConfigModifierFunction> config_modifiers_;
+
+  // Track if the connect timeout has been set (to avoid clobbering a custom setting with the
+  // default).
+  bool connect_timeout_set_{false};
 
   // A sanity check guard to make sure config is not modified after handing it to Envoy.
   bool finalized_{false};
