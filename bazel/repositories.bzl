@@ -100,12 +100,20 @@ def cc_deps(skip_targets):
             actual = "@grpc_httpjson_transcoding//src:transcoding",
         )
 
+def go_deps(skip_targets):
+    if 'io_bazel_rules_go' not in skip_targets:
+        native.git_repository(
+            name = "io_bazel_rules_go",
+            remote = "https://github.com/bazelbuild/rules_go.git",
+            commit = "4374be38e9a75ff5957c3922adb155d32086fe14",
+        )
+
 def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "f2c1dc99df64144f76107725bde870dd6827e044",
+        commit = "b085af2c8485ba8525a128f466b1ec9ccf14574e",
     )
 
     api_bind_targets = [
@@ -227,6 +235,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
 
     python_deps(skip_targets)
     cc_deps(skip_targets)
+    go_deps(skip_targets)
     envoy_api_deps(skip_targets)
 
 def com_github_fmtlib_fmt(repository = ""):

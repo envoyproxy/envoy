@@ -26,10 +26,10 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   std::chrono::microseconds responseReceivedDuration() const override {
-    return request_received_duration_;
+    return response_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override {
-    request_received_duration_ =
+    response_received_duration_ =
         std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
   }
 

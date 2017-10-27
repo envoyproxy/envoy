@@ -336,6 +336,7 @@ protected:
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
   void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                           const std::vector<HostSharedPtr>& hosts_removed) override;
+  void blockHcUpdates(bool block);
 
   static const HostListsConstSharedPtr empty_host_lists_;
 
@@ -348,6 +349,8 @@ protected:
 
 private:
   void reloadHealthyHosts();
+
+  bool block_hc_updates_{};
 };
 
 /**
