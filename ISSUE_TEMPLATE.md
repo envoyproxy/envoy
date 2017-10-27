@@ -1,6 +1,6 @@
-**Issue Template**
+##Issue Template
 
-*title*: *One line description*
+*Title*: *One line description*
 
 *Description*:
 >Describe the issue. Please be detailed. If a feature request, please
@@ -12,7 +12,7 @@ would be used.
 
 
 
-**Bug Template**
+##Bug Template
 
 *Title*: *One line description*
 

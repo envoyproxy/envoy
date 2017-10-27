@@ -1,11 +1,11 @@
-*title*: *One line description*
+*title*: *one line description*
 
 >Title can be a one or two words to describe the subsystem or the aspect
- this PR applies to. Title must be lower case. For example: 
+ this PR applies to. Title and description must be lower case. For example: 
 * ci: update build image to 44d539cb
 * docs: fix indent, buffer: add copyOut() method
 * router:add x-envoy-overloaded header
-* tls: Add support for specifying TLS session ticket keys
+* tls: add support for specifying TLS session ticket keys
 
 
 *Description*:
