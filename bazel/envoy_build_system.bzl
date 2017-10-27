@@ -40,10 +40,13 @@ def envoy_linkopts():
             # TODO(zuercher): should be able to remove this after the next gperftools release after
             # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
             "-Wl,-U,___lsan_ignore_object",
+            # See note here: http://luajit.org/install.html
+            "-pagezero_size 10000", "-image_base 100000000",
         ],
         "//conditions:default": [
             "-pthread",
             "-lrt",
+            "-ldl",
             # Force MD5 hash in build. This is part of the workaround for
             # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
             # does this by itself prior to
@@ -66,11 +69,13 @@ def envoy_test_linkopts():
             # TODO(zuercher): should be able to remove this after the next gperftools release after
             # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
             "-Wl,-U,___lsan_ignore_object",
+            # See note here: http://luajit.org/install.html
+            "-pagezero_size 10000", "-image_base 100000000",
         ],
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
-        "//conditions:default": ["-pthread", "-latomic", "-lrt"],
+        "//conditions:default": ["-pthread", "-latomic", "-lrt", "-ldl"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.

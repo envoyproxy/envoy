@@ -60,6 +60,7 @@ cc_library(
     srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
     hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
     includes = ["thirdparty_build/include"],
+    strip_include_prefix = "thirdparty_build/include/luajit-2.0/",
 )
 
 cc_library(
