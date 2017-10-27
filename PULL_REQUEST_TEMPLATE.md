@@ -21,17 +21,22 @@ feature get enabled? By default, config change, etc...
 
 *Risk Level*: Low | Medium | High
 >Low: Small bug fix or small optional feature.
+
 >Medium: New features that are not enabled(for example: new filter). Small-medium
 features added to existing components(for example: modification to an existing 
 filter).
+
 >High: Complicated changes such as flow control, rewrites of critical
 components, etc.
+
 >Note: The above is only a rough guide for choosing a level,
 please ask if you have any concerns about the risk of the PR.
 
 *Testing*:
 >Explanation of what testing was done, for example: unit test, 
-integration, manual testing, etc. Note: It isn’t expected to do all 
+integration, manual testing, etc.
+
+>Note: It isn’t expected to do all 
 forms of testing, please use your best judgement or ask for guidance 
 if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.
@@ -39,5 +44,5 @@ more comprehensive the testing should be.
 [optional *Deprecated*:]
 > Description of what is deprecated.
 
-[optional *Release notes*:]
+[optional *Release Notes*:]
  > Description of what to add to next point release notes.

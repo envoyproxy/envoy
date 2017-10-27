@@ -1,4 +1,5 @@
 **Issue Template**
+
 *title*: *One line description*
 
 *Description*:
@@ -12,6 +13,7 @@ would be used.
 
 
 **Bug Template**
+
 *Title*: *One line description*
 
 *Description*:
@@ -22,6 +24,7 @@ returned, etc.
 *Repro steps*:
 > Include sample requests, environment, etc. All data and inputs 
 required to reproduce the bug.
+
 >**Note**: The [Envoy_collect tool](https://github.com/envoyproxy/envoy/blob/master/tools/envoy_collect/README.md)
 gathers a tarball with debug logs, config and the following admin 
 endpoints: /stats, /clusters and /server_info. Please note if there are
@@ -31,6 +34,7 @@ privacy concerns, sanitize the data prior to sharing the tarball/pasting.
 >Include the admin output for the following endpoints: /stats, 
 /clusters, /routes, /server_info. For more information, refer to the 
 [admin endpoint documentation.](https://envoyproxy.github.io/envoy/operations/admin.html)
+
 >**Note**: If there are privacy concerns, sanitize the data prior to
 sharing.
 
@@ -39,6 +43,7 @@ sharing.
 
 *Logs*:
 >Include the access logs and the Envoy logs.
+
 >**Note**: If there are privacy concerns, sanitize the data prior to
 sharing.
 
