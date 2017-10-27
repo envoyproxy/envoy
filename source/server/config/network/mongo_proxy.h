@@ -16,11 +16,11 @@ namespace Configuration {
  * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
-public:
   NetworkFilterFactoryCb
   createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& mongo_proxy,
                           FactoryContext& context);
 
+public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;
