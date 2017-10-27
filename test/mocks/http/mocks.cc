@@ -90,6 +90,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
       .WillByDefault(Invoke([this](DownstreamWatermarkCallbacks& callbacks) -> void {
         callbacks_.remove(&callbacks);
       }));
+
+  ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
@@ -97,6 +99,7 @@ MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
   ON_CALL(*this, encodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
+  ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}

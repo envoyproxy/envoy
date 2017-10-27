@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "fmt/format.h"
 
@@ -49,7 +49,7 @@ Network::FilterStatus Instance::onNewConnection() {
     config_->stats().active_.inc();
     config_->stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::EMPTY_CONTEXT);
+    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance());
     calling_limit_ = false;
   }
 

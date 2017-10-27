@@ -8,7 +8,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 
 namespace Envoy {
 
@@ -41,7 +41,6 @@ static_resources:
             name: route_config_0
   clusters:
     name: cluster_0
-    connect_timeout: 5s
     hosts:
       socket_address:
         address: 127.0.0.1
@@ -114,6 +113,18 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     }
   }
   ASSERT(port_idx == ports.size());
+
+  if (!connect_timeout_set_) {
+#ifdef __APPLE__
+    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
+    // connections can take inordinately long to complete.
+    setConnectTimeout(std::chrono::seconds(30));
+#else
+    // Set a default connect timeout.
+    setConnectTimeout(std::chrono::seconds(5));
+#endif
+  }
+
   finalized_ = true;
 }
 
@@ -127,7 +138,7 @@ void ConfigHelper::setSourceAddress(const std::string& address_string) {
 
 void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std::string& prefix) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
   auto* virtual_host = hcm_config.mutable_route_config()->mutable_virtual_hosts(0);
@@ -150,9 +161,9 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     cluster->mutable_per_connection_buffer_limit_bytes()->set_value(upstream_buffer_limit);
   }
 
-  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
-  if (hcm_config.codec_type() == envoy::api::v2::filter::HttpConnectionManager::HTTP2) {
+  if (hcm_config.codec_type() == envoy::api::v2::filter::http::HttpConnectionManager::HTTP2) {
     const uint32_t size =
         std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
     auto* options = hcm_config.mutable_http2_protocol_options();
@@ -161,11 +172,26 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   }
 }
 
+void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
+  RELEASE_ASSERT(!finalized_);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    auto* connect_timeout = cluster->mutable_connect_timeout();
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    connect_timeout->set_seconds(seconds.count());
+    connect_timeout->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(timeout - seconds).count());
+  }
+  connect_timeout_set_ = true;
+}
+
 void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
                             const std::string& cluster,
                             envoy::api::v2::VirtualHost::TlsRequirementType type) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
   auto* virtual_host = hcm_config.mutable_route_config()->add_virtual_hosts();
@@ -179,7 +205,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
 
 void ConfigHelper::addFilter(const std::string& config) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
   auto* filter_list_back = hcm_config.add_http_filters();
@@ -193,9 +219,10 @@ void ConfigHelper::addFilter(const std::string& config) {
   storeHttpConnectionManager(hcm_config);
 }
 
-void ConfigHelper::setClientCodec(envoy::api::v2::filter::HttpConnectionManager::CodecType type) {
+void ConfigHelper::setClientCodec(
+    envoy::api::v2::filter::http::HttpConnectionManager::CodecType type) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
   hcm_config.set_codec_type(type);
   storeHttpConnectionManager(hcm_config);
@@ -226,7 +253,8 @@ void ConfigHelper::addSslConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 }
 
-void ConfigHelper::loadHttpConnectionManager(envoy::api::v2::filter::HttpConnectionManager& hcm) {
+void ConfigHelper::loadHttpConnectionManager(
+    envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_chain = listener->mutable_filter_chains(0);
@@ -235,7 +263,7 @@ void ConfigHelper::loadHttpConnectionManager(envoy::api::v2::filter::HttpConnect
 }
 
 void ConfigHelper::storeHttpConnectionManager(
-    const envoy::api::v2::filter::HttpConnectionManager& hcm) {
+    const envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_chain = listener->mutable_filter_chains(0);
@@ -251,7 +279,7 @@ void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   addConfigModifier([function, this](envoy::api::v2::Bootstrap&) -> void {
-    envoy::api::v2::filter::HttpConnectionManager hcm_config;
+    envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);

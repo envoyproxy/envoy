@@ -5,10 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/tracing/context.h"
-
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 
@@ -46,39 +43,33 @@ void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& reques
 }
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Descriptor>& descriptors,
-                           const Tracing::TransportContext& context) {
+                           const std::vector<Descriptor>& descriptors, Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
-  context_ = context;
 
   pb::lyft::ratelimit::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
-  request_ = async_client_->send(service_method_, request, *this, timeout_);
+  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
-  if (!context_.request_id_.empty()) {
-    metadata.insertRequestId().value(context_.request_id_);
-  }
-
-  if (!context_.span_context_.empty()) {
-    metadata.insertOtSpanContext().value(context_.span_context_);
-  }
-}
-
-void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response) {
+void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response,
+                               Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
   ASSERT(response->overall_code() != pb::lyft::ratelimit::RateLimitResponse_Code_UNKNOWN);
   if (response->overall_code() == pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT) {
     status = LimitStatus::OverLimit;
+    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOverLimit);
+  } else {
+    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
   }
+
   callbacks_->complete(status);
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&) {
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
+                               Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
   UNREFERENCED_PARAMETER(status);
   callbacks_->complete(LimitStatus::Error);

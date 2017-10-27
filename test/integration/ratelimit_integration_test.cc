@@ -1,7 +1,8 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-#include "common/ratelimit/ratelimit.pb.h"
+
+#include "source/common/ratelimit/ratelimit.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -37,7 +38,7 @@ public:
       ratelimit_cluster->set_name("ratelimit");
       ratelimit_cluster->mutable_http2_protocol_options();
     });
-    config_helper_.addConfigModifier([](envoy::api::v2::filter::HttpConnectionManager& hcm) {
+    config_helper_.addConfigModifier([](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
       auto* rate_limit = hcm.mutable_route_config()
                              ->mutable_virtual_hosts(0)
                              ->mutable_routes(0)

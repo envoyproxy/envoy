@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -8,7 +9,7 @@
 #include "api/base.pb.h"
 #include "api/bootstrap.pb.h"
 #include "api/cds.pb.h"
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 #include "api/protocol.pb.h"
 #include "api/rds.pb.h"
 
@@ -21,7 +22,8 @@ public:
   ConfigHelper(const Network::Address::IpVersion version);
 
   typedef std::function<void(envoy::api::v2::Bootstrap&)> ConfigModifierFunction;
-  typedef std::function<void(envoy::api::v2::filter::HttpConnectionManager&)> HttpModifierFunction;
+  typedef std::function<void(envoy::api::v2::filter::http::HttpConnectionManager&)>
+      HttpModifierFunction;
 
   // A string for a basic buffer filter, which can be used with addFilter()
   static const std::string DEFAULT_BUFFER_FILTER;
@@ -43,6 +45,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Set the connect timeout on upstream connections.
+  void setConnectTimeout(std::chrono::milliseconds timeout);
+
   // Add an additional route to the configuration.
   void addRoute(
       const std::string& host, const std::string& route, const std::string& cluster,
@@ -52,7 +57,7 @@ public:
   void addFilter(const std::string& filter_yaml);
 
   // Sets the client codec to the specified type.
-  void setClientCodec(envoy::api::v2::filter::HttpConnectionManager::CodecType type);
+  void setClientCodec(envoy::api::v2::filter::http::HttpConnectionManager::CodecType type);
 
   // Add the default SSL configuration.
   void addSslConfig();
@@ -70,16 +75,20 @@ public:
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
-  void loadHttpConnectionManager(envoy::api::v2::filter::HttpConnectionManager& hcm);
+  void loadHttpConnectionManager(envoy::api::v2::filter::http::HttpConnectionManager& hcm);
   // Stick the contents of the procided HCM proto and stuff them into the first HCM
   // struct of the first listener.
-  void storeHttpConnectionManager(const envoy::api::v2::filter::HttpConnectionManager& hcm);
+  void storeHttpConnectionManager(const envoy::api::v2::filter::http::HttpConnectionManager& hcm);
 
   // The bootstrap proto Envoy will start up with.
   envoy::api::v2::Bootstrap bootstrap_;
 
   // The config modifiers added via addConfigModifier() which will be applied in finalize()
   std::vector<ConfigModifierFunction> config_modifiers_;
+
+  // Track if the connect timeout has been set (to avoid clobbering a custom setting with the
+  // default).
+  bool connect_timeout_set_{false};
 
   // A sanity check guard to make sure config is not modified after handing it to Envoy.
   bool finalized_{false};

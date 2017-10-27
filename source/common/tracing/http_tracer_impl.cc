@@ -115,52 +115,50 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   NOT_REACHED;
 }
 
-HttpConnManFinalizerImpl::HttpConnManFinalizerImpl(Http::HeaderMap* request_headers,
-                                                   Http::AccessLog::RequestInfo& request_info,
-                                                   Config& tracing_config)
-    : request_headers_(request_headers), request_info_(request_info),
-      tracing_config_(tracing_config) {}
-
-void HttpConnManFinalizerImpl::finalize(Span& span) {
+void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
+                                     const Http::AccessLog::RequestInfo& request_info,
+                                     const Config& tracing_config) {
   // Pre response data.
-  if (request_headers_) {
-    span.setTag("guid:x-request-id", std::string(request_headers_->RequestId()->value().c_str()));
-    span.setTag("http.url", buildUrl(*request_headers_));
-    span.setTag("http.method", request_headers_->Method()->value().c_str());
+  if (request_headers) {
+    span.setTag("guid:x-request-id", std::string(request_headers->RequestId()->value().c_str()));
+    span.setTag("http.url", buildUrl(*request_headers));
+    span.setTag("http.method", request_headers->Method()->value().c_str());
     span.setTag("downstream_cluster",
-                valueOrDefault(request_headers_->EnvoyDownstreamServiceCluster(), "-"));
-    span.setTag("user_agent", valueOrDefault(request_headers_->UserAgent(), "-"));
+                valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
+    span.setTag("user_agent", valueOrDefault(request_headers->UserAgent(), "-"));
     span.setTag("http.protocol",
-                Http::AccessLog::AccessLogFormatUtils::protocolToString(request_info_.protocol()));
+                Http::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol()));
 
-    if (request_headers_->ClientTraceId()) {
+    if (request_headers->ClientTraceId()) {
       span.setTag("guid:x-client-trace-id",
-                  std::string(request_headers_->ClientTraceId()->value().c_str()));
+                  std::string(request_headers->ClientTraceId()->value().c_str()));
     }
 
     // Build tags based on the custom headers.
-    for (const Http::LowerCaseString& header : tracing_config_.requestHeadersForTags()) {
-      const Http::HeaderEntry* entry = request_headers_->get(header);
+    for (const Http::LowerCaseString& header : tracing_config.requestHeadersForTags()) {
+      const Http::HeaderEntry* entry = request_headers->get(header);
       if (entry) {
         span.setTag(header.get(), entry->value().c_str());
       }
     }
   }
-  span.setTag("request_size", std::to_string(request_info_.bytesReceived()));
+  span.setTag("request_size", std::to_string(request_info.bytesReceived()));
 
-  if (nullptr != request_info_.upstreamHost()) {
-    span.setTag("upstream_cluster", request_info_.upstreamHost()->cluster().name());
+  if (nullptr != request_info.upstreamHost()) {
+    span.setTag("upstream_cluster", request_info.upstreamHost()->cluster().name());
   }
 
   // Post response data.
-  span.setTag("http.status_code", buildResponseCode(request_info_));
-  span.setTag("response_size", std::to_string(request_info_.bytesSent()));
-  span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info_));
+  span.setTag("http.status_code", buildResponseCode(request_info));
+  span.setTag("response_size", std::to_string(request_info.bytesSent()));
+  span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info));
 
-  if (!request_info_.responseCode().valid() ||
-      Http::CodeUtility::is5xx(request_info_.responseCode().value())) {
+  if (!request_info.responseCode().valid() ||
+      Http::CodeUtility::is5xx(request_info.responseCode().value())) {
     span.setTag("error", "true");
   }
+
+  span.finishSpan();
 }
 
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)

@@ -184,6 +184,11 @@ public:
   COUNTER  (lb_zone_routing_all_directly)                                                          \
   COUNTER  (lb_zone_routing_sampled)                                                               \
   COUNTER  (lb_zone_routing_cross_zone)                                                            \
+  GAUGE    (lb_subsets_active)                                                                     \
+  COUNTER  (lb_subsets_created)                                                                    \
+  COUNTER  (lb_subsets_removed)                                                                    \
+  COUNTER  (lb_subsets_selected)                                                                   \
+  COUNTER  (lb_subsets_fallback)                                                                   \
   COUNTER  (upstream_cx_total)                                                                     \
   GAUGE    (upstream_cx_active)                                                                    \
   COUNTER  (upstream_cx_http1_total)                                                               \

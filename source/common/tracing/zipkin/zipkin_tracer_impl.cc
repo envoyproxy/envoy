@@ -15,10 +15,7 @@ namespace Zipkin {
 
 ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
-void ZipkinSpan::finishSpan(Tracing::SpanFinalizer& finalizer) {
-  finalizer.finalize(*this);
-  span_.finish();
-}
+void ZipkinSpan::finishSpan() { span_.finish(); }
 
 void ZipkinSpan::setOperation(const std::string& operation) { span_.setName(operation); }
 

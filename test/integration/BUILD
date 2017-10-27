@@ -200,6 +200,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "integration_lib",
     srcs = [
+        "autonomous_upstream.cc",
         "fake_upstream.cc",
         "integration.cc",
         "server.cc",
@@ -207,6 +208,7 @@ envoy_cc_test_library(
         "utility.cc",
     ],
     hdrs = [
+        "autonomous_upstream.h",
         "fake_upstream.h",
         "integration.h",
         "server.h",

@@ -32,6 +32,7 @@ namespace Logger {
   FUNCTION(http2)                \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \
+  FUNCTION(lua)                  \
   FUNCTION(mongo)                \
   FUNCTION(pool)                 \
   FUNCTION(redis)                \

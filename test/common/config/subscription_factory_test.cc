@@ -116,7 +116,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
   NiceMock<Http::MockAsyncClientStream> stream;
-  EXPECT_CALL(cm_.async_client_, start(_, _)).WillOnce(Return(&stream));
+  EXPECT_CALL(cm_.async_client_, start(_, _, false)).WillOnce(Return(&stream));
   Http::TestHeaderMapImpl headers{
       {":method", "POST"},
       {":path", "/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints"},

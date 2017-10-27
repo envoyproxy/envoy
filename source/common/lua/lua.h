@@ -11,7 +11,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#include "luajit-2.0/lua.hpp"
+#include "lua.hpp"
 
 namespace Envoy {
 namespace Lua {
@@ -105,7 +105,7 @@ public:
   static void registerType(lua_State* state) {
     std::vector<luaL_Reg> to_register;
 
-    // Fetch all o the functions to be exported to Lua so that we can register them in the
+    // Fetch all of the functions to be exported to Lua so that we can register them in the
     // metatable.
     ExportedFunctions functions = T::exportedFunctions();
     for (auto function : functions) {
@@ -130,6 +130,7 @@ public:
     ENVOY_LOG(info, "registering new type: {}", typeid(T).name());
     int rc = luaL_newmetatable(state, typeid(T).name());
     ASSERT(rc == 1);
+    UNREFERENCED_PARAMETER(rc);
 
     lua_pushvalue(state, -1);
     lua_setfield(state, -2, "__index");
@@ -191,6 +192,7 @@ private:
  * This is basically a Lua smart pointer. The idea is that given a Lua object, if we want to
  * guarantee that Lua won't destroy it, we need to reference it. This wraps the reference
  * functionality. While a LuaRef owns an object it's guaranteed that Lua will not GC it.
+ * TODO(mattklein123): Add dedicated unit tests. This will require mocking a Lua state.
  */
 template <typename T> class LuaRef {
 public:
@@ -259,6 +261,7 @@ protected:
 /**
  * This is a variant of LuaRef which also marks an object as dead during destruction. This is
  * useful if an object should not be used after the scope of the pcall() or resume().
+ * TODO(mattklein123): Add dedicated unit tests. This will require mocking a Lua state.
  */
 template <typename T> class LuaDeathRef : public LuaRef<T> {
 public:

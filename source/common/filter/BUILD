@@ -31,9 +31,9 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
-        "//source/common/common:empty_string",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 

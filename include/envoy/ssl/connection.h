@@ -17,7 +17,7 @@ public:
   /**
    * @return whether the peer certificate is presented.
    **/
-  virtual bool peerCertificatePresented() PURE;
+  virtual bool peerCertificatePresented() const PURE;
 
   /**
    * @return the URI in the SAN feld of the local certificate. Returns "" if there is no local
@@ -35,7 +35,7 @@ public:
    * @return the subject field of the peer certificate in RFC 2253 format. Returns "" if there is
    *         no peer certificate, or no subject.
    **/
-  virtual std::string subjectPeerCertificate() PURE;
+  virtual std::string subjectPeerCertificate() const PURE;
 
   /**
    * @return the URI in the SAN field of the peer certificate. Returns "" if there is no peer

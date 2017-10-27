@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/tracing/context.h"
 
 #include "gmock/gmock.h"
 
@@ -19,8 +18,7 @@ public:
   // RateLimit::Client
   MOCK_METHOD0(cancel, void());
   MOCK_METHOD4(limit, void(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Descriptor>& descriptors,
-                           const Tracing::TransportContext& context));
+                           const std::vector<Descriptor>& descriptors, Tracing::Span& parent_span));
 };
 
 inline bool operator==(const DescriptorEntry& lhs, const DescriptorEntry& rhs) {
