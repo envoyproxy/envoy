@@ -105,7 +105,7 @@ public:
   static void registerType(lua_State* state) {
     std::vector<luaL_Reg> to_register;
 
-    // Fetch all o the functions to be exported to Lua so that we can register them in the
+    // Fetch all of the functions to be exported to Lua so that we can register them in the
     // metatable.
     ExportedFunctions functions = T::exportedFunctions();
     for (auto function : functions) {
