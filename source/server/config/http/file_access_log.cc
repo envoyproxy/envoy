@@ -17,7 +17,7 @@ namespace Configuration {
 
 Http::AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, Http::AccessLog::FilterPtr&& filter, FactoryContext& context) {
-  const auto& fal_config = dynamic_cast<const envoy::api::v2::filter::http::FileAccessLog&>(config);
+  const auto& fal_config = dynamic_cast<const envoy::api::v2::filter::FileAccessLog&>(config);
   Http::AccessLog::FormatterPtr formatter;
   if (fal_config.format().empty()) {
     formatter = Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
@@ -29,7 +29,7 @@ Http::AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::FileAccessLog()};
+  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::FileAccessLog()};
 }
 
 std::string FileAccessLogFactory::name() const { return Config::AccessLogNames::get().FILE; }
