@@ -6,6 +6,8 @@
 
 #include "common/config/well_known_names.h"
 
+#include "api/filter/network/mongo_proxy.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -15,6 +17,10 @@ namespace Configuration {
  */
 class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
+  NetworkFilterFactoryCb
+  createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& mongo_proxy,
+                          FactoryContext& context);
+
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
                                              FactoryContext& context) override;

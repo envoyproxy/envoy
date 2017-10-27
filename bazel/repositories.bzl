@@ -147,7 +147,7 @@ def envoy_api_deps(skip_targets):
     ]
     for t in http_filter_bind_targets:
         native.bind(
-            name = "envoy_filter_" + t,
+            name = "envoy_filter_http_" + t,
             actual = "@envoy_api//api/filter/http:" + t + "_cc",
         )
     network_filter_bind_targets = [
@@ -159,7 +159,7 @@ def envoy_api_deps(skip_targets):
     ]
     for t in network_filter_bind_targets:
         native.bind(
-            name = "envoy_filter_" + t,
+            name = "envoy_filter_network_" + t,
             actual = "@envoy_api//api/filter/network:" + t + "_cc",
         )    
     native.bind(

@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "common/config/filter_json.h"
 #include "common/json/json_loader.h"
 #include "common/mongo/proxy.h"
 
@@ -15,16 +16,16 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
-    envoy::api::v2::filter::MongoProxy& mongo_proxy, FactoryContext& context) {
+    const envoy::api::v2::filter::network::MongoProxy& mongo_proxy, FactoryContext& context) {
   std::string stat_prefix = "mongo." + mongo_proxy.stat_prefix() + ".";
   Mongo::AccessLogSharedPtr access_log;
-  if (mongo_proxy.access_log()) {
+  if (!mongo_proxy.access_log().empty()) {
     access_log.reset(new Mongo::AccessLog(mongo_proxy.access_log(), context.accessLogManager()));
   }
 
   Mongo::FaultConfigSharedPtr fault_config;
-  if (mongo_proxy.delay()) {
-    fault_config = std::make_shared<Mongo::FaultConfig>(*mongo_proxy.delay());
+  if (mongo_proxy.has_delay()) {
+    fault_config = std::make_shared<Mongo::FaultConfig>(mongo_proxy.delay());
   }
 
   return [stat_prefix, &context, access_log,

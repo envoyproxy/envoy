@@ -224,7 +224,7 @@ void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
     const auto json_fault = json_mongo_proxy.getObject("fault")->getObject("fixed_delay");
     auto* delay = mongo_proxy.mutable_delay();
 
-    delay->set_type(envoy::api::v2::filter::FaultDelay::FaultDelayType::FIXED);
+    delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
     delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
     delay->mutable_fixed_delay()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(json_fault->getInteger("duration_ms")));

@@ -79,7 +79,7 @@ public:
   void setupDelayFault(bool enable_fault) {
     envoy::api::v2::filter::FaultDelay fault{};
     fault.set_percent(50);
-    fault->mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
+    fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
     fault_config_.reset(new FaultConfig(fault));
 
