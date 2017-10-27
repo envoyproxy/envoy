@@ -17,6 +17,7 @@ to find out more about the origin story and design philosophy of Envoy.
 * [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart.
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture.
 * [Blog](https://medium.com/@mattklein123/the-universal-data-plane-api-d15cec7a) about universal data plane API.
+* [Blog](https://medium.com/@mattklein123/lyfts-envoy-dashboards-5c91738816b1) on Lyft's Envoy dashboards.
 
 ## Related
 
@@ -35,9 +36,11 @@ to find out more about the origin story and design philosophy of Envoy.
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go here: http://envoyslack.cncf.io (NOTE: Response to user
-  questions is best effort on Slack. For a "guaranteed" response please email envoy-users@ per the
-  guidance in the following linked thread.).
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](http://envoyslack.cncf.io). 
+  We have the IRC/XMPP gateways enabled if you prefer either of those. Once an account is created,
+  connection instructions for IRC/XMPP can be found [here](https://envoyproxy.slack.com/account/gateways).
+  * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email 
+    envoy-users@ per the guidance in the following linked thread.
 
 Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread 
 for information on email list usage.

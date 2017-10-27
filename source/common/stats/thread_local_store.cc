@@ -86,6 +86,16 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
+std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::vector<Tag>& tags) {
+  std::string tag_extracted_name = name;
+  if (tag_extractors_ != nullptr) {
+    for (const TagExtractorPtr& tag_extractor : *tag_extractors_) {
+      tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
+    }
+  }
+  return tag_extracted_name;
+}
+
 void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
@@ -134,7 +144,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
-    central_ref.reset(new CounterImpl(alloc.data_, alloc.free_));
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
+    central_ref.reset(
+        new CounterImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
   }
 
   // If we have a TLS location to store or allocation into, do it.
@@ -179,7 +192,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
-    central_ref.reset(new GaugeImpl(alloc.data_, alloc.free_));
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
+    central_ref.reset(
+        new GaugeImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
   }
 
   if (tls_ref) {
@@ -205,7 +221,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
   if (!central_ref) {
-    central_ref.reset(new HistogramImpl(final_name, parent_));
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
+    central_ref.reset(
+        new HistogramImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
   }
 
   if (tls_ref) {

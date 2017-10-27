@@ -13,6 +13,7 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -164,7 +165,8 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
-  ServerStats server_stats_;
+  std::vector<Stats::TagExtractorPtr> tag_extractors_;
+  std::unique_ptr<ServerStats> server_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

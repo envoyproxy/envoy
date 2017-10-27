@@ -179,6 +179,8 @@ protected:
   std::vector<std::string> named_ports_{{"http"}};
   // The ports from upstreams created in createUpstreams()
   std::vector<uint32_t> ports_;
+  // If true, use AutonomousUpstream for fake upstreams.
+  bool autonomous_upstream_{false};
 
 private:
   // The codec type for the client-to-Envoy connection

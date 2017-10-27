@@ -3,7 +3,7 @@
 Statistics
 ==========
 
-Every listener has a statistics tree rooted at *listener.<port>.* with the following statistics:
+Every listener has a statistics tree rooted at *listener.<address>.* with the following statistics:
 
 .. csv-table::
    :header: Name, Type, Description

@@ -55,6 +55,7 @@ envoy_cc_library(
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
+        ":subset_lb_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -258,6 +259,26 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
+        "//source/common/router:router_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "subset_lb_lib",
+    srcs = ["subset_lb.cc"],
+    hdrs = ["subset_lb.h"],
+    deps = [
+        ":load_balancer_lib",
+        ":ring_hash_lb_lib",
+        ":upstream_lib",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/upstream:load_balancer_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

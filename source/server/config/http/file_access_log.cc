@@ -9,7 +9,7 @@
 #include "common/http/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -17,7 +17,7 @@ namespace Configuration {
 
 Http::AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, Http::AccessLog::FilterPtr&& filter, FactoryContext& context) {
-  const auto& fal_config = dynamic_cast<const envoy::api::v2::filter::FileAccessLog&>(config);
+  const auto& fal_config = dynamic_cast<const envoy::api::v2::filter::http::FileAccessLog&>(config);
   Http::AccessLog::FormatterPtr formatter;
   if (fal_config.format().empty()) {
     formatter = Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
@@ -29,7 +29,7 @@ Http::AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::FileAccessLog()};
+  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::FileAccessLog()};
 }
 
 std::string FileAccessLogFactory::name() const { return Config::AccessLogNames::get().FILE; }

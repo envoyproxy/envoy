@@ -257,20 +257,22 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[2].size());
   EXPECT_EQ(6860994315024339285U, cluster_->info()->stats().version_.value());
 
-  // Now run through and make all the hosts healthy except for the first one.
+  // Now run through and make all the hosts healthy except for the first one. Because we are
+  // blocking HC updates, they should all still be unhealthy.
   for (size_t i = 1; i < cluster_->hosts().size(); i++) {
     cluster_->hosts()[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     health_checker->runCallbacks(cluster_->hosts()[i], true);
   }
 
-  EXPECT_EQ(12UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality().size());
-  EXPECT_EQ(3UL, cluster_->healthyHostsPerLocality()[0].size());
-  EXPECT_EQ(5UL, cluster_->healthyHostsPerLocality()[1].size());
-  EXPECT_EQ(4UL, cluster_->healthyHostsPerLocality()[2].size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[0].size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[1].size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerLocality()[2].size());
 
-  // Do the last one now which should fire the initialized event.
+  // Do the last one now which should fire the initialized event. It should also cause a healthy
+  // host recalculation and unblock health updates.
   EXPECT_CALL(membership_updated_, ready());
   cluster_->hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster_->hosts()[0], true);
