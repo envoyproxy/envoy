@@ -1,4 +1,4 @@
-##Issue Template
+**Issue Template**
 
 *Title*: *One line description*
 
@@ -12,7 +12,7 @@ would be used.
 
 
 
-##Bug Template
+**Bug Template**
 
 *Title*: *One line description*
 
