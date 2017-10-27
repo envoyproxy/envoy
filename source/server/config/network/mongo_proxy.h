@@ -16,9 +16,6 @@ namespace Configuration {
  * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
-  NetworkFilterFactoryCb
-  createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& mongo_proxy,
-                          FactoryContext& context);
 
 public:
   // NamedNetworkFilterConfigFactory
@@ -28,6 +25,11 @@ public:
                                                       FactoryContext& context) override;
 
   std::string name() override { return Config::NetworkFilterNames::get().MONGO_PROXY; }
+
+private:
+  NetworkFilterFactoryCb
+  createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& mongo_proxy,
+                          FactoryContext& context);
 };
 
 } // namespace Configuration

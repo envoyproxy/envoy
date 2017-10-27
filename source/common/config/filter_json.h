@@ -40,8 +40,7 @@ public:
       envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager);
 
   /**
-   * Translate a v1 JSON Mongo proxy object to v2
-   * envoy::api::v2::filter::network::MongoProxy.
+   * Translate a v1 JSON Mongo proxy object to v2 envoy::api::v2::filter::network::MongoProxy.
    * @param json_mongo_proxy source v1 JSON HTTP connection manager object.
    * @param mongo_proxy destination v2
    * envoy::api::v2::filter::network::MongoProxy.
