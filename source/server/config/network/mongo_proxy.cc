@@ -18,9 +18,7 @@ namespace Configuration {
 NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
     const envoy::api::v2::filter::network::MongoProxy& mongo_proxy, FactoryContext& context) {
 
-  if (mongo_proxy.stat_prefix().empty()) {
-    throw MissingFieldException("stat_prefix", mongo_proxy);
-  }
+  ASSERT(!mongo_proxy.stat_prefix().empty());
   std::string stat_prefix = "mongo." + mongo_proxy.stat_prefix() + ".";
 
   Mongo::AccessLogSharedPtr access_log;
@@ -31,10 +29,7 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
   Mongo::FaultConfigSharedPtr fault_config;
   if (mongo_proxy.has_delay()) {
     auto delay = mongo_proxy.delay();
-    if (!delay.has_fixed_delay()) {
-      throw MissingFieldException("delay.fixed_delay", mongo_proxy);
-    }
-
+    ASSERT(delay.has_fixed_delay());
     fault_config = std::make_shared<Mongo::FaultConfig>(mongo_proxy.delay());
   }
 

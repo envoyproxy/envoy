@@ -55,13 +55,6 @@ void handleInvalidConfiguration(const std::string& json_string) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
-void handleInvalidProto(const envoy::api::v2::filter::network::MongoProxy& config) {
-  NiceMock<MockFactoryContext> context;
-  MongoProxyFilterConfigFactory factory;
-
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), MissingFieldException);
-}
-
 TEST(MongoFilterConfigTest, InvalidExtraProperty) {
   std::string json_string = R"EOF(
   {
@@ -75,11 +68,6 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
 }
 
 TEST(MongoFilterConfigTest, EmptyConfig) { handleInvalidConfiguration("{}"); }
-
-TEST(MongoFilterConfigTest, EmptyProto) {
-  envoy::api::v2::filter::network::MongoProxy config{};
-  handleInvalidProto(config);
-}
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
   std::string json_string = R"EOF(
@@ -120,13 +108,6 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
   )EOF";
 
   handleInvalidConfiguration(json_string);
-}
-
-TEST(MongoFilterConfigTest, InvalidFaultsMissingDurationInProto) {
-  envoy::api::v2::filter::network::MongoProxy config{};
-  config.set_stat_prefix("my_stat_prefix");
-  config.mutable_delay()->set_percent(50);
-  handleInvalidProto(config);
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
