@@ -113,7 +113,7 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["envoy_api"],
-        commit = "b085af2c8485ba8525a128f466b1ec9ccf14574e",
+        commit = "6e3e1a784cc583f1fe1a7fd3ed109a8f54e0b1b4",
     )
 
     api_bind_targets = [
@@ -136,6 +136,7 @@ def envoy_api_deps(skip_targets):
             actual = "@envoy_api//api:" + t + "_cc",
         )
     filter_bind_targets = [
+        "accesslog",
         "fault",
     ]
     for t in filter_bind_targets:

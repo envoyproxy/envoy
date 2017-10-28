@@ -17,13 +17,13 @@ namespace Config {
 namespace {
 
 void translateComparisonFilter(const Json::Object& config,
-                               envoy::api::v2::filter::http::ComparisonFilter& filter) {
+                               envoy::api::v2::filter::ComparisonFilter& filter) {
   const std::string op = config.getString("op");
   if (op == ">=") {
-    filter.set_op(envoy::api::v2::filter::http::ComparisonFilter::GE);
+    filter.set_op(envoy::api::v2::filter::ComparisonFilter::GE);
   } else {
     ASSERT(op == "=");
-    filter.set_op(envoy::api::v2::filter::http::ComparisonFilter::EQ);
+    filter.set_op(envoy::api::v2::filter::ComparisonFilter::EQ);
   }
 
   auto* runtime = filter.mutable_value();
@@ -32,34 +32,33 @@ void translateComparisonFilter(const Json::Object& config,
 }
 
 void translateStatusCodeFilter(const Json::Object& config,
-                               envoy::api::v2::filter::http::StatusCodeFilter& filter) {
+                               envoy::api::v2::filter::StatusCodeFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateDurationFilter(const Json::Object& config,
-                             envoy::api::v2::filter::http::DurationFilter& filter) {
+                             envoy::api::v2::filter::DurationFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateRuntimeFilter(const Json::Object& config,
-                            envoy::api::v2::filter::http::RuntimeFilter& filter) {
+                            envoy::api::v2::filter::RuntimeFilter& filter) {
   filter.set_runtime_key(config.getString("key"));
 }
 
 void translateRepeatedFilter(
     const Json::Object& config,
-    Protobuf::RepeatedPtrField<envoy::api::v2::filter::http::AccessLogFilter>& filters) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLogFilter>& filters) {
   for (const auto& json_filter : config.getObjectArray("filters")) {
     FilterJson::translateAccessLogFilter(*json_filter, *filters.Add());
   }
 }
 
-void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::http::OrFilter& filter) {
+void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::OrFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
-void translateAndFilter(const Json::Object& config,
-                        envoy::api::v2::filter::http::AndFilter& filter) {
+void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
@@ -67,7 +66,7 @@ void translateAndFilter(const Json::Object& config,
 
 void FilterJson::translateAccessLogFilter(
     const Json::Object& json_access_log_filter,
-    envoy::api::v2::filter::http::AccessLogFilter& access_log_filter) {
+    envoy::api::v2::filter::AccessLogFilter& access_log_filter) {
   const std::string type = json_access_log_filter.getString("type");
   if (type == "status_code") {
     translateStatusCodeFilter(json_access_log_filter,
@@ -89,8 +88,8 @@ void FilterJson::translateAccessLogFilter(
 }
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
-                                    envoy::api::v2::filter::http::AccessLog& access_log) {
-  envoy::api::v2::filter::http::FileAccessLog file_access_log;
+                                    envoy::api::v2::filter::AccessLog& access_log) {
+  envoy::api::v2::filter::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);
