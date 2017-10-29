@@ -33,7 +33,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   cb(connection);
 }
 
-TEST(MongoFilterConfigTest, CorrectProtoConfigurationNoFaults) {
+TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
   envoy::api::v2::filter::network::MongoProxy config{};
 
   config.set_access_log("path/to/access/log");

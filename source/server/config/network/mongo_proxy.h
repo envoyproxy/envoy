@@ -16,7 +16,6 @@ namespace Configuration {
  * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
-
 public:
   // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,

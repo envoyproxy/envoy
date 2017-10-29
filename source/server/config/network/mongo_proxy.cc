@@ -6,7 +6,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
-#include "common/json/json_loader.h"
 #include "common/mongo/proxy.h"
 
 #include "api/filter/network/mongo_proxy.pb.h"
