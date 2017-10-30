@@ -26,6 +26,8 @@ public:
   MOCK_METHOD0(inc, void());
   MOCK_METHOD0(latch, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
+  MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD0(reset, void());
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
@@ -42,6 +44,8 @@ public:
   MOCK_METHOD0(dec, void());
   MOCK_METHOD0(inc, void());
   MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
+  MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD1(set, void(uint64_t value));
   MOCK_METHOD1(sub, void(uint64_t amount));
   MOCK_CONST_METHOD0(used, bool());
@@ -58,6 +62,9 @@ public:
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
   const std::string& name() const override { return name_; };
+
+  MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
+  MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD1(recordValue, void(uint64_t value));
 
   std::string name_;

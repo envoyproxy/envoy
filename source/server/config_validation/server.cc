@@ -2,6 +2,7 @@
 
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
+#include "common/config/utility.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
@@ -73,6 +74,9 @@ void ValidationInstance::initialize(Options& options,
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
     Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
+
+  tag_extractors_ = Config::Utility::createTagExtractors(bootstrap);
+
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_.reset(

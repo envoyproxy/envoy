@@ -4,6 +4,7 @@
 
 #include "common/http/header_map_impl.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -240,43 +241,37 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
   const uint32_t num_requests = 50;
   std::vector<Http::StreamEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
-  std::vector<FakeStreamPtr> upstream_requests;
+  std::vector<int> response_bytes;
+  autonomous_upstream_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
     responses.push_back(IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
-    encoders.push_back(
-        &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                             {":path", "/test/long/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"}},
-                                     *responses[i]));
+    response_bytes.push_back(rand.random() % (1024 * 2));
+    auto headers = Http::TestHeaderMapImpl{
+        {":method", "POST"},
+        {":path", "/test/long/url"},
+        {":scheme", "http"},
+        {":authority", "host"},
+        {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(response_bytes[i])},
+        {AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, std::to_string(request_bytes)}};
+    if (i % 2 == 0) {
+      headers.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
+    }
+    encoders.push_back(&codec_client_->startRequest(headers, *responses[i]));
     codec_client_->sendData(*encoders[i], request_bytes, true);
   }
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    // As data and streams are interwoven, make sure waitForNewStream()
-    // ignores incoming data and waits for actual stream establishment.
-    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(*dispatcher_, true));
-  }
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    upstream_requests[i]->waitForEndStream(*dispatcher_);
-    if (i % 2 == 0) {
-      upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-      upstream_requests[i]->encodeData(rand.random() % (1024 * 2), true);
-    } else {
-      upstream_requests[i]->encodeResetStream();
-    }
-  }
+
   for (uint32_t i = 0; i < num_requests; ++i) {
     responses[i]->waitForEndStream();
-    if (i % 2 == 0) {
-      EXPECT_TRUE(upstream_requests[i]->complete());
-      EXPECT_EQ(request_bytes, upstream_requests[i]->bodyLength());
-
+    if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
       EXPECT_STREQ("200", responses[i]->headers().Status()->value().c_str());
+      EXPECT_EQ(response_bytes[i], responses[i]->body().length());
+    } else {
+      // Upstream stream reset.
+      EXPECT_STREQ("503", responses[i]->headers().Status()->value().c_str());
     }
   }
 }

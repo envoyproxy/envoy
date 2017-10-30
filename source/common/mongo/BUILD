@@ -40,6 +40,7 @@ envoy_cc_library(
     name = "proxy_lib",
     srcs = ["proxy.cc"],
     hdrs = ["proxy.h"],
+    external_deps = ["envoy_filter_network_mongo_proxy"],
     deps = [
         ":codec_lib",
         ":utility_lib",
@@ -48,6 +49,7 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/mongo:codec_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
@@ -57,7 +59,9 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:singleton",
         "//source/common/common:utility_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/network:filter_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

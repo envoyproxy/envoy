@@ -224,6 +224,8 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
 }
 
 void ConnectionImpl::readDisable(bool disable) {
+  ASSERT(state() == State::Open);
+
   bool read_enabled = readEnabled();
   UNREFERENCED_PARAMETER(read_enabled);
   ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled, disable);
