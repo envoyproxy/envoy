@@ -206,7 +206,7 @@ TEST(UtilityTest, UnixClusterDns) {
   cluster_type = "strict_dns";
   std::string json = 
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
-      R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": ["url": "unix:///test.sock"]})EOF";
+      R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
   envoy::api::v2::Cluster cluster;
   envoy::api::v2::ConfigSource eds_config;
@@ -221,7 +221,7 @@ TEST(UtilityTest, UnixClusterStatic) {
   cluster_type = "static";
   std::string json = 
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
-      R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": ["url": "unix:///test.sock"]})EOF";
+      R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
   envoy::api::v2::Cluster cluster;
   envoy::api::v2::ConfigSource eds_config;
