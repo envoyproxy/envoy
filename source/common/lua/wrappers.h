@@ -15,14 +15,14 @@ public:
   BufferWrapper(const Buffer::Instance& data) : data_(data) {}
 
   static ExportedFunctions exportedFunctions() {
-    return {{"byteSize", static_luaByteSize}, {"getBytes", static_luaGetBytes}};
+    return {{"length", static_luaLength}, {"getBytes", static_luaGetBytes}};
   }
 
 private:
   /**
    * @return int the size in bytes of the buffer.
    */
-  DECLARE_LUA_FUNCTION(BufferWrapper, luaByteSize);
+  DECLARE_LUA_FUNCTION(BufferWrapper, luaLength);
 
   /**
    * Get bytes out of a buffer for inspection in Lua.

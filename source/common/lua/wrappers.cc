@@ -3,14 +3,14 @@
 namespace Envoy {
 namespace Lua {
 
-int BufferWrapper::luaByteSize(lua_State* state) {
+int BufferWrapper::luaLength(lua_State* state) {
   lua_pushnumber(state, data_.length());
   return 1;
 }
 
 int BufferWrapper::luaGetBytes(lua_State* state) {
-  int index = luaL_checkint(state, 2);
-  int length = luaL_checkint(state, 3);
+  const int index = luaL_checkint(state, 2);
+  const int length = luaL_checkint(state, 3);
   if (index < 0 || length < 0 ||
       static_cast<uint64_t>(index) + static_cast<uint64_t>(length) > data_.length()) {
     luaL_error(state, "index/length must be >= 0 and (index + length) must be <= buffer size");

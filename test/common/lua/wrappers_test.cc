@@ -13,7 +13,11 @@ class LuaBufferWrapperTest : public LuaWrappersTestBase<BufferWrapper> {};
 TEST_F(LuaBufferWrapperTest, Methods) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
+<<<<<<< HEAD
       testPrint(object:byteSize())
+=======
+      testPrint(object:length())
+>>>>>>> master
       testPrint(object:getBytes(0, 2))
       testPrint(object:getBytes(6, 5))
     end

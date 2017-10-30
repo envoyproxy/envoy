@@ -60,6 +60,8 @@ int HeaderMapWrapper::luaPairs(lua_State* state) {
   // are potentially better ways of handling this but due to GC of the iterator it's very
   // difficult to control safety without tracking every allocated iterator and invalidating them
   // if the map is modified.
+  // TODO(mattklein123): Handle explicit iterator invalidation. We should allowing calling code to
+  // to destroy the iterator if it should not be used again.
   iterating_ = true;
   HeaderMapIterator::create(state, *this);
   lua_pushcclosure(state, HeaderMapIterator::static_luaPairsIterator, 1);
