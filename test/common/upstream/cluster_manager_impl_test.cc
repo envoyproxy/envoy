@@ -294,6 +294,57 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
       "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'");
 }
 
+TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
+    }]
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
+      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
+  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->add_subset_selectors()->add_keys("x");
+
+  create(bootstrap);
+
+  EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+
+  factory_.tls_.shutdownThread();
+}
+
+TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "original_dst",
+      "lb_type": "original_dst_lb"
+    }]
+  }
+  )EOF";
+
+  envoy::api::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
+      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
+  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->add_subset_selectors()->add_keys("x");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      create(bootstrap), EnvoyException,
+      "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
+}
+
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string json = R"EOF(
   {

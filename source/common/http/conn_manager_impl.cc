@@ -369,9 +369,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 
   if (request_info_.healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
-  } else {
-    Tracing::HttpConnManFinalizerImpl finalizer(request_headers_.get(), request_info_, *this);
-    active_span_->finishSpan(finalizer);
+  } else if (active_span_) {
+    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), request_info_,
+                                             *this);
   }
 
   ASSERT(state_.filter_call_state_ == 0);
@@ -676,11 +676,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
-      (state_.filter_call_state_ & FilterCallState::DecodeHeaders)) {
+      (state_.filter_call_state_ & FilterCallState::DecodeHeaders) ||
+      (state_.filter_call_state_ & FilterCallState::DecodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.decoder_filters_streaming_ = streaming;
-    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
-    // processing happens in the decodeHeaders() callback if necessary.
+    // If no call is happening or we are in the decode headers/data callback, buffer the data.
+    // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -850,11 +851,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
-      (state_.filter_call_state_ & FilterCallState::EncodeHeaders)) {
+      (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
+      (state_.filter_call_state_ & FilterCallState::EncodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
-    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
-    // processing happens in the decodeHeaders() callback if necessary.
+    // If no call is happening or we are in the decode headers/data callback, buffer the data.
+    // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -1095,7 +1097,11 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
 }
 
 Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
-  return *parent_.active_span_;
+  if (parent_.active_span_) {
+    return *parent_.active_span_;
+  } else {
+    return Tracing::NullSpan::instance();
+  }
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {

@@ -3,17 +3,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/tracing/context.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Tracing {
-
-inline bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
-  return lhs.request_id_ == rhs.request_id_ && lhs.span_context_ == rhs.span_context_;
-}
 
 class MockConfig : public Config {
 public:
@@ -34,7 +29,7 @@ public:
 
   MOCK_METHOD1(setOperation, void(const std::string& operation));
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
-  MOCK_METHOD1(finishSpan, void(SpanFinalizer& finalizer));
+  MOCK_METHOD0(finishSpan, void());
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
@@ -44,14 +39,6 @@ public:
 
   MOCK_METHOD3(spawnChild_,
                Span*(const Config& config, const std::string& name, SystemTime start_time));
-};
-
-class MockFinalizer : public SpanFinalizer {
-public:
-  MockFinalizer();
-  ~MockFinalizer();
-
-  MOCK_METHOD1(finalize, void(Span& span));
 };
 
 class MockHttpTracer : public HttpTracer {

@@ -87,7 +87,10 @@ envoy_cc_library(
     name = "filter_json_lib",
     srcs = ["filter_json.cc"],
     hdrs = ["filter_json.h"],
-    external_deps = ["envoy_filter_http_connection_manager"],
+    external_deps = [
+        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_mongo_proxy",
+    ],
     deps = [
         ":json_utility_lib",
         ":protocol_json_lib",
@@ -274,11 +277,12 @@ envoy_cc_library(
         "envoy_eds",
         "envoy_lds",
         "envoy_rds",
-        "envoy_filter_http_connection_manager",
+        "envoy_filter_http_http_connection_manager",
     ],
     deps = [
         ":json_utility_lib",
         ":resources_lib",
+        ":well_known_names",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -298,6 +302,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "well_known_names",
+    srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
     deps = ["//source/common/common:singleton"],
 )

@@ -11,7 +11,7 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Http {

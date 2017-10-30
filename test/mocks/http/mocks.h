@@ -284,6 +284,7 @@ public:
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
+  testing::NiceMock<Tracing::MockSpan> active_span_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,
@@ -313,6 +314,7 @@ public:
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 
   Buffer::InstancePtr buffer_;
+  testing::NiceMock<Tracing::MockSpan> active_span_;
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {
@@ -389,8 +391,9 @@ public:
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout));
 
-  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
-                              const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks,
+                              const Optional<std::chrono::milliseconds>& timeout,
+                              bool buffer_body_for_retry));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 

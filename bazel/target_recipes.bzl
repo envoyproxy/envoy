@@ -12,6 +12,7 @@ TARGET_RECIPES = {
     "googletest": "googletest",
     "tcmalloc_and_profiler": "gperftools",
     "http_parser": "http-parser",
+    "luajit": "luajit",
     "nghttp2": "nghttp2",
     "rapidjson": "rapidjson",
     "ssl": "boringssl",

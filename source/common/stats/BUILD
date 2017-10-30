@@ -12,12 +12,16 @@ envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
+    external_deps = ["envoy_bootstrap"],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:singleton",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/protobuf",
     ],
 )
 

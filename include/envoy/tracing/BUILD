@@ -9,11 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "context_interface",
-    hdrs = ["context.h"],
-)
-
-envoy_cc_library(
     name = "http_tracer_interface",
     hdrs = ["http_tracer.h"],
     deps = [
