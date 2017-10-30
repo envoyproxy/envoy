@@ -213,5 +213,21 @@ void FilterJson::translateHttpConnectionManager(
   }
 }
 
+void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
+                                     envoy::api::v2::filter::network::MongoProxy& mongo_proxy) {
+  json_mongo_proxy.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, stat_prefix);
+  JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, access_log);
+  if (json_mongo_proxy.hasObject("fault")) {
+    const auto json_fault = json_mongo_proxy.getObject("fault")->getObject("fixed_delay");
+    auto* delay = mongo_proxy.mutable_delay();
+
+    delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
+    delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
+  }
+}
+
 } // namespace Config
 } // namespace Envoy
