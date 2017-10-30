@@ -127,6 +127,27 @@ TEST_P(SslConnectionImplTest, GetCertDigest) {
            true, GetParam());
 }
 
+TEST_P(SslConnectionImplTest, GetCertDigestServerCertWithoutCommonName) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_only_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json,
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "ssl.handshake",
+           true, GetParam());
+}
+
 TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
   std::string client_ctx_json = R"EOF(
   {
