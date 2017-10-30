@@ -34,9 +34,9 @@ const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
-  if (url.find(TCP_SCHEME) == 0) {
+  if (urlIsTcpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
-  } else if (url.find(UNIX_SCHEME) == 0) {
+  } else if (urlIsUnixScheme(url)) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
@@ -44,9 +44,17 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
+bool Utility::urlIsTcpScheme(const std::string& url) {
+  return url.find(TCP_SCHEME) == 0;
+}
+
+bool Utility::urlIsUnixScheme(const std::string& url) {
+  return url.find(UNIX_SCHEME) == 0;
+}
+
 std::string Utility::hostFromTcpUrl(const std::string& url) {
-  if (url.find(TCP_SCHEME) != 0) {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
+  if (!urlIsTcpScheme(url)) {
+    throw EnvoyException(fmt::format("expected TCP scheme, got: {}", url));
   }
 
   size_t colon_index = url.find(':', TCP_SCHEME.size());
@@ -59,8 +67,8 @@ std::string Utility::hostFromTcpUrl(const std::string& url) {
 }
 
 uint32_t Utility::portFromTcpUrl(const std::string& url) {
-  if (url.find(TCP_SCHEME) != 0) {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
+  if (!urlIsTcpScheme(url)) {
+    throw EnvoyException(fmt::format("expected TCP scheme, got: {}", url));
   }
 
   size_t colon_index = url.find(':', TCP_SCHEME.size());
