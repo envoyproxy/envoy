@@ -83,7 +83,7 @@ public:
       request_handle:logTrace(request_handle:headers():get(":path"))
 
       for chunk in request_handle:bodyChunks() do
-        request_handle:logTrace(chunk:byteSize())
+        request_handle:logTrace(chunk:length())
       end
 
       request_handle:logTrace("done")
@@ -95,7 +95,7 @@ public:
       request_handle:logTrace(request_handle:headers():get(":path"))
 
       for chunk in request_handle:bodyChunks() do
-        request_handle:logTrace(chunk:byteSize())
+        request_handle:logTrace(chunk:length())
       end
 
       local trailers = request_handle:trailers()
@@ -124,7 +124,7 @@ public:
       request_handle:logTrace(request_handle:headers():get(":path"))
 
       if request_handle:body() ~= nil then
-        request_handle:logTrace(request_handle:body():byteSize())
+        request_handle:logTrace(request_handle:body():length())
       else
         request_handle:logTrace("no body")
       end
@@ -136,7 +136,7 @@ public:
       request_handle:logTrace(request_handle:headers():get(":path"))
 
       if request_handle:body() ~= nil then
-        request_handle:logTrace(request_handle:body():byteSize())
+        request_handle:logTrace(request_handle:body():length())
       else
         request_handle:logTrace("no body")
       end
@@ -451,7 +451,7 @@ TEST_F(LuaHttpFilterTest, BodyChunkOutsideOfLoop) {
         if previous_chunk == nil then
           previous_chunk = chunk
         else
-          previous_chunk:byteSize()
+          previous_chunk:length()
         end
       end
     end
@@ -588,7 +588,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
       request_handle:logTrace(request_handle:headers():get(":path"))
 
       for chunk in request_handle:bodyChunks() do
-        request_handle:logTrace(chunk:byteSize())
+        request_handle:logTrace(chunk:length())
       end
 
       request_handle:logTrace(request_handle:trailers():get("foo"))
@@ -598,7 +598,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
       response_handle:logTrace(response_handle:headers():get(":status"))
 
       for chunk in response_handle:bodyChunks() do
-        response_handle:logTrace(chunk:byteSize())
+        response_handle:logTrace(chunk:length())
       end
 
       response_handle:logTrace(response_handle:trailers():get("hello"))
@@ -638,7 +638,7 @@ TEST_F(LuaHttpFilterTest, ResponseBlockingBody) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
       response_handle:logTrace(response_handle:headers():get(":status"))
-      response_handle:logTrace(response_handle:body():byteSize())
+      response_handle:logTrace(response_handle:body():length())
       if response_handle:trailers() == nil then
         response_handle:logTrace("no trailers")
       end
