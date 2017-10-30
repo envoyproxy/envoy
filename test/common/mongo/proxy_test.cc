@@ -15,6 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
 
+#include "api/filter/fault.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -76,17 +77,11 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    const std::string json_config = R"EOF(
-    {
-      "fixed_delay": {
-        "percent": 50,
-        "duration_ms": 10
-      }
-    }
-    )EOF";
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json_config);
+    envoy::api::v2::filter::FaultDelay fault{};
+    fault.set_percent(50);
+    fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
-    fault_config_.reset(new FaultConfig(*config));
+    fault_config_.reset(new FaultConfig(fault));
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _)).Times(AnyNumber());
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50))
