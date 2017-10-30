@@ -71,7 +71,8 @@ public:
   }
 
   void initializeFilter() {
-    filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_));
+    filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_,
+                                      drain_decision_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
   }
@@ -103,6 +104,7 @@ public:
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
+  NiceMock<Network::MockDrainDecision> drain_decision_;
 };
 
 TEST_F(MongoProxyFilterTest, DelayFaults) {
@@ -397,7 +399,7 @@ TEST_F(MongoProxyFilterTest, DecodeError) {
   EXPECT_EQ(1U, store_.counter("test.decoding_error").value());
 }
 
-TEST_F(MongoProxyFilterTest, ConcurrentQuery) {
+TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
   initializeFilter();
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -416,6 +418,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQuery) {
   filter_->onData(fake_data_);
   EXPECT_EQ(2U, store_.gauge("test.op_query_active").value());
 
+  Event::MockTimer* drain_timer = nullptr;
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 1));
     message->flags(0b11);
@@ -427,10 +430,19 @@ TEST_F(MongoProxyFilterTest, ConcurrentQuery) {
     message->flags(0b11);
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
+    EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
+    drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0)));
     filter_->callbacks_->decodeReply(std::move(message));
   }));
   filter_->onWrite(fake_data_);
+
+  EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->callback_();
+
   EXPECT_EQ(0U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
 }
 
 TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
