@@ -28,6 +28,8 @@ TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
   testRouterNotFoundWithBody();
 }
 
+TEST_P(Http2IntegrationTest, RouterUnknownCluster) { testRouterUnknownCluster(); }
+
 TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
 TEST_P(Http2IntegrationTest, ValidZeroLengthContent) { testValidZeroLengthContent(); }

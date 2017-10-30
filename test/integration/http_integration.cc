@@ -326,9 +326,22 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
+// Add a route that uses unknown cluster.
+void HttpIntegrationTest::testRouterUnknownCluster() {
+  config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
+                          envoy::api::v2::VirtualHost::NONE);
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+}
+
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 void HttpIntegrationTest::testRouterRedirect() {
-  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", envoy::api::v2::VirtualHost::ALL);
+  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
+                          envoy::api::v2::VirtualHost::ALL);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -790,7 +803,8 @@ void HttpIntegrationTest::testNoHost() {
 void HttpIntegrationTest::testAbsolutePath() {
   // Configure www.redirect.com to send a redirect, and ensure the redirect is
   // encountered via absolute URL.
-  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", envoy::api::v2::VirtualHost::ALL);
+  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
+                          envoy::api::v2::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
 
   initialize();
@@ -811,7 +825,7 @@ void HttpIntegrationTest::testAbsolutePath() {
 void HttpIntegrationTest::testAbsolutePathWithPort() {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
-  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0",
+  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
                           envoy::api::v2::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
@@ -833,7 +847,7 @@ void HttpIntegrationTest::testAbsolutePathWithoutPort() {
   // Add a restrictive default match, to avoid the request hitting the * / catchall.
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   // Set a matcher for namewithport:1234 and verify http://namewithport does not match
-  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0",
+  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
                           envoy::api::v2::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();

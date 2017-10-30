@@ -51,6 +51,7 @@ public:
   // Add an additional route to the configuration.
   void addRoute(
       const std::string& host, const std::string& route, const std::string& cluster,
+      bool validate_clusters,
       envoy::api::v2::VirtualHost::TlsRequirementType type = envoy::api::v2::VirtualHost::NONE);
 
   // Add an HTTP filter prior to existing filters.

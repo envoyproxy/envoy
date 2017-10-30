@@ -26,6 +26,8 @@ TEST_P(IntegrationTest, RouterNotFoundBodyBuffer) {
   testRouterNotFoundWithBody();
 }
 
+TEST_P(IntegrationTest, RouterUnknownCluster) { testRouterUnknownCluster(); }
+
 TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
 TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
