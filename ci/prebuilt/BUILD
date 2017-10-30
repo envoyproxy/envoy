@@ -60,7 +60,8 @@ cc_library(
     srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
     hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
     includes = ["thirdparty_build/include"],
-    strip_include_prefix = "thirdparty_build/include/luajit-2.0/",
+    # TODO(mattklein123): We should strip luajit-2.0 here for consumers. However, if we do that
+    # the headers get included using -I vs. -isystem which then causes old-style-cast warnings.
 )
 
 cc_library(
