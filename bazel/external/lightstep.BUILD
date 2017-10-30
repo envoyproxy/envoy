@@ -17,7 +17,7 @@ cc_library(
     hdrs = [":" + hdr for hdr in _PREFIX_HDRS],
     includes = ["_prefix/include"],
     visibility = ["//visibility:public"],
-    deps = ["@protobuf_bzl//:protobuf"],
+    deps = ["@com_google_protobuf//:protobuf"],
 )
 
 genrule_environment(
@@ -29,7 +29,7 @@ genrule_environment(
 # file outputs.
 genrule_cc_deps(
     name = "protobuf_deps",
-    deps = ["@protobuf_bzl//:protobuf"],
+    deps = ["@com_google_protobuf//:protobuf"],
 )
 
 genrule(
@@ -37,7 +37,7 @@ genrule(
     srcs = glob(["**"]) + [
         ":lightstep_compiler_flags",
         ":protobuf_deps",
-        "@protobuf_bzl//:well_known_protos",
+        "@com_google_protobuf//:well_known_protos",
         "@local_config_cc//:toolchain",
     ],
     outs = _PREFIX_HDRS + [
@@ -45,6 +45,6 @@ genrule(
     ],
     cmd = genrule_cmd("@envoy//bazel/external:lightstep.genrule_cmd"),
     tools = [
-        "@protobuf_bzl//:protoc",
+        "@com_google_protobuf//:protoc",
     ],
 )

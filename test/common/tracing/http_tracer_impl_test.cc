@@ -257,10 +257,9 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   EXPECT_CALL(*span, setTag("http.url", path_prefix + expected_path));
   EXPECT_CALL(*span, setTag("http.method", "GET"));
   EXPECT_CALL(*span, setTag("http.protocol", "HTTP/2"));
-  NiceMock<MockConfig> config;
 
-  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
-  finalizer.finalize(*span);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, &request_headers, request_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
@@ -279,10 +278,9 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(*span, setTag("response_flags", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
-  NiceMock<MockConfig> config;
 
-  HttpConnManFinalizerImpl finalizer(nullptr, request_info, config);
-  finalizer.finalize(*span);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, nullptr, request_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
@@ -302,10 +300,9 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   EXPECT_CALL(*span, setTag("response_size", "11"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
-  NiceMock<MockConfig> config;
 
-  HttpConnManFinalizerImpl finalizer(nullptr, request_info, config);
-  finalizer.finalize(*span);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, nullptr, request_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
@@ -343,9 +340,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
 
   NiceMock<MockConfig> config;
-
-  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
-  finalizer.finalize(*span);
+  HttpTracerUtility::finalizeSpan(*span, &request_headers, request_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
@@ -401,8 +396,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
   EXPECT_CALL(*span, setTag("upstream_cluster", _)).Times(0);
 
-  HttpConnManFinalizerImpl finalizer(&request_headers, request_info, config);
-  finalizer.finalize(*span);
+  HttpTracerUtility::finalizeSpan(*span, &request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {

@@ -18,7 +18,7 @@
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
 
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 #include "api/rds.pb.h"
 
 namespace Envoy {
@@ -34,9 +34,10 @@ public:
    *         configuration.
    */
   static RouteConfigProviderSharedPtr
-  create(const envoy::api::v2::filter::HttpConnectionManager& config, Runtime::Loader& runtime,
-         Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
-         Init::Manager& init_manager, RouteConfigProviderManager& route_config_provider_manager);
+  create(const envoy::api::v2::filter::http::HttpConnectionManager& config,
+         Runtime::Loader& runtime, Upstream::ClusterManager& cm, Stats::Scope& scope,
+         const std::string& stat_prefix, Init::Manager& init_manager,
+         RouteConfigProviderManager& route_config_provider_manager);
 };
 
 /**
@@ -114,7 +115,7 @@ private:
     ConfigConstSharedPtr config_;
   };
 
-  RdsRouteConfigProviderImpl(const envoy::api::v2::filter::Rds& rds,
+  RdsRouteConfigProviderImpl(const envoy::api::v2::filter::http::Rds& rds,
                              const std::string& manager_identifier, Runtime::Loader& runtime,
                              Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
@@ -155,7 +156,7 @@ public:
   // ServerRouteConfigProviderManager
   std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr getRouteConfigProvider(const envoy::api::v2::filter::Rds& rds,
+  RouteConfigProviderSharedPtr getRouteConfigProvider(const envoy::api::v2::filter::http::Rds& rds,
                                                       Upstream::ClusterManager& cm,
                                                       Stats::Scope& scope,
                                                       const std::string& stat_prefix,

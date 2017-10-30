@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <unordered_set>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
@@ -18,6 +19,7 @@
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
+#include "common/config/utility.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
@@ -25,6 +27,7 @@
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
+#include "common/stats/thread_local_store.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -42,11 +45,9 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory, ThreadLocal::Instance& tls)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_),
-      stats_store_(store), server_stats_{ALL_SERVER_STATS(
-                               POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
-      dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
+      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
+      api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
+      singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
@@ -62,17 +63,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       }
     }
 
-    failHealthcheck(false);
-
-    uint64_t version_int;
-    if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
-    }
-    server_stats_.version_.set(version_int);
-
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
@@ -103,7 +95,7 @@ void InstanceImpl::drainListeners() {
 
 void InstanceImpl::failHealthcheck(bool fail) {
   // We keep liveness state in shared memory so the parent process sees the same state.
-  server_stats_.live_.set(!fail);
+  server_stats_->live_.set(!fail);
 }
 
 void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
@@ -138,13 +130,13 @@ void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
   HotRestart::GetParentStatsInfo info;
   restarter_.getParentStats(info);
-  server_stats_.uptime_.set(time(nullptr) - original_start_time_);
-  server_stats_.memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                      info.memory_allocated_);
-  server_stats_.memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-  server_stats_.parent_connections_.set(info.num_connections_);
-  server_stats_.total_connections_.set(numConnections() + info.num_connections_);
-  server_stats_.days_until_first_cert_expiring_.set(
+  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+  server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
+                                       info.memory_allocated_);
+  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->parent_connections_.set(info.num_connections_);
+  server_stats_->total_connections_.set(numConnections() + info.num_connections_);
+  server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
   InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
@@ -156,7 +148,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
   info.num_connections_ = numConnections();
 }
 
-bool InstanceImpl::healthCheckFailed() { return server_stats_.live_.value() == 0; }
+bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
 void InstanceImpl::initialize(Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
@@ -176,6 +168,23 @@ void InstanceImpl::initialize(Options& options,
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
     Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
   }
+
+  // Needs to happen as early as possible in the instantiation to preempt the objects that require
+  // stats.
+  tag_extractors_ = Config::Utility::createTagExtractors(bootstrap);
+  stats_store_.setTagExtractors(tag_extractors_);
+
+  server_stats_.reset(
+      new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+
+  failHealthcheck(false);
+
+  uint64_t version_int;
+  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+  }
+
+  server_stats_->version_.set(version_int);
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_.reset(

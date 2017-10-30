@@ -19,7 +19,7 @@
 #include "api/base.pb.h"
 #include "api/cds.pb.h"
 #include "api/eds.pb.h"
-#include "api/filter/http_connection_manager.pb.h"
+#include "api/filter/http/http_connection_manager.pb.h"
 #include "api/lds.pb.h"
 #include "api/rds.pb.h"
 
@@ -134,11 +134,12 @@ public:
                                  envoy::api::v2::ConfigSource& cds_config);
 
   /**
-   * Convert a v1 RDS JSON config to v2 RDS envoy::api::v2::filter::Rds.
+   * Convert a v1 RDS JSON config to v2 RDS envoy::api::v2::filter::http::Rds.
    * @param json_rds source v1 RDS JSON config.
-   * @param rds destination v2 RDS envoy::api::v2::filter::Rds.
+   * @param rds destination v2 RDS envoy::api::v2::filter::http::Rds.
    */
-  static void translateRdsConfig(const Json::Object& json_rds, envoy::api::v2::filter::Rds& rds);
+  static void translateRdsConfig(const Json::Object& json_rds,
+                                 envoy::api::v2::filter::http::Rds& rds);
 
   /**
    * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::ConfigSource.
@@ -212,6 +213,15 @@ public:
    * @return std::string resource name.
    */
   static std::string resourceName(const ProtobufWkt::Any& resource);
+
+  /**
+   * Creates the set of stats tag extractors requested by the config and transfers ownership to the
+   * caller.
+   * @param bootstrap bootstrap proto.
+   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
+   */
+  static std::vector<Stats::TagExtractorPtr>
+  createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

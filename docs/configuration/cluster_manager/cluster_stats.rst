@@ -175,3 +175,19 @@ the following statistics:
   lb_zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
   lb_zone_number_differs, Counter, Number of zones in local and upstream cluster different
+
+Load balancer subset statistics
+-------------------------------
+
+Statistics for monitoring `load balancer subset <arch_overview_load_balancer_subsets>`
+decisions. Stats are rooted at *cluster.<name>.* and contain the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  lb_subsets_active, Gauge, Number of currently available subsets.
+  lb_subsets_created, Counter, Number of subsets created.
+  lb_subsets_removed, Counter, Number of subsets removed due to no hosts.
+  lb_subsets_selected, Counter, Number of times any subset was selected for load balancing.
+  lb_subsets_fallback, Counter, Number of times the fallback policy was invoked.

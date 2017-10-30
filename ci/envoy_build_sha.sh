@@ -1,3 +1,2 @@
-# If you edit the SHA here you must also edit the SHA in .circleci/config.yml.
-
-ENVOY_BUILD_SHA=44d539cb572d04c81b62425373440c54934cf267
+ENVOY_BUILD_SHA=$(grep lyft/envoy-build .circleci/config.yml | sed -e 's#.*lyft/envoy-build:\(.*\)#\1#' | uniq)
+[[ $(wc -l <<< "${ENVOY_BUILD_SHA}" | awk '{$1=$1};1') == 1 ]] || (echo ".circleci/config.yml hashes are inconsistent!" && exit 1)

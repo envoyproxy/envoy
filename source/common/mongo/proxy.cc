@@ -38,9 +38,11 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         const FaultConfigSharedPtr& fault_config)
+                         const FaultConfigSharedPtr& fault_config,
+                         const Network::DrainDecision& drain_decision)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
-      runtime_(runtime), access_log_(access_log), fault_config_(fault_config) {
+      runtime_(runtime), drain_decision_(drain_decision), access_log_(access_log),
+      fault_config_(fault_config) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -182,6 +184,28 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     active_query_list_.erase(i);
     break;
   }
+
+  if (active_query_list_.empty() && drain_decision_.drainClose()) {
+    ENVOY_LOG(debug, "drain closing mongo connection");
+    stats_.cx_drain_close_.inc();
+
+    // We are currently in the write path, so we need to let the write flush out before we close.
+    // We do this by creating a timer and firing it with a zero timeout. This will cause it to run
+    // in the next event loop iteration. This is really a hack. A better solution would be to
+    // introduce the concept of a write complete callback so we can get notified when the write goes
+    // out (e.g., flow control, further filters, etc.). This is a much larger project so we can
+    // start with this since it will get the job done.
+    // TODO(mattklein123): Investigate a better solution for write complete callbacks.
+    if (drain_close_timer_ == nullptr) {
+      drain_close_timer_ =
+          read_callbacks_->connection().dispatcher().createTimer([this] { onDrainClose(); });
+      drain_close_timer_->enableTimer(std::chrono::milliseconds(0));
+    }
+  }
+}
+
+void ProxyFilter::onDrainClose() {
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string& prefix,
@@ -235,6 +259,11 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
     if (delay_timer_) {
       delay_timer_->disableTimer();
       delay_timer_.reset();
+    }
+
+    if (drain_close_timer_) {
+      drain_close_timer_->disableTimer();
+      drain_close_timer_.reset();
     }
   }
 
