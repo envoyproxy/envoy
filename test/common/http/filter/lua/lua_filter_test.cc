@@ -581,6 +581,29 @@ TEST_F(LuaHttpFilterTest, ErrorDuringCallback) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Use of header iterator across yield.
+TEST_F(LuaHttpFilterTest, HeadersIteratorAcrossYield) {
+  const std::string SCRIPT(R"EOF(
+    function envoy_on_request(request_handle)
+      local headers_it = pairs(request_handle:headers())
+      request_handle:body()
+      headers_it()
+    end
+  )EOF");
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err,
+                        StrEq("[string \"...\"]:5: object used outside of proper scope")));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+}
+
 // Combo request and response script.
 TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   const std::string SCRIPT{R"EOF(

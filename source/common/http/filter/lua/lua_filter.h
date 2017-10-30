@@ -143,15 +143,11 @@ private:
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
-    headers_wrapper_.markDead();
-    body_wrapper_.markDead();
-    trailers_wrapper_.markDead();
-  }
-
-  void onMarkLive() override {
-    headers_wrapper_.markLive();
-    body_wrapper_.markLive();
-    trailers_wrapper_.markLive();
+    // Headers/body/trailers wrappers do not survive any yields. The user can request them
+    // again across yields if needed.
+    headers_wrapper_.reset();
+    body_wrapper_.reset();
+    trailers_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks

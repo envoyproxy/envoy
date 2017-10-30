@@ -63,11 +63,13 @@ config:
         request_handle:logErr("log test")
         request_handle:logCritical("log test")
 
-        request_handle:headers():add("request_body_size", request_handle:body():length())
+        local body_length = request_handle:body():length()
+        request_handle:headers():add("request_body_size", body_length)
       end
 
       function envoy_on_response(response_handle)
-        response_handle:headers():add("response_body_size", response_handle:body():length())
+        local body_length = response_handle:body():length()
+        response_handle:headers():add("response_body_size", body_length)
         response_handle:headers():remove("foo")
       end
 )EOF";
