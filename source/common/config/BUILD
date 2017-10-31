@@ -89,6 +89,7 @@ envoy_cc_library(
     hdrs = ["filter_json.h"],
     external_deps = [
         "envoy_filter_http_http_connection_manager",
+        "envoy_filter_http_fault",
         "envoy_filter_network_mongo_proxy",
     ],
     deps = [
