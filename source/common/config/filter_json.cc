@@ -17,13 +17,13 @@ namespace Config {
 namespace {
 
 void translateComparisonFilter(const Json::Object& config,
-                               envoy::api::v2::filter::http::ComparisonFilter& filter) {
+                               envoy::api::v2::filter::ComparisonFilter& filter) {
   const std::string op = config.getString("op");
   if (op == ">=") {
-    filter.set_op(envoy::api::v2::filter::http::ComparisonFilter::GE);
+    filter.set_op(envoy::api::v2::filter::ComparisonFilter::GE);
   } else {
     ASSERT(op == "=");
-    filter.set_op(envoy::api::v2::filter::http::ComparisonFilter::EQ);
+    filter.set_op(envoy::api::v2::filter::ComparisonFilter::EQ);
   }
 
   auto* runtime = filter.mutable_value();
@@ -32,34 +32,33 @@ void translateComparisonFilter(const Json::Object& config,
 }
 
 void translateStatusCodeFilter(const Json::Object& config,
-                               envoy::api::v2::filter::http::StatusCodeFilter& filter) {
+                               envoy::api::v2::filter::StatusCodeFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateDurationFilter(const Json::Object& config,
-                             envoy::api::v2::filter::http::DurationFilter& filter) {
+                             envoy::api::v2::filter::DurationFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateRuntimeFilter(const Json::Object& config,
-                            envoy::api::v2::filter::http::RuntimeFilter& filter) {
+                            envoy::api::v2::filter::RuntimeFilter& filter) {
   filter.set_runtime_key(config.getString("key"));
 }
 
 void translateRepeatedFilter(
     const Json::Object& config,
-    Protobuf::RepeatedPtrField<envoy::api::v2::filter::http::AccessLogFilter>& filters) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLogFilter>& filters) {
   for (const auto& json_filter : config.getObjectArray("filters")) {
     FilterJson::translateAccessLogFilter(*json_filter, *filters.Add());
   }
 }
 
-void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::http::OrFilter& filter) {
+void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::OrFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
-void translateAndFilter(const Json::Object& config,
-                        envoy::api::v2::filter::http::AndFilter& filter) {
+void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
@@ -67,7 +66,7 @@ void translateAndFilter(const Json::Object& config,
 
 void FilterJson::translateAccessLogFilter(
     const Json::Object& json_access_log_filter,
-    envoy::api::v2::filter::http::AccessLogFilter& access_log_filter) {
+    envoy::api::v2::filter::AccessLogFilter& access_log_filter) {
   const std::string type = json_access_log_filter.getString("type");
   if (type == "status_code") {
     translateStatusCodeFilter(json_access_log_filter,
@@ -89,8 +88,8 @@ void FilterJson::translateAccessLogFilter(
 }
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
-                                    envoy::api::v2::filter::http::AccessLog& access_log) {
-  envoy::api::v2::filter::http::FileAccessLog file_access_log;
+                                    envoy::api::v2::filter::AccessLog& access_log) {
+  envoy::api::v2::filter::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);
@@ -211,6 +210,22 @@ void FilterJson::translateHttpConnectionManager(
       http_connection_manager.mutable_set_current_client_cert_details()->mutable_san()->set_value(
           true);
     }
+  }
+}
+
+void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
+                                     envoy::api::v2::filter::network::MongoProxy& mongo_proxy) {
+  json_mongo_proxy.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, stat_prefix);
+  JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, access_log);
+  if (json_mongo_proxy.hasObject("fault")) {
+    const auto json_fault = json_mongo_proxy.getObject("fault")->getObject("fixed_delay");
+    auto* delay = mongo_proxy.mutable_delay();
+
+    delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
+    delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
   }
 }
 

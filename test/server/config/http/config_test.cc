@@ -196,7 +196,8 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
 TEST(HttpFilterConfigTest, RouterFilter) {
   std::string json_string = R"EOF(
   {
-    "dynamic_stats" : true
+    "dynamic_stats" : true,
+    "start_child_span" : true
   }
   )EOF";
 
@@ -299,7 +300,7 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   ASSERT_NE(nullptr, message);
 
-  envoy::api::v2::filter::http::FileAccessLog file_access_log;
+  envoy::api::v2::filter::FileAccessLog file_access_log;
   file_access_log.set_path("/dev/null");
   file_access_log.set_format("%START_TIME%");
   MessageUtil::jsonConvert(file_access_log, *message);

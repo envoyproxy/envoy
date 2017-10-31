@@ -5,6 +5,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/network/mongo_proxy.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -27,6 +28,20 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
+  envoy::api::v2::filter::network::MongoProxy config{};
+
+  config.set_access_log("path/to/access/log");
+  config.set_stat_prefix("my_stat_prefix");
+
+  NiceMock<MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -212,6 +227,20 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
+  envoy::api::v2::filter::network::MongoProxy config{};
+  config.set_stat_prefix("my_stat_prefix");
+  config.mutable_delay()->set_percent(50);
+  config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
+
+  NiceMock<MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);

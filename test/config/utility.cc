@@ -41,7 +41,6 @@ static_resources:
             name: route_config_0
   clusters:
     name: cluster_0
-    connect_timeout: 5s
     hosts:
       socket_address:
         address: 127.0.0.1
@@ -114,6 +113,18 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     }
   }
   ASSERT(port_idx == ports.size());
+
+  if (!connect_timeout_set_) {
+#ifdef __APPLE__
+    // Set a high default connect timeout. Under heavy load (and in particular in CI), macOS
+    // connections can take inordinately long to complete.
+    setConnectTimeout(std::chrono::seconds(30));
+#else
+    // Set a default connect timeout.
+    setConnectTimeout(std::chrono::seconds(5));
+#endif
+  }
+
   finalized_ = true;
 }
 
@@ -159,6 +170,21 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     options->mutable_initial_stream_window_size()->set_value(size);
     storeHttpConnectionManager(hcm_config);
   }
+}
+
+void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
+  RELEASE_ASSERT(!finalized_);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    auto* connect_timeout = cluster->mutable_connect_timeout();
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    connect_timeout->set_seconds(seconds.count());
+    connect_timeout->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(timeout - seconds).count());
+  }
+  connect_timeout_set_ = true;
 }
 
 void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,

@@ -74,3 +74,11 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "lua_wrappers_lib",
+    hdrs = ["lua_wrappers.h"],
+    deps = [
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
+)
