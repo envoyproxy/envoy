@@ -36,6 +36,17 @@ public:
   }
 
   /**
+   * Replaces a factory by name. This method should only be used for testing purposes.
+   * @param factory is the factory to inject
+   * @return Base* a pointer to the previously registered value
+   */
+  static Base* replaceFactoryForTest(Base& factory) {
+    auto displaced = getFactory(factory.name());
+    factories().emplace(std::make_pair(factory.name(), &factory));
+    return displaced;
+  }
+
+  /**
    * Gets a factory by name.  If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(const std::string& name) {
