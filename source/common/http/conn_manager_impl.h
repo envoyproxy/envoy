@@ -581,6 +581,7 @@ private:
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
+    const std::string* decorated_operation_{nullptr};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
