@@ -14,8 +14,8 @@ namespace Buffer {
  * A raw memory data slice including location and length.
  */
 struct RawSlice {
-  void* mem_;
-  size_t len_;
+  void* mem_ = nullptr;
+  size_t len_ = 0;
 };
 
 /**
