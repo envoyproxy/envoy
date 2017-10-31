@@ -177,14 +177,23 @@ TEST(StrictDnsClusterImplTest, Basic) {
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.name.default.max_pending_requests", 57));
   EXPECT_EQ(57U,
             cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
   EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
   EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
   EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
   EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);

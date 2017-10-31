@@ -72,7 +72,7 @@ do
 
   echo "Checking for match of --hot-restart-version and admin /hot_restart_version"
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
-  ADMIN_HOT_RESTART_VERSION=$(curl -s http://${ADMIN_ADDRESS_0}/hot_restart_version)
+  ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version mismatch: ${ADMIN_HOT_RESTART_VERSION} != " \
