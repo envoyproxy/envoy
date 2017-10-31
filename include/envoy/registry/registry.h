@@ -37,8 +37,8 @@ public:
 
   /**
    * Replaces a factory by name. This method should only be used for testing purposes.
-   * @param factory is the factory to inject
-   * @return Base* a pointer to the previously registered value
+   * @param factory is the factory to inject.
+   * @return Base* a pointer to the previously registered value.
    */
   static Base* replaceFactoryForTest(Base& factory) {
     auto displaced = getFactory(factory.name());
