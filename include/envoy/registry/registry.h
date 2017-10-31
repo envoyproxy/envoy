@@ -11,6 +11,9 @@
 namespace Envoy {
 namespace Registry {
 
+// Forward declaration of test class for friend declaration below.
+template <typename T> class InjectFactory;
+
 /**
  * General registry for implementation factories. The registry is templated by the Base class that a
  * set of factories conforms to.
@@ -48,7 +51,7 @@ public:
 
 private:
   // Allow factory injection only in tests.
-  template <typename T> friend class InjectFactory;
+  friend class InjectFactory<Base>;
 
   /**
    * Replaces a factory by name. This method should only be used for testing purposes.

@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Registry {
 
 /**
  * Factory registration template for tests. This can be used to inject a mock or dummy version
@@ -29,4 +30,5 @@ private:
   Base* displaced_{};
 };
 
+} // namespace Registry
 } // namespace Envoy
