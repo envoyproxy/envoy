@@ -3,7 +3,7 @@
 ## Your organization is not yet a committer
 
 * Express interest to the senior committers that your organization is interested in becoming a
-  committer. Becoming a committer generally means that you are going to be working close to full
+  committer. Becoming a committer generally means that you are going to be spending substantial
   time on Envoy for the foreseeable future. You should have domain expertise and be extremely
   proficient in C++. Ultimately your goal is to become a senior committer that will represent your
   organization.
