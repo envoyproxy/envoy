@@ -58,12 +58,13 @@ public:
   }
 
   /**
-   * Remove a factory by name.
+   * Remove a factory by name. This method should only be used for testing purposes.
+   * @param name is the name of the factory to remove.
    */
-  static void unregisterFactory(Base& factory) {
-    auto result = factories().erase(factory.name());
+  static void removeFactoryForTest(const std::string& name) {
+    auto result = factories().erase(name);
     if (result == 0) {
-      throw EnvoyException(fmt::format("No registration for name: '{}'", factory.name()));
+      throw EnvoyException(fmt::format("No registration for name: '{}'", name));
     }
   }
 
@@ -94,17 +95,12 @@ public:
   /**
    * Contructor that registers an instance of the factory with the FactoryRegistry.
    */
-  RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
-
-  /**
-   * Destructor that removes an instance of the factory from the FactoryRegistry.
-   */
-  ~RegisterFactory() { FactoryRegistry<Base>::unregisterFactory(instance_); }
-
-  T& testGetFactory() { return instance_; }
+  RegisterFactory() {
+    FactoryRegistry<Base>::registerFactory(instance_);
+  }
 
 private:
-  T instance_;
+  T instance_ {};
 };
 
 } // namespace Registry
