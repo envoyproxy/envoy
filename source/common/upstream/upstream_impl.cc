@@ -262,6 +262,15 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
+void ClusterImplBase::blockHcUpdates(bool block) {
+  ASSERT(block_hc_updates_ == !block);
+  block_hc_updates_ = block;
+
+  if (!block_hc_updates_) {
+    reloadHealthyHosts();
+  }
+}
+
 void ClusterImplBase::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
   if (!hosts_added.empty() || !hosts_removed.empty()) {
@@ -280,7 +289,7 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool changed_state) -> void {
     // If we get a health check completion that resulted in a state change, signal to
     // update the host sets on all threads.
-    if (changed_state) {
+    if (!block_hc_updates_ && changed_state) {
       reloadHealthyHosts();
     }
   });
@@ -320,7 +329,21 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
-  const std::string runtime_prefix = fmt::format("circuit_breakers.{}.{}.", cluster_name, priority);
+
+  std::string priority_name;
+  switch (priority) {
+  case envoy::api::v2::RoutingPriority::DEFAULT:
+    priority_name = "default";
+    break;
+  case envoy::api::v2::RoutingPriority::HIGH:
+    priority_name = "high";
+    break;
+  default:
+    NOT_REACHED;
+  }
+
+  const std::string runtime_prefix =
+      fmt::format("circuit_breakers.{}.{}.", cluster_name, priority_name);
 
   const auto& thresholds = config.circuit_breakers().thresholds();
   const auto it =

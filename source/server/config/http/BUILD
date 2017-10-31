@@ -62,7 +62,7 @@ envoy_cc_library(
     name = "file_access_log_lib",
     srcs = ["file_access_log.cc"],
     hdrs = ["file_access_log.h"],
-    external_deps = ["envoy_filter_http_connection_manager"],
+    external_deps = ["envoy_filter_http_http_connection_manager"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:access_log_config_interface",

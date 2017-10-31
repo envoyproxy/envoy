@@ -17,6 +17,7 @@ to find out more about the origin story and design philosophy of Envoy.
 * [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart.
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture.
 * [Blog](https://medium.com/@mattklein123/the-universal-data-plane-api-d15cec7a) about universal data plane API.
+* [Blog](https://medium.com/@mattklein123/lyfts-envoy-dashboards-5c91738816b1) on Lyft's Envoy dashboards.
 
 ## Related
 
@@ -35,14 +36,25 @@ to find out more about the origin story and design philosophy of Envoy.
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](http://envoyslack.cncf.io). 
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](http://envoyslack.cncf.io).
   We have the IRC/XMPP gateways enabled if you prefer either of those. Once an account is created,
   connection instructions for IRC/XMPP can be found [here](https://envoyproxy.slack.com/account/gateways).
-  * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email 
+  * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
     envoy-users@ per the guidance in the following linked thread.
 
-Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread 
+Please see [this](https://groups.google.com/forum/#!topic/envoy-announce/l9zjYsnS3TY) email thread
 for information on email list usage.
+
+## Contributing
+
+Contributing to Envoy is fun and modern C++ is a lot less scary than you might think if you don't
+have prior experience. To get started:
+
+* [Contributing guide](CONTRIBUTING.md)
+* [Beginner issues](https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner)
+* [Build/test quick start using docker](ci#building-and-running-tests-as-a-developer)
+* [Developer guide](DEVELOPER.md)
+* Please make sure that you let us know if you are working on an issue so we don't duplicate work!
 
 ## Community Meeting
 
@@ -56,5 +68,3 @@ If you've found a vulnerability or a potential vulnerability in Envoy
 please let us know at envoy-security@googlegroups.com. We'll send a
 confirmation email to acknowledge your report, and we'll send an
 additional email when we've identified the issue positively or negatively.
-
-
