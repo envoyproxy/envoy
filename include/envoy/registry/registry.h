@@ -95,12 +95,10 @@ public:
   /**
    * Contructor that registers an instance of the factory with the FactoryRegistry.
    */
-  RegisterFactory() {
-    FactoryRegistry<Base>::registerFactory(instance_);
-  }
+  RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
 
 private:
-  T instance_ {};
+  T instance_{};
 };
 
 } // namespace Registry

@@ -23,9 +23,10 @@ public:
       Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name());
     }
   }
+
 private:
   T& instance_;
-  Base* displaced_ {};
+  Base* displaced_{};
 };
 
 } // namespace Envoy
