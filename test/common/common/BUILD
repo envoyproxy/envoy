@@ -47,6 +47,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "singleton_test",
+    srcs = ["singleton_test.cc"],
+    deps = [
+        "//source/common/common:singleton",
+        "//source/common/common:thread_lib",
+        "//test/test_common:singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = ["//source/common/common:utility_lib"],

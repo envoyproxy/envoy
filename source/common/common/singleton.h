@@ -14,8 +14,17 @@ public:
    * @return const T& a reference to the singleton for class T.
    */
   static const T& get() {
-    absl::call_once(create_once_, &ConstSingleton<T>::Create);
-    return *instance_;
+    static T* instance = new T();
+    return *instance;
+  }
+};
+
+/* Mutable singleton.  All functions in the singleton class *must* be threadsafe.*/
+template <class T> class ThreadSafeSingleton {
+public:
+  static T& get() {
+    absl::call_once(ThreadSafeSingleton<T>::create_once_, &ThreadSafeSingleton<T>::Create);
+    return *ThreadSafeSingleton<T>::instance_;
   }
 
 protected:
@@ -27,17 +36,8 @@ protected:
   static T* instance_;
 };
 
-/* Mutable singleton.  All functions in the singleton class *must* be threadsafe.*/
-template <class T> class ThreadSafeSingleton : public ConstSingleton<T> {
-public:
-  static T& get() {
-    absl::call_once(ConstSingleton<T>::create_once_, &ConstSingleton<T>::Create);
-    return *ConstSingleton<T>::instance_;
-  }
-};
+template <class T> absl::once_flag ThreadSafeSingleton<T>::create_once_;
 
-template <class T> absl::once_flag ConstSingleton<T>::create_once_;
-
-template <class T> T* ConstSingleton<T>::instance_ = nullptr;
+template <class T> T* ThreadSafeSingleton<T>::instance_ = nullptr;
 
 } // namespace Envoy
