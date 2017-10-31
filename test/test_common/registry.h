@@ -9,9 +9,9 @@ namespace Envoy {
  * of a factory for testing purposes. It will restore the original value, if any, when it goes
  * out of scope.
  */
-template <class T, class Base> class InjectFactory {
+template <class Base> class InjectFactory {
 public:
-  InjectFactory(T& instance) : instance_(instance) {
+  InjectFactory(Base& instance) : instance_(instance) {
     displaced_ = Registry::FactoryRegistry<Base>::replaceFactoryForTest(instance_);
   }
 
@@ -25,7 +25,7 @@ public:
   }
 
 private:
-  T& instance_;
+  Base& instance_;
   Base* displaced_{};
 };
 

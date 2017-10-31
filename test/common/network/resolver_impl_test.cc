@@ -107,7 +107,7 @@ TEST(ResolverTest, NonStandardResolver) {
   TestResolver test_resolver;
   test_resolver.addMapping("foo", "1.2.3.4");
   test_resolver.addMapping("bar", "4.3.2.1");
-  InjectFactory<TestResolver, Resolver> register_resolver(test_resolver);
+  InjectFactory<Resolver> register_resolver(test_resolver);
 
   {
     envoy::api::v2::Address address;
