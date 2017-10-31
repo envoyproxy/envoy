@@ -560,6 +560,9 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
   active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
 
+  // TODO: Need to investigate the following code based on the cached route, as may
+  // be broken in the case a filter changes the route.
+
   // If a decorator has been defined, apply it to the active span.
   if (cached_route_.value() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
@@ -826,26 +829,28 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
   }
 
-  if (connection_manager_.config_.tracingConfig() &&
-      connection_manager_.config_.tracingConfig()->operation_name_ ==
-          Tracing::OperationName::Ingress) {
-    // For ingress (inbound) responses, if the request headers do not include a
-    // decorator operation (override), then pass the decorator's operation name (if defined)
-    // as a response header to enable the client service to use it in its client span.
-    if (decorated_operation_) {
-      headers.insertEnvoyDecoratorOperation().value(*decorated_operation_);
-    }
-  } else {
-    const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
-
-    // For Egress (outbound) response, if a decorator operation name has been provided, it
-    // should be used to override the active span's operation.
-    if (resp_operation_override) {
-      if (!resp_operation_override->value().empty()) {
-        active_span_->setOperation(resp_operation_override->value().c_str());
+  if (connection_manager_.config_.tracingConfig()) {
+    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+        Tracing::OperationName::Ingress) {
+      // For ingress (inbound) responses, if the request headers do not include a
+      // decorator operation (override), then pass the decorator's operation name (if defined)
+      // as a response header to enable the client service to use it in its client span.
+      if (decorated_operation_) {
+        headers.insertEnvoyDecoratorOperation().value(*decorated_operation_);
       }
-      // Remove header so not propagated to service
-      headers.removeEnvoyDecoratorOperation();
+    } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+               Tracing::OperationName::Egress) {
+      const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
+
+      // For Egress (outbound) response, if a decorator operation name has been provided, it
+      // should be used to override the active span's operation.
+      if (resp_operation_override) {
+        if (!resp_operation_override->value().empty()) {
+          active_span_->setOperation(resp_operation_override->value().c_str());
+        }
+        // Remove header so not propagated to service.
+        headers.removeEnvoyDecoratorOperation();
+      }
     }
   }
 
