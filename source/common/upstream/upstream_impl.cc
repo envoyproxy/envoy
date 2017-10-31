@@ -329,7 +329,21 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
-  const std::string runtime_prefix = fmt::format("circuit_breakers.{}.{}.", cluster_name, priority);
+
+  std::string priority_name;
+  switch (priority) {
+  case envoy::api::v2::RoutingPriority::DEFAULT:
+    priority_name = "default";
+    break;
+  case envoy::api::v2::RoutingPriority::HIGH:
+    priority_name = "high";
+    break;
+  default:
+    NOT_REACHED;
+  }
+
+  const std::string runtime_prefix =
+      fmt::format("circuit_breakers.{}.{}.", cluster_name, priority_name);
 
   const auto& thresholds = config.circuit_breakers().thresholds();
   const auto it =
