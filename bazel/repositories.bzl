@@ -113,7 +113,7 @@ def envoy_api_deps(skip_targets):
     native.git_repository(
         name = "envoy_api",
         remote = REPO_LOCATIONS["data-plane-api"],
-        commit = "e355cdbe0f7d614a110dc12e9d01b3ce817a2e87",
+        commit = "d5519766d4a9a63e371357f61eaa00d7601c2cee",
     )
 
     api_bind_targets = [
