@@ -411,13 +411,15 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   X509_NAME* cert_subject = X509_get_subject_name(cert);
   RELEASE_ASSERT(cert_subject != nullptr);
   int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
-  RELEASE_ASSERT(cn_index >= 0);
-  X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-  RELEASE_ASSERT(cn_entry != nullptr);
-  ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-  RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0);
-  rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-  RELEASE_ASSERT(rc == 1);
+  // It's possible that the certificate doesn't have CommonName, but has SANs.
+  if (cn_index >= 0) {
+    X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+    RELEASE_ASSERT(cn_entry != nullptr);
+    ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+    RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0);
+    rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+    RELEASE_ASSERT(rc == 1);
+  }
 
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
@@ -431,6 +433,9 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
         RELEASE_ASSERT(rc == 1);
       }
     }
+  } else {
+    // Make sure that we have either CommonName or SANs.
+    RELEASE_ASSERT(cn_index >= 0);
   }
 
   X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
