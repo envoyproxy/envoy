@@ -183,13 +183,13 @@ def envoy_api_deps(skip_targets):
 def abseil_deps(skip_targets):
   if 'abseil' not in skip_targets:
     native.git_repository(
-        name = "abseil",
+        name = "com_google_absl",
         remote = REPO_LOCATIONS["abseil_cpp"],
         commit = "6de53819a7173bd446156237a37f53464b7732cc",
     )
     native.bind(
         name = "abseil_base",
-        actual = "@abseil//absl/base:base",
+        actual = "@com_google_absl//absl/base:base",
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False, skip_targets = [],
