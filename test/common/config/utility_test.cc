@@ -204,7 +204,7 @@ TEST(UtilityTest, UnixClusterDns) {
 
   std::string cluster_type;
   cluster_type = "strict_dns";
-  std::string json = 
+  std::string json =
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
       R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
@@ -219,7 +219,7 @@ TEST(UtilityTest, UnixClusterStatic) {
 
   std::string cluster_type;
   cluster_type = "static";
-  std::string json = 
+  std::string json =
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
       R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);

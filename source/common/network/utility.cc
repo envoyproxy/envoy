@@ -44,13 +44,9 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) {
-  return url.find(TCP_SCHEME) == 0;
-}
+bool Utility::urlIsTcpScheme(const std::string& url) { return url.find(TCP_SCHEME) == 0; }
 
-bool Utility::urlIsUnixScheme(const std::string& url) {
-  return url.find(UNIX_SCHEME) == 0;
-}
+bool Utility::urlIsUnixScheme(const std::string& url) { return url.find(UNIX_SCHEME) == 0; }
 
 std::string Utility::hostFromTcpUrl(const std::string& url) {
   if (!urlIsTcpScheme(url)) {
