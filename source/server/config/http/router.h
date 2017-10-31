@@ -5,6 +5,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,6 +19,11 @@ public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                           const std::string& stat_prefix,
                                           FactoryContext& context) override;
+
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                   const std::string& stat_prefix,
+                                                   FactoryContext& context) override;
+
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
 };
 
