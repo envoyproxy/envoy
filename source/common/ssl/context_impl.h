@@ -27,6 +27,7 @@ namespace Ssl {
   COUNTER(handshake)                                                                               \
   COUNTER(session_reused)                                                                          \
   COUNTER(no_certificate)                                                                          \
+  COUNTER(fail_no_sni_match)                                                                       \
   COUNTER(fail_verify_no_cert)                                                                     \
   COUNTER(fail_verify_error)                                                                       \
   COUNTER(fail_verify_san)                                                                         \
@@ -117,6 +118,7 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
+  const std::string ecdh_curves_;
 };
 
 class ClientContextImpl : public ContextImpl, public ClientContext {

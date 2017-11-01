@@ -30,7 +30,7 @@ int ContextImpl::sslContextIndex() {
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
-      stats_(generateStats(scope)) {
+      stats_(generateStats(scope)), ecdh_curves_(config.ecdhCurves()) {
   RELEASE_ASSERT(ctx_);
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -41,8 +41,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
         fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
   }
 
-  if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
-    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
+  if (!SSL_CTX_set1_curves_list(ctx_.get(), ecdh_curves_.c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", ecdh_curves_));
   }
 
   int verify_mode = SSL_VERIFY_NONE;
@@ -415,7 +415,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1);
 
-  // Hash the CommonName/SANs in the server certificate.  This makes sure that
+  // Hash the CommonName/SANs of the server certificate.  This makes sure that
   // sessions can only be resumed to a certificate for the same name, but allows
   // resuming to unique certs in the case that different Envoy instances each have
   // their own certs.
@@ -480,6 +480,13 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
     RELEASE_ASSERT(rc == 1);
   }
 
+  // Hash configured SNIs for this context, so that sessions cannot be resumed across different
+  // filter chains, even when using the same server certificate.
+  for (const auto& name : server_names_) {
+    rc = EVP_DigestUpdate(&md, name.data(), name.size());
+    RELEASE_ASSERT(rc == 1);
+  }
+
   rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
   RELEASE_ASSERT(rc == 1);
   rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
@@ -518,6 +525,7 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
 
   // Reject connection if we didn't find a match.
   if (new_ctx == nullptr) {
+    stats_.fail_no_sni_match_.inc();
     return ssl_select_cert_error;
   }
 
@@ -533,10 +541,15 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
 void ServerContextImpl::updateConnection(SSL* ssl) {
   ASSERT(ctx_);
 
-  // Note: this updates only served certificates.
   SSL_set_SSL_CTX(ssl, ctx_.get());
+  SSL_CTX *ssl_ctx = SSL_get_SSL_CTX(ssl);
+  ASSERT(SSL_CTX_get_ex_data(ssl_ctx, sslContextIndex()) == this);
 
-  // TODO(PiotrSikora): update other settings.
+  // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
+  SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ssl_ctx), SSL_CTX_get_verify_callback(ssl_ctx));
+
+  int rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
+  ASSERT(rc == 1);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
