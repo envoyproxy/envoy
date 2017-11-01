@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    external_deps = ["envoy_filter_accesslog"],
+    external_deps = [
+        "envoy_filter_accesslog",
+        "envoy_filter_http_router",
+    ],
     deps = [
         "//source/common/config:well_known_names",
         "//source/common/http/access_log:access_log_lib",

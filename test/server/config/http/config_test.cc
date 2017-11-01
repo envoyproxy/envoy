@@ -213,7 +213,7 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(HttpFilterConfigTest, RouterFilter) {
+TEST(HttpFilterConfigTest, RouterFilterInJson) {
   std::string json_string = R"EOF(
   {
     "dynamic_stats" : true
@@ -241,6 +241,16 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   NiceMock<MockFactoryContext> context;
   RouterFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+}
+
+TEST(HttpFilterConfigTest, RouterFilterInProto) {
+  envoy::api::v2::filter::http::Router config{};
+  NiceMock<MockFactoryContext> context;
+  RouterFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, IpTaggingFilter) {
