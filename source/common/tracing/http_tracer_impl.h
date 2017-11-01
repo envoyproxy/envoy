@@ -62,6 +62,20 @@ public:
   static const std::string EGRESS_OPERATION;
 };
 
+class EgressConfigImpl : public Config {
+public:
+  // Tracing::Config
+  Tracing::OperationName operationName() const override { return Tracing::OperationName::Egress; }
+  const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
+    return request_headers_for_tags_;
+  }
+
+private:
+  const std::vector<Http::LowerCaseString> request_headers_for_tags_;
+};
+
+typedef ConstSingleton<EgressConfigImpl> EgressConfig;
+
 class NullSpan : public Span {
 public:
   static NullSpan& instance() {

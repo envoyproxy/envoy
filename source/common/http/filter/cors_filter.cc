@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Http {
 
-CorsFilter::CorsFilter() : is_cors_request_(false) {}
+CorsFilter::CorsFilter() : policies_({{nullptr, nullptr}}), is_cors_request_(false) {}
 
 // This handles the CORS preflight request as described in #6.2
 // https://www.w3.org/TR/cors/

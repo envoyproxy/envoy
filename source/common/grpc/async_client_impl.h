@@ -260,14 +260,8 @@ private:
   friend class AsyncClientImpl<RequestType, ResponseType>;
 };
 
-class AsyncClientTracingConfig : public Tracing::Config {
+class AsyncClientTracingConfig : public Tracing::EgressConfigImpl {
 public:
-  // Tracing::Config
-  Tracing::OperationName operationName() const override { return Tracing::OperationName::Egress; }
-  const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
-    return request_headers_for_tags_;
-  }
-
   struct {
     const std::string STATUS = "status";
     const std::string GRPC_STATUS = "grpc.status_code";
@@ -276,9 +270,6 @@ public:
     const std::string TRUE = "true";
     const std::string UPSTREAM_CLUSTER_NAME = "upstream_cluster_name";
   } TagStrings;
-
-private:
-  const std::vector<Http::LowerCaseString> request_headers_for_tags_;
 };
 
 typedef ConstSingleton<AsyncClientTracingConfig> TracingConfig;

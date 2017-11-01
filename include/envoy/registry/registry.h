@@ -11,6 +11,9 @@
 namespace Envoy {
 namespace Registry {
 
+// Forward declaration of test class for friend declaration below.
+template <typename T> class InjectFactory;
+
 /**
  * General registry for implementation factories. The registry is templated by the Base class that a
  * set of factories conforms to.
@@ -46,17 +49,32 @@ public:
     return it->second;
   }
 
+private:
+  // Allow factory injection only in tests.
+  friend class InjectFactory<Base>;
+
   /**
-   * Remove a factory by name.
+   * Replaces a factory by name. This method should only be used for testing purposes.
+   * @param factory is the factory to inject.
+   * @return Base* a pointer to the previously registered value.
    */
-  static void unregisterFactory(Base& factory) {
-    auto result = factories().erase(factory.name());
+  static Base* replaceFactoryForTest(Base& factory) {
+    auto displaced = getFactory(factory.name());
+    factories().emplace(std::make_pair(factory.name(), &factory));
+    return displaced;
+  }
+
+  /**
+   * Remove a factory by name. This method should only be used for testing purposes.
+   * @param name is the name of the factory to remove.
+   */
+  static void removeFactoryForTest(const std::string& name) {
+    auto result = factories().erase(name);
     if (result == 0) {
-      throw EnvoyException(fmt::format("No registration for name: '{}'", factory.name()));
+      throw EnvoyException(fmt::format("No registration for name: '{}'", name));
     }
   }
 
-private:
   /**
    * Gets the current map of factory implementations.
    */
@@ -85,15 +103,8 @@ public:
    */
   RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
 
-  /**
-   * Destructor that removes an instance of the factory from the FactoryRegistry.
-   */
-  ~RegisterFactory() { FactoryRegistry<Base>::unregisterFactory(instance_); }
-
-  T& testGetFactory() { return instance_; }
-
 private:
-  T instance_;
+  T instance_{};
 };
 
 } // namespace Registry
