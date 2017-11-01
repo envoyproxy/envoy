@@ -29,7 +29,6 @@ public:
   // Upstream::Cluster
   void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-  void setInitializedCb(std::function<void()> callback) override { callback(); }
 
   /**
    * Special Load Balancer for Original Dst Cluster.

@@ -324,6 +324,13 @@ public:
   // Upstream::Cluster
   ClusterInfoConstSharedPtr info() const override { return info_; }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
+  void setInitializedCb(std::function<void()> callback) override {
+    if (initialized_) {
+      callback();
+    } else {
+      initialize_callback_ = callback;
+    }
+  }
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
@@ -336,7 +343,7 @@ protected:
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
   void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                           const std::vector<HostSharedPtr>& hosts_removed) override;
-  void blockHcUpdates(bool block);
+  void setInitialized();
 
   static const HostListsConstSharedPtr empty_host_lists_;
 
@@ -350,7 +357,9 @@ protected:
 private:
   void reloadHealthyHosts();
 
-  bool block_hc_updates_{};
+  std::function<void()> initialize_callback_;
+  bool initialized_{};
+  uint64_t pending_initialize_health_checks_{};
 };
 
 /**
@@ -366,23 +375,12 @@ public:
   // Upstream::Cluster
   void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-  void setInitializedCb(std::function<void()> callback) override { callback(); }
 };
 
 /**
  * Base for all dynamic cluster types.
  */
 class BaseDynamicClusterImpl : public ClusterImplBase {
-public:
-  // Upstream::Cluster
-  void setInitializedCb(std::function<void()> callback) override {
-    if (initialized_) {
-      callback();
-    } else {
-      initialize_callback_ = callback;
-    }
-  }
-
 protected:
   using ClusterImplBase::ClusterImplBase;
 
@@ -390,10 +388,6 @@ protected:
                              std::vector<HostSharedPtr>& current_hosts,
                              std::vector<HostSharedPtr>& hosts_added,
                              std::vector<HostSharedPtr>& hosts_removed, bool depend_on_hc);
-
-  std::function<void()> initialize_callback_;
-  // Set once the first resolve completes.
-  bool initialized_ = false;
 };
 
 /**

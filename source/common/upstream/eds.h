@@ -34,12 +34,9 @@ public:
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:
-  void runInitializeCallbackIfAny();
-
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
-  uint64_t pending_health_checks_{};
 };
 
 } // namespace Upstream

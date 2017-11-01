@@ -38,13 +38,6 @@ public:
   // Upstream::Cluster
   void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-  void setInitializedCb(std::function<void()> callback) override {
-    if (initialized_) {
-      callback();
-    } else {
-      initialize_callback_ = callback;
-    }
-  }
 
 private:
   struct LogicalHost : public HostImpl {
@@ -98,9 +91,6 @@ private:
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
   ThreadLocal::SlotPtr tls_;
-  std::function<void()> initialize_callback_;
-  // Set once the first resolve completes.
-  bool initialized_;
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
   std::string hostname_;

@@ -27,7 +27,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      tls_(tls.allocateSlot()), initialized_(false),
+      tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
   const auto& hosts = cluster.hosts();
   if (hosts.size() != 1) {
@@ -117,12 +117,7 @@ void LogicalDnsCluster::startResolve() {
           }
         }
 
-        if (initialize_callback_) {
-          initialize_callback_();
-          initialize_callback_ = nullptr;
-        }
-        initialized_ = true;
-
+        setInitialized();
         resolve_timer_->enableTimer(dns_refresh_rate_ms_);
       });
 }
