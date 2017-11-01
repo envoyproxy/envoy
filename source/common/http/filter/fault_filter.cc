@@ -46,7 +46,7 @@ FaultFilterConfig::FaultFilterConfig(const envoy::api::v2::filter::http::HTTPFau
 
   if (fault.has_delay()) {
     fixed_delay_percent_ = fault.delay().percent();
-    auto delay = fault.delay();
+    const auto& delay = fault.delay();
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
 
