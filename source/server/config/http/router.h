@@ -27,8 +27,7 @@ public:
                                                    FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::unique_ptr<envoy::api::v2::filter::http::Router>(
-        new envoy::api::v2::filter::http::Router());
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::Router()};
   }
 
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
