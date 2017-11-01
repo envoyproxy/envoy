@@ -15,7 +15,7 @@
   community reviews).
 * After a period of approximately 2-3 months of working together and making sure we see eye to eye,
   the existing senior committers will confer and decide whether to grant commit status or not. We
-  make no guarantees on the length of time this will take, but 2-3 months of is the approximate
+  make no guarantees on the length of time this will take, but 2-3 months is the approximate
   goal.
 
 ## Your organization is currently a committer
