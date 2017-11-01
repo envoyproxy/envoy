@@ -111,7 +111,7 @@ TEST(HttpFilterConfigTest, DynamoFilter) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, FaultFilter) {
+TEST(HttpFilterConfigTest, CorrectFaultFilterInJson) {
   std::string json_string = R"EOF(
   {
     "delay" : {
@@ -129,6 +129,26 @@ TEST(HttpFilterConfigTest, FaultFilter) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, CorrectFaultFilterInProto) {
+  envoy::api::v2::filter::http::HTTPFault config{};
+  config.mutable_delay()->set_percent(100);
+  config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
+
+  NiceMock<MockFactoryContext> context;
+  FaultFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, EmptyFaultFilterInProto) {
+  envoy::api::v2::filter::http::HTTPFault config{};
+  NiceMock<MockFactoryContext> context;
+  FaultFilterConfig factory;
+  EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
 }
 
 TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
