@@ -12,21 +12,37 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                                            const std::string& stat_prefix,
-                                                            FactoryContext& context) {
-  json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
-
+HttpFilterFactoryCb RouterFilterConfig::createRouterFilter(bool dynamic_stats, bool start_child_span,
+                                                           const std::string& stat_prefix,
+                                                           FactoryContext& context) {
   Router::FilterConfigSharedPtr config(new Router::FilterConfig(
       stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
       context.runtime(), context.random(),
       Router::ShadowWriterPtr{new Router::ShadowWriterImpl(context.clusterManager())},
-      json_config.getBoolean("dynamic_stats", true),
-      json_config.getBoolean("start_child_span", false)));
+      dynamic_stats, start_child_span));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*config));
   };
+}
+
+HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
+                                                            const std::string& stat_prefix,
+                                                            FactoryContext& context) {
+  json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
+  return createRouterFilter(json_config.getBoolean("dynamic_stats", true), json_config.getBoolean("start_child_span", false), stat_prefix, context);
+}
+
+HttpFilterFactoryCb RouterFilterConfig::createFilterFactoryFromProto(
+    const Protobuf::Message& config, const std::string& stat_prefix, FactoryContext& context) {
+  const envoy::api::v2::filter::http::Router& router =
+      dynamic_cast<const envoy::api::v2::filter::http::Router&>(config);
+  bool dynamic_stats = true; // defaults to true
+  if (router.has_dynamic_stats()) {
+    dynamic_stats = router.dynamic_stats().value();
+  }
+  bool start_child_span = router.start_child_span(); // defaults to false
+  return createRouterFilter(dynamic_stats, start_child_span, stat_prefix, context);
 }
 
 /**
