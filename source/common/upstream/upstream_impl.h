@@ -171,7 +171,7 @@ typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostLists
 /**
  * Base class for all clusters as well as thread local host sets.
  */
-class HostSetImpl : public virtual HostSet {
+class HostSetImpl : public HostSet {
 public:
   HostSetImpl()
       : hosts_(new std::vector<HostSharedPtr>()), healthy_hosts_(new std::vector<HostSharedPtr>()),
@@ -294,9 +294,7 @@ private:
 /**
  * Base class all primary clusters.
  */
-class ClusterImplBase : public Cluster,
-                        public HostSetImpl,
-                        protected Logger::Loggable<Logger::Id::upstream> {
+class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
   static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
@@ -307,6 +305,9 @@ public:
                                  const LocalInfo::LocalInfo& local_info,
                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
                                  bool added_via_api);
+  // From Cluster.
+  virtual HostSetImpl& primaryHosts() override { return primary_hosts_; }
+  virtual const HostSetImpl& primaryHosts() const override { return primary_hosts_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -334,8 +335,6 @@ protected:
   static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
   static HostListsConstSharedPtr
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
-  void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                          const std::vector<HostSharedPtr>& hosts_removed) override;
   void blockHcUpdates(bool block);
 
   static const HostListsConstSharedPtr empty_host_lists_;
@@ -351,6 +350,8 @@ private:
   void reloadHealthyHosts();
 
   bool block_hc_updates_{};
+
+  HostSetImpl primary_hosts_;
 };
 
 /**

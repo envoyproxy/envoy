@@ -112,8 +112,8 @@ void LogicalDnsCluster::startResolve() {
             }
             HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
             new_hosts->emplace_back(logical_host_);
-            updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
-                        empty_host_lists_, *new_hosts, {});
+            primaryHosts().updateHosts(new_hosts, createHealthyHostList(*new_hosts),
+                                       empty_host_lists_, empty_host_lists_, *new_hosts, {});
           }
         }
 

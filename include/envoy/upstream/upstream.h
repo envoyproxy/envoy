@@ -378,8 +378,10 @@ typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
  * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
  * all forwarding threads/workers. Individual HostSets are used on the workers themselves.
  */
-class Cluster : public virtual HostSet {
+class Cluster {
 public:
+  virtual ~Cluster() {}
+
   enum class InitializePhase { Primary, Secondary };
 
   /**
@@ -412,6 +414,22 @@ public:
    * resolution is complete.
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
+
+  /**
+   * @return the HostSet of the primary hosts.
+   *
+   * This is the set of the hosts which should receive all traffic for the
+   * cluster as long as the primary hosts remain healthy.
+   */
+  virtual HostSet& primaryHosts() PURE;
+
+  /**
+   * @return the const HostSet of the primary hosts.
+   *
+   * This is the set of the hosts which should receive all traffic for the
+   * cluster as long as the primary hosts remain healthy.
+   */
+  virtual const HostSet& primaryHosts() const PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;

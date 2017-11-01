@@ -26,10 +26,9 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Upstream {
 
-class MockCluster : public Cluster {
+class MockHostSet : public HostSet {
 public:
-  MockCluster();
-  ~MockCluster();
+  MockHostSet();
 
   void runCallbacks(const std::vector<HostSharedPtr> added,
                     const std::vector<HostSharedPtr> removed) {
@@ -43,6 +42,19 @@ public:
   MOCK_CONST_METHOD0(hostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());
 
+  std::vector<HostSharedPtr> hosts_;
+  std::vector<HostSharedPtr> healthy_hosts_;
+  std::vector<std::vector<HostSharedPtr>> hosts_per_locality_;
+  std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_locality_;
+  Common::CallbackManager<const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
+};
+
+class MockCluster : public Cluster {
+public:
+  MockCluster();
+  ~MockCluster();
+
   // Upstream::Cluster
   MOCK_CONST_METHOD0(info, ClusterInfoConstSharedPtr());
   MOCK_CONST_METHOD0(outlierDetector, const Outlier::Detector*());
@@ -50,16 +62,13 @@ public:
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD0(primaryHosts, HostSet&());
+  MOCK_CONST_METHOD0(primaryHosts, const HostSet&());
 
-  std::vector<HostSharedPtr> hosts_;
-  std::vector<HostSharedPtr> healthy_hosts_;
-  std::vector<std::vector<HostSharedPtr>> hosts_per_locality_;
-  std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_locality_;
-  Common::CallbackManager<const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&>
-      member_update_cb_helper_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  NiceMock<MockHostSet> primary_hosts_;
 };
 
 class MockLoadBalancer : public LoadBalancer {

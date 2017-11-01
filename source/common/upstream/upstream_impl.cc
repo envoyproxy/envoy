@@ -214,7 +214,17 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
-                                                   ssl_context_manager, added_via_api)) {}
+                                                   ssl_context_manager, added_via_api)) {
+  primaryHosts().addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
+                                          const std::vector<HostSharedPtr>& hosts_removed) {
+    if (!hosts_added.empty() || !hosts_removed.empty()) {
+      info_->stats().membership_change_.inc();
+    }
+
+    info_->stats().membership_healthy_.set(primaryHosts().healthyHosts().size());
+    info_->stats().membership_total_.set(primaryHosts().hosts().size());
+  });
+}
 
 HostVectorConstSharedPtr
 ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) {
@@ -271,17 +281,6 @@ void ClusterImplBase::blockHcUpdates(bool block) {
   }
 }
 
-void ClusterImplBase::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                                         const std::vector<HostSharedPtr>& hosts_removed) {
-  if (!hosts_added.empty() || !hosts_removed.empty()) {
-    info_->stats().membership_change_.inc();
-  }
-
-  info_->stats().membership_healthy_.set(healthyHosts().size());
-  info_->stats().membership_total_.set(hosts().size());
-  HostSetImpl::runUpdateCallbacks(hosts_added, hosts_removed);
-}
-
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
@@ -305,11 +304,12 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
 }
 
 void ClusterImplBase::reloadHealthyHosts() {
-  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(hosts()));
+  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(primaryHosts().hosts()));
   HostListsConstSharedPtr hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(hostsPerLocality()));
-  updateHosts(hosts_copy, createHealthyHostList(hosts()), hosts_per_locality_copy,
-              createHealthyHostLists(hostsPerLocality()), {}, {});
+      new std::vector<std::vector<HostSharedPtr>>(primaryHosts().hostsPerLocality()));
+  primaryHosts().updateHosts(hosts_copy, createHealthyHostList(primaryHosts().hosts()),
+                             hosts_per_locality_copy,
+                             createHealthyHostLists(primaryHosts().hostsPerLocality()), {}, {});
 }
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
@@ -376,8 +376,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                    envoy::api::v2::Locality().default_instance())});
   }
 
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
-              {}, {});
+  primaryHosts().updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
+                             empty_host_lists_, {}, {});
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
@@ -513,8 +513,8 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostSharedPtr>& host
     }
   }
 
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
-              hosts_added, hosts_removed);
+  primaryHosts().updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
+                             empty_host_lists_, hosts_added, hosts_removed);
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,

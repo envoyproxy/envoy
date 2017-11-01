@@ -158,7 +158,7 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
     response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
                              cluster.second.get().info()->addedViaApi()));
 
-    for (auto& host : cluster.second.get().hosts()) {
+    for (auto& host : cluster.second.get().primaryHosts().hosts()) {
       std::map<std::string, uint64_t> all_stats;
       for (const Stats::CounterSharedPtr& counter : host->counters()) {
         all_stats[counter->name()] = counter->value();
