@@ -9,8 +9,6 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
-#include "api/filter/http/router.pb.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {

@@ -7,6 +7,8 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
+#include "api/filter/http/router.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -23,6 +25,11 @@ public:
   HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                    const std::string& stat_prefix,
                                                    FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::unique_ptr<envoy::api::v2::filter::http::Router>(
+        new envoy::api::v2::filter::http::Router());
+  }
 
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
 };

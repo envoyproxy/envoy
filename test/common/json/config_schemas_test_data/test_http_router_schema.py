@@ -14,7 +14,7 @@ def test(writer):
     )
 
     writer.write_test_file(
-        'ValidDynamicStatsMissing',
+        'ValidDefaults',
         schema='ROUTER_HTTP_FILTER_SCHEMA',
         data={},
         throws=False,
