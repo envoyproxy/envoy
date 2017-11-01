@@ -144,6 +144,13 @@ TEST(HttpFilterConfigTest, CorrectFaultFilterInProto) {
   cb(filter_callback);
 }
 
+TEST(HttpFilterConfigTest, EmptyFaultFilterInProto) {
+  envoy::api::v2::filter::http::HTTPFault config{};
+  NiceMock<MockFactoryContext> context;
+  FaultFilterConfig factory;
+  EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
+}
+
 TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
   std::string json_string = R"EOF(
   {

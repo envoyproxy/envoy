@@ -236,10 +236,6 @@ void FilterJson::translateFaultFilter(const Json::Object& config,
   const Json::ObjectSharedPtr config_abort = config.getObject("abort", true);
   const Json::ObjectSharedPtr config_delay = config.getObject("delay", true);
 
-  if (config_abort->empty() && config_delay->empty()) {
-    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
-  }
-
   if (!config_abort->empty()) {
     auto* abort_fault = fault.mutable_abort();
     abort_fault->set_percent(static_cast<uint32_t>(config_abort->getInteger("abort_percent")));
@@ -249,12 +245,7 @@ void FilterJson::translateFaultFilter(const Json::Object& config,
   }
 
   if (!config_delay->empty()) {
-    const std::string type = config_delay->getString("type");
-    ASSERT(type == "fixed");
-    UNREFERENCED_PARAMETER(type);
-
     auto* delay = fault.mutable_delay();
-
     delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
     delay->set_percent(static_cast<uint32_t>(config_delay->getInteger("fixed_delay_percent")));
     JSON_UTIL_SET_DURATION_FROM_FIELD(*config_delay, *delay, fixed_delay, fixed_duration);

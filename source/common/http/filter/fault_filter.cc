@@ -35,6 +35,10 @@ FaultFilterConfig::FaultFilterConfig(const envoy::api::v2::filter::http::HTTPFau
     : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
       scope_(scope) {
 
+  if (!fault.has_abort() && !fault.has_delay()) {
+    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
+  }
+
   if (fault.has_abort()) {
     abort_percent_ = fault.abort().percent();
     http_status_ = fault.abort().http_status();
