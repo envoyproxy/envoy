@@ -26,8 +26,8 @@ public:
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
 
 private:
-  HttpFilterFactoryCb createRouterFilter(bool dynamic_stats, bool start_child_span, const std::string& stat_prefix,
-                                         FactoryContext& context);
+  HttpFilterFactoryCb createRouterFilter(bool dynamic_stats, bool start_child_span,
+                                         const std::string& stat_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

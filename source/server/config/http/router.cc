@@ -12,7 +12,8 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb RouterFilterConfig::createRouterFilter(bool dynamic_stats, bool start_child_span,
+HttpFilterFactoryCb RouterFilterConfig::createRouterFilter(bool dynamic_stats,
+                                                           bool start_child_span,
                                                            const std::string& stat_prefix,
                                                            FactoryContext& context) {
   Router::FilterConfigSharedPtr config(new Router::FilterConfig(
@@ -30,7 +31,9 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& 
                                                             const std::string& stat_prefix,
                                                             FactoryContext& context) {
   json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
-  return createRouterFilter(json_config.getBoolean("dynamic_stats", true), json_config.getBoolean("start_child_span", false), stat_prefix, context);
+  return createRouterFilter(json_config.getBoolean("dynamic_stats", true),
+                            json_config.getBoolean("start_child_span", false), stat_prefix,
+                            context);
 }
 
 HttpFilterFactoryCb RouterFilterConfig::createFilterFactoryFromProto(
