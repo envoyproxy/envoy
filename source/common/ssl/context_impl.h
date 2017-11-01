@@ -42,8 +42,6 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  ~ContextImpl() { parent_.releaseContext(this); }
-
   virtual bssl::UniquePtr<SSL> newSsl() const;
 
   /**
@@ -124,6 +122,7 @@ protected:
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
   ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ClientContextConfig& config);
+  ~ClientContextImpl() { parent_.releaseClientContext(this); }
 
   bssl::UniquePtr<SSL> newSsl() const override;
 
@@ -133,19 +132,26 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ServerContextConfig& config,
-                    Runtime::Loader& runtime);
+  ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
+                    const std::vector<std::string>& server_names, Stats::Scope& scope,
+                    ServerContextConfig& config, Runtime::Loader& runtime);
+  ~ServerContextImpl() { parent_.releaseServerContext(this, listener_name_, server_names_); }
 
 private:
+  ssl_select_cert_result_t processClientHello(const SSL_CLIENT_HELLO* client_hello);
+  void updateConnection(SSL* ssl);
+
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
 
+  const std::string listener_name_;
+  const std::vector<std::string> server_names_;
   Runtime::Loader& runtime_;
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

@@ -3,6 +3,7 @@
 #include <functional>
 #include <list>
 #include <mutex>
+#include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
@@ -27,13 +28,19 @@ public:
    * admin purposes. When a caller frees a context it will tell us to release it also from the list
    * of contexts.
    */
-  void releaseContext(Context* context);
+  void releaseClientContext(ClientContext* context);
+  void releaseServerContext(ServerContext* context, const std::string& listener_name,
+                            const std::vector<std::string>& server_names);
 
   // Ssl::ContextManager
   Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope,
                                                ClientContextConfig& config) override;
-  Ssl::ServerContextPtr createSslServerContext(Stats::Scope& scope,
+  Ssl::ServerContextPtr createSslServerContext(const std::string& listener_name,
+                                               const std::vector<std::string>& server_names,
+                                               Stats::Scope& scope,
                                                ServerContextConfig& config) override;
+  Ssl::ServerContext* findSslServerContext(const std::string& listener_name,
+                                           const std::string& server_name) override;
   size_t daysUntilFirstCertExpires() override;
   void iterateContexts(std::function<void(Context&)> callback) override;
 
@@ -41,6 +48,8 @@ private:
   Runtime::Loader& runtime_;
   std::list<Context*> contexts_;
   std::mutex contexts_lock_;
+  std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_exact_;
+  std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_wildcard_;
 };
 
 } // namespace Ssl

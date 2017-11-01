@@ -77,6 +77,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
           Network::Utility::parseInternetAddress(config.address().socket_address().address(),
                                                  config.address().socket_address().port_value())),
       global_scope_(parent_.server_.stats().createScope("")),
+      listener_scope_(
+          parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       use_proxy_proto_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)),
@@ -88,19 +90,22 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       local_drain_manager_(parent.factory_.createDrainManager()) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
-  ASSERT(config.filter_chains().size() == 1);
-  const auto& filter_chain = config.filter_chains()[0];
+  ASSERT(config.filter_chains().size() >= 1);
 
-  listener_scope_ =
-      parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()));
-
-  if (filter_chain.has_tls_context()) {
-    Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
-    ssl_context_ = parent_.server_.sslContextManager().createSslServerContext(*listener_scope_,
-                                                                              context_config);
+  for (const auto& filter_chain : config.filter_chains()) {
+    std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
+                                         filter_chain.filter_chain_match().sni_domains().end());
+    if (filter_factories_.empty() || !filter_chain.filters().empty()) {
+      // Only one filter chain can have filters until multiple filter chains are properly supported.
+      RELEASE_ASSERT(filter_factories_.empty());
+      filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+    }
+    if (filter_chain.has_tls_context()) {
+      Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
+      tls_contexts_.emplace_back(parent_.server_.sslContextManager().createSslServerContext(
+          name_, sni_domains, *listener_scope_, context_config));
+    }
   }
-
-  filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
 }
 
 ListenerImpl::~ListenerImpl() {

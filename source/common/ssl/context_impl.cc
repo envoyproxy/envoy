@@ -9,6 +9,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/hex.h"
 
 #include "fmt/format.h"
@@ -355,10 +356,20 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ServerContextConfig& config, Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), runtime_(runtime),
+ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
+                                     const std::vector<std::string>& server_names,
+                                     Stats::Scope& scope, ServerContextConfig& config,
+                                     Runtime::Loader& runtime)
+    : ContextImpl(parent, scope, config), listener_name_(listener_name),
+      server_names_(server_names), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
+  SSL_CTX_set_select_certificate_cb(
+      ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
+        ContextImpl* context_impl = static_cast<ContextImpl*>(
+            SSL_CTX_get_ex_data(SSL_get_SSL_CTX(client_hello->ssl), sslContextIndex()));
+        return dynamic_cast<ServerContextImpl*>(context_impl)->processClientHello(client_hello);
+      });
+
   if (!config.caCertFile().empty()) {
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(SSL_load_client_CA_file(config.caCertFile().c_str()));
     if (nullptr == list) {
@@ -471,6 +482,55 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   RELEASE_ASSERT(rc == 1);
   rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
   RELEASE_ASSERT(rc == 1);
+}
+
+ssl_select_cert_result_t
+ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
+  std::string server_name = EMPTY_STRING;
+  const uint8_t* data;
+  size_t len;
+
+  if (SSL_early_callback_ctx_extension_get(client_hello, TLSEXT_TYPE_server_name, &data, &len)) {
+    /* Based on BoringSSL's ext_sni_parse_clienthello(). Match on empty SNI if we encounter any
+     * errors. */
+    CBS extension;
+    CBS_init(&extension, data, len);
+    CBS server_name_list, host_name;
+    uint8_t name_type;
+    if (CBS_get_u16_length_prefixed(&extension, &server_name_list) &&
+        CBS_get_u8(&server_name_list, &name_type) &&
+        CBS_get_u16_length_prefixed(&server_name_list, &host_name) &&
+        CBS_len(&server_name_list) == 0 && CBS_len(&extension) == 0 &&
+        name_type == TLSEXT_NAMETYPE_host_name && CBS_len(&host_name) != 0 &&
+        CBS_len(&host_name) <= TLSEXT_MAXLEN_host_name && !CBS_contains_zero_byte(&host_name)) {
+      server_name =
+          std::string(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
+    }
+  }
+
+  ServerContext* new_ctx = parent_.findSslServerContext(listener_name_, server_name);
+
+  // Reject connection if we didn't find a match.
+  if (new_ctx == nullptr) {
+    return ssl_select_cert_error;
+  }
+
+  // Update context if it changed.
+  if (new_ctx != this) {
+    ServerContextImpl* new_impl = dynamic_cast<ServerContextImpl*>(new_ctx);
+    new_impl->updateConnection(client_hello->ssl);
+  }
+
+  return ssl_select_cert_success;
+}
+
+void ServerContextImpl::updateConnection(SSL* ssl) {
+  RELEASE_ASSERT(ctx_);
+
+  // Note: this updates only served certificates.
+  SSL_set_SSL_CTX(ssl, ctx_.get());
+
+  // TODO(PiotrSikora): update other settings.
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,

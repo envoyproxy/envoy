@@ -24,15 +24,20 @@ public:
     return ClientContextPtr{createSslClientContext_(scope, config)};
   }
 
-  ServerContextPtr createSslServerContext(Stats::Scope& scope,
+  ServerContextPtr createSslServerContext(const std::string& listener_name,
+                                          const std::vector<std::string>& server_names,
+                                          Stats::Scope& scope,
                                           ServerContextConfig& config) override {
-    return ServerContextPtr{createSslServerContext_(scope, config)};
+    return ServerContextPtr{createSslServerContext_(listener_name, server_names, scope, config)};
   }
 
   MOCK_METHOD2(createSslClientContext_,
                ClientContext*(Stats::Scope& scope, ClientContextConfig& config));
-  MOCK_METHOD2(createSslServerContext_,
-               ServerContext*(Stats::Scope& stats, ServerContextConfig& config));
+  MOCK_METHOD4(createSslServerContext_,
+               ServerContext*(const std::string& listener_name,
+                              const std::vector<std::string>& server_names, Stats::Scope& stats,
+                              ServerContextConfig& config));
+  MOCK_METHOD2(findSslServerContext, ServerContext*(const std::string&, const std::string&));
   MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(Context&)> callback));
 };
