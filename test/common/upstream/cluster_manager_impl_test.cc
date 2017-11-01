@@ -462,7 +462,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   EXPECT_EQ("cluster_1", cluster.info()->name());
   EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
   EXPECT_EQ(1UL, cluster_manager_->get("cluster_1")->hostSet().hosts().size());
-  EXPECT_EQ(cluster.hosts()[0],
+  EXPECT_EQ(cluster.primaryHosts().hosts()[0],
             cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 
   // Local reference, primary reference, thread local reference, host reference.
@@ -591,19 +591,20 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
-  foo->addMemberUpdateCb([&membership_updated](const std::vector<HostSharedPtr>&,
-                                               const std::vector<HostSharedPtr>&) -> void {
-    membership_updated.ready();
-  });
+  foo->primaryHosts().addMemberUpdateCb(
+      [&membership_updated](const std::vector<HostSharedPtr>&,
+                            const std::vector<HostSharedPtr>&) -> void {
+        membership_updated.ready();
+      });
 
   // Remove the new cluster.
   cluster_manager_->removePrimaryCluster("cluster1");
 
   // Fire a member callback on the local cluster, which should not call any update callbacks on
   // the deleted cluster.
-  foo->hosts_ = {makeTestHost(foo->info_, "tcp://127.0.0.1:80")};
+  foo->primary_hosts_.hosts_ = {makeTestHost(foo->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(membership_updated, ready());
-  foo->runCallbacks(foo->hosts_, {});
+  foo->primary_hosts_.runCallbacks(foo->primary_hosts_.hosts_, {});
 
   factory_.tls_.shutdownThread();
 
@@ -642,7 +643,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   update_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
   std::shared_ptr<MockCluster> cluster2(new NiceMock<MockCluster>());
-  cluster2->hosts_ = {makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
+  cluster2->primary_hosts_.hosts_ = {makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
