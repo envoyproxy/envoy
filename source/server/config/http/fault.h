@@ -22,7 +22,6 @@ public:
                                           FactoryContext& context) override;
   HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                    const std::string& stats_prefix,
-
                                                    FactoryContext& context) override;
   std::string name() override { return Config::HttpFilterNames::get().FAULT; }
 

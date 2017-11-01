@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
@@ -40,11 +41,8 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactoryFromProto(
     const Protobuf::Message& config, const std::string& stat_prefix, FactoryContext& context) {
   const envoy::api::v2::filter::http::Router& router =
       dynamic_cast<const envoy::api::v2::filter::http::Router&>(config);
-  bool dynamic_stats = true; // defaults to true
-  if (router.has_dynamic_stats()) {
-    dynamic_stats = router.dynamic_stats().value();
-  }
-  bool start_child_span = router.start_child_span(); // defaults to false
+  bool dynamic_stats = PROTOBUF_GET_WRAPPED_OR_DEFAULT(router, dynamic_stats, true);
+  bool start_child_span = router.start_child_span();
   return createRouterFilter(dynamic_stats, start_child_span, stat_prefix, context);
 }
 
