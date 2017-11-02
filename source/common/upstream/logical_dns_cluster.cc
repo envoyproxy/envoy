@@ -53,12 +53,13 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 
-  // This must come before startResolve(), since the resolve callback relies on
-  // tls_slot_ being initialized.
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
   });
+}
 
+void LogicalDnsCluster::initialize(std::function<void()> callback) {
+  setInitializeCallback(callback);
   startResolve();
 }
 

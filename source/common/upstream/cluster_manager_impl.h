@@ -77,13 +77,6 @@ private:
  */
 class ClusterManagerInitHelper : Logger::Loggable<Logger::Id::upstream> {
 public:
-  void addCluster(Cluster& cluster);
-  void onStaticLoadComplete();
-  void removeCluster(Cluster& cluster);
-  void setCds(CdsApi* cds);
-  void setInitializedCb(std::function<void()> callback);
-
-private:
   enum class State {
     Loading,
     WaitingForStaticInitialize,
@@ -92,6 +85,14 @@ private:
     AllClustersInitialized
   };
 
+  void addCluster(Cluster& cluster);
+  void onStaticLoadComplete();
+  void removeCluster(Cluster& cluster);
+  void setCds(CdsApi* cds);
+  void setInitializedCb(std::function<void()> callback);
+  State state() { return state_; }
+
+private:
   void maybeFinishInitialize();
 
   CdsApi* cds_{};

@@ -26,7 +26,7 @@ public:
   const std::string versionInfo() const { return subscription_->versionInfo(); }
 
   // Upstream::Cluster
-  void initialize() override;
+  void initialize(std::function<void()> callback) override;
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
   // Config::SubscriptionCallbacks

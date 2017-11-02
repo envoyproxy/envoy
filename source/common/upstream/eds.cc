@@ -39,7 +39,10 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
 }
 
-void EdsClusterImpl::initialize() { subscription_->start({cluster_name_}, *this); }
+void EdsClusterImpl::initialize(std::function<void()> callback) {
+  setInitializeCallback(callback);
+  subscription_->start({cluster_name_}, *this);
+}
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;

@@ -102,7 +102,6 @@ OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
-  startInitialization();
 }
 
 void OriginalDstCluster::addHost(HostSharedPtr& host) {

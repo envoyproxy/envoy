@@ -27,7 +27,10 @@ public:
                      ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
-  void initialize() override {}
+  void initialize(std::function<void()> callback) override {
+    setInitializeCallback(callback);
+    startInitialization();
+  }
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
   /**

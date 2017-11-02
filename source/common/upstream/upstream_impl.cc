@@ -262,6 +262,12 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
+void ClusterImplBase::setInitializeCallback(std::function<void()> callback) {
+  ASSERT(!initialization_started_);
+  ASSERT(initialization_complete_callback_ == nullptr);
+  initialization_complete_callback_ = callback;
+}
+
 void ClusterImplBase::startInitialization() {
   if (!initialization_started_ && health_checker_ && pending_initialize_health_checks_ == 0) {
     pending_initialize_health_checks_ = hosts().size();
@@ -275,23 +281,27 @@ void ClusterImplBase::startInitialization() {
   }
 
   if (!initialization_started_ && pending_initialize_health_checks_ == 0) {
+    initialization_started_ = true;
     finishInitialization();
+  } else {
+    initialization_started_ = true;
   }
-
-  initialization_started_ = true;
 }
 
 void ClusterImplBase::finishInitialization() {
+  ASSERT(initialization_complete_callback_ != nullptr);
+  ASSERT(initialization_started_);
+
   // Snap a copy of the completion callback so that we can set it to nullptr to unblock
   // reloadHealthyHosts(). See that function for more info on why we do this.
   auto snapped_callback = initialization_complete_callback_;
   initialization_complete_callback_ = nullptr;
 
-  if (snapped_callback != nullptr) {
-    if (health_checker_ != nullptr) {
-      reloadHealthyHosts();
-    }
+  if (health_checker_ != nullptr) {
+    reloadHealthyHosts();
+  }
 
+  if (snapped_callback != nullptr) {
     snapped_callback();
   }
 }
@@ -401,17 +411,32 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
-                      added_via_api) {
-  HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
+                      added_via_api),
+      initial_hosts_(new std::vector<HostSharedPtr>()) {
+
   for (const auto& host : cluster.hosts()) {
-    new_hosts->emplace_back(
+    initial_hosts_->emplace_back(
         HostSharedPtr{new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
                                    envoy::api::v2::Metadata::default_instance(), 1,
                                    envoy::api::v2::Locality().default_instance())});
   }
+}
 
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
-              {}, {});
+void StaticClusterImpl::initialize(std::function<void()> callback) {
+  setInitializeCallback(callback);
+
+  // At this point see if we have a health checker. If so, mark all the hosts unhealthy and then
+  // fire update callbacks to start the health checking process.
+  if (health_checker_) {
+    for (const auto& host : *initial_hosts_) {
+      host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    }
+  }
+
+  updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_), empty_host_lists_,
+              empty_host_lists_, *initial_hosts_, {});
+  initial_hosts_ = nullptr;
+
   startInitialization();
 }
 
@@ -529,10 +554,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                           fmt::format("tcp://{}:{}", host.socket_address().address(),
                                       host.socket_address().port_value())));
   }
+}
 
-  // We have to first construct resolve_targets_ before invoking startResolve(),
-  // since startResolve() might resolve immediately and relies on
-  // resolve_targets_ indirectly for performing host updates on resolution.
+void StrictDnsClusterImpl::initialize(std::function<void()> callback) {
+  setInitializeCallback(callback);
   for (const ResolveTargetPtr& target : resolve_targets_) {
     target->startResolve();
   }

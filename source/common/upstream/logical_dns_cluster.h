@@ -36,7 +36,7 @@ public:
   ~LogicalDnsCluster();
 
   // Upstream::Cluster
-  void initialize() override {}
+  void initialize(std::function<void()> callback) override;
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
