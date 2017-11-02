@@ -59,6 +59,7 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
 void RdsSubscription::onFetchComplete() {}
 
 void RdsSubscription::onFetchFailure(const EnvoyException* e) {
+  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdateFailed(e);
   stats_.update_failure_.inc();
   if (e) {

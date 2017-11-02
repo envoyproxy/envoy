@@ -51,6 +51,7 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
     Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add());
   }
 
+  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdate(resources);
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);
@@ -62,6 +63,7 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
 void CdsSubscription::onFetchComplete() {}
 
 void CdsSubscription::onFetchFailure(const EnvoyException* e) {
+  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdateFailed(e);
   stats_.update_failure_.inc();
   if (e) {

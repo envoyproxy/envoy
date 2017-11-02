@@ -57,7 +57,7 @@ private:
   std::string route_config_name_;
   std::string version_info_;
   const LocalInfo::LocalInfo& local_info_;
-  Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>* callbacks_;
+  Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>* callbacks_ = nullptr;
   Envoy::Config::SubscriptionStats stats_;
 };
 
