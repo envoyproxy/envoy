@@ -25,16 +25,6 @@ protected:
     return str;
   }
 
-  static void compressorDoubleInitTestHelper() {
-    ZlibCompressorImpl compressor;
-    compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
-                    ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
-                    memory_level);
-    compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
-                    ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
-                    memory_level);
-  }
-
   static void compressorBadInitTestHelper(int8_t window_bits, int8_t mem_level) {
     ZlibCompressorImpl compressor;
     compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
@@ -51,8 +41,6 @@ protected:
 };
 
 TEST_F(ZlibCompressorImplTest, CompressorTestDeath) {
-  EXPECT_DEATH(compressorDoubleInitTestHelper(),
-               std::string{"assert failure: initialized_ == false"});
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result >= 0"});
