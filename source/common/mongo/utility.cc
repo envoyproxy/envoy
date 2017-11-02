@@ -9,7 +9,8 @@
 namespace Envoy {
 namespace Mongo {
 
-QueryMessageInfo::QueryMessageInfo(const QueryMessage& query) : request_id_{query.requestId()} {
+QueryMessageInfo::QueryMessageInfo(const QueryMessage& query)
+    : request_id_{query.requestId()}, max_time_{0} {
   // First see if this is a command, if so we are done.
   const Bson::Document* command = parseCommand(query);
   if (command) {
