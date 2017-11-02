@@ -5,7 +5,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/singleton_injector.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 

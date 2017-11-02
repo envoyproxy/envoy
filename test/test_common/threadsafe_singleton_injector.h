@@ -1,4 +1,4 @@
-#include "common/common/singleton.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 

@@ -6,8 +6,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/singleton.h"
 #include "common/common/utility.h"
+#include "common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Http {

@@ -2,7 +2,7 @@
 
 #include "envoy/api/os_sys_calls.h"
 
-#include "common/common/singleton.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Api {

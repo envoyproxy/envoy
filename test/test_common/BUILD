@@ -92,9 +92,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "singleton_injector_lib",
-    hdrs = ["singleton_injector.h"],
+    name = "threadsafe_singleton_injector_lib",
+    hdrs = ["threadsafe_singleton_injector.h"],
     deps = [
-        "//source/common/common:singleton",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )

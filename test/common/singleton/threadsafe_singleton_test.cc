@@ -1,9 +1,9 @@
 #include <mutex>
 
-#include "common/common/singleton.h"
 #include "common/common/thread.h"
+#include "common/singleton/threadsafe_singleton.h"
 
-#include "test/test_common/singleton_injector.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 

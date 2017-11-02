@@ -93,12 +93,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "singleton",
-    hdrs = ["singleton.h"],
-    external_deps = ["abseil_base"],
-)
-
-envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )
