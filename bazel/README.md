@@ -72,9 +72,9 @@ unprefixed, e.g. `as` instead of `x86_64-linux-gnu-as`.
 
 ## Supported compiler versions
 
-Though Envoy has been run in production compiled with GCC 4.9 extensively, we now strongly
-recommend GCC >= 5 due to known issues with std::string thread safety. Clang >= 4.0 is also known
-to work.
+Though Envoy has been run in production compiled with GCC 4.9 extensively, we now require
+GCC >= 5 due to known issues with std::string thread safety and C++14 support. Clang >= 4.0 is also
+known to work.
 
 ## Clang STL debug symbols
 
