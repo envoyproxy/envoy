@@ -1,6 +1,7 @@
 #pragma once
 
 namespace Envoy {
+
 /**
  * @return the size of a C array.
  */
@@ -37,4 +38,5 @@ namespace Envoy {
 #else // C++11 on gcc 6, and all other cases
 #define FALLTHRU
 #endif
+
 } // Envoy
