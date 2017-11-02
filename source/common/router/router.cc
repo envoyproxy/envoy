@@ -144,16 +144,11 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     Http::CodeUtility::chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseStatInfo info{config_.scope_,
-                                               cluster_->statsScope(),
-                                               alt_stat_prefix_,
-                                               response_status_code,
-                                               internal_request,
-                                               EMPTY_STRING,
-                                               EMPTY_STRING,
-                                               zone_name,
-                                               upstream_zone,
-                                               is_canary};
+      Http::CodeUtility::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
+                                               alt_stat_prefix_, response_status_code,
+                                               internal_request, EMPTY_STRING,
+                                               EMPTY_STRING,     zone_name,
+                                               upstream_zone,    is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
