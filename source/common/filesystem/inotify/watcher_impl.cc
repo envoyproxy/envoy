@@ -52,14 +52,16 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb
 
 void WatcherImpl::onInotifyEvent() {
   while (true) {
-    char buffer[sizeof(inotify_event) + NAME_MAX + 1];
+    uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
     ssize_t rc = read(inotify_fd_, &buffer, sizeof(buffer));
     if (rc == -1 && errno == EAGAIN) {
       return;
     }
+    RELEASE_ASSERT(rc >= 0);
 
-    ssize_t index = 0;
-    while (index < rc) {
+    const size_t event_count = rc;
+    size_t index = 0;
+    while (index < event_count) {
       inotify_event* file_event = reinterpret_cast<inotify_event*>(&buffer[index]);
       ASSERT(callback_map_.count(file_event->wd) == 1);
 

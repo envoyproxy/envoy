@@ -57,6 +57,14 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
+    name = "registry_lib",
+    hdrs = ["registry.h"],
+    deps = [
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

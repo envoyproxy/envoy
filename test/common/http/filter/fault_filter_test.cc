@@ -7,6 +7,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/config/filter_json.h"
 #include "common/http/filter/fault_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -113,7 +114,10 @@ public:
 
   void SetUpTest(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new FaultFilterConfig(*config, runtime_, "prefix.", stats_));
+    envoy::api::v2::filter::http::HTTPFault fault;
+
+    Config::FilterJson::translateFaultFilter(*config, fault);
+    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -135,19 +139,9 @@ public:
 };
 
 void faultFilterBadConfigHelper(const std::string& json) {
-  Stats::IsolatedStoreImpl stats;
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
-}
-
-TEST(FaultFilterBadConfigTest, EmptyConfig) {
-  const std::string json = R"EOF(
-  {
-  }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
+  envoy::api::v2::filter::http::HTTPFault fault;
+  EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
 }
 
 TEST(FaultFilterBadConfigTest, BadAbortPercent) {

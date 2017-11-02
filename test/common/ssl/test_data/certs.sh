@@ -39,6 +39,10 @@ openssl x509 -req -days 730 -in san_dns_cert2.csr -sha256 -CA ca_cert.pem -CAkey
 openssl req -new -key san_multiple_dns_key.pem -out san_multiple_dns_cert.csr -config san_multiple_dns_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_multiple_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_multiple_dns_cert.pem -extensions v3_ca -extfile san_multiple_dns_cert.cfg
 
+# Generate san_only_dns_cert.pem.
+openssl req -new -key san_only_dns_key.pem -out san_only_dns_cert.csr -config san_only_dns_cert.cfg -batch -sha256
+openssl x509 -req -days 730 -in san_only_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_only_dns_cert.pem -extensions v3_ca -extfile san_only_dns_cert.cfg
+
 # Generate san_uri_cert.pem.
 openssl req -new -key san_uri_key.pem -out san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg

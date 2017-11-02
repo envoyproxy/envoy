@@ -172,8 +172,8 @@ private:
   static void buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
                                      rapidjson::Document::AllocatorType& allocator);
 
-  uint64_t line_number_start_;
-  uint64_t line_number_end_;
+  uint64_t line_number_start_ = 0;
+  uint64_t line_number_end_ = 0;
   const Type type_;
   Value value_;
 };
