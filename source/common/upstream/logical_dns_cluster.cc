@@ -117,7 +117,7 @@ void LogicalDnsCluster::startResolve() {
           }
         }
 
-        setInitialized();
+        startInitialization();
         resolve_timer_->enableTimer(dns_refresh_rate_ms_);
       });
 }

@@ -325,10 +325,10 @@ public:
   ClusterInfoConstSharedPtr info() const override { return info_; }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void setInitializedCb(std::function<void()> callback) override {
-    if (initialized_) {
+    if (initialization_started_) {
       callback();
     } else {
-      initialize_callback_ = callback;
+      initialization_complete_callback_ = callback;
     }
   }
 
@@ -343,7 +343,7 @@ protected:
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
   void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                           const std::vector<HostSharedPtr>& hosts_removed) override;
-  void setInitialized();
+  void startInitialization();
 
   static const HostListsConstSharedPtr empty_host_lists_;
 
@@ -355,10 +355,11 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
+  void finishInitialization();
   void reloadHealthyHosts();
 
-  std::function<void()> initialize_callback_;
-  bool initialized_{};
+  bool initialization_started_{};
+  std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
 };
 

@@ -26,6 +26,7 @@
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
@@ -131,6 +132,43 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   cluster.setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.hosts().size());
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
+}
+
+// Resolve zero hosts, while using health checking.
+TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
+  InSequence s;
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<MockClusterManager> cm;
+  ReadyWatcher initialized;
+
+  const std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}]
+  }
+  )EOF";
+
+  ResolverData resolver(*dns_resolver, dispatcher);
+  StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster.setHealthChecker(health_checker);
+  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(*resolver.timer_, enableTimer(_));
+  resolver.dns_callback_({});
+  EXPECT_EQ(0UL, cluster.hosts().size());
+  EXPECT_EQ(0UL, cluster.healthyHosts().size());
 }
 
 TEST(StrictDnsClusterImplTest, Basic) {
@@ -290,7 +328,7 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(100U, host->weight());
 }
 
-TEST(HostImplTest, HostameCanaryAndLocality) {
+TEST(HostImplTest, HostnameCanaryAndLocality) {
   MockCluster cluster;
   envoy::api::v2::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,

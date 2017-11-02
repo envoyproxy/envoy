@@ -262,34 +262,37 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
-void ClusterImplBase::setInitialized() {
-  if (!initialized_ && health_checker_ && pending_initialize_health_checks_ == 0) {
+void ClusterImplBase::startInitialization() {
+  if (!initialization_started_ && health_checker_ && pending_initialize_health_checks_ == 0) {
     pending_initialize_health_checks_ = hosts().size();
-    ASSERT(pending_initialize_health_checks_ > 0);
 
     // TODO(mattklein123): Remove this callback when done.
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool) -> void {
       if (pending_initialize_health_checks_ > 0 && --pending_initialize_health_checks_ == 0) {
-        setInitialized();
+        finishInitialization();
       }
     });
   }
 
-  initialized_ = true;
-  if (initialize_callback_ && pending_initialize_health_checks_ == 0) {
-    // Every time a host changes HC state we cause a full healthy host recalculation which
-    // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
-    // can also block worker threads by doing this repeatedly. There is no reason to do this
-    // as we will not start taking traffic until we are initialized. By blocking HC updates
-    // while initializing we can avoid this. When HC responses for all hosts have arrived and
-    // we are about to initialize, we unblock further HC updates which has the additional effect
-    // of forcing a healthy host recalculation.
+  if (!initialization_started_ && pending_initialize_health_checks_ == 0) {
+    finishInitialization();
+  }
+
+  initialization_started_ = true;
+}
+
+void ClusterImplBase::finishInitialization() {
+  // Snap a copy of the completion callback so that we can set it to nullptr to unblock
+  // reloadHealthyHosts(). See that function for more info on why we do this.
+  auto snapped_callback = initialization_complete_callback_;
+  initialization_complete_callback_ = nullptr;
+
+  if (snapped_callback != nullptr) {
     if (health_checker_ != nullptr) {
       reloadHealthyHosts();
     }
 
-    initialize_callback_();
-    initialize_callback_ = nullptr;
+    snapped_callback();
   }
 }
 
@@ -310,9 +313,8 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool changed_state) -> void {
     // If we get a health check completion that resulted in a state change, signal to
-    // update the host sets on all threads. See setInitialized() for why we block the reload
-    // on whether we are initializing or not.
-    if (initialize_callback_ == nullptr && changed_state) {
+    // update the host sets on all threads.
+    if (changed_state) {
       reloadHealthyHosts();
     }
   });
@@ -328,6 +330,15 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
 }
 
 void ClusterImplBase::reloadHealthyHosts() {
+  // Every time a host changes HC state we cause a full healthy host recalculation which
+  // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
+  // can also block worker threads by doing this repeatedly. There is no reason to do this
+  // as we will not start taking traffic until we are initialized. By blocking HC updates
+  // while initializing we can avoid this.
+  if (initialization_complete_callback_ != nullptr) {
+    return;
+  }
+
   HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(hosts()));
   HostListsConstSharedPtr hosts_per_locality_copy(
       new std::vector<std::vector<HostSharedPtr>>(hostsPerLocality()));
@@ -401,7 +412,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
               {}, {});
-  setInitialized();
+  startInitialization();
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
@@ -588,7 +599,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         // multiple DNS names, this will return initialized after a single DNS resolution completes.
         // This is not perfect but is easier to code and unclear if the extra complexity is needed
         // so will start with this.
-        parent_.setInitialized();
+        parent_.startInitialization();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
 }
