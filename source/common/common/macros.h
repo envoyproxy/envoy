@@ -28,7 +28,9 @@ namespace Envoy {
 /**
  * Have a generic fall-through for different versions of C++
  */
-#if __cplusplus >= 201402L // C++14, C++17 and above
+#if __cplusplus >= 201703L // C++17 and above
+#define FALLTHRU [[fallthrough]]
+#elif __cplusplus >= 201402L && __clang_major__ >= 5 // C++14 clang-5
 #define FALLTHRU [[fallthrough]]
 #elif __cplusplus >= 201103L && __GNUC__ >= 7 // C++11 gcc 7
 #define FALLTHRU [[gnu::fallthrough]]
