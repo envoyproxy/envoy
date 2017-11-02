@@ -57,7 +57,7 @@ private:
 
   std::string cluster_name_;
   std::string version_info_;
-  Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>* callbacks_;
+  Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>* callbacks_ = nullptr;
   ClusterStats& stats_;
 };
 

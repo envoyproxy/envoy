@@ -54,7 +54,8 @@ void SignalAction::installSigHandlers() {
     sigemptyset(&saction.sa_mask);
     saction.sa_flags = (SA_SIGINFO | SA_ONSTACK | SA_RESETHAND | SA_NODEFER);
     saction.sa_sigaction = sigHandler;
-    RELEASE_ASSERT(sigaction(sig, &saction, &previous_handlers_[hidx++]) == 0);
+    auto* handler = &previous_handlers_[hidx++];
+    RELEASE_ASSERT(sigaction(sig, &saction, handler) == 0);
   }
 }
 
@@ -69,7 +70,8 @@ void SignalAction::removeSigHandlers() {
 
   int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {
-    RELEASE_ASSERT(sigaction(sig, &previous_handlers_[hidx++], nullptr) == 0);
+    auto* handler = &previous_handlers_[hidx++];
+    RELEASE_ASSERT(sigaction(sig, handler, nullptr) == 0);
   }
 }
 
