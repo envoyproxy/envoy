@@ -10,35 +10,34 @@ namespace Compressor {
 /**
  * Implementation of compressor's interface.
  */
-class CompressorImpl : public Compressor {
+class ZlibCompressorImpl : public Compressor {
 public:
-  CompressorImpl();
-  ~CompressorImpl();
+  ZlibCompressorImpl();
 
   /**
-   * Enum values used to set compression level during initialization
+   * Enum values used to set compression level during initialization.
    * best: gives best compression.
    * speed: gives best.
    * standard: gives normal compression. (default)
    */
   enum class CompressionLevel : int8_t {
-    best = 9,
-    speed = 1,
-    standard = -1,
+    Best = 9,
+    Speed = 1,
+    Standard = -1,
   };
 
   /**
-   * Enum values are used for setting the compression algorith strategy.
+   * Enum values are used for setting the compression algorithm strategy.
    * filtered: used for data produced by a filter. (or predictor) @see Z_FILTERED (zlib manual)
    * huffman: used to enforce Huffman encoding. @see RFC 1951
    * rle: used to limit match distances to one. (Run-length encoding)
    * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY (zlib manual)
    */
   enum class CompressionStrategy : uint8_t {
-    filtered = 1,
-    huffman = 2,
-    rle = 3,
-    standard = 4,
+    Filtered = 1,
+    Huffman = 2,
+    Rle = 3,
+    Standard = 4,
   };
 
   /**
@@ -57,7 +56,6 @@ public:
    * compression, but will use more memory @see window_bits. (zlib manual)
    * @param memory_level sets how much memory should be allocated for the internal compression, min
    * 1 and max 9. @see memory_level (zlib manual)
-   * @throws EnvoyException if initialization fails.
    */
   void init(CompressionLevel level, CompressionStrategy strategy, int8_t window_bits,
             uint8_t memory_level);
@@ -66,13 +64,11 @@ public:
    * Finish must be called when the stream is over. It will compress all the remaining
    * input data and flush it to the output buffer.
    * @param output_buffer supplies the buffer to output compressed data.
-   * @throws EnvoyException if compression fails.
    */
   void finish(Buffer::Instance& output_buffer);
 
   /**
    * Implements Envoy::Compressor
-   * @throws EnvoyException if compression fails.
    */
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
@@ -80,7 +76,6 @@ private:
   void process(Buffer::Instance& output_buffer, uint8_t flush_state);
   void commit(Buffer::Instance& output_buffer);
   void reserve(Buffer::Instance& output_buffer);
-  std::string error(int8_t err);
 
   std::unique_ptr<Buffer::RawSlice> output_slice_ptr_;
   std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
