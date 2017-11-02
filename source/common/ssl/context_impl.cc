@@ -392,7 +392,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
           ContextImpl* context_impl = static_cast<ContextImpl*>(
               SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
           ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
-          RELEASE_ASSERT(server_context_impl != nullptr);
+          RELEASE_ASSERT(server_context_impl != nullptr); // for Coverity
           return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
                                                            encrypt);
         });
