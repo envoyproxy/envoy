@@ -51,7 +51,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
     Config::LdsJson::translateListener(*json_listener, *resources.Add());
   }
 
-  RELEASE_ASSERT(callbacks_ = nullptr);
+  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdate(resources);
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);
@@ -63,7 +63,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
 void LdsSubscription::onFetchComplete() {}
 
 void LdsSubscription::onFetchFailure(const EnvoyException* e) {
-  RELEASE_ASSERT(callbacks_ = nullptr);
+  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdateFailed(e);
   stats_.update_failure_.inc();
   if (e) {
