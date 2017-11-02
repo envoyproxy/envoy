@@ -72,7 +72,6 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     locality_lb_endpoints->mutable_lb_endpoints()->Swap(&it.second);
   }
 
-  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdate(resources);
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);
@@ -82,7 +81,6 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
 }
 
 void SdsSubscription::onFetchFailure(const EnvoyException* e) {
-  RELEASE_ASSERT(callbacks_ != nullptr);
   callbacks_->onConfigUpdateFailed(e);
   ENVOY_LOG(debug, "sds refresh failure for cluster: {}", cluster_name_);
   stats_.update_failure_.inc();
