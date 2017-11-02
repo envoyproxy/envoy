@@ -37,6 +37,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cleanup_lib",
+    hdrs = ["cleanup.h"],
+)
+
+envoy_cc_library(
     name = "compiler_requirements_lib",
     hdrs = ["compiler_requirements.h"],
 )
