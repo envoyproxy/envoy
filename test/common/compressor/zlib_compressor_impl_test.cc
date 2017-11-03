@@ -24,7 +24,10 @@ protected:
     }
     return str;
   }
+};
 
+class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
+protected:
   static void compressorBadInitTestHelper(int8_t window_bits, int8_t mem_level) {
     ZlibCompressorImpl compressor;
     compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
@@ -38,9 +41,10 @@ protected:
     in.add(multiply32BytesText(1));
     compressor.compress(in, out);
   }
+
 };
 
-TEST_F(ZlibCompressorImplTest, CompressorTestDeath) {
+TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result >= 0"});
