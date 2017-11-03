@@ -122,7 +122,7 @@ public:
             rds:
               route_config_name: {}
               config_source: {{ ads: {{}} }}
-            http_filters: [{{ name: envoy.router, config: {{ deprecated_v1: true }}}}]
+            http_filters: [{{ name: envoy.router }}]
     )EOF",
                     name, Network::Test::getLoopbackAddressString(GetParam()), route_config));
   }
