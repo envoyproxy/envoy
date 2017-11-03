@@ -162,3 +162,11 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "filter_json_test",
+    srcs = ["filter_json_test.cc"],
+    deps = [
+        "//source/common/config:filter_json_lib",
+    ],
+)

@@ -136,10 +136,6 @@ private:
   const std::string runtime_key_;
 };
 
-InstanceSharedPtr instanceFromProto(const envoy::api::v2::filter::AccessLog& config,
-                                    Runtime::Loader& runtime,
-                                    Envoy::AccessLog::AccessLogManager& log_manager);
-
 /**
  * Access log factory that reads the configuration from proto.
  */

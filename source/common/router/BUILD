@@ -123,6 +123,7 @@ envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
+    external_deps = ["envoy_filter_http_router"],
     deps = [
         ":config_lib",
         ":retry_state_lib",
@@ -136,6 +137,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:shadow_writer_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -154,6 +156,8 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/access_log:access_log_lib",
+        "//source/common/http/access_log:request_info_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )
