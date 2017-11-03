@@ -46,8 +46,6 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactoryFromProto(
   return createRouterFilter(dynamic_stats, start_child_span, stat_prefix, context);
 }
 
-ProtobufTypes::MessagePtr RouterFilterConfig::createEmptyConfigProto() { return nullptr; }
-
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */

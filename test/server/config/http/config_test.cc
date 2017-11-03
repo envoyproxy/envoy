@@ -144,11 +144,19 @@ TEST(HttpFilterConfigTest, CorrectFaultFilterInProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, EmptyFaultFilterInProto) {
+TEST(HttpFilterConfigTest, InvalidFaultFilterInProto) {
   envoy::api::v2::filter::http::HTTPFault config{};
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
+}
+
+TEST(HttpFilterConfigTest, FaultFilterWithEmptyProto) {
+  NiceMock<MockFactoryContext> context;
+  FaultFilterConfig factory;
+  EXPECT_THROW(
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context),
+      EnvoyException);
 }
 
 TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
@@ -244,11 +252,21 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(HttpFilterConfigTest, RouterFilterInProto) {
+TEST(HttpFilterConfigTest, CorrectRouterFilterProtoConfig) {
   envoy::api::v2::filter::http::Router config{};
   NiceMock<MockFactoryContext> context;
   RouterFilterConfig factory;
   HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
+  NiceMock<MockFactoryContext> context;
+  RouterFilterConfig factory;
+  HttpFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
