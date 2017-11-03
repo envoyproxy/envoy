@@ -127,6 +127,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
 
     // TODO(mattklein123): Remove copy when G string compat issues are fixed.
     const std::string zone_name = config_.local_info_.zoneName();
+    const std::string upstream_zone = upstreamZone(upstream_host);
 
     Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                              cluster_->statsScope(),
@@ -137,22 +138,17 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                              request_vcluster_ ? request_vcluster_->name()
                                                                : EMPTY_STRING,
                                              zone_name,
-                                             upstreamZone(upstream_host),
+                                             upstream_zone,
                                              is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseStatInfo info{config_.scope_,
-                                               cluster_->statsScope(),
-                                               alt_stat_prefix_,
-                                               response_status_code,
-                                               internal_request,
-                                               EMPTY_STRING,
-                                               EMPTY_STRING,
-                                               zone_name,
-                                               upstreamZone(upstream_host),
-                                               is_canary};
+      Http::CodeUtility::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
+                                               alt_stat_prefix_, response_status_code,
+                                               internal_request, EMPTY_STRING,
+                                               EMPTY_STRING,     zone_name,
+                                               upstream_zone,    is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
