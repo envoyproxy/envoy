@@ -41,7 +41,6 @@ protected:
     in.add(multiply32BytesText(1));
     compressor.compress(in, out);
   }
-
 };
 
 TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
