@@ -52,7 +52,7 @@ private:
 
   std::string version_info_;
   const LocalInfo::LocalInfo& local_info_;
-  Config::SubscriptionCallbacks<envoy::api::v2::Listener>* callbacks_;
+  Config::SubscriptionCallbacks<envoy::api::v2::Listener>* callbacks_ = nullptr;
   Config::SubscriptionStats stats_;
 };
 

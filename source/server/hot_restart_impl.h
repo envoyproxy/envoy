@@ -190,6 +190,7 @@ private:
   }
 
   int bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls);
+  void initDomainSocketAddress(sockaddr_un* address);
   sockaddr_un createDomainSocketAddress(uint64_t id);
   void onGetListenSocket(RpcGetListenSocketRequest& rpc);
   void onSocketEvent();
