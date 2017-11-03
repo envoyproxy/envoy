@@ -339,6 +339,7 @@ private:
     bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
     void commonContinue();
+    virtual bool canContinue() PURE;
     virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
     virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
     virtual bool complete() PURE;
@@ -375,6 +376,14 @@ private:
         : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
+    bool canContinue() override {
+      // It is possible for the connection manager to respond directly to a request even while
+      // a filter is trying to continue. If a response has already happened, we should not
+      // continue to further filters. A concrete example of this is a filter buffering data, the
+      // last data frame comes in and the filter continues, but the final buffering takes the stream
+      // over the high watermark such that a 413 is returned.
+      return !parent_.state_.local_complete_;
+    }
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
@@ -424,6 +433,7 @@ private:
         : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
+    bool canContinue() override { return true; }
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
