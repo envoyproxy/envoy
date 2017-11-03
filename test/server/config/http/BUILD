@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/http/access_log:access_log_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:router_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
