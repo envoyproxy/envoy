@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "common/common/cleanup.h"
+#include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/upstream/cds_subscription.h"
@@ -37,6 +39,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
+  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
   // We need to keep track of which clusters we might need to remove.
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   for (auto& cluster : resources) {
