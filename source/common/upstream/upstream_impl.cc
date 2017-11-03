@@ -298,6 +298,9 @@ uint64_t ClusterInfoImpl::parseFeatures(const envoy::api::v2::Cluster& config) {
   if (config.has_http2_protocol_options()) {
     features |= Features::HTTP2;
   }
+  if (config.protocol_selection() == envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL) {
+    features |= Features::USE_DOWNSTREAM_PROTOCOL;
+  }
   return features;
 }
 
