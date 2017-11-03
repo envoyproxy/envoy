@@ -103,9 +103,7 @@ public:
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span()) {
     for (const auto& upstream_log : config.upstream_log()) {
-      Http::AccessLog::InstanceSharedPtr current_upstream_log =
-          Http::AccessLog::AccessLogFactory::fromProto(upstream_log, context);
-      upstream_logs_.push_back(current_upstream_log);
+      upstream_logs_.push_back(Http::AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
 
