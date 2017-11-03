@@ -531,7 +531,7 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
 }
 
 void ServerContextImpl::updateConnection(SSL* ssl) {
-  RELEASE_ASSERT(ctx_);
+  ASSERT(ctx_);
 
   // Note: this updates only served certificates.
   SSL_set_SSL_CTX(ssl, ctx_.get());
