@@ -31,7 +31,7 @@ GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node,
                   dispatcher, service_method) {}
 
 GrpcMuxImpl::~GrpcMuxImpl() {
-  for (auto api_state : api_state_) {
+  for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
       watch->inserted_ = false;
     }
@@ -90,7 +90,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 void GrpcMuxImpl::handleFailure() {
-  for (auto api_state : api_state_) {
+  for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
       watch->callbacks_.onConfigUpdateFailed(nullptr);
     }
