@@ -41,10 +41,12 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactoryFromProto(
     const Protobuf::Message& config, const std::string& stat_prefix, FactoryContext& context) {
   const envoy::api::v2::filter::http::Router& router =
       dynamic_cast<const envoy::api::v2::filter::http::Router&>(config);
-  bool dynamic_stats = PROTOBUF_GET_WRAPPED_OR_DEFAULT(router, dynamic_stats, true);
-  bool start_child_span = router.start_child_span();
+  const bool dynamic_stats = PROTOBUF_GET_WRAPPED_OR_DEFAULT(router, dynamic_stats, true);
+  const bool start_child_span = router.start_child_span();
   return createRouterFilter(dynamic_stats, start_child_span, stat_prefix, context);
 }
+
+ProtobufTypes::MessagePtr RouterFilterConfig::createEmptyConfigProto() { return nullptr; }
 
 /**
  * Static registration for the router filter. @see RegisterFactory.

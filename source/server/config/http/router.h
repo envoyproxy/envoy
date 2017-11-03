@@ -23,6 +23,7 @@ public:
   HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                    const std::string& stat_prefix,
                                                    FactoryContext& context) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
 
 private:
