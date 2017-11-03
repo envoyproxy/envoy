@@ -60,7 +60,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
-      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
+      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
+      reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)) {
   cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
     onClusterMemberUpdate(hosts_added, hosts_removed);
