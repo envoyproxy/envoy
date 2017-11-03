@@ -2,10 +2,12 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/router/router.h"
 
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
@@ -23,9 +25,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/http/router.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
@@ -252,11 +256,13 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(HttpFilterConfigTest, CorrectRouterFilterProtoConfig) {
-  envoy::api::v2::filter::http::Router config{};
+TEST(HttpFilterConigTest, RouterV2Filter) {
+  envoy::api::v2::filter::http::Router router_config;
+  router_config.mutable_dynamic_stats()->set_value(true);
+
   NiceMock<MockFactoryContext> context;
   RouterFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

@@ -1,11 +1,9 @@
 #pragma once
 
-#include <regex>
-
 namespace Envoy {
-#if __cplusplus < 201103L ||                                                                       \
-    (defined(__GLIBCXX__) && (__cplusplus < 201402L) &&                                            \
-     (!defined(_GLIBCXX_REGEX_DFS_QUANTIFIERS_LIMIT) && !defined(_GLIBCXX_REGEX_STATE_LIMIT)))
-#error "Your compiler does not support std::regex properly.  GCC 4.9+ or Clang required."
+
+#if __cplusplus < 201402L
+#error "Your compiler does not support C++14. GCC 5+ or Clang is required."
 #endif
+
 } // Envoy
