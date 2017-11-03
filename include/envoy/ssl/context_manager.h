@@ -27,8 +27,8 @@ public:
    */
   virtual ServerContextPtr createSslServerContext(const std::string& listener_name,
                                                   const std::vector<std::string>& server_names,
-                                                  Stats::Scope& scope,
-                                                  ServerContextConfig& config) PURE;
+                                                  Stats::Scope& scope, ServerContextConfig& config,
+                                                  bool skip_context_update) PURE;
 
   /**
    * Find ServerContext for a given listener and server_name.

@@ -134,7 +134,8 @@ class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
   ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
                     const std::vector<std::string>& server_names, Stats::Scope& scope,
-                    ServerContextConfig& config, Runtime::Loader& runtime);
+                    ServerContextConfig& config, bool skip_context_update,
+                    Runtime::Loader& runtime);
   ~ServerContextImpl() { parent_.releaseServerContext(this, listener_name_, server_names_); }
 
 private:
@@ -148,6 +149,7 @@ private:
 
   const std::string listener_name_;
   const std::vector<std::string> server_names_;
+  const bool skip_context_update_;
   Runtime::Loader& runtime_;
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;

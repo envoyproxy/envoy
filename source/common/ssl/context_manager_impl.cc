@@ -59,12 +59,11 @@ ClientContextPtr ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
-ServerContextPtr
-ContextManagerImpl::createSslServerContext(const std::string& listener_name,
-                                           const std::vector<std::string>& server_names,
-                                           Stats::Scope& scope, ServerContextConfig& config) {
-  ServerContextPtr context(
-      new ServerContextImpl(*this, listener_name, server_names, scope, config, runtime_));
+ServerContextPtr ContextManagerImpl::createSslServerContext(
+    const std::string& listener_name, const std::vector<std::string>& server_names,
+    Stats::Scope& scope, ServerContextConfig& config, bool skip_context_update) {
+  ServerContextPtr context(new ServerContextImpl(*this, listener_name, server_names, scope, config,
+                                                 skip_context_update, runtime_));
   std::unique_lock<std::mutex> lock(contexts_lock_);
   contexts_.emplace_back(context.get());
 

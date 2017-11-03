@@ -47,7 +47,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config));
+      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
@@ -344,7 +344,7 @@ TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config));
+      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -418,9 +418,9 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx1(
-      manager.createSslServerContext("server1", {}, stats_store, server_ctx_config1));
+      manager.createSslServerContext("server1", {}, stats_store, server_ctx_config1, false));
   ServerContextPtr server_ctx2(
-      manager.createSslServerContext("server2", {}, stats_store, server_ctx_config2));
+      manager.createSslServerContext("server2", {}, stats_store, server_ctx_config2, false));
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
@@ -703,9 +703,9 @@ TEST_P(SslConnectionImplTest, ClientAuthCrossListenerSessionResumption) {
   ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(
-      manager.createSslServerContext("server1", {}, stats_store, server_ctx_config));
+      manager.createSslServerContext("server1", {}, stats_store, server_ctx_config, false));
   ServerContextPtr server2_ctx(
-      manager.createSslServerContext("server2", {}, stats_store, server2_ctx_config));
+      manager.createSslServerContext("server2", {}, stats_store, server2_ctx_config, false));
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -806,7 +806,7 @@ TEST_P(SslConnectionImplTest, SslError) {
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config));
+      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -848,7 +848,7 @@ public:
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
     server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_));
     manager_.reset(new ContextManagerImpl(runtime_));
-    server_ctx_ = manager_->createSslServerContext("", {}, stats_store_, *server_ctx_config_);
+    server_ctx_ = manager_->createSslServerContext("", {}, stats_store_, *server_ctx_config_, true);
 
     listener_ = dispatcher_->createSslListener(
         connection_handler_, *server_ctx_, socket_, listener_callbacks_, stats_store_,

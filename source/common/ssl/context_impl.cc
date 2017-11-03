@@ -359,9 +359,9 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
                                      const std::vector<std::string>& server_names,
                                      Stats::Scope& scope, ServerContextConfig& config,
-                                     Runtime::Loader& runtime)
+                                     bool skip_context_update, Runtime::Loader& runtime)
     : ContextImpl(parent, scope, config), listener_name_(listener_name),
-      server_names_(server_names), runtime_(runtime),
+      server_names_(server_names), skip_context_update_(skip_context_update), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   SSL_CTX_set_select_certificate_cb(
       ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
@@ -508,6 +508,10 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
       server_name =
           std::string(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
     }
+  }
+
+  if (skip_context_update_) {
+    return ssl_select_cert_success;
   }
 
   ServerContext* new_ctx = parent_.findSslServerContext(listener_name_, server_name);
