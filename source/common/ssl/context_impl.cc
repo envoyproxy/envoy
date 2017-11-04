@@ -493,8 +493,8 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
   size_t len;
 
   if (SSL_early_callback_ctx_extension_get(client_hello, TLSEXT_TYPE_server_name, &data, &len)) {
-    /* Based on BoringSSL's ext_sni_parse_clienthello(). Match on empty SNI if we encounter any
-     * errors. */
+    // Based on BoringSSL's ext_sni_parse_clienthello().
+    // Match on empty SNI instead of rejecting connection in case we cannot process the extension.
     CBS extension;
     CBS_init(&extension, data, len);
     CBS server_name_list, host_name;
