@@ -8,7 +8,7 @@ large amount of HTTP specific functionality. Envoy has a built in network level 
 :ref:`HTTP connection manager <config_http_conn_man>`. This filter translates raw bytes into HTTP
 level messages and events (e.g., headers received, body data received, trailers received, etc.). It
 also handles functionality common to all HTTP connections and requests such as :ref:`access logging
-<arch_overview_http_access_logs>`, :ref:`request ID generation and tracing <arch_overview_tracing>`,
+<arch_overview_access_logs>`, :ref:`request ID generation and tracing <arch_overview_tracing>`,
 :ref:`request/response header manipulation <config_http_conn_man_headers>`, :ref:`route table
 <arch_overview_http_routing>` management, and :ref:`statistics <config_http_conn_man_stats>`.
 
@@ -33,23 +33,6 @@ HTTP header sanitizing
 
 The HTTP connection manager performs various :ref:`header sanitizing
 <config_http_conn_man_header_sanitizing>` actions for security reasons.
-
-.. _arch_overview_http_access_logs:
-
-HTTP access logging
--------------------
-
-The HTTP connection manager supports extensible access logging with the following features:
-
-* Any number of access logs per connection manager.
-* Asynchronous IO flushing architecture. Access logging will never block the main network processing
-  threads.
-* Customizable access log formats using predefined fields as well as arbitrary HTTP request and
-  response headers.
-* Customizable access log filters that allow different types of requests and responses to be written
-  to different access logs.
-
-HTTP access log :ref:`configuration <config_http_conn_man_access_log>`.
 
 Route table configuration
 -------------------------
