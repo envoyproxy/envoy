@@ -33,7 +33,7 @@ protected:
     Buffer::OwnedImpl input_buffer;
     Buffer::OwnedImpl ouput_buffer;
     ZlibDecompressorImpl decompressor;
-    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     decompressor.decompress(input_buffer, ouput_buffer);
   }
 };
@@ -54,7 +54,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressSymetricTesting) {
 
   std::string original_text{};
   for (uint64_t i = 0; i < 50; ++i) {
-    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
     compressor.compress(input_buffer, output_buffer);
     original_text.append(TestUtility::bufferToString(input_buffer));
     input_buffer.drain(4796);
@@ -85,7 +85,7 @@ TEST_F(ZlibDecompressorImplTest, CompressWithSmallChunkMemmory) {
 
   std::string original_text{};
   for (uint64_t i = 0; i < 50; ++i) {
-    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
     compressor.compress(input_buffer, output_buffer);
     original_text.append(TestUtility::bufferToString(input_buffer));
     input_buffer.drain(4796);

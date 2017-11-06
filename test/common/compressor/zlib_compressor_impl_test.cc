@@ -34,7 +34,7 @@ protected:
     Buffer::OwnedImpl input_buffer;
     Buffer::OwnedImpl output_buffer;
     ZlibCompressorImpl compressor;
-    TestUtility::feedBufferWithRandomCharecters(input_buffer, 100);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     compressor.compress(input_buffer, output_buffer);
   }
 };
@@ -55,7 +55,7 @@ TEST_F(ZlibCompressorImplTest, CompressWithSmallChunkMemory) {
                   memory_level);
 
   for (uint64_t i = 0; i < 50; i++) {
-    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
     compressor.compress(input_buffer, output_buffer);
     input_buffer.drain(4796);
     ASSERT_EQ(0, input_buffer.length());
@@ -93,7 +93,7 @@ TEST_F(ZlibCompressorImplTest, CompressFlushAndCompressMore) {
                   memory_level);
 
   for (uint64_t i = 0; i < 50; i++) {
-    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
     compressor.compress(input_buffer, temp_buffer);
     input_buffer.drain(4796);
     ASSERT_EQ(0, input_buffer.length());
@@ -107,7 +107,7 @@ TEST_F(ZlibCompressorImplTest, CompressFlushAndCompressMore) {
   output_buffer.move(temp_buffer);
   ASSERT_EQ(0, temp_buffer.length());
 
-  TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+  TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
   compressor.compress(input_buffer, temp_buffer);
   input_buffer.drain(4796);
   output_buffer.move(temp_buffer);

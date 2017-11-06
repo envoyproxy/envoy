@@ -70,7 +70,7 @@ public:
    * @param buffer supplies the buffer to be fed.
    * @param n_bytes amount of bytes that should be add to the supplied buffer.
    */
-  static void feedBufferWithRandomCharecters(Buffer::Instance& buffer, uint64_t n_bytes);
+  static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_bytes);
 
   /**
    * Find a counter in a stats store.
