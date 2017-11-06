@@ -367,10 +367,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleFailure(FailureType::Active);
   }
 
-  if (response_headers_->Connection() &&
+  if ((response_headers_->Connection() &&
       0 ==
           StringUtil::caseInsensitiveCompare(response_headers_->Connection()->value().c_str(),
-                                             Http::Headers::get().ConnectionValues.Close.c_str())) {
+                                             Http::Headers::get().ConnectionValues.Close.c_str())) || !parent_.reuse_connection_) {
     client_->close();
   }
 
