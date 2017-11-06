@@ -440,11 +440,14 @@ TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession(
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
+    ENVOY_CONN_LOG(trace, "Healthcheck passed", *client_);
     data.drain(data.length());
     handleSuccess();
-  }
-  if (!parent_.reuse_connection_) {
-    client_->close(Network::ConnectionCloseType::NoFlush);
+    if (!parent_.reuse_connection_) {
+      if (client_) {
+        client_->close(Network::ConnectionCloseType::NoFlush);
+      }
+    }
   }
 }
 
