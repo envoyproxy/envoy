@@ -396,8 +396,11 @@ public:
   /**
    * Initialize the cluster. This will be called either immediately at creation or after all primary
    * clusters have been initialized (determined via initializePhase()).
+   * @param callback supplies a callback that will be invoked after the cluster has undergone first
+   *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
+   *        called when initial DNS resolution is complete.
    */
-  virtual void initialize() PURE;
+  virtual void initialize(std::function<void()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
@@ -405,13 +408,6 @@ public:
    *         that depends on resolution of the SDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
-
-  /**
-   * Set a callback that will be invoked after the cluster has undergone first time initialization.
-   * E.g., for a dynamic DNS cluster the initialize callback will be called when initial DNS
-   * resolution is complete.
-   */
-  virtual void setInitializedCb(std::function<void()> callback) PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;
