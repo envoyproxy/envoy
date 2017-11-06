@@ -39,17 +39,14 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
 }
 
-void EdsClusterImpl::initialize(std::function<void()> callback) {
-  setInitializeCallback(callback);
-  subscription_->start({cluster_name_}, *this);
-}
+void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   std::vector<HostSharedPtr> new_hosts;
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
-    startInitialization();
+    onPreInitComplete();
     return;
   }
   if (resources.size() != 1) {
@@ -102,18 +99,18 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
     updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), per_locality,
                 createHealthyHostLists(*per_locality), hosts_added, hosts_removed);
-    startInitialization();
+    onPreInitComplete();
   }
 
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
-  startInitialization();
+  onPreInitComplete();
 }
 
 void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
   UNREFERENCED_PARAMETER(e);
   // We need to allow server startup to continue, even if we have a bad config.
-  startInitialization();
+  onPreInitComplete();
 }
 
 } // namespace Upstream

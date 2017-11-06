@@ -27,10 +27,6 @@ public:
                      ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
-  void initialize(std::function<void()> callback) override {
-    setInitializeCallback(callback);
-    startInitialization();
-  }
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
   /**
@@ -104,6 +100,9 @@ public:
 private:
   void addHost(HostSharedPtr&);
   void cleanup();
+
+  // ClusterImplBase
+  void startPreInit() override { onPreInitComplete(); }
 
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds cleanup_interval_ms_;

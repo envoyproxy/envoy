@@ -262,14 +262,19 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
-void ClusterImplBase::setInitializeCallback(std::function<void()> callback) {
+void ClusterImplBase::initialize(std::function<void()> callback) {
   ASSERT(!initialization_started_);
   ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
+  startPreInit();
 }
 
-void ClusterImplBase::startInitialization() {
-  if (!initialization_started_ && health_checker_ && pending_initialize_health_checks_ == 0) {
+void ClusterImplBase::onPreInitComplete() {
+  // Protect against multiple calls.
+  const bool init_already_started = initialization_started_;
+  initialization_started_ = true;
+
+  if (!init_already_started && health_checker_ && pending_initialize_health_checks_ == 0) {
     pending_initialize_health_checks_ = hosts().size();
 
     // TODO(mattklein123): Remove this callback when done.
@@ -280,11 +285,8 @@ void ClusterImplBase::startInitialization() {
     });
   }
 
-  if (!initialization_started_ && pending_initialize_health_checks_ == 0) {
-    initialization_started_ = true;
+  if (!init_already_started && pending_initialize_health_checks_ == 0) {
     finishInitialization();
-  } else {
-    initialization_started_ = true;
   }
 }
 
@@ -422,9 +424,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
   }
 }
 
-void StaticClusterImpl::initialize(std::function<void()> callback) {
-  setInitializeCallback(callback);
-
+void StaticClusterImpl::startPreInit() {
   // At this point see if we have a health checker. If so, mark all the hosts unhealthy and then
   // fire update callbacks to start the health checking process.
   if (health_checker_) {
@@ -437,7 +437,7 @@ void StaticClusterImpl::initialize(std::function<void()> callback) {
               empty_host_lists_, *initial_hosts_, {});
   initial_hosts_ = nullptr;
 
-  startInitialization();
+  onPreInitComplete();
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
@@ -556,8 +556,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
   }
 }
 
-void StrictDnsClusterImpl::initialize(std::function<void()> callback) {
-  setInitializeCallback(callback);
+void StrictDnsClusterImpl::startPreInit() {
   for (const ResolveTargetPtr& target : resolve_targets_) {
     target->startResolve();
   }
@@ -624,7 +623,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         // multiple DNS names, this will return initialized after a single DNS resolution completes.
         // This is not perfect but is easier to code and unclear if the extra complexity is needed
         // so will start with this.
-        parent_.startInitialization();
+        parent_.onPreInitComplete();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
 }

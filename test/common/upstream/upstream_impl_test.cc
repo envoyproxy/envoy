@@ -143,18 +143,16 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   NiceMock<MockClusterManager> cm;
   ReadyWatcher initialized;
 
-  const std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "strict_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}]
-  }
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
   )EOF";
 
   ResolverData resolver(*dns_resolver, dispatcher);
-  StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());

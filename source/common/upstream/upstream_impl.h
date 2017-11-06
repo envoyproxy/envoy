@@ -324,6 +324,7 @@ public:
   // Upstream::Cluster
   ClusterInfoConstSharedPtr info() const override { return info_; }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
+  void initialize(std::function<void()> callback) override;
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
@@ -336,8 +337,18 @@ protected:
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
   void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                           const std::vector<HostSharedPtr>& hosts_removed) override;
-  void setInitializeCallback(std::function<void()> callback);
-  void startInitialization();
+
+  /**
+   * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
+   * query DNS, contact EDS, etc.
+   */
+  virtual void startPreInit() PURE;
+
+  /**
+   * Called by every concrete cluster when pre-init is complete. At this point, shared init takes
+   * over and determines if there is an initial health check pass needed, etc.
+   */
+  void onPreInitComplete();
 
   static const HostListsConstSharedPtr empty_host_lists_;
 
@@ -368,10 +379,12 @@ public:
                     ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
-  void initialize(std::function<void()> callback) override;
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
+  // ClusterImplBase
+  void startPreInit() override;
+
   HostVectorSharedPtr initial_hosts_;
 };
 
@@ -400,7 +413,6 @@ public:
                        Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
-  void initialize(std::function<void()> callback) override;
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
@@ -422,6 +434,9 @@ private:
 
   void updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
                       const std::vector<HostSharedPtr>& hosts_removed);
+
+  // ClusterImplBase
+  void startPreInit() override;
 
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;

@@ -36,7 +36,6 @@ public:
   ~LogicalDnsCluster();
 
   // Upstream::Cluster
-  void initialize(std::function<void()> callback) override;
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
@@ -86,6 +85,9 @@ private:
   };
 
   void startResolve();
+
+  // ClusterImplBase
+  void startPreInit() override;
 
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;

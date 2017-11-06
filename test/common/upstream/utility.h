@@ -51,6 +51,12 @@ inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_stri
   return cluster;
 }
 
+inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::Cluster cluster;
+  MessageUtil::loadFromYaml(yaml, cluster);
+  return cluster;
+}
+
 inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
   return parseClusterFromJson(defaultStaticClusterJson(name));
 }

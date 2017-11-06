@@ -58,10 +58,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
   });
 }
 
-void LogicalDnsCluster::initialize(std::function<void()> callback) {
-  setInitializeCallback(callback);
-  startResolve();
-}
+void LogicalDnsCluster::startPreInit() { startResolve(); }
 
 LogicalDnsCluster::~LogicalDnsCluster() {
   if (active_dns_query_) {
@@ -118,7 +115,7 @@ void LogicalDnsCluster::startResolve() {
           }
         }
 
-        startInitialization();
+        onPreInitComplete();
         resolve_timer_->enableTimer(dns_refresh_rate_ms_);
       });
 }

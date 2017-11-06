@@ -78,10 +78,19 @@ private:
 class ClusterManagerInitHelper : Logger::Loggable<Logger::Id::upstream> {
 public:
   enum class State {
+    // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
+    // are immediately initialized.
     Loading,
+    // During this state we wait for all static clusters to fully initialize. This requires
+    // completing phase 1 clusters, initializing phase 2 clusters, and then waiting for them.
     WaitingForStaticInitialize,
+    // If CDS is configured, this state tracks waiting for the first CDS response to populate
+    // clusters.
     WaitingForCdsInitialize,
+    // During this state, all CDS populated clusters are undergoing either phase 1 or phase 2
+    // initialization.
     CdsInitialized,
+    // All clusters are fully initialized.
     AllClustersInitialized
   };
 
@@ -90,7 +99,7 @@ public:
   void removeCluster(Cluster& cluster);
   void setCds(CdsApi* cds);
   void setInitializedCb(std::function<void()> callback);
-  State state() { return state_; }
+  State state() const { return state_; }
 
 private:
   void maybeFinishInitialize();
