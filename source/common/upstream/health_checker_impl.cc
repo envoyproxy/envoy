@@ -59,9 +59,9 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
+      reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
-      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
-      reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)) {
+      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
   cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
     onClusterMemberUpdate(hosts_added, hosts_removed);
@@ -443,6 +443,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     data.drain(data.length());
     handleSuccess();
   }
+  if (!parent_.reuse_connection_) {
+    client_->close(Network::ConnectionCloseType::NoFlush);
+  }
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
@@ -551,6 +554,9 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     handleSuccess();
   } else {
     handleFailure(FailureType::Active);
+  }
+  if (!parent_.reuse_connection_) {
+    client_->close();
   }
 }
 
