@@ -85,7 +85,7 @@ std::string RandomGeneratorImpl::uuid() {
   static thread_local uint8_t buffered[2048];
   static thread_local size_t buffered_idx = sizeof(buffered);
 
-  if (buffered_idx >= sizeof(buffered)) {
+  if (buffered_idx + 16 > sizeof(buffered)) {
     int rc = RAND_bytes(buffered, sizeof(buffered));
     ASSERT(rc == 1);
     UNREFERENCED_PARAMETER(rc);

@@ -13,6 +13,7 @@
 
 #include "common/common/callback_impl.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -120,6 +121,7 @@ public:
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  NiceMock<Config::MockGrpcMux> ads_mux_;
 };
 
 class MockHealthChecker : public HealthChecker {

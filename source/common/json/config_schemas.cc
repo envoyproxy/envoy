@@ -1093,7 +1093,8 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties" : {
-      "dynamic_stats" : {"type" : "boolean"}
+      "dynamic_stats" : {"type" : "boolean"},
+      "start_child_span" : {"type" : "boolean"}
     },
     "additionalProperties" : false
   }

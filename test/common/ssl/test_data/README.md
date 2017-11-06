@@ -18,6 +18,9 @@ There are 6 identities:
 - **SAN With Multiple DNS**: Same as *SAN With DNS* except there are multiple
   SANs. It has certificate *san_multiple_dns_cert.pem*, *san_multiple_dns_key.pem*
   is its private key.
+- **SAN only**: Same as *SAN With DNS* except that the certificate doesn't have the
+  CommonName set. It has certificate *san_only_dns_cert.pem*, *san_only_dns_key.pem*
+  is its private key.
 - **Self-signed**: The self-signed certificate *selfsigned_cert.pem", using the
   config *selfsigned_cert.cfg*. *selfsigned_key.pem* is its private key.
 

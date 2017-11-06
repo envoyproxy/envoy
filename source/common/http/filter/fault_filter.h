@@ -12,6 +12,9 @@
 
 #include "common/router/config_impl.h"
 
+#include "api/filter/http/fault.pb.h"
+#include "api/rds.pb.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -36,7 +39,7 @@ struct FaultFilterStats {
  */
 class FaultFilterConfig {
 public:
-  FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
+  FaultFilterConfig(const envoy::api::v2::filter::http::HTTPFault& fault, Runtime::Loader& runtime,
                     const std::string& stats_prefix, Stats::Scope& scope);
 
   const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {

@@ -12,6 +12,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "api/address.pb.h"
@@ -103,12 +104,10 @@ private:
 };
 
 TEST(ResolverTest, NonStandardResolver) {
-  // TODO(akonradi) Use singleton override instead of adding and removing
-  // resolvers for this test once issue #1808 is resolved.
-  Registry::RegisterFactory<TestResolver, Resolver> register_resolver;
-  auto& test_resolver = register_resolver.testGetFactory();
+  TestResolver test_resolver;
   test_resolver.addMapping("foo", "1.2.3.4");
   test_resolver.addMapping("bar", "4.3.2.1");
+  Registry::InjectFactory<Resolver> register_resolver(test_resolver);
 
   {
     envoy::api::v2::Address address;
