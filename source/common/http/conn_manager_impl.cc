@@ -1020,6 +1020,12 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   // TODO(mattklein123): Raise an error if this is called during a callback.
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", parent_,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
   ASSERT(stopped_);
@@ -1191,6 +1197,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
+  ENVOY_STREAM_LOG(debug, "request data too large watermark exceeded", parent_);
   if (parent_.state_.decoder_filters_streaming_) {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
@@ -1261,13 +1268,14 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
+    parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
+
     // If headers have not been sent to the user, send a 500.
     if (!headers_continued_) {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
       stopped_ = false;
 
-      parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
       Http::Utility::sendLocalReply(
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
             parent_.response_headers_ = std::move(response_headers);
