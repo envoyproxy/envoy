@@ -75,7 +75,9 @@ class HealthCheckerImplBase : public HealthChecker,
                               public std::enable_shared_from_this<HealthCheckerImplBase> {
 public:
   // Upstream::HealthChecker
-  void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
+  void addHostCheckCompleteCb(HostStatusCb callback) const override {
+    callbacks_.push_back(callback);
+  }
   void start() override;
 
 protected:
@@ -152,7 +154,7 @@ private:
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
-  std::list<HostStatusCb> callbacks_;
+  mutable std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds interval_jitter_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;

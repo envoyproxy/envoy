@@ -52,7 +52,7 @@ public:
     }
   }
 
-  MOCK_METHOD1(addChangedStateCb, void(ChangeStateCb cb));
+  MOCK_CONST_METHOD1(addChangedStateCb, void(ChangeStateCb cb));
   MOCK_CONST_METHOD0(successRateAverage, double());
   MOCK_CONST_METHOD0(successRateEjectionThreshold, double());
 

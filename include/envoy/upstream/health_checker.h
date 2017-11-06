@@ -28,7 +28,7 @@ public:
    * a host. The host's health check state may not have changed.
    * @param callback supplies the callback to invoke.
    */
-  virtual void addHostCheckCompleteCb(HostStatusCb callback) PURE;
+  virtual void addHostCheckCompleteCb(HostStatusCb callback) const PURE;
 
   /**
    * Start cyclic health checking based on the provided settings and the type of health checker.

@@ -322,6 +322,7 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   // Upstream::Cluster
+  const HealthChecker* healthChecker() const override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;

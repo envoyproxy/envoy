@@ -374,6 +374,8 @@ public:
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
 
+class HealthChecker;
+
 /**
  * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
  * all forwarding threads/workers. Individual HostSets are used on the workers themselves.
@@ -383,13 +385,19 @@ public:
   enum class InitializePhase { Primary, Secondary };
 
   /**
+   * @return a pointer to the cluster's health checker. If a health checker has not been installed,
+   *         returns nullptr.
+   */
+  virtual const HealthChecker* healthChecker() const PURE;
+
+  /**
    * @return the information about this upstream cluster.
    */
   virtual ClusterInfoConstSharedPtr info() const PURE;
 
   /**
    * @return a pointer to the cluster's outlier detector. If an outlier detector has not been
-   *         installed, returns a nullptr.
+   *         installed, returns nullptr.
    */
   virtual const Outlier::Detector* outlierDetector() const PURE;
 

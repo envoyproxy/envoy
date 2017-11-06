@@ -221,6 +221,7 @@ private:
                                         const std::vector<HostSharedPtr>& hosts_added,
                                         const std::vector<HostSharedPtr>& hosts_removed,
                                         ThreadLocal::Slot& tls);
+    static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
@@ -244,6 +245,7 @@ private:
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
                                     const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed);
+  void postThreadLocalHealthFailure(const HostSharedPtr& host);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

@@ -202,7 +202,7 @@ public:
   DetectorConfig& config() { return config_; }
 
   // Upstream::Outlier::Detector
-  void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
+  void addChangedStateCb(ChangeStateCb cb) const override { callbacks_.push_back(cb); }
   double successRateAverage() const override { return success_rate_average_; }
   double successRateEjectionThreshold() const override { return success_rate_ejection_threshold_; }
 
@@ -229,7 +229,7 @@ private:
   MonotonicTimeSource& time_source_;
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
-  std::list<ChangeStateCb> callbacks_;
+  mutable std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
   double success_rate_average_;
