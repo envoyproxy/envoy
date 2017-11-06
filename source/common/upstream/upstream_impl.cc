@@ -271,10 +271,12 @@ void ClusterImplBase::initialize(std::function<void()> callback) {
 
 void ClusterImplBase::onPreInitComplete() {
   // Protect against multiple calls.
-  const bool init_already_started = initialization_started_;
+  if (initialization_started_) {
+    return;
+  }
   initialization_started_ = true;
 
-  if (!init_already_started && health_checker_ && pending_initialize_health_checks_ == 0) {
+  if (health_checker_ && pending_initialize_health_checks_ == 0) {
     pending_initialize_health_checks_ = hosts().size();
 
     // TODO(mattklein123): Remove this callback when done.
@@ -285,7 +287,7 @@ void ClusterImplBase::onPreInitComplete() {
     });
   }
 
-  if (!init_already_started && pending_initialize_health_checks_ == 0) {
+  if (pending_initialize_health_checks_ == 0) {
     finishInitialization();
   }
 }
