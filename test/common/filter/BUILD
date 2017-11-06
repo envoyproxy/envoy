@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/server/config/http:file_access_log_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",

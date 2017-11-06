@@ -68,6 +68,7 @@ TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Protocol::Http10));
   EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Protocol::Http11));
   EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Protocol::Http2));
+  EXPECT_EQ("-", AccessLogFormatUtils::protocolToString({}));
 }
 
 TEST(AccessLogFormatterTest, plainStringFormatter) {
@@ -100,10 +101,24 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
+    RequestInfoFormatter request_duration_format("REQUEST_DURATION");
+    EXPECT_CALL(request_info, requestReceivedDuration())
+        .WillOnce(Return(Optional<std::chrono::microseconds>()));
+    EXPECT_EQ("-", request_duration_format.format(header, header, request_info));
+  }
+
+  {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
     std::chrono::microseconds duration{10000};
     EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(Return(duration));
     EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
+    EXPECT_CALL(request_info, responseReceivedDuration())
+        .WillOnce(Return(Optional<std::chrono::microseconds>()));
+    EXPECT_EQ("-", response_duration_format.format(header, header, request_info));
   }
 
   {

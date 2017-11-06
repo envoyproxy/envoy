@@ -106,25 +106,43 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
 }
 
 TEST(RequestInfoImplTest, MiscSettersAndGetters) {
-  RequestInfoImpl request_info(Protocol::Http2);
-  EXPECT_EQ(Protocol::Http2, request_info.protocol().value());
+  {
+    RequestInfoImpl request_info(Protocol::Http2);
+    EXPECT_EQ(Protocol::Http2, request_info.protocol().value());
 
-  request_info.protocol(Protocol::Http10);
-  EXPECT_EQ(Protocol::Http10, request_info.protocol().value());
+    request_info.protocol(Protocol::Http10);
+    EXPECT_EQ(Protocol::Http10, request_info.protocol().value());
 
-  EXPECT_FALSE(request_info.responseCode().valid());
-  request_info.response_code_ = 200;
-  ASSERT_TRUE(request_info.responseCode().valid());
-  EXPECT_EQ(200, request_info.responseCode().value());
+    EXPECT_FALSE(request_info.responseCode().valid());
+    request_info.response_code_ = 200;
+    ASSERT_TRUE(request_info.responseCode().valid());
+    EXPECT_EQ(200, request_info.responseCode().value());
 
-  EXPECT_EQ(nullptr, request_info.upstreamHost());
-  Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
-  request_info.onUpstreamHostSelected(host);
-  EXPECT_EQ(host, request_info.upstreamHost());
+    EXPECT_EQ(nullptr, request_info.upstreamHost());
+    Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
+    request_info.onUpstreamHostSelected(host);
+    EXPECT_EQ(host, request_info.upstreamHost());
 
-  EXPECT_FALSE(request_info.healthCheck());
-  request_info.healthCheck(true);
-  EXPECT_TRUE(request_info.healthCheck());
+    EXPECT_FALSE(request_info.healthCheck());
+    request_info.healthCheck(true);
+    EXPECT_TRUE(request_info.healthCheck());
+  }
+
+  {
+    RequestInfoImpl request_info;
+
+    // If no value is set, these should be not valid
+    EXPECT_FALSE(request_info.protocol().valid());
+    EXPECT_FALSE(request_info.requestReceivedDuration().valid());
+    EXPECT_FALSE(request_info.responseReceivedDuration().valid());
+
+    request_info.protocol(Protocol::Http10);
+    request_info.requestReceivedDuration(std::chrono::steady_clock::now());
+    request_info.responseReceivedDuration(std::chrono::steady_clock::now());
+    EXPECT_TRUE(request_info.protocol().valid());
+    EXPECT_TRUE(request_info.requestReceivedDuration().valid());
+    EXPECT_TRUE(request_info.responseReceivedDuration().valid());
+  }
 }
 
 } // namespace

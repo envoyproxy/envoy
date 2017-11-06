@@ -20,6 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -340,23 +341,59 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
   EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
 }
 
-class TcpProxyTest : public testing::Test {
-public:
-  TcpProxyTest() {
-    std::string json = R"EOF(
+TEST(TcpProxyConfigTest, AccessLogConfig) {
+  std::string json = R"EOF(
     {
       "stat_prefix": "name",
       "route_config": {
         "routes": [
-          {
-            "cluster": "fake_cluster"
-          }
         ]
-      }
+      },
+      "access_log": [
+        {
+          "path": "some_path",
+          "format": "the format specifier"
+        },
+        {
+          "path": "another path"
+        }
+      ]
     }
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+
+  TcpProxyConfig config_obj(*json_config, factory_context_);
+  EXPECT_EQ(2, config_obj.accessLogs().size());
+}
+
+class TcpProxyTest : public testing::Test {
+public:
+  TcpProxyTest() {
+    ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
+        .WillByDefault(SaveArg<0>(&access_log_data_));
+    reconfigureAccessLogging(std::string());
+  }
+
+  void reconfigureAccessLogging(const std::string& accessLogJson) {
+    std::string json = R"EOF(
+    {{
+      "stat_prefix": "name",
+      "route_config": {{
+        "routes": [
+          {{
+            "cluster": "fake_cluster"
+          }}
+        ]
+      }},
+      "access_log": [
+        {}
+      ]
+    }}
+    )EOF";
+
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(fmt::format(json, accessLogJson));
     config_.reset(new TcpProxyConfig(*config, factory_context_));
   }
 
@@ -398,6 +435,7 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   NiceMock<Event::MockTimer>* connect_timer_{};
   std::unique_ptr<TcpProxy> filter_;
+  std::string access_log_data_;
 };
 
 TEST_F(TcpProxyTest, UpstreamDisconnect) {
@@ -478,6 +516,13 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
+  reconfigureAccessLogging(R"EOF(
+      {
+        "path": "unused",
+        "format": "%RESPONSE_FLAGS%"
+      }
+    )EOF");
+
   setup(true);
 
   Buffer::OwnedImpl buffer("hello");
@@ -490,11 +535,23 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   EXPECT_EQ(1U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_timeout")
                     .value());
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UF");
 }
 
 TEST_F(TcpProxyTest, NoHost) {
+  reconfigureAccessLogging(R"EOF(
+      {
+        "path": "unused",
+        "format": "%RESPONSE_FLAGS%"
+      }
+    )EOF");
+
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   setup(false);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UH");
 }
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
@@ -505,6 +562,12 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
+  reconfigureAccessLogging(R"EOF(
+      {
+        "path": "unused",
+        "format": "%RESPONSE_FLAGS%"
+      }
+    )EOF");
   setup(true);
 
   Buffer::OwnedImpl buffer("hello");
@@ -517,9 +580,18 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   EXPECT_EQ(1U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_fail")
                     .value());
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UF");
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
+  reconfigureAccessLogging(R"EOF(
+      {
+        "path": "unused",
+        "format": "%RESPONSE_FLAGS%"
+      }
+    )EOF");
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
 
@@ -533,6 +605,45 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   EXPECT_EQ(1U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_overflow")
                     .value());
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UO");
+}
+
+TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
+  reconfigureAccessLogging(R"EOF(
+      {
+        "path": "unused",
+        "format": "%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"
+      }
+    )EOF");
+  setup(true);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
+}
+
+TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
+  reconfigureAccessLogging(R"EOF(
+      {
+        "path": "unused",
+        "format": "bytesreceived=%BYTES_RECEIVED% bytessent=%BYTES_SENT% datetime=%START_TIME% nonzeronum=%DURATION%"
+      }
+    )EOF");
+  setup(true);
+
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  Buffer::OwnedImpl buffer("a");
+  filter_->onData(buffer);
+  Buffer::OwnedImpl response("bb");
+  upstream_read_filter_->onData(response);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_THAT(access_log_data_,
+              MatchesRegex(
+                  "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
 }
 
 class TcpProxyRoutingTest : public testing::Test {

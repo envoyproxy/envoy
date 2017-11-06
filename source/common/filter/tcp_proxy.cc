@@ -271,6 +271,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 void TcpProxy::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
+  request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure);
 
   // This will close the upstream connection as well.
   onConnectTimeoutError();
