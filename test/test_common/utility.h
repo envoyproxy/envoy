@@ -66,6 +66,13 @@ public:
   static std::string bufferToString(const Buffer::Instance& buffer);
 
   /**
+   * Feed a buffer with random characters.
+   * @param buffer supplies the buffer to be fed.
+   * @param n_bytes amount of bytes that should be add to the supplied buffer.
+   */
+  static void feedBufferWithRandomCharecters(Buffer::Instance& buffer, uint64_t n_bytes);
+
+  /**
    * Find a counter in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.

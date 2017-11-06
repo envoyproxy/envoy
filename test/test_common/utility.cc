@@ -80,6 +80,18 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   return output;
 }
 
+void TestUtility::feedBufferWithRandomCharecters(Buffer::Instance& buffer, uint64_t n_bytes) {
+  std::string const chars = "abcdefghijklmnaoqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+  std::random_device rd;
+  std::mt19937 generate(rd());
+  std::uniform_int_distribution<> distribute(1, chars.length() - 1);
+  std::string str{};
+  for (uint64_t n = 0; n < n_bytes; ++n) {
+    str += chars.at(distribute(generate));
+  }
+  buffer.add(str);
+}
+
 Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
   for (auto counter : store.counters()) {
     if (counter->name() == name) {

@@ -13,6 +13,7 @@ namespace Compressor {
 class ZlibCompressorImpl : public Compressor {
 public:
   ZlibCompressorImpl();
+  ZlibCompressorImpl(uint64_t chunk);
 
   /**
    * Enum values used to set compression level during initialization.
@@ -41,13 +42,6 @@ public:
   };
 
   /**
-   * Sets buffer size for feeding data to the compressor routines.
-   * @param chunk amount of memory reserved for the compressor output default =
-   * 4096.
-   */
-  void setChunk(uint64_t chunk);
-
-  /**
    * Init must be called in order to initialize the compressor. It should be always called before
    * calling compress.
    * @param level @see CompressionLevel enum
@@ -61,11 +55,16 @@ public:
             uint8_t memory_level);
 
   /**
-   * Finish must be called when the stream is over. It will compress all the remaining
-   * input data and flush it to the output buffer.
+   * Flush must be called usually when stream is over. It will compress any remaining
+   * input data in the compressor and flush it to the output buffer.
    * @param output_buffer supplies the buffer to output compressed data.
    */
-  void finish(Buffer::Instance& output_buffer);
+  void flush(Buffer::Instance& output_buffer);
+
+  /**
+   * Returns adler checksum
+   */
+  uint64_t checksum();
 
   /**
    * Implements Envoy::Compressor
@@ -73,16 +72,13 @@ public:
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
 private:
-  void process(Buffer::Instance& output_buffer, uint8_t flush_state);
-  void commit(Buffer::Instance& output_buffer);
-  void reserve(Buffer::Instance& output_buffer);
-
-  std::unique_ptr<Buffer::RawSlice> output_slice_ptr_;
+  bool deflateNext(int8_t flush_state);
+  void process(Buffer::Instance& output_buffer, int8_t flush_state);
+  void updateOutput(Buffer::Instance& output_buffer);
+  uint64_t chunk_;
+  bool initialized_;
+  std::unique_ptr<unsigned char[]> output_char_ptr_;
   std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
-
-  bool initialized_{false};
-
-  uint64_t chunk_{4096};
 };
 
 } // namespace Compressor

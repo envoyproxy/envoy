@@ -1,3 +1,4 @@
+#include <random>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -6,6 +7,8 @@
 #include "common/common/assert.h"
 #include "common/common/hex.h"
 #include "common/compressor/zlib_compressor_impl.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -17,13 +20,6 @@ class ZlibCompressorImplTest : public testing::Test {
 protected:
   static const int8_t gzip_window_bits{31};
   static const int8_t memory_level{8};
-  static std::string multiply32BytesText(uint64_t n) {
-    std::string str{};
-    for (uint64_t i = 0; i < n; ++i) {
-      str.append("Sed ut perspiciatis unde omnis i");
-    }
-    return str;
-  }
 };
 
 class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
@@ -35,43 +31,42 @@ protected:
   }
 
   static void unitializedCompressorTestHelper() {
-    Buffer::OwnedImpl in;
-    Buffer::OwnedImpl out;
+    Buffer::OwnedImpl input_buffer;
+    Buffer::OwnedImpl output_buffer;
     ZlibCompressorImpl compressor;
-    in.add(multiply32BytesText(1));
-    compressor.compress(in, out);
+    TestUtility::feedBufferWithRandomCharecters(input_buffer, 100);
+    compressor.compress(input_buffer, output_buffer);
   }
 };
 
 TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
-  EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result >= 0"});
+  EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
 }
 
-TEST_F(ZlibCompressorImplTest, CompressGzipEnconding) {
-  Buffer::OwnedImpl in;
-  Buffer::OwnedImpl out;
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+TEST_F(ZlibCompressorImplTest, CompressWithSmallChunkMemory) {
+  Buffer::OwnedImpl input_buffer;
+  Buffer::OwnedImpl output_buffer;
 
+  Envoy::Compressor::ZlibCompressorImpl compressor(768);
   compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
                   ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
                   memory_level);
 
-  const uint64_t n_chunks = 1000;
-  for (uint64_t i = 0; i < n_chunks; i++) {
-    const uint64_t index{i % 256};
-    in.add(multiply32BytesText(index));
-    compressor.compress(in, out);
-    in.drain(32 * index);
-    ASSERT_EQ(0, in.length());
+  for (uint64_t i = 0; i < 50; i++) {
+    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    compressor.compress(input_buffer, output_buffer);
+    input_buffer.drain(4796);
+    ASSERT_EQ(0, input_buffer.length());
   }
 
-  compressor.finish(out);
+  compressor.flush(output_buffer);
+  ASSERT_TRUE(output_buffer.length() > 0);
 
-  uint64_t num_comp_slices = out.getRawSlices(nullptr, 0);
+  uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice compressed_slices[num_comp_slices];
-  out.getRawSlices(compressed_slices, num_comp_slices);
+  output_buffer.getRawSlices(compressed_slices, num_comp_slices);
 
   const std::string header_hex_str = Hex::encode(
       reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
@@ -87,30 +82,45 @@ TEST_F(ZlibCompressorImplTest, CompressGzipEnconding) {
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
-TEST_F(ZlibCompressorImplTest, CompressWithSmallChunk) {
-  Buffer::OwnedImpl in;
-  Buffer::OwnedImpl out;
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+TEST_F(ZlibCompressorImplTest, CompressFlushAndCompressMore) {
+  Buffer::OwnedImpl input_buffer;
+  Buffer::OwnedImpl temp_buffer;
+  Buffer::OwnedImpl output_buffer;
 
+  Envoy::Compressor::ZlibCompressorImpl compressor;
   compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
                   ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
                   memory_level);
-  compressor.setChunk(768);
 
-  const uint64_t n_chunks = 1000;
-  for (uint64_t i = 0; i < n_chunks; i++) {
-    const uint64_t index{i % 256};
-    in.add(multiply32BytesText(index));
-    compressor.compress(in, out);
-    in.drain(32 * index);
-    ASSERT_EQ(0, in.length());
+  for (uint64_t i = 0; i < 50; i++) {
+    TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+    compressor.compress(input_buffer, temp_buffer);
+    input_buffer.drain(4796);
+    ASSERT_EQ(0, input_buffer.length());
+    output_buffer.move(temp_buffer);
+    ASSERT_EQ(0, temp_buffer.length());
   }
 
-  compressor.finish(out);
+  compressor.flush(temp_buffer);
+  ASSERT_TRUE(temp_buffer.length() > 0);
 
-  const uint64_t num_comp_slices = out.getRawSlices(nullptr, 0);
+  output_buffer.move(temp_buffer);
+  ASSERT_EQ(0, temp_buffer.length());
+
+  TestUtility::feedBufferWithRandomCharecters(input_buffer, 4796);
+  compressor.compress(input_buffer, temp_buffer);
+  input_buffer.drain(4796);
+  output_buffer.move(temp_buffer);
+
+  compressor.flush(temp_buffer);
+  ASSERT_TRUE(temp_buffer.length() > 0);
+
+  output_buffer.move(temp_buffer);
+  ASSERT_EQ(0, temp_buffer.length());
+
+  uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice compressed_slices[num_comp_slices];
-  out.getRawSlices(compressed_slices, num_comp_slices);
+  output_buffer.getRawSlices(compressed_slices, num_comp_slices);
 
   const std::string header_hex_str = Hex::encode(
       reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);

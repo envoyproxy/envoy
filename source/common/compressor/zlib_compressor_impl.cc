@@ -7,14 +7,19 @@
 namespace Envoy {
 namespace Compressor {
 
-ZlibCompressorImpl::ZlibCompressorImpl()
-    : zstream_ptr_(new z_stream(), [](z_stream* z) {
+ZlibCompressorImpl::ZlibCompressorImpl() : ZlibCompressorImpl(4096){};
+
+ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
+    : chunk_{chunk_size}, initialized_{false}, output_char_ptr_(new unsigned char[chunk_size]),
+      zstream_ptr_(new z_stream(), [](z_stream* z) {
         deflateEnd(z);
         delete z;
       }) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
+  zstream_ptr_->avail_out = chunk_;
+  zstream_ptr_->next_out = output_char_ptr_.get();
 }
 
 void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
@@ -27,19 +32,14 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
   initialized_ = true;
 }
 
-void ZlibCompressorImpl::setChunk(uint64_t chunk) { chunk_ = chunk; }
-
-void ZlibCompressorImpl::finish(Buffer::Instance& output_buffer) {
+void ZlibCompressorImpl::flush(Buffer::Instance& output_buffer) {
   process(output_buffer, Z_SYNC_FLUSH);
-  commit(output_buffer);
 }
+
+uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibCompressorImpl::compress(const Buffer::Instance& input_buffer,
                                   Buffer::Instance& output_buffer) {
-  if (zstream_ptr_->total_out == 0) {
-    reserve(output_buffer);
-  }
-
   const uint64_t num_slices = input_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   input_buffer.getRawSlices(slices, num_slices);
@@ -51,27 +51,33 @@ void ZlibCompressorImpl::compress(const Buffer::Instance& input_buffer,
   }
 }
 
-void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, uint8_t flush_state) {
-  do {
+bool ZlibCompressorImpl::deflateNext(int8_t flush_state) {
+  const int result = deflate(zstream_ptr_.get(), static_cast<int>(flush_state));
+  if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
+    return false; // This means that zlib needs more input, so stop here
+  }
+
+  RELEASE_ASSERT(result == Z_OK);
+  return true;
+}
+
+void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int8_t flush_state) {
+  while (deflateNext(flush_state)) {
     if (zstream_ptr_->avail_out == 0) {
-      commit(output_buffer);
-      reserve(output_buffer);
+      updateOutput(output_buffer);
     }
-    const int result = deflate(zstream_ptr_.get(), static_cast<int>(flush_state));
-    RELEASE_ASSERT(result >= 0);
-  } while (zstream_ptr_->avail_out == 0);
+  }
+
+  if (flush_state == Z_SYNC_FLUSH) {
+    updateOutput(output_buffer);
+  }
 }
 
-void ZlibCompressorImpl::reserve(Buffer::Instance& output_buffer) {
-  output_slice_ptr_.reset(new Buffer::RawSlice());
-  output_buffer.reserve(chunk_, output_slice_ptr_.get(), 1);
-  zstream_ptr_->avail_out = output_slice_ptr_->len_;
-  zstream_ptr_->next_out = static_cast<Bytef*>(output_slice_ptr_->mem_);
-}
-
-void ZlibCompressorImpl::commit(Buffer::Instance& output_buffer) {
-  output_slice_ptr_->len_ = output_slice_ptr_->len_ - zstream_ptr_->avail_out;
-  output_buffer.commit(output_slice_ptr_.get(), 1);
+void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
+  output_buffer.add(static_cast<void*>(output_char_ptr_.get()), chunk_ - zstream_ptr_->avail_out);
+  output_char_ptr_.reset(new unsigned char[chunk_]);
+  zstream_ptr_->avail_out = chunk_;
+  zstream_ptr_->next_out = output_char_ptr_.get();
 }
 
 } // namespace Compressor
