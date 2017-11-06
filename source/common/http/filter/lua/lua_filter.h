@@ -52,7 +52,27 @@ class Filter;
 class StreamHandleWrapper : public Envoy::Lua::BaseLuaObject<StreamHandleWrapper>,
                             public AsyncClient::Callbacks {
 public:
-  enum class State { Running, WaitForBodyChunk, WaitForBody, WaitForTrailers, HttpCall, Responded };
+  /**
+   * The state machine for a stream handler. In the current implementation everything the filter
+   * does is a discrete state. This may become sub-optimal as we add other things that might
+   * cause the filter to block.
+   * TODO(mattklein123): Consider whether we should split the state machine into an overall state
+   * and a blocking reason type.
+   */
+  enum class State {
+    // Lua code is currently running or the script has finished.
+    Running,
+    // Lua script is blocked waiting for the next body chunk.
+    WaitForBodyChunk,
+    // Lua script is blocked waiting for the full body.
+    WaitForBody,
+    // Lua script is blocked waiting for trailers.
+    WaitForTrailers,
+    // Lua script is blocked waiting for the result of an HTTP call.
+    HttpCall,
+    // Lua script has done a direct response.
+    Responded
+  };
 
   StreamHandleWrapper(Envoy::Lua::CoroutinePtr&& coroutine, HeaderMap& headers, bool end_stream,
                       Filter& filter, FilterCallbacks& callbacks);

@@ -43,7 +43,7 @@ FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool end_st
   saw_body_ = true;
 
   if (state_ == State::WaitForBodyChunk) {
-    ENVOY_LOG(debug, "resuming for next body chunk");
+    ENVOY_LOG(trace, "resuming for next body chunk");
     Envoy::Lua::LuaDeathRef<Envoy::Lua::BufferWrapper> wrapper(
         Envoy::Lua::BufferWrapper::create(coroutine_->luaState(), data), true);
     state_ = State::Running;
@@ -60,7 +60,7 @@ FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool end_st
   }
 
   if (state_ == State::HttpCall || state_ == State::WaitForBody) {
-    ENVOY_LOG(debug, "buffering body");
+    ENVOY_LOG(trace, "buffering body");
     return FilterDataStatus::StopIterationAndBuffer;
   } else if (state_ == State::Responded) {
     return FilterDataStatus::StopIterationNoBuffer;
@@ -105,6 +105,10 @@ FilterTrailersStatus StreamHandleWrapper::onTrailers(HeaderMap& trailers) {
 int StreamHandleWrapper::luaRespond(lua_State* state) {
   ASSERT(state_ == State::Running);
 
+  if (headers_continued_) {
+    luaL_error(state, "respond() cannot be called if headers have been continued");
+  }
+
   luaL_checktype(state, 2, LUA_TTABLE);
   size_t body_size;
   const char* raw_body = luaL_optlstring(state, 3, nullptr, &body_size);
@@ -142,7 +146,8 @@ HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, int ta
     const char* value = luaL_checkstring(state, -1);
     headers->addCopy(LowerCaseString(key), value);
 
-    // removes 'value'; keeps 'key' for next iteration.
+    // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
+    // it can push the next key/value pair onto the stack.
     lua_pop(state, 1);
   }
 

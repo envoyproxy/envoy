@@ -52,26 +52,24 @@ TEST_P(LuaIntegrationTest, RequestAndResponse) {
       R"EOF(
 name: envoy.lua
 config:
-  deprecated_v1: true
-  value:
-    inline_code: |
-      function envoy_on_request(request_handle)
-        request_handle:logTrace("log test")
-        request_handle:logDebug("log test")
-        request_handle:logInfo("log test")
-        request_handle:logWarn("log test")
-        request_handle:logErr("log test")
-        request_handle:logCritical("log test")
+  inline_code: |
+    function envoy_on_request(request_handle)
+      request_handle:logTrace("log test")
+      request_handle:logDebug("log test")
+      request_handle:logInfo("log test")
+      request_handle:logWarn("log test")
+      request_handle:logErr("log test")
+      request_handle:logCritical("log test")
 
-        local body_length = request_handle:body():length()
-        request_handle:headers():add("request_body_size", body_length)
-      end
+      local body_length = request_handle:body():length()
+      request_handle:headers():add("request_body_size", body_length)
+    end
 
-      function envoy_on_response(response_handle)
-        local body_length = response_handle:body():length()
-        response_handle:headers():add("response_body_size", body_length)
-        response_handle:headers():remove("foo")
-      end
+    function envoy_on_response(response_handle)
+      local body_length = response_handle:body():length()
+      response_handle:headers():add("response_body_size", body_length)
+      response_handle:headers():remove("foo")
+    end
 )EOF";
 
   initializeFilter(FILTER_AND_CODE);
@@ -116,23 +114,21 @@ TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
       R"EOF(
 name: envoy.lua
 config:
-  deprecated_v1: true
-  value:
-    inline_code: |
-      function envoy_on_request(request_handle)
-        local headers, body = request_handle:httpCall(
-        "lua_cluster",
-        {
-          [":method"] = "POST",
-          [":path"] = "/",
-          [":authority"] = "lua_cluster"
-        },
-        "hello world",
-        5000)
+  inline_code: |
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+      "lua_cluster",
+      {
+        [":method"] = "POST",
+        [":path"] = "/",
+        [":authority"] = "lua_cluster"
+      },
+      "hello world",
+      5000)
 
-        request_handle:headers():add("upstream_foo", headers["foo"])
-        request_handle:headers():add("upstream_body_size", #body)
-      end
+      request_handle:headers():add("upstream_foo", headers["foo"])
+      request_handle:headers():add("upstream_body_size", #body)
+    end
 )EOF";
 
   initializeFilter(FILTER_AND_CODE);
@@ -174,25 +170,23 @@ TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
       R"EOF(
 name: envoy.lua
 config:
-  deprecated_v1: true
-  value:
-    inline_code: |
-      function envoy_on_request(request_handle)
-        local headers, body = request_handle:httpCall(
-        "lua_cluster",
-        {
-          [":method"] = "POST",
-          [":path"] = "/",
-          [":authority"] = "lua_cluster"
-        },
-        "hello world",
-        5000)
+  inline_code: |
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+      "lua_cluster",
+      {
+        [":method"] = "POST",
+        [":path"] = "/",
+        [":authority"] = "lua_cluster"
+      },
+      "hello world",
+      5000)
 
-        request_handle:respond(
-          {[":status"] = "403",
-           ["upstream_foo"] = headers["foo"]},
-          "nope")
-      end
+      request_handle:respond(
+        {[":status"] = "403",
+         ["upstream_foo"] = headers["foo"]},
+        "nope")
+    end
 )EOF";
 
   initializeFilter(FILTER_AND_CODE);

@@ -73,18 +73,22 @@ inline_code
 Script examples
 ---------------
 
+This section provides some concrete examples of Lua scripts as a more gentle introduction and quick
+start. Please refer to the :ref:`stream handle API <config_http_filters_lua_stream_handle_api>` for
+more details on the supported API.
+
 .. code-block:: lua
 
   -- Called on the request path.
   function envoy_on_request(request_handle)
     -- Wait for the entire request body and add a request header with the body size.
-    request_handle:headers():add("request_body_size", request_handle:body():byteSize())
+    request_handle:headers():add("request_body_size", request_handle:body():length())
   end
 
   -- Called on the response path.
   function envoy_on_response(response_handle)
     -- Wait for the entire response body and a response header with the the body size.
-    response_handle:headers():add("response_body_size", response_handle:body():byteSize())
+    response_handle:headers():add("response_body_size", response_handle:body():length())
     -- Remove a response header named 'foo'
     response_handle:headers():remove("foo")
   end
@@ -130,6 +134,8 @@ Script examples
        ["upstream_foo"] = headers["foo"]},
       "nope")
   end
+
+.. _config_http_filters_lua_stream_handle_api:
 
 Stream handle API
 -----------------
@@ -198,7 +204,7 @@ a script to inspect data as it is streaming by.
 .. code-block:: lua
 
   for chunk in request_handle:bodyChunks() do
-    request_handle:log(0, chunk:byteSize())
+    request_handle:log(0, chunk:length())
   end
 
 Each chunk the iterator returns is a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
@@ -253,7 +259,20 @@ respond()
   handle:respond(headers, body)
 
 Respond immediately and do not continue further filter iteration. This call is *only valid in
-the request flow*. *headers* is a table of key/value pairs to send. Note that the *:status* header
+the request flow*. Additionally, a response is only possible if request headers have not yet been
+passed to subsequent filters. Meaning, the following Lua code is invalid:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    for chunk in request_handle:bodyChunks() do
+      request_handle:respond(
+        {[":status"] = "100"},
+        "nope")
+    end
+  end
+
+*headers* is a table of key/value pairs to send. Note that the *:status* header
 must be set. *body* is a string and supplies the optional response body. May be nil.
 
 .. _config_http_filters_lua_header_wrapper:
@@ -312,12 +331,12 @@ Removes a header. *key* supplies the header key to remove.
 Buffer API
 ----------
 
-byteSize()
+length()
 ^^^^^^^^^^
 
 .. code-block:: lua
 
-  size = buffer:byteSize()
+  size = buffer:length()
 
 Gets the size of the buffer in bytes. Returns an integer.
 

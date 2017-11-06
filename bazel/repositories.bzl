@@ -112,8 +112,8 @@ def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
         name = "envoy_api",
-        remote = REPO_LOCATIONS["envoy_api"],
-        commit = "b236cc7c73353959af4b70903273d358c10aeb34",
+        remote = REPO_LOCATIONS["data-plane-api"],
+        commit = "4d18e6d236a6476782076b217cd62d43c30a7dfe",
     )
 
     api_bind_targets = [
@@ -145,14 +145,15 @@ def envoy_api_deps(skip_targets):
             actual = "@envoy_api//api/filter:" + t + "_cc",
         )
     http_filter_bind_targets = [
-        "http_connection_manager",
-        "router",
         "buffer",
-        "transcoder",
-        "rate_limit",
-        "ip_tagging",
-        "health_check",
         "fault",
+        "health_check",
+        "http_connection_manager",
+        "ip_tagging",
+        "lua",
+        "rate_limit",
+        "router",
+        "transcoder",
     ]
     for t in http_filter_bind_targets:
         native.bind(

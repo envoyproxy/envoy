@@ -1209,6 +1209,33 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseBadStatus) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
+// Respond after headers have been continued.
+TEST_F(LuaHttpFilterTest, RespondAfterHeadersContinued) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      for chunk in request_handle:bodyChunks() do
+        request_handle:respond(
+          {[":status"] = "100"},
+          "nope")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(
+      *filter_,
+      scriptLog(
+          spdlog::level::err,
+          StrEq("[string \"...\"]:4: respond() cannot be called if headers have been continued")));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+}
+
 // Respond in response path.
 TEST_F(LuaHttpFilterTest, RespondInResponsePath) {
   const std::string SCRIPT{R"EOF(
