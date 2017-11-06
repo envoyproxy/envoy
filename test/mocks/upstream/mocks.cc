@@ -95,15 +95,20 @@ MockClusterInfo::MockClusterInfo()
 
 MockClusterInfo::~MockClusterInfo() {}
 
-MockCluster::MockCluster() {
+MockHostSet::MockHostSet() {
   ON_CALL(*this, addMemberUpdateCb(_))
-      .WillByDefault(Invoke([this](MemberUpdateCb cb) -> Common::CallbackHandle* {
+      .WillByDefault(Invoke([this](HostSet::MemberUpdateCb cb) -> Common::CallbackHandle* {
         return member_update_cb_helper_.add(cb);
       }));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
   ON_CALL(*this, hostsPerLocality()).WillByDefault(ReturnRef(hosts_per_locality_));
   ON_CALL(*this, healthyHostsPerLocality()).WillByDefault(ReturnRef(healthy_hosts_per_locality_));
+}
+
+MockCluster::MockCluster() {
+  ON_CALL(*this, primaryHosts()).WillByDefault(ReturnRef(primary_hosts_));
+  ON_CALL(testing::Const(*this), primaryHosts()).WillByDefault(ReturnRef(primary_hosts_));
   ON_CALL(*this, info()).WillByDefault(Return(info_));
   ON_CALL(*this, setInitializedCb(_))
       .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
@@ -119,7 +124,7 @@ MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefau
 MockLoadBalancer::~MockLoadBalancer() {}
 
 MockThreadLocalCluster::MockThreadLocalCluster() {
-  ON_CALL(*this, hostSet()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, hostSet()).WillByDefault(ReturnRef(cluster_.primary_hosts_));
   ON_CALL(*this, info()).WillByDefault(Return(cluster_.info_));
   ON_CALL(*this, loadBalancer()).WillByDefault(ReturnRef(lb_));
 }

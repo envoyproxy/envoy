@@ -418,7 +418,7 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   EXPECT_EQ(&active_request2, request2);
 
   EXPECT_CALL(*client2, close());
-  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host2});
+  cm_.thread_local_cluster_.cluster_.primary_hosts_.runCallbacks({}, {host2});
 
   EXPECT_CALL(*client1, close());
   tls_.shutdownThread();
@@ -428,7 +428,7 @@ TEST_F(RedisConnPoolImplTest, DeleteFollowedByClusterUpdateCallback) {
   conn_pool_.reset();
 
   std::shared_ptr<Upstream::Host> host(new Upstream::MockHost());
-  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host});
+  cm_.thread_local_cluster_.cluster_.primary_hosts_.runCallbacks({}, {host});
 }
 
 TEST_F(RedisConnPoolImplTest, NoHost) {

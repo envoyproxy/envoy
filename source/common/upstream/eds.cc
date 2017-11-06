@@ -67,12 +67,14 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     }
   }
 
-  HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(hosts()));
+  HostSetImpl& primary_hosts = primaryHosts();
+  HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(primary_hosts.hosts()));
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(), hosts().size());
+    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(),
+              primary_hosts.hosts().size());
     HostListsSharedPtr per_locality(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local locality is not defined then skip populating per locality hosts.
@@ -97,11 +99,12 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       }
     }
 
-    updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), per_locality,
-                createHealthyHostLists(*per_locality), hosts_added, hosts_removed);
+    primary_hosts.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
+                              per_locality, createHealthyHostLists(*per_locality), hosts_added,
+                              hosts_removed);
 
     if (initialize_callback_ && health_checker_ && pending_health_checks_ == 0) {
-      pending_health_checks_ = hosts().size();
+      pending_health_checks_ = primary_hosts.hosts().size();
       ASSERT(pending_health_checks_ > 0);
 
       // Every time a host changes HC state we cause a full healthy host recalculation which

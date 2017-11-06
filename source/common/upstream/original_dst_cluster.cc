@@ -105,16 +105,16 @@ OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
 }
 
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
-  HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>(hosts()));
+  HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>(primaryHosts().hosts()));
   new_hosts->emplace_back(host);
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
-              {std::move(host)}, {});
+  primaryHosts().updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
+                             empty_host_lists_, {std::move(host)}, {});
 }
 
 void OriginalDstCluster::cleanup() {
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>);
   std::vector<HostSharedPtr> to_be_removed;
-  const auto& host_set = hosts();
+  const auto& host_set = primaryHosts().hosts();
 
   ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
   for (const HostSharedPtr& host : host_set) {
@@ -129,8 +129,8 @@ void OriginalDstCluster::cleanup() {
   }
 
   if (to_be_removed.size() > 0) {
-    updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
-                {}, to_be_removed);
+    primaryHosts().updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
+                               empty_host_lists_, {}, to_be_removed);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

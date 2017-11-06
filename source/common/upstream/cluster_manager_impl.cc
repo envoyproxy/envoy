@@ -259,11 +259,12 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
 }
 
 void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
-  if (cluster.hosts().empty()) {
+  if (cluster.primaryHosts().hosts().empty()) {
     return;
   }
 
-  postThreadLocalClusterUpdate(cluster, cluster.hosts(), std::vector<HostSharedPtr>{});
+  postThreadLocalClusterUpdate(cluster, cluster.primaryHosts().hosts(),
+                               std::vector<HostSharedPtr>{});
 }
 
 bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) {
@@ -338,7 +339,7 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   }
 
   const Cluster& primary_cluster_reference = *new_cluster;
-  new_cluster->addMemberUpdateCb(
+  new_cluster->primaryHosts().addMemberUpdateCb(
       [&primary_cluster_reference, this](const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
         // This fires when a cluster is about to have an updated member set. We need to send this
@@ -389,13 +390,15 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
     const Cluster& primary_cluster, const std::vector<HostSharedPtr>& hosts_added,
     const std::vector<HostSharedPtr>& hosts_removed) {
   const std::string& name = primary_cluster.info()->name();
-  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(primary_cluster.hosts()));
+  HostVectorConstSharedPtr hosts_copy(
+      new std::vector<HostSharedPtr>(primary_cluster.primaryHosts().hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(
-      new std::vector<HostSharedPtr>(primary_cluster.healthyHosts()));
-  HostListsConstSharedPtr hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.hostsPerLocality()));
+      new std::vector<HostSharedPtr>(primary_cluster.primaryHosts().healthyHosts()));
+  HostListsConstSharedPtr hosts_per_locality_copy(new std::vector<std::vector<HostSharedPtr>>(
+      primary_cluster.primaryHosts().hostsPerLocality()));
   HostListsConstSharedPtr healthy_hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.healthyHostsPerLocality()));
+      new std::vector<std::vector<HostSharedPtr>>(
+          primary_cluster.primaryHosts().healthyHostsPerLocality()));
 
   tls_->runOnAllThreads([this, name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
                          healthy_hosts_per_locality_copy, hosts_added, hosts_removed]() -> void {

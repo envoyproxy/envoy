@@ -60,7 +60,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    for (auto& hosts : cluster.hostsPerLocality()) {
+    for (auto& hosts : cluster.primaryHosts().hostsPerLocality()) {
       auto* locality_stats = cluster_stats->add_upstream_locality_stats();
       ASSERT(hosts.size() > 0);
       locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
@@ -113,7 +113,7 @@ void LoadStatsReporter::onReceiveMessage(
       continue;
     }
     auto& cluster = it->second.get();
-    for (auto host : cluster.hosts()) {
+    for (auto host : cluster.primaryHosts().hosts()) {
       host->stats().rq_success_.latch();
       host->stats().rq_error_.latch();
     }

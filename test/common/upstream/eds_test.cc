@@ -143,7 +143,7 @@ TEST_F(EdsTest, EndpointMetadata) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
-  auto& hosts = cluster_->hosts();
+  auto& hosts = cluster_->primaryHosts().hosts();
   EXPECT_EQ(hosts.size(), 2);
   EXPECT_EQ(hosts[0]->metadata().filter_metadata_size(), 2);
   EXPECT_EQ(Config::Metadata::metadataValue(hosts[0]->metadata(),
@@ -194,7 +194,7 @@ TEST_F(EdsTest, EndpointLocality) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
-  const auto& hosts = cluster_->hosts();
+  const auto& hosts = cluster_->primaryHosts().hosts();
   EXPECT_EQ(hosts.size(), 2);
   for (int i = 0; i < 2; ++i) {
     const auto& locality = hosts[i]->locality();
@@ -237,34 +237,34 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
-  EXPECT_EQ(2, cluster_->hostsPerLocality().size());
-  EXPECT_EQ(1, cluster_->hostsPerLocality()[0].size());
+  EXPECT_EQ(2, cluster_->primaryHosts().hostsPerLocality().size());
+  EXPECT_EQ(1, cluster_->primaryHosts().hostsPerLocality()[0].size());
   EXPECT_EQ(Locality("", "us-east-1a", ""),
-            Locality(cluster_->hostsPerLocality()[0][0]->locality()));
-  EXPECT_EQ(2, cluster_->hostsPerLocality()[1].size());
+            Locality(cluster_->primaryHosts().hostsPerLocality()[0][0]->locality()));
+  EXPECT_EQ(2, cluster_->primaryHosts().hostsPerLocality()[1].size());
   EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-            Locality(cluster_->hostsPerLocality()[1][0]->locality()));
+            Locality(cluster_->primaryHosts().hostsPerLocality()[1][0]->locality()));
   EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-            Locality(cluster_->hostsPerLocality()[1][1]->locality()));
+            Locality(cluster_->primaryHosts().hostsPerLocality()[1][1]->locality()));
 
   add_hosts_to_locality("oceania", "koala", "eucalyptus", 3);
   add_hosts_to_locality("general", "koala", "ingsoc", 5);
 
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
-  EXPECT_EQ(4, cluster_->hostsPerLocality().size());
-  EXPECT_EQ(1, cluster_->hostsPerLocality()[0].size());
+  EXPECT_EQ(4, cluster_->primaryHosts().hostsPerLocality().size());
+  EXPECT_EQ(1, cluster_->primaryHosts().hostsPerLocality()[0].size());
   EXPECT_EQ(Locality("", "us-east-1a", ""),
-            Locality(cluster_->hostsPerLocality()[0][0]->locality()));
-  EXPECT_EQ(5, cluster_->hostsPerLocality()[1].size());
+            Locality(cluster_->primaryHosts().hostsPerLocality()[0][0]->locality()));
+  EXPECT_EQ(5, cluster_->primaryHosts().hostsPerLocality()[1].size());
   EXPECT_EQ(Locality("general", "koala", "ingsoc"),
-            Locality(cluster_->hostsPerLocality()[1][0]->locality()));
-  EXPECT_EQ(3, cluster_->hostsPerLocality()[2].size());
+            Locality(cluster_->primaryHosts().hostsPerLocality()[1][0]->locality()));
+  EXPECT_EQ(3, cluster_->primaryHosts().hostsPerLocality()[2].size());
   EXPECT_EQ(Locality("oceania", "koala", "eucalyptus"),
-            Locality(cluster_->hostsPerLocality()[2][0]->locality()));
-  EXPECT_EQ(2, cluster_->hostsPerLocality()[3].size());
+            Locality(cluster_->primaryHosts().hostsPerLocality()[2][0]->locality()));
+  EXPECT_EQ(2, cluster_->primaryHosts().hostsPerLocality()[3].size());
   EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-            Locality(cluster_->hostsPerLocality()[3][0]->locality()));
+            Locality(cluster_->primaryHosts().hostsPerLocality()[3][0]->locality()));
 }
 
 } // namespace Upstream

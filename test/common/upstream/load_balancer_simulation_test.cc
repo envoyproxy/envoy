@@ -56,16 +56,16 @@ public:
            std::vector<uint32_t> healthy_destination_cluster) {
     local_host_set_ = new HostSetImpl();
     // TODO(mattklein123): make load balancer per originating cluster host.
-    RandomLoadBalancer lb(cluster_, local_host_set_, stats_, runtime_, random_);
+    RandomLoadBalancer lb(cluster_.primary_hosts_, local_host_set_, stats_, runtime_, random_);
 
     HostListsSharedPtr upstream_per_zone_hosts = generateHostsPerZone(healthy_destination_cluster);
     HostListsSharedPtr local_per_zone_hosts = generateHostsPerZone(originating_cluster);
 
     HostVectorSharedPtr originating_hosts = generateHostList(originating_cluster);
     HostVectorSharedPtr healthy_destination = generateHostList(healthy_destination_cluster);
-    cluster_.healthy_hosts_ = *healthy_destination;
+    cluster_.primary_hosts_.healthy_hosts_ = *healthy_destination;
     HostVectorSharedPtr all_destination = generateHostList(all_destination_cluster);
-    cluster_.hosts_ = *all_destination;
+    cluster_.primary_hosts_.hosts_ = *all_destination;
 
     std::map<std::string, uint32_t> hits;
     for (uint32_t i = 0; i < total_number_of_requests; ++i) {
@@ -82,8 +82,8 @@ public:
 
         per_zone_upstream->push_back((*upstream_per_zone_hosts)[zone]);
       }
-      cluster_.hosts_per_locality_ = *per_zone_upstream;
-      cluster_.healthy_hosts_per_locality_ = *per_zone_upstream;
+      cluster_.primary_hosts_.hosts_per_locality_ = *per_zone_upstream;
+      cluster_.primary_hosts_.healthy_hosts_per_locality_ = *per_zone_upstream;
 
       // Populate host set for originating cluster.
       HostListsSharedPtr per_zone_local(new std::vector<std::vector<HostSharedPtr>>());

@@ -61,10 +61,11 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
-  cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
-                                    const std::vector<HostSharedPtr>& hosts_removed) -> void {
-    onClusterMemberUpdate(hosts_added, hosts_removed);
-  });
+  cluster_.primaryHosts().addMemberUpdateCb(
+      [this](const std::vector<HostSharedPtr>& hosts_added,
+             const std::vector<HostSharedPtr>& hosts_removed) -> void {
+        onClusterMemberUpdate(hosts_added, hosts_removed);
+      });
 }
 
 void HealthCheckerImplBase::decHealthy() {
@@ -178,7 +179,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
   });
 }
 
-void HealthCheckerImplBase::start() { addHosts(cluster_.hosts()); }
+void HealthCheckerImplBase::start() { addHosts(cluster_.primaryHosts().hosts()); }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
     HealthCheckerImplBase& parent, HostSharedPtr host)
