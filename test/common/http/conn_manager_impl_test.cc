@@ -140,9 +140,7 @@ public:
   }
 
   void setUpBufferLimits() {
-    EXPECT_CALL(response_encoder_, getStream())
-        .Times(AnyNumber())
-        .WillRepeatedly(ReturnRef(stream_));
+    ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
@@ -1863,10 +1861,10 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
 
 // Return 413 from an intermediate filter and make sure we don't continue the filter chain.
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) {
+  InSequence s;
   initial_buffer_limit_ = 10;
   setup(false, "");
 
-  setUpBufferLimits();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
@@ -1879,6 +1877,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
     decoder->decodeData(fake_data2, true);
   }));
 
+  setUpBufferLimits();
   setupFilterChain(2, 1);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
