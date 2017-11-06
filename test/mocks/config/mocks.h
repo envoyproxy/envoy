@@ -45,6 +45,8 @@ public:
                              GrpcMuxCallbacks& callbacks));
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
                             GrpcMuxCallbacks& callbacks);
+  MOCK_METHOD1(pause, void(const std::string& type_url));
+  MOCK_METHOD1(resume, void(const std::string& type_url));
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

@@ -148,6 +148,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 

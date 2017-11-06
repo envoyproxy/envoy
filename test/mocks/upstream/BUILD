@@ -42,6 +42,7 @@ envoy_cc_mock(
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",

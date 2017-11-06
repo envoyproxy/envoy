@@ -131,7 +131,7 @@ elif [[ "$1" == "bazel.coverity" ]]; then
   /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel --batch build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
     -c opt //source/exe:envoy-static.stamped
   # tar up the coverity results
-  tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz "${ENVOY_BUILD_DIR}"/cov-int
+  tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
   # Copy the Coverity results somewhere that we can access outside of the container.
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \

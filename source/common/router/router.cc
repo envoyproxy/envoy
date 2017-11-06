@@ -127,6 +127,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
 
     // TODO(mattklein123): Remove copy when G string compat issues are fixed.
     const std::string zone_name = config_.local_info_.zoneName();
+    const std::string upstream_zone = upstreamZone(upstream_host);
 
     Http::CodeUtility::ResponseStatInfo info{config_.scope_,
                                              cluster_->statsScope(),
@@ -137,22 +138,17 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                              request_vcluster_ ? request_vcluster_->name()
                                                                : EMPTY_STRING,
                                              zone_name,
-                                             upstreamZone(upstream_host),
+                                             upstream_zone,
                                              is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeUtility::ResponseStatInfo info{config_.scope_,
-                                               cluster_->statsScope(),
-                                               alt_stat_prefix_,
-                                               response_status_code,
-                                               internal_request,
-                                               EMPTY_STRING,
-                                               EMPTY_STRING,
-                                               zone_name,
-                                               upstreamZone(upstream_host),
-                                               is_canary};
+      Http::CodeUtility::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
+                                               alt_stat_prefix_, response_status_code,
+                                               internal_request, EMPTY_STRING,
+                                               EMPTY_STRING,     zone_name,
+                                               upstream_zone,    is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
@@ -398,6 +394,9 @@ void Filter::onRequestComplete() {
 
   // Possible that we got an immediate reset.
   if (upstream_request_) {
+    // Nominally how long it took to send the request.
+    upstream_request_->request_info_.requestReceivedDuration(downstream_request_complete_time_);
+
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
     maybeDoShadowing();
@@ -548,12 +547,12 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool en
   }
 }
 
-void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&& headers,
+                               bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
   ASSERT(!downstream_response_started_);
 
-  upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(
-      Http::Utility::getResponseStatus(*headers));
+  upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(response_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request_->upstream_host_->healthChecker().setUnhealthy();
@@ -566,9 +565,8 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     // upstream_request_.
     const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
-      Http::CodeUtility::chargeBasicResponseStat(
-          cluster_->statsScope(), "retry.",
-          static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
+      Http::CodeUtility::chargeBasicResponseStat(cluster_->statsScope(), "retry.",
+                                                 static_cast<Http::Code>(response_code));
       upstream_host->stats().rq_error_.inc();
       return;
     } else if (retry_status == RetryStatus::NoOverflow) {
@@ -588,12 +586,12 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
         response_received_time - downstream_request_complete_time_);
     headers->insertEnvoyUpstreamServiceTime().value(ms.count());
     callbacks_->requestInfo().responseReceivedDuration(response_received_time);
+    upstream_request_->request_info_.responseReceivedDuration(response_received_time);
   }
 
   upstream_request_->upstream_canary_ =
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
       upstream_request_->upstream_host_->canary();
-  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   chargeUpstreamCode(response_code, *headers, upstream_request_->upstream_host_, false);
   if (!Http::CodeUtility::is5xx(response_code)) {
     handleNon5xxResponseHeaders(*headers, end_stream);
@@ -739,14 +737,16 @@ void Filter::doRetry() {
 
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
-      calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-      encode_trailers_(false) {
+      request_info_(pool.protocol()), calling_encode_headers_(false), upstream_canary_(false),
+      encode_complete_(false), encode_trailers_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         Tracing::EgressConfig::get(), "router " + parent.cluster_->name() + " egress",
         ProdSystemTimeSource::instance_.currentTime());
   }
+
+  request_info_.healthCheck(parent_.callbacks_->requestInfo().healthCheck());
 }
 
 Filter::UpstreamRequest::~UpstreamRequest() {
@@ -759,13 +759,21 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     per_try_timeout_->disableTimer();
   }
   clearRequestEncoder();
+
+  for (const auto& upstream_log : parent_.config_.upstream_logs_) {
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_, request_info_);
+  }
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
-  parent_.onUpstreamHeaders(std::move(headers), end_stream);
+  upstream_headers_ = headers.get();
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  request_info_.response_code_.value(static_cast<uint32_t>(response_code));
+  parent_.onUpstreamHeaders(response_code, std::move(headers), end_stream);
 }
 
 void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
+  request_info_.bytes_received_ += data.length();
   parent_.onUpstreamData(data, end_stream);
 }
 
@@ -802,6 +810,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     buffered_request_body_->move(data);
   } else {
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
+    request_info_.bytes_sent_ += data.length();
     request_encoder_->encodeData(data, end_stream);
   }
 }
@@ -822,6 +831,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
   clearRequestEncoder();
   if (!calling_encode_headers_) {
+    request_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
     parent_.onUpstreamReset(UpstreamResetType::Reset, Optional<Http::StreamResetReason>(reason));
   } else {
     deferred_reset_reason_ = reason;
@@ -859,6 +869,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
     upstream_host_->stats().rq_timeout_.inc();
   }
   resetStream();
+  request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout);
   parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
                           Optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
 }
@@ -910,6 +921,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     onResetStream(deferred_reset_reason_.value());
   } else {
     if (buffered_request_body_) {
+      request_info_.bytes_sent_ += buffered_request_body_->length();
       request_encoder.encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
     }
 

@@ -2,7 +2,9 @@
 
 #include "envoy/json/json_object.h"
 
+#include "api/filter/http/fault.pb.h"
 #include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/http/router.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
 
 namespace Envoy {
@@ -46,6 +48,23 @@ public:
    */
   static void translateMongoProxy(const Json::Object& json_mongo_proxy,
                                   envoy::api::v2::filter::network::MongoProxy& mongo_proxy);
+
+  /**
+   * Translate a v1 JSON Fault filter object to v2 envoy::api::v2::filter::http::HTTPFault.
+   * @param config source v1 JSON HTTP Fault Filter object.
+   * @param fault destination v2
+   * envoy::api::v2::filter::http::HTTPFault.
+   */
+  static void translateFaultFilter(const Json::Object& config,
+                                   envoy::api::v2::filter::http::HTTPFault& fault);
+
+  /*
+   * Translate a v1 JSON Router object to v2 envoy::api::v2::filter::http::Router.
+   * @param json_router source v1 JSON HTTP router object.
+   * @param router destination v2 envoy::api::v2::filter::http::Router.
+   */
+  static void translateRouter(const Json::Object& json_router,
+                              envoy::api::v2::filter::http::Router& router);
 };
 
 } // namespace Config

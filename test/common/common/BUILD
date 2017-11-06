@@ -18,6 +18,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cleanup_test",
+    srcs = ["cleanup_test.cc"],
+    deps = ["//source/common/common:cleanup_lib"],
+)
+
+envoy_cc_test(
     name = "hash_test",
     srcs = ["hash_test.cc"],
     deps = ["//source/common/common:hash_lib"],

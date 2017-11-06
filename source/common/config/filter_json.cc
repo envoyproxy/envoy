@@ -229,5 +229,48 @@ void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
   }
 }
 
+void FilterJson::translateFaultFilter(const Json::Object& config,
+                                      envoy::api::v2::filter::http::HTTPFault& fault) {
+  config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
+
+  const Json::ObjectSharedPtr config_abort = config.getObject("abort", true);
+  const Json::ObjectSharedPtr config_delay = config.getObject("delay", true);
+
+  if (!config_abort->empty()) {
+    auto* abort_fault = fault.mutable_abort();
+    abort_fault->set_percent(static_cast<uint32_t>(config_abort->getInteger("abort_percent")));
+
+    // TODO(mattklein123): Throw error if invalid return code is provided
+    abort_fault->set_http_status(static_cast<uint32_t>(config_abort->getInteger("http_status")));
+  }
+
+  if (!config_delay->empty()) {
+    auto* delay = fault.mutable_delay();
+    delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
+    delay->set_percent(static_cast<uint32_t>(config_delay->getInteger("fixed_delay_percent")));
+    JSON_UTIL_SET_DURATION_FROM_FIELD(*config_delay, *delay, fixed_delay, fixed_duration);
+  }
+
+  for (const auto json_header_matcher : config.getObjectArray("headers", true)) {
+    auto* header_matcher = fault.mutable_headers()->Add();
+    RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
+  }
+
+  JSON_UTIL_SET_STRING(config, fault, upstream_cluster);
+
+  for (auto json_downstream_node : config.getStringArray("downstream_nodes", true)) {
+    auto* downstream_node = fault.mutable_downstream_nodes()->Add();
+    *downstream_node = json_downstream_node;
+  }
+}
+
+void FilterJson::translateRouter(const Json::Object& json_router,
+                                 envoy::api::v2::filter::http::Router& router) {
+  json_router.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
+
+  router.mutable_dynamic_stats()->set_value(json_router.getBoolean("dynamic_stats", true));
+  router.set_start_child_span(json_router.getBoolean("start_child_span", false));
+}
+
 } // namespace Config
 } // namespace Envoy
