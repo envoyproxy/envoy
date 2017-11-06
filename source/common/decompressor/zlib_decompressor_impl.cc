@@ -50,13 +50,14 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
       }
     }
   }
+
   output_buffer.add(static_cast<void*>(output_char_ptr_.get()), chunk_ - zstream_ptr_->avail_out);
 }
 
 bool ZlibDecompressorImpl::inflateNext() {
   const int result = inflate(zstream_ptr_.get(), Z_NO_FLUSH);
   if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
-    return false;
+    return false; // This means that zlib needs more input, so stop here.
   }
 
   RELEASE_ASSERT(result == Z_OK);

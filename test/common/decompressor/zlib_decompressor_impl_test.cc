@@ -43,9 +43,9 @@ TEST_F(ZlibDecompressorImplDeathTest, DecompressorTestDeath) {
   EXPECT_DEATH(unitializedDecompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
 }
 
-TEST_F(ZlibDecompressorImplTest, CompressDecompressSymetricTesting) {
-  Buffer::OwnedImpl input_buffer;
-  Buffer::OwnedImpl output_buffer;
+TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
+  Buffer::OwnedImpl compressor_input_buffer;
+  Buffer::OwnedImpl compressor_output_buffer;
 
   Envoy::Compressor::ZlibCompressorImpl compressor;
   compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
@@ -54,27 +54,30 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressSymetricTesting) {
 
   std::string original_text{};
   for (uint64_t i = 0; i < 50; ++i) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
-    compressor.compress(input_buffer, output_buffer);
-    original_text.append(TestUtility::bufferToString(input_buffer));
-    input_buffer.drain(4796);
+    TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4796);
+    compressor.compress(compressor_input_buffer, compressor_output_buffer);
+    original_text.append(TestUtility::bufferToString(compressor_input_buffer));
+    compressor_input_buffer.drain(4796);
   }
 
-  compressor.flush(output_buffer);
+  compressor.flush(compressor_output_buffer);
 
   ZlibDecompressorImpl decompressor;
   decompressor.init(gzip_window_bits);
-  ASSERT_EQ(0, input_buffer.length());
-  decompressor.decompress(output_buffer, input_buffer);
+  ASSERT_EQ(0, compressor_input_buffer.length());
 
-  std::string decompressed_text{TestUtility::bufferToString(input_buffer)};
+  // compressor_output_buffer becomes decompressor input param.
+  // compressor_input_buffer is re-used as decompressor output since it is empty.
+  decompressor.decompress(compressor_output_buffer, compressor_input_buffer);
+
+  std::string decompressed_text{TestUtility::bufferToString(compressor_input_buffer)};
 
   ASSERT_EQ(decompressor.checksum(), compressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   ASSERT_EQ(original_text, decompressed_text);
 }
 
-TEST_F(ZlibDecompressorImplTest, CompressWithSmallChunkMemmory) {
+TEST_F(ZlibDecompressorImplTest, DecompressWithSmallChunkMemory) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;
 

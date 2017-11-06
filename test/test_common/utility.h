@@ -68,7 +68,7 @@ public:
   /**
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
-   * @param n_bytes amount of bytes that should be add to the supplied buffer.
+   * @param n_bytes amount of bytes that should be added to the supplied buffer.
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_bytes);
 

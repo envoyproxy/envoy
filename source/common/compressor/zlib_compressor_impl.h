@@ -13,6 +13,11 @@ namespace Compressor {
 class ZlibCompressorImpl : public Compressor {
 public:
   ZlibCompressorImpl();
+
+  /**
+   * Sets buffer size for feeding data to the compressor routines.
+   * @param chunk amount of memory reserved for the compressor output.
+   */
   ZlibCompressorImpl(uint64_t chunk);
 
   /**
@@ -62,12 +67,12 @@ public:
   void flush(Buffer::Instance& output_buffer);
 
   /**
-   * Returns adler checksum
+   * Returns adler checksum.
    */
   uint64_t checksum();
 
   /**
-   * Implements Envoy::Compressor
+   * Implements Envoy::Compressor.
    */
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
@@ -75,8 +80,10 @@ private:
   bool deflateNext(int8_t flush_state);
   void process(Buffer::Instance& output_buffer, int8_t flush_state);
   void updateOutput(Buffer::Instance& output_buffer);
+
   uint64_t chunk_;
   bool initialized_;
+
   std::unique_ptr<unsigned char[]> output_char_ptr_;
   std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };

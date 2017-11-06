@@ -54,7 +54,7 @@ void ZlibCompressorImpl::compress(const Buffer::Instance& input_buffer,
 bool ZlibCompressorImpl::deflateNext(int8_t flush_state) {
   const int result = deflate(zstream_ptr_.get(), static_cast<int>(flush_state));
   if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
-    return false; // This means that zlib needs more input, so stop here
+    return false; // This means that zlib needs more input, so stop here.
   }
 
   RELEASE_ASSERT(result == Z_OK);
