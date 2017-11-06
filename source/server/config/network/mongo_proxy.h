@@ -23,6 +23,10 @@ public:
   NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                       FactoryContext& context) override;
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::network::MongoProxy()};
+  }
+
   std::string name() override { return Config::NetworkFilterNames::get().MONGO_PROXY; }
 
 private:

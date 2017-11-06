@@ -80,7 +80,7 @@ public:
     return map;
   }
 
-  MockClusterManager cm_;
+  NiceMock<MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
