@@ -85,6 +85,12 @@ ServerContextPtr ContextManagerImpl::createSslServerContext(
 
 ServerContext* ContextManagerImpl::findSslServerContext(const std::string& listener_name,
                                                         const std::string& server_name) {
+  // Find Ssl::ServerContext to use. The algorithm for "www.example.com" is as follows:
+  // 1. Try exact match on domain, i.e. "www.example.com"
+  // 2. Try exact match on wildcard, i.e. "*.example.com"
+  // 3. Try "no SNI" match, i.e. ""
+  // 4. Return no context and reject connection.
+
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
   if (map_exact_[listener_name].find(server_name) != map_exact_[listener_name].end()) {
     return map_exact_[listener_name][server_name];
