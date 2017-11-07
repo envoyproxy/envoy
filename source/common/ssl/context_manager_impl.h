@@ -2,7 +2,7 @@
 
 #include <functional>
 #include <list>
-#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
@@ -47,7 +47,7 @@ public:
 private:
   Runtime::Loader& runtime_;
   std::list<Context*> contexts_;
-  std::mutex contexts_lock_;
+  std::shared_timed_mutex contexts_lock_;
   std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_exact_;
   std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_wildcard_;
 };
