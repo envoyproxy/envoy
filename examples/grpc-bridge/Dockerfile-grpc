@@ -1,4 +1,4 @@
-FROM lyft/envoy:latest
+FROM envoyproxy/envoy:latest
 
 RUN mkdir /var/log/envoy/
 COPY ./bin/service /usr/local/bin/srv

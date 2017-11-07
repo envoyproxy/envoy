@@ -13,7 +13,7 @@ else
 	USER_GROUP=$(id -g)
 fi
 
-[[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="lyft/envoy-build-ubuntu"
+[[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
