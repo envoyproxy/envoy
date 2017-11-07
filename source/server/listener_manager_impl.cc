@@ -124,6 +124,10 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   }
 
   // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
+  // This doesn't work right now, because BoringSSL uses "session context" (initial SSL_CTX that
+  // accepted connection, before SNI update) for session related stuff, including Session Ticket
+  // callback, which is going to be called iff it's set on the initial SSL_CTX, even if it's not
+  // set on the current SSL_CTX that doesn't have any Session Ticket Keys configured.
   ASSERT(has_stk == 0 || has_stk == has_tls);
   UNREFERENCED_PARAMETER(has_tls);
   UNREFERENCED_PARAMETER(has_stk);
