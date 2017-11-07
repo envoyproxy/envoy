@@ -48,6 +48,7 @@ envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
+    external_deps = ["envoy_filter_http_fault"],
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
@@ -61,7 +62,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
     ],
 )

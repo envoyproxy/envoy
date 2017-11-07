@@ -115,11 +115,11 @@ build and test Envoy.
 
 Coverity Scan static analysis is not run within Envoy CI. However, Envoy can be locally built and
 submitted for analysis. A Coverity Scan Envoy project token must be generated from the
-[Coverity Project Settings](https://scan.coverity.com/projects/envoy-proxy?tab=pro).
-With this token, running `ci/do_coverity_local.sh` will use the Ubuntu based
-`lyft/envoy-build-ubuntu` image to build the Envoy static binary with the Coverity Scan tool chain.
-This process generates an artifact, envoy-coverity-output.tgz, that is uploaded to Coverity for
-static analysis.
+[Coverity Project Settings](https://scan.coverity.com/projects/envoy-proxy?tab=project_settings).
+Only a Coverity Project Administrator can create a token. With this token, running
+`ci/do_coverity_local.sh` will use the Ubuntu based `lyft/envoy-build-ubuntu` image to build the
+Envoy static binary with the Coverity Scan tool chain. This process generates an artifact,
+envoy-coverity-output.tgz, that is uploaded to Coverity for static analysis.
 
 To build and submit for analysis:
 ```bash

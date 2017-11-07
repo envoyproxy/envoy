@@ -41,6 +41,7 @@ envoy_cc_test(
         "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
+        "//source/common/config:filter_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/filter:fault_filter_lib",
