@@ -36,19 +36,6 @@ cc_library(
 )
 
 cc_library(
-    name = "googletest",
-    srcs = [
-        "thirdparty_build/lib/libgmock.a",
-        "thirdparty_build/lib/libgtest.a",
-    ],
-    hdrs = glob([
-        "thirdparty_build/include/gmock/**/*.h",
-        "thirdparty_build/include/gtest/**/*.h",
-    ]),
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "http_parser",
     srcs = ["thirdparty_build/lib/libhttp_parser.a"],
     hdrs = glob(["thirdparty_build/include/http_parser.h"]),
