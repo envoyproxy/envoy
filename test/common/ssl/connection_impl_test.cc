@@ -162,37 +162,36 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  if (expect_success) {
-    unsigned connect_count = 0;
-    auto stopSecondTime = [&]() {
-      connect_count++;
-      if (connect_count == 2) {
-        if (!expected_server_cert_digest.empty()) {
-          EXPECT_EQ(expected_server_cert_digest,
-                    client_connection->ssl()->sha256PeerCertificateDigest());
-        }
-        if (!expected_alpn_protocol.empty()) {
-          EXPECT_EQ(expected_alpn_protocol, client_connection->nextProtocol());
-        }
-        EXPECT_EQ(expected_client_cert_uri, server_connection->ssl()->uriSanPeerCertificate());
-        Ssl::ConnectionImpl* ssl_connection =
-            dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
-        SSL* client_ssl_connection = ssl_connection->rawSslForTest();
-        SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_connection);
-        EXPECT_FALSE(client_ssl_session->not_resumable);
-        uint8_t* session_data;
-        size_t session_len;
-        int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
-        ASSERT(rc == 1);
-        UNREFERENCED_PARAMETER(rc);
-        new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
-        OPENSSL_free(session_data);
-        server_connection->close(Network::ConnectionCloseType::NoFlush);
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher.exit();
+  unsigned connect_count = 0;
+  auto stopSecondTime = [&]() {
+    if (++connect_count == 2) {
+      if (!expected_server_cert_digest.empty()) {
+        EXPECT_EQ(expected_server_cert_digest,
+                  client_connection->ssl()->sha256PeerCertificateDigest());
       }
-    };
+      if (!expected_alpn_protocol.empty()) {
+        EXPECT_EQ(expected_alpn_protocol, client_connection->nextProtocol());
+      }
+      EXPECT_EQ(expected_client_cert_uri, server_connection->ssl()->uriSanPeerCertificate());
+      Ssl::ConnectionImpl* ssl_connection =
+          dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+      SSL* client_ssl_connection = ssl_connection->rawSslForTest();
+      SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_connection);
+      EXPECT_FALSE(client_ssl_session->not_resumable);
+      uint8_t* session_data;
+      size_t session_len;
+      int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
+      ASSERT(rc == 1);
+      UNREFERENCED_PARAMETER(rc);
+      new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
+      OPENSSL_free(session_data);
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+      client_connection->close(Network::ConnectionCloseType::NoFlush);
+      dispatcher.exit();
+    }
+  };
 
+  if (expect_success) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { stopSecondTime(); }));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
