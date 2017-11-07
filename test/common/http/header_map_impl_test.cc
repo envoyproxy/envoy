@@ -74,6 +74,62 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(4096UL, string2.size());
   }
 
+  // Static move operator
+  {
+    std::string static_string("HELLO");
+    HeaderString string1(static_string);
+    std::string static_string2("GOODBYE");
+    HeaderString string2(static_string2);
+
+    string2 = std::move(string1);
+    EXPECT_STREQ("HELLO", string2.c_str());
+    EXPECT_EQ(static_string.c_str(), string1.c_str());
+    EXPECT_EQ(static_string.c_str(), string2.c_str());
+    EXPECT_EQ(5U, string1.size());
+    EXPECT_EQ(5U, string2.size());
+  }
+
+  // Inline move operator
+  {
+    HeaderString string;
+    string.setCopy("hello", 5);
+    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    HeaderString string2;
+    string2.setCopy("goodbye", 7);
+    EXPECT_EQ(HeaderString::Type::Inline, string2.type());
+
+    string2 = std::move(string);
+    EXPECT_TRUE(string.empty());
+    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_EQ(HeaderString::Type::Inline, string2.type());
+    string.append("world", 5);
+    EXPECT_STREQ("world", string.c_str());
+    EXPECT_EQ(5UL, string.size());
+    EXPECT_STREQ("hello", string2.c_str());
+    EXPECT_EQ(5UL, string2.size());
+  }
+
+  // Dynamic move operator
+  {
+    std::string large(4096, 'a');
+    std::string large2(4096, 'b');
+    HeaderString string;
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    HeaderString string2;
+    string2.setCopy(large2.c_str(), large2.size());
+
+    string2 = std::move(string);
+    EXPECT_TRUE(string.empty());
+    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_EQ(HeaderString::Type::Dynamic, string2.type());
+    string.append("c", 1);
+    EXPECT_STREQ("c", string.c_str());
+    EXPECT_EQ(1UL, string.size());
+    EXPECT_STREQ(large.c_str(), string2.c_str());
+    EXPECT_EQ(4096UL, string2.size());
+  }
+
   // Static to inline number.
   {
     std::string static_string("HELLO");
@@ -280,6 +336,18 @@ TEST(HeaderMapImplTest, MoveIntoInline) {
   EXPECT_STREQ("hello", headers.Host()->value().c_str());
 }
 
+TEST(HeaderMapImplTest, SetViaMoveIntoInline) {
+  HeaderMapImpl headers;
+  HeaderString key;
+  key.setCopy(Headers::get().Host.get().c_str(), Headers::get().Host.get().size());
+  HeaderString value;
+  value.setCopy("hello", 5);
+
+  headers.setViaMove(std::move(key), std::move(value));
+  EXPECT_STREQ(":authority", headers.Host()->key().c_str());
+  EXPECT_STREQ("hello", headers.Host()->value().c_str());
+}
+
 TEST(HeaderMapImplTest, Remove) {
   HeaderMapImpl headers;
 
@@ -311,10 +379,69 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(0UL, headers.size());
 }
 
+TEST(HeaderMapImplTest, SetRemovesAllValues) {
+  HeaderMapImpl headers;
+
+  LowerCaseString key1("hello");
+  LowerCaseString key2("olleh");
+  std::string ref_value1("world");
+  std::string ref_value2("planet");
+  std::string ref_value3("globe");
+  std::string ref_value4("earth");
+  std::string ref_value5("blue marble");
+
+  headers.addReference(key1, ref_value1);
+  headers.addReference(key2, ref_value2);
+  headers.addReference(key1, ref_value3);
+  headers.addReference(key1, ref_value4);
+
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+
+  {
+    MockCb cb;
+
+    EXPECT_CALL(cb, Call("hello", "world"));
+    EXPECT_CALL(cb, Call("olleh", "planet"));
+    EXPECT_CALL(cb, Call("hello", "globe"));
+    EXPECT_CALL(cb, Call("hello", "earth"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+  }
+
+  headers.setReference(key1, ref_value5);
+
+  {
+    MockCb cb;
+
+    EXPECT_CALL(cb, Call("hello", "blue marble"));
+    EXPECT_CALL(cb, Call("olleh", "planet"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+  }
+}
+
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
   HeaderMapImpl headers;
   headers.addReferenceKey(Headers::get().ContentLength, 5);
   headers.addReferenceKey(Headers::get().ContentLength, 6);
+  EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
+  EXPECT_EQ(1UL, headers.size());
+}
+
+TEST(HeaderMapImplTest, DoubleInlineSet) {
+  HeaderMapImpl headers;
+  headers.setReferenceKey(Headers::get().ContentLength, 5);
+  headers.setReferenceKey(Headers::get().ContentLength, 6);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
 }
@@ -325,6 +452,18 @@ TEST(HeaderMapImplTest, AddReferenceKey) {
   headers.addReferenceKey(foo, "world");
   EXPECT_NE("world", headers.get(foo)->value().c_str());
   EXPECT_STREQ("world", headers.get(foo)->value().c_str());
+}
+
+TEST(HeaderMapImplTest, SetReferenceKey) {
+  HeaderMapImpl headers;
+  LowerCaseString foo("hello");
+  headers.setReferenceKey(foo, "world");
+  EXPECT_NE("world", headers.get(foo)->value().c_str());
+  EXPECT_STREQ("world", headers.get(foo)->value().c_str());
+
+  headers.setReferenceKey(foo, "monde");
+  EXPECT_NE("monde", headers.get(foo)->value().c_str());
+  EXPECT_STREQ("monde", headers.get(foo)->value().c_str());
 }
 
 TEST(HeaderMapImplTest, AddCopy) {
@@ -382,6 +521,57 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_EQ(2UL, headers.get(lcKey3)->value().size());
 }
 
+TEST(HeaderMapImplTest, SetCopy) {
+  HeaderMapImpl headers;
+
+  // Start with a string value.
+  std::unique_ptr<LowerCaseString> lcKeyPtr(new LowerCaseString("hello"));
+  headers.setCopy(*lcKeyPtr, "world");
+
+  const HeaderString& value = headers.get(*lcKeyPtr)->value();
+
+  EXPECT_STREQ("world", value.c_str());
+  EXPECT_EQ(5UL, value.size());
+
+  lcKeyPtr.reset();
+
+  const HeaderString& value2 = headers.get(LowerCaseString("hello"))->value();
+
+  EXPECT_STREQ("world", value2.c_str());
+  EXPECT_EQ(5UL, value2.size());
+  EXPECT_EQ(value.c_str(), value2.c_str());
+  EXPECT_EQ(1UL, headers.size());
+
+  // Repeat with an int value.
+
+  // Build "hello" with string concatenation to make it unlikely that the
+  // compiler is just reusing the same string constant for everything.
+  lcKeyPtr.reset(new LowerCaseString(std::string("he") + "llo"));
+  EXPECT_STREQ("hello", lcKeyPtr->get().c_str());
+
+  headers.setCopy(*lcKeyPtr, 42);
+
+  const HeaderString& value3 = headers.get(*lcKeyPtr)->value();
+
+  EXPECT_STREQ("42", value3.c_str());
+  EXPECT_EQ(2UL, value3.size());
+
+  lcKeyPtr.reset();
+
+  const HeaderString& value4 = headers.get(LowerCaseString("hello"))->value();
+
+  EXPECT_STREQ("42", value4.c_str());
+  EXPECT_EQ(2UL, value4.size());
+  EXPECT_EQ(1UL, headers.size());
+
+  // Here, again, we'll build yet another key string.
+  LowerCaseString lcKey3(std::string("he") + "ll" + "o");
+  EXPECT_STREQ("hello", lcKey3.get().c_str());
+
+  EXPECT_STREQ("42", headers.get(lcKey3)->value().c_str());
+  EXPECT_EQ(2UL, headers.get(lcKey3)->value().size());
+}
+
 TEST(HeaderMapImplTest, Equality) {
   TestHeaderMapImpl headers1;
   TestHeaderMapImpl headers2;
@@ -404,9 +594,10 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
 
 TEST(HeaderMapImplTest, Iterate) {
   TestHeaderMapImpl headers;
-  headers.addCopy("hello", "world");
+  headers.setCopy(LowerCaseString("hello"), "xxxxx");
   headers.addCopy("foo", "bar");
   headers.addCopy("world", "hello");
+  headers.setCopy(LowerCaseString("hello"), "world");
 
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
@@ -426,7 +617,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
   headers.addCopy("foo", "bar");
-  headers.addCopy("world", "hello");
+  headers.setCopy(LowerCaseString("world"), std::string("hello"));
 
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;

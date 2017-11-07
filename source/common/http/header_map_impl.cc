@@ -190,6 +190,36 @@ void HeaderString::setReference(const std::string& ref_value) {
   string_length_ = ref_value.size();
 }
 
+HeaderString& HeaderString::operator=(HeaderString&& move_value) {
+  freeDynamic();
+
+  type_ = move_value.type_;
+  string_length_ = move_value.string_length_;
+  switch (move_value.type_) {
+  case Type::Reference: {
+    buffer_.ref_ = move_value.buffer_.ref_;
+    break;
+  }
+  case Type::Dynamic: {
+    // When we move a dynamic header, we switch the moved header back to its default state (inline).
+    buffer_.dynamic_ = move_value.buffer_.dynamic_;
+    dynamic_capacity_ = move_value.dynamic_capacity_;
+    move_value.type_ = Type::Inline;
+    move_value.buffer_.dynamic_ = move_value.inline_buffer_;
+    move_value.clear();
+    break;
+  }
+  case Type::Inline: {
+    buffer_.dynamic_ = inline_buffer_;
+    memcpy(inline_buffer_, move_value.inline_buffer_, string_length_ + 1);
+    move_value.string_length_ = 0;
+    move_value.inline_buffer_[0] = 0;
+    break;
+  }
+  }
+  return *this;
+}
+
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key) : key_(key) {}
 
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key, HeaderString&& value)
@@ -205,6 +235,8 @@ void HeaderMapImpl::HeaderEntryImpl::value(const char* value, uint32_t size) {
 void HeaderMapImpl::HeaderEntryImpl::value(const std::string& value) {
   this->value(value.c_str(), static_cast<uint32_t>(value.size()));
 }
+
+void HeaderMapImpl::HeaderEntryImpl::value(HeaderString&& value) { value_ = std::move(value); }
 
 void HeaderMapImpl::HeaderEntryImpl::value(uint64_t value) { value_.setInteger(value); }
 
@@ -317,8 +349,43 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   }
 }
 
+void HeaderMapImpl::updateByKey(HeaderString&& key, HeaderString&& value) {
+  StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());
+  if (cb) {
+    key.clear();
+    StaticLookupResponse ref_lookup_response = cb(*this);
+    maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
+  } else {
+    std::list<HeaderEntryImpl>::iterator i = headers_.begin();
+    bool found = false;
+    while (i != headers_.end()) {
+      if (i->key() == key.c_str()) {
+        if (found) {
+          // Erase any other entries with this key.
+          i = headers_.erase(i);
+          continue;
+        }
+
+        i->value(std::move(value));
+        found = true;
+      }
+      ++i;
+    }
+
+    if (!found) {
+      // Not found, append.
+      i = headers_.emplace(headers_.end(), std::move(key), std::move(value));
+      i->entry_ = i;
+    }
+  }
+}
+
 void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   insertByKey(std::move(key), std::move(value));
+}
+
+void HeaderMapImpl::setViaMove(HeaderString&& key, HeaderString&& value) {
+  updateByKey(std::move(key), std::move(value));
 }
 
 void HeaderMapImpl::addReference(const LowerCaseString& key, const std::string& value) {
@@ -360,6 +427,46 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   new_value.setCopy(value.c_str(), value.size());
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());
+  ASSERT(new_value.empty());
+}
+
+void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString ref_value(value);
+  setViaMove(std::move(ref_key), std::move(ref_value));
+}
+
+void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, uint64_t value) {
+  HeaderString ref_key(key);
+  HeaderString new_value;
+  new_value.setInteger(value);
+  updateByKey(std::move(ref_key), std::move(new_value));
+  ASSERT(new_value.empty());
+}
+
+void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString new_value;
+  new_value.setCopy(value.c_str(), value.size());
+  updateByKey(std::move(ref_key), std::move(new_value));
+  ASSERT(new_value.empty());
+}
+
+void HeaderMapImpl::setCopy(const LowerCaseString& key, uint64_t value) {
+  HeaderString new_key;
+  new_key.setCopy(key.get().c_str(), key.get().size());
+  HeaderString new_value;
+  new_value.setInteger(value);
+  updateByKey(std::move(new_key), std::move(new_value));
+  ASSERT(new_value.empty());
+}
+
+void HeaderMapImpl::setCopy(const LowerCaseString& key, const std::string& value) {
+  HeaderString new_key;
+  new_key.setCopy(key.get().c_str(), key.get().size());
+  HeaderString new_value;
+  new_value.setCopy(value.c_str(), value.size());
+  updateByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_value.empty());
 }
 
