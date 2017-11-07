@@ -44,6 +44,3 @@ set +e
 set -e
 
 EXPECTED_CXX_VERSION="g++ (GCC) 5.3.1 20160406 (Red Hat 5.3.1-6)" ./build_container_common.sh
-
-# googletest install to lib64
-cp -a /thirdparty_build/lib64/* /thirdparty_build/lib
