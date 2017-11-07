@@ -86,7 +86,7 @@ ServerContextPtr ContextManagerImpl::createSslServerContext(
 ServerContext* ContextManagerImpl::findSslServerContext(const std::string& listener_name,
                                                         const std::string& server_name) {
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
-  if (map_exact_[listener_name][server_name] != nullptr) {
+  if (map_exact_[listener_name].find(server_name) != map_exact_[listener_name].end()) {
     return map_exact_[listener_name][server_name];
   }
 
@@ -97,14 +97,18 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
       size_t rpos = server_name.rfind('.');
       if (rpos > pos + 1 && rpos != server_name.size() - 1) {
         std::string wildcard = '*' + server_name.substr(pos);
-        if (map_wildcard_[listener_name][wildcard] != nullptr) {
+        if (map_wildcard_[listener_name].find(wildcard) != map_wildcard_[listener_name].end()) {
           return map_wildcard_[listener_name][wildcard];
         }
       }
     }
   }
 
-  return map_exact_[listener_name][EMPTY_STRING];
+  if (map_exact_[listener_name].find(EMPTY_STRING) != map_wildcard_[listener_name].end()) {
+    return map_exact_[listener_name][EMPTY_STRING];
+  }
+
+  return nullptr;
 }
 
 size_t ContextManagerImpl::daysUntilFirstCertExpires() {
