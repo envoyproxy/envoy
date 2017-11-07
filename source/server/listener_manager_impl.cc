@@ -102,6 +102,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
     skip_context_update = false;
   }
 
+  size_t has_tls = 0;
+  size_t has_stk = 0;
   for (const auto& filter_chain : config.filter_chains()) {
     std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
                                          filter_chain.filter_chain_match().sni_domains().end());
@@ -114,8 +116,17 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
       tls_contexts_.emplace_back(parent_.server_.sslContextManager().createSslServerContext(
           name_, sni_domains, *listener_scope_, context_config, skip_context_update));
+      has_tls++;
+      if (filter_chain.tls_context().has_session_ticket_keys()) {
+        has_stk++;
+      }
     }
   }
+
+  // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
+  ASSERT(has_stk == 0 || has_stk == has_tls);
+  UNREFERENCED_PARAMETER(has_tls);
+  UNREFERENCED_PARAMETER(has_stk);
 }
 
 ListenerImpl::~ListenerImpl() {
