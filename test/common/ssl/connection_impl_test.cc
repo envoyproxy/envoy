@@ -1010,8 +1010,8 @@ TEST_P(SslConnectionImplTest, SniCertificate) {
   envoy::api::v2::FilterChain* filter_chain3 = listener.add_filter_chains();
   envoy::api::v2::TlsCertificate* server_cert3 =
       filter_chain3->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
-  server_cert3->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
+  server_cert3->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
   server_cert3->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 

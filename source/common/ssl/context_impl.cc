@@ -29,8 +29,8 @@ int ContextImpl::sslContextIndex() {
 }
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
-    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
-      stats_(generateStats(scope)), ecdh_curves_(config.ecdhCurves()) {
+    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
+      ecdh_curves_(config.ecdhCurves()) {
   RELEASE_ASSERT(ctx_);
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -542,7 +542,7 @@ void ServerContextImpl::updateConnection(SSL* ssl) {
   ASSERT(ctx_);
 
   SSL_set_SSL_CTX(ssl, ctx_.get());
-  SSL_CTX *ssl_ctx = SSL_get_SSL_CTX(ssl);
+  SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
   ASSERT(SSL_CTX_get_ex_data(ssl_ctx, sslContextIndex()) == this);
 
   // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
