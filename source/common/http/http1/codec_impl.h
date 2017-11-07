@@ -16,7 +16,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 
-#include "http_parser.h"
+#include <http_parser.h>
 
 namespace Envoy {
 namespace Http {

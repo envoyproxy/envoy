@@ -2,7 +2,7 @@
 
 #include "common/common/logger.h"
 
-#include "backward.hpp"
+#include <backward.hpp>
 
 namespace Envoy {
 #define BACKTRACE_LOG()                                                                            \

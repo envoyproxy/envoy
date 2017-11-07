@@ -102,7 +102,7 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
   echo "bazel coverage build with tests..."
-  export GCOVR="/thirdparty/gcovr/scripts/gcovr"
+  export GCOVR="bazel --batch run -- @com_github_gcovr_gcovr//:gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export WORKSPACE=ci
