@@ -182,7 +182,9 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
         EXPECT_FALSE(client_ssl_session->not_resumable);
         uint8_t* session_data;
         size_t session_len;
-        ASSERT(SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len));
+        int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
+        ASSERT(rc == 1);
+        UNREFERECED_PARAMETER(rc);
         new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
         OPENSSL_free(session_data);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
