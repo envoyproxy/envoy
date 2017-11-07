@@ -47,6 +47,21 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
   cb(connection);
 }
 
+TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
+  NiceMock<MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  envoy::api::v2::filter::network::MongoProxy config =
+      *dynamic_cast<envoy::api::v2::filter::network::MongoProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_access_log("path/to/access/log");
+  config.set_stat_prefix("my_stat_prefix");
+
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
 void handleInvalidConfiguration(const std::string& json_string) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;

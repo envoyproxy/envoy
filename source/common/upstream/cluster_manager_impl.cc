@@ -36,29 +36,30 @@ namespace Upstream {
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   if (state_ == State::AllClustersInitialized) {
-    cluster.initialize();
+    cluster.initialize([] {});
     return;
   }
 
+  const auto initialize_cb = [&cluster, this] {
+    ASSERT(state_ != State::AllClustersInitialized);
+    removeCluster(cluster);
+  };
+
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     primary_init_clusters_.push_back(&cluster);
-    cluster.initialize();
+    cluster.initialize(initialize_cb);
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
     secondary_init_clusters_.push_back(&cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
       // already started secondary init. In this case, just immediately initialize.
-      cluster.initialize();
+      cluster.initialize(initialize_cb);
     }
   }
 
   ENVOY_LOG(info, "cm init: adding: cluster={} primary={} secondary={}", cluster.info()->name(),
             primary_init_clusters_.size(), secondary_init_clusters_.size());
-  cluster.setInitializedCb([&cluster, this]() -> void {
-    ASSERT(state_ != State::AllClustersInitialized);
-    removeCluster(cluster);
-  });
 }
 
 void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
@@ -109,7 +110,10 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
         Cluster* cluster = *iter;
         ++iter;
-        cluster->initialize();
+        cluster->initialize([cluster, this] {
+          ASSERT(state_ != State::AllClustersInitialized);
+          removeCluster(*cluster);
+        });
       }
     }
 
@@ -229,6 +233,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
         new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
   });
 
+  init_helper_.onStaticLoadComplete();
+
   // To avoid threading issues, for those clusters that start with hosts already in them (like the
   // static cluster), we need to post an update onto each thread to notify them of the update. We
   // also require this for dynamic clusters where an immediate resolve occurred in the cluster
@@ -237,7 +243,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     postInitializeCluster(*cluster.second.cluster_);
   }
 
-  init_helper_.onStaticLoadComplete();
   ads_mux_->start();
 
   if (cm_config.has_load_stats_config()) {
@@ -388,6 +393,12 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 void ClusterManagerImpl::postThreadLocalClusterUpdate(
     const Cluster& primary_cluster, const std::vector<HostSharedPtr>& hosts_added,
     const std::vector<HostSharedPtr>& hosts_removed) {
+  if (init_helper_.state() == ClusterManagerInitHelper::State::Loading) {
+    // A cluster may try to post updates before we are ready for multi-threading. Block this case
+    // since we will post the update in postInitializeCluster().
+    return;
+  }
+
   const std::string& name = primary_cluster.info()->name();
   HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(primary_cluster.hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(
