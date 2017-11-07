@@ -80,14 +80,14 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   return output;
 }
 
-void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_bytes) {
-  std::string const chars = "abcdefghijklmnaoqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-  std::random_device rd;
-  std::mt19937 generate(rd());
-  std::uniform_int_distribution<> distribute(1, chars.length() - 1);
+void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_bytes,
+                                                 uint64_t seed) {
+  std::string const sample = "Neque porro quisquam est qui dolorem ipsum..";
+  std::mt19937 generate(seed);
+  std::uniform_int_distribution<> distribute(1, sample.length() - 1);
   std::string str{};
   for (uint64_t n = 0; n < n_bytes; ++n) {
-    str += chars.at(distribute(generate));
+    str += sample.at(distribute(generate));
   }
   buffer.add(str);
 }

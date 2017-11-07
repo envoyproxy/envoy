@@ -20,6 +20,7 @@ class ZlibDecompressorImplTest : public testing::Test {
 protected:
   static const int8_t gzip_window_bits{31};
   static const int8_t memory_level{8};
+  static const uint64_t default_input_size{796};
 };
 
 class ZlibDecompressorImplDeathTest : public ZlibDecompressorImplTest {
@@ -53,11 +54,11 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
                   gzip_window_bits, memory_level);
 
   std::string original_text{};
-  for (uint64_t i = 0; i < 50; ++i) {
-    TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4796);
+  for (uint64_t i = 0; i < 20; ++i) {
+    TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, default_input_size * i);
     compressor.compress(compressor_input_buffer, compressor_output_buffer);
     original_text.append(TestUtility::bufferToString(compressor_input_buffer));
-    compressor_input_buffer.drain(4796);
+    compressor_input_buffer.drain(default_input_size * i);
   }
 
   compressor.flush(compressor_output_buffer);
@@ -72,12 +73,12 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
 
   std::string decompressed_text{TestUtility::bufferToString(compressor_input_buffer)};
 
-  ASSERT_EQ(decompressor.checksum(), compressor.checksum());
+  ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
-  ASSERT_EQ(original_text, decompressed_text);
+  EXPECT_EQ(original_text, decompressed_text);
 }
 
-TEST_F(ZlibDecompressorImplTest, DecompressWithSmallChunkMemory) {
+TEST_F(ZlibDecompressorImplTest, DecompressWithReducedInternalMemory) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;
 
@@ -87,25 +88,53 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallChunkMemory) {
                   gzip_window_bits, memory_level);
 
   std::string original_text{};
-  for (uint64_t i = 0; i < 50; ++i) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, 4796);
+  for (uint64_t i = 0; i < 20; ++i) {
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
     compressor.compress(input_buffer, output_buffer);
     original_text.append(TestUtility::bufferToString(input_buffer));
-    input_buffer.drain(4796);
+    input_buffer.drain(default_input_size * i);
   }
-
   compressor.flush(output_buffer);
 
-  ZlibDecompressorImpl decompressor(768);
+  ZlibDecompressorImpl decompressor(16);
   decompressor.init(gzip_window_bits);
   ASSERT_EQ(0, input_buffer.length());
   decompressor.decompress(output_buffer, input_buffer);
 
   std::string decompressed_text{TestUtility::bufferToString(input_buffer)};
 
-  ASSERT_EQ(decompressor.checksum(), compressor.checksum());
+  ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   ASSERT_EQ(original_text, decompressed_text);
+}
+
+TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
+  Buffer::OwnedImpl input_buffer;
+  Buffer::OwnedImpl output_buffer;
+
+  Envoy::Compressor::ZlibCompressorImpl compressor;
+  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
+                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, 15, 2);
+
+  std::string original_text{};
+  for (uint64_t i = 0; i < 20; ++i) {
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    compressor.compress(input_buffer, output_buffer);
+    original_text.append(TestUtility::bufferToString(input_buffer));
+    input_buffer.drain(default_input_size * i);
+  }
+  compressor.flush(output_buffer);
+
+  ZlibDecompressorImpl decompressor;
+  decompressor.init(15);
+  ASSERT_EQ(0, input_buffer.length());
+  decompressor.decompress(output_buffer, input_buffer);
+
+  std::string decompressed_text{TestUtility::bufferToString(input_buffer)};
+
+  ASSERT_EQ(compressor.checksum(), decompressor.checksum());
+  ASSERT_EQ(original_text.length(), decompressed_text.length());
+  EXPECT_EQ(original_text, decompressed_text);
 }
 
 } // namespace
