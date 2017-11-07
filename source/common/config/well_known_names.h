@@ -123,7 +123,7 @@ public:
 
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER}) {}
+                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
