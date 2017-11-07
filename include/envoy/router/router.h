@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include "envoy/common/optional.h"
 #include "envoy/http/access_log.h"
@@ -441,11 +442,16 @@ public:
    */
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
 
-  /**
-   * Return a list of header key/value pairs that will be added to every response that transits the
-   * router.
+  /*
+   * Whether a given header should be appended to or override existing values.
    */
-  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
+  enum class HeaderOp { Append, Override };
+
+  /**
+   * Return a list of header key/value pairs will be appended to or override (per HeaderOp) every
+   * response that transits the router.
+   */
+  virtual const std::list<std::tuple<Http::LowerCaseString, std::string, HeaderOp>>&
   responseHeadersToAdd() const PURE;
 
   /**
