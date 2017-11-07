@@ -27,19 +27,24 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
 
   // Remove mappings.
+  auto& listener_map_exact = map_exact_[listener_name];
   if (server_names.empty()) {
-    if (map_exact_[listener_name][EMPTY_STRING] == context) {
-      map_exact_[listener_name][EMPTY_STRING] = nullptr;
+    auto ctx = listener_map_exact.find(EMPTY_STRING);
+    if (ctx != listener_map_exact.end() && ctx->second == context) {
+      listener_map_exact.erase(EMPTY_STRING);
     }
   } else {
+    auto& listener_map_wildcard = map_wildcard_[listener_name];
     for (const auto& name : server_names) {
       if (name.size() > 2 && name[0] == '*' && name[1] == '.') {
-        if (map_wildcard_[listener_name][name] == context) {
-          map_wildcard_[listener_name][name] = nullptr;
+        auto ctx = listener_map_wildcard.find(name);
+        if (ctx != listener_map_wildcard.end() && ctx->second == context) {
+          listener_map_wildcard.erase(name);
         }
       } else {
-        if (map_exact_[listener_name][name] == context) {
-          map_exact_[listener_name][name] = nullptr;
+        auto ctx = listener_map_exact.find(name);
+        if (ctx != listener_map_exact.end() && ctx->second == context) {
+          listener_map_exact.erase(name);
         }
       }
     }
@@ -92,8 +97,10 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   // 4. Return no context and reject connection.
 
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
-  if (map_exact_[listener_name].find(server_name) != map_exact_[listener_name].end()) {
-    return map_exact_[listener_name][server_name];
+  auto& listener_map_exact = map_exact_[listener_name];
+  auto ctx = listener_map_exact.find(server_name);
+  if (ctx != listener_map_exact.end()) {
+    return ctx->second;
   }
 
   // Try to construct and match wildcard domain.
@@ -103,15 +110,18 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
       size_t rpos = server_name.rfind('.');
       if (rpos > pos + 1 && rpos != server_name.size() - 1) {
         std::string wildcard = '*' + server_name.substr(pos);
-        if (map_wildcard_[listener_name].find(wildcard) != map_wildcard_[listener_name].end()) {
-          return map_wildcard_[listener_name][wildcard];
+        auto& listener_map_wildcard = map_wildcard_[listener_name];
+        auto ctx = listener_map_wildcard.find(wildcard);
+        if (ctx != listener_map_wildcard.end()) {
+          return ctx->second;
         }
       }
     }
   }
 
-  if (map_exact_[listener_name].find(EMPTY_STRING) != map_wildcard_[listener_name].end()) {
-    return map_exact_[listener_name][EMPTY_STRING];
+  ctx = listener_map_exact.find(EMPTY_STRING);
+  if (ctx != listener_map_exact.end()) {
+    return ctx->second;
   }
 
   return nullptr;
