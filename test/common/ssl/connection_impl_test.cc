@@ -146,7 +146,9 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
     SSL_SESSION* client_ssl_session =
         SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(client_session.data()),
                                client_session.size(), client_ssl_context);
-    ASSERT(SSL_set_session(client_ssl_connection, client_ssl_session));
+    int rc = SSL_set_session(client_ssl_connection, client_ssl_session);
+    ASSERT(rc == 1);
+    UNREFERENCED_PARAMETER(rc);
     SSL_SESSION_free(client_ssl_session);
   }
 
