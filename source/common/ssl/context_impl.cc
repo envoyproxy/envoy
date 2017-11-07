@@ -550,6 +550,7 @@ void ServerContextImpl::updateConnection(SSL* ssl) {
 
   int rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
   ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
