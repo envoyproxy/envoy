@@ -13,9 +13,9 @@ namespace Configuration {
  */
 class FileAccessLogFactory : public AccessLogInstanceFactory {
 public:
-  Http::AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
-                                                             Http::AccessLog::FilterPtr&& filter,
-                                                             FactoryContext& context) override;
+  AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
+                                                       AccessLog::FilterPtr&& filter,
+                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

@@ -70,7 +70,7 @@ public:
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
-  Http::AccessLog::MockRequestInfo request_info_;
+  AccessLog::MockRequestInfo request_info_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<LightStepDriver> driver_;

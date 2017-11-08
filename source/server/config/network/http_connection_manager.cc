@@ -12,9 +12,9 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
+#include "common/access_log/access_log_impl.h"
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -194,8 +194,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   for (const auto& access_log : config.access_log()) {
-    Http::AccessLog::InstanceSharedPtr current_access_log =
-        Http::AccessLog::AccessLogFactory::fromProto(access_log, context_);
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, context_);
     access_logs_.push_back(current_access_log);
   }
 
