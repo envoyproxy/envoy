@@ -229,7 +229,7 @@ private:
   MonotonicTimeSource& time_source_;
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
-  mutable std::list<ChangeStateCb> callbacks_;
+  mutable std::list<ChangeStateCb> callbacks_; // TODO(mattklein123): Remove mutable.
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
   double success_rate_average_;

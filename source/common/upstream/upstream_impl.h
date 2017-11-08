@@ -214,6 +214,7 @@ private:
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_locality_;
   HostListsConstSharedPtr healthy_hosts_per_locality_;
+  // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<const std::vector<HostSharedPtr>&,
                                   const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;

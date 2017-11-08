@@ -154,7 +154,7 @@ private:
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
-  mutable std::list<HostStatusCb> callbacks_;
+  mutable std::list<HostStatusCb> callbacks_; // TODO(mattklein123): Remove mutable.
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds interval_jitter_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
