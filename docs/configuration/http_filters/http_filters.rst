@@ -17,3 +17,4 @@ HTTP filters
   ip_tagging_filter
   rate_limit_filter
   router_filter
+  lua_filter
