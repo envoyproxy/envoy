@@ -32,3 +32,4 @@ Architecture overview
   hot_restart
   dynamic_configuration
   init
+  scripting

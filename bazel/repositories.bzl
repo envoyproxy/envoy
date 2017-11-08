@@ -112,8 +112,8 @@ def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
         name = "envoy_api",
-        remote = REPO_LOCATIONS["envoy_api"],
-        commit = "b236cc7c73353959af4b70903273d358c10aeb34",
+        remote = REPO_LOCATIONS["data-plane-api"],
+        commit = "4d18e6d236a6476782076b217cd62d43c30a7dfe",
     )
 
     api_bind_targets = [
@@ -145,14 +145,15 @@ def envoy_api_deps(skip_targets):
             actual = "@envoy_api//api/filter:" + t + "_cc",
         )
     http_filter_bind_targets = [
-        "http_connection_manager",
-        "router",
         "buffer",
-        "transcoder",
-        "rate_limit",
-        "ip_tagging",
-        "health_check",
         "fault",
+        "health_check",
+        "http_connection_manager",
+        "ip_tagging",
+        "lua",
+        "rate_limit",
+        "router",
+        "transcoder",
     ]
     for t in http_filter_bind_targets:
         native.bind(
@@ -224,6 +225,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
         com_github_gabime_spdlog(repository)
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
         com_github_lightstep_lightstep_tracer_cpp(repository)
+    if not ("googletest" in skip_targets or "com_google_googletest" in existing_rule_keys):
+        com_google_googletest()
     if not (skip_com_google_protobuf or "com_google_protobuf" in existing_rule_keys):
         com_google_protobuf()
 
@@ -286,6 +289,17 @@ def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
   native.bind(
       name="lightstep",
       actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+  )
+
+def com_google_googletest():
+  native.git_repository(
+      name = "com_google_googletest",
+      remote = "https://github.com/google/googletest",
+      commit = "43863938377a9ea1399c0596269e0890b5c5515a",
+  )
+  native.bind(
+      name = "googletest",
+      actual = "@com_google_googletest//:gtest",
   )
 
 def com_google_protobuf():

@@ -20,9 +20,9 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/access_log/request_info_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
-#include "common/http/access_log/request_info_impl.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -143,8 +143,7 @@ private:
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    void finalizeRequestHeaders(Http::HeaderMap&,
-                                const Http::AccessLog::RequestInfo&) const override {}
+    void finalizeRequestHeaders(Http::HeaderMap&, const AccessLog::RequestInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {

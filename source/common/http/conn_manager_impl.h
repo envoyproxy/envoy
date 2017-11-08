@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/event/deferred_deletable.h"
-#include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/websocket.h"
@@ -23,9 +23,9 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/request_info_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
-#include "common/http/access_log/request_info_impl.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
 #include "common/http/websocket/ws_handler_impl.h"
@@ -519,7 +519,7 @@ private:
       addStreamDecoderFilterWorker(filter, true);
       addStreamEncoderFilterWorker(filter, true);
     }
-    void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
+    void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     // Http::WsHandlerCallbacks
     void sendHeadersOnlyResponse(HeaderMap& headers) override {
@@ -583,7 +583,7 @@ private:
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
-    std::list<Http::AccessLog::InstanceSharedPtr> access_log_handlers_;
+    std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
     State state_;
     AccessLog::RequestInfoImpl request_info_;

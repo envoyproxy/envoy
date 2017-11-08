@@ -185,7 +185,8 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     break;
   }
 
-  if (active_query_list_.empty() && drain_decision_.drainClose()) {
+  if (active_query_list_.empty() && drain_decision_.drainClose() &&
+      runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().DrainCloseEnabled, 100)) {
     ENVOY_LOG(debug, "drain closing mongo connection");
     stats_.cx_drain_close_.inc();
 

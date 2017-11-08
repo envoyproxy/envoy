@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "common/http/access_log/access_log_formatter.h"
+#include "common/access_log/access_log_formatter.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/rds.pb.h"
@@ -18,8 +18,7 @@ class HeaderFormatter {
 public:
   virtual ~HeaderFormatter() {}
 
-  virtual const std::string
-  format(const Envoy::Http::AccessLog::RequestInfo& request_info) const PURE;
+  virtual const std::string format(const Envoy::AccessLog::RequestInfo& request_info) const PURE;
 
   /*
    * @return bool indicating whether the formatted header should be appended to the existing
@@ -38,11 +37,11 @@ public:
   RequestHeaderFormatter(const std::string& field_name, bool append);
 
   // HeaderFormatter::format
-  const std::string format(const Envoy::Http::AccessLog::RequestInfo& request_info) const override;
+  const std::string format(const Envoy::AccessLog::RequestInfo& request_info) const override;
   bool append() const override { return append_; }
 
 private:
-  std::function<std::string(const Envoy::Http::AccessLog::RequestInfo&)> field_extractor_;
+  std::function<std::string(const Envoy::AccessLog::RequestInfo&)> field_extractor_;
   const bool append_;
 };
 
@@ -55,7 +54,7 @@ public:
       : static_value_(static_header_value), append_(append){};
 
   // HeaderFormatter::format
-  const std::string format(const Envoy::Http::AccessLog::RequestInfo&) const override {
+  const std::string format(const Envoy::AccessLog::RequestInfo&) const override {
     return static_value_;
   };
   bool append() const override { return append_; }
@@ -80,7 +79,7 @@ public:
   parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
   void evaluateRequestHeaders(Http::HeaderMap& headers,
-                              const Http::AccessLog::RequestInfo& request_info) const;
+                              const AccessLog::RequestInfo& request_info) const;
 
 private:
   std::list<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;

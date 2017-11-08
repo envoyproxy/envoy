@@ -40,8 +40,8 @@ RequestHeaderParserPtr RequestHeaderParser::parse(
   return request_header_parser;
 }
 
-void RequestHeaderParser::evaluateRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+void RequestHeaderParser::evaluateRequestHeaders(Http::HeaderMap& headers,
+                                                 const AccessLog::RequestInfo& request_info) const {
   for (const auto& formatter : header_formatters_) {
     if (formatter.second->append()) {
       headers.addReferenceKey(formatter.first, formatter.second->format(request_info));
@@ -54,12 +54,11 @@ void RequestHeaderParser::evaluateRequestHeaders(
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& field_name, bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const Envoy::Http::AccessLog::RequestInfo& request_info) {
-      return Envoy::Http::AccessLog::AccessLogFormatUtils::protocolToString(
-          request_info.protocol());
+    field_extractor_ = [](const Envoy::AccessLog::RequestInfo& request_info) {
+      return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol());
     };
   } else if (field_name == "CLIENT_IP") {
-    field_extractor_ = [](const Envoy::Http::AccessLog::RequestInfo& request_info) {
+    field_extractor_ = [](const Envoy::AccessLog::RequestInfo& request_info) {
       return request_info.getDownstreamAddress();
     };
   } else {
@@ -69,7 +68,7 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& field_name, bo
 }
 
 const std::string
-RequestHeaderFormatter::format(const Envoy::Http::AccessLog::RequestInfo& request_info) const {
+RequestHeaderFormatter::format(const Envoy::AccessLog::RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }
 

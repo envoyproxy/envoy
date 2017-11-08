@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <string>
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
-#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"

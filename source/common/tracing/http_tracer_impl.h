@@ -42,7 +42,7 @@ public:
    *
    * @return decision if request is traceable or not and Reason why.
    **/
-  static Decision isTracing(const Http::AccessLog::RequestInfo& request_info,
+  static Decision isTracing(const AccessLog::RequestInfo& request_info,
                             const Http::HeaderMap& request_headers);
 
   /**
@@ -55,7 +55,7 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                           const Http::AccessLog::RequestInfo& request_info,
+                           const AccessLog::RequestInfo& request_info,
                            const Config& tracing_config);
 
   static const std::string INGRESS_OPERATION;
@@ -96,7 +96,7 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const AccessLog::RequestInfo&) override {
     return SpanPtr{new NullSpan()};
   }
 };
@@ -107,7 +107,7 @@ public:
 
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const Http::AccessLog::RequestInfo& request_info) override;
+                    const AccessLog::RequestInfo& request_info) override;
 
 private:
   DriverPtr driver_;

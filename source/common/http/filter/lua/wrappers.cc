@@ -18,7 +18,7 @@ HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent)
 
 int HeaderMapIterator::luaPairsIterator(lua_State* state) {
   if (current_ == entries_.size()) {
-    parent_.iterating_ = false;
+    parent_.iterator_.reset();
     return 0;
   } else {
     lua_pushstring(state, entries_[current_]->key().c_str());
@@ -49,7 +49,7 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
 }
 
 int HeaderMapWrapper::luaPairs(lua_State* state) {
-  if (iterating_) {
+  if (iterator_.get() != nullptr) {
     luaL_error(state, "cannot create a second iterator before completing the first");
   }
 
@@ -60,10 +60,7 @@ int HeaderMapWrapper::luaPairs(lua_State* state) {
   // are potentially better ways of handling this but due to GC of the iterator it's very
   // difficult to control safety without tracking every allocated iterator and invalidating them
   // if the map is modified.
-  // TODO(mattklein123): Handle explicit iterator invalidation. We should allowing calling code to
-  // to destroy the iterator if it should not be used again.
-  iterating_ = true;
-  HeaderMapIterator::create(state, *this);
+  iterator_.reset(HeaderMapIterator::create(state, *this), true);
   lua_pushcclosure(state, HeaderMapIterator::static_luaPairsIterator, 1);
   return 1;
 }
@@ -77,7 +74,7 @@ int HeaderMapWrapper::luaRemove(lua_State* state) {
 }
 
 void HeaderMapWrapper::checkModifiable(lua_State* state) {
-  if (iterating_) {
+  if (iterator_.get() != nullptr) {
     luaL_error(state, "header map cannot be modified while iterating");
   }
 

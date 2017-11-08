@@ -4,7 +4,7 @@
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/http/access_log/request_info_impl.h"
+#include "common/access_log/request_info_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
 
@@ -13,14 +13,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 namespace {
 
 class RequestInfoTimingWrapper {
 public:
   RequestInfoTimingWrapper()
-      : pre_start_(std::chrono::steady_clock::now()), request_info_(Protocol::Http2),
+      : pre_start_(std::chrono::steady_clock::now()), request_info_(Http::Protocol::Http2),
         post_start_(std::chrono::steady_clock::now()) {}
 
   void checkTimingBounds(
@@ -69,7 +68,7 @@ TEST(RequestInfoImplTest, TimingTest) {
 }
 
 TEST(RequestInfoImplTest, BytesTest) {
-  RequestInfoImpl request_info(Protocol::Http2);
+  RequestInfoImpl request_info(Http::Protocol::Http2);
   const uint64_t bytes_sent = 7;
   const uint64_t bytes_received = 12;
 
@@ -94,7 +93,7 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
                                                    FaultInjected,
                                                    RateLimited};
 
-  RequestInfoImpl request_info(Protocol::Http2);
+  RequestInfoImpl request_info(Http::Protocol::Http2);
   for (ResponseFlag flag : responseFlags) {
     // Test cumulative setting of response flags.
     EXPECT_FALSE(request_info.getResponseFlag(flag))
@@ -106,11 +105,11 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
 }
 
 TEST(RequestInfoImplTest, MiscSettersAndGetters) {
-  RequestInfoImpl request_info(Protocol::Http2);
-  EXPECT_EQ(Protocol::Http2, request_info.protocol());
+  RequestInfoImpl request_info(Http::Protocol::Http2);
+  EXPECT_EQ(Http::Protocol::Http2, request_info.protocol());
 
-  request_info.protocol(Protocol::Http10);
-  EXPECT_EQ(Protocol::Http10, request_info.protocol());
+  request_info.protocol(Http::Protocol::Http10);
+  EXPECT_EQ(Http::Protocol::Http10, request_info.protocol());
 
   EXPECT_FALSE(request_info.responseCode().valid());
   request_info.response_code_ = 200;
@@ -129,5 +128,4 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
 
 } // namespace
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

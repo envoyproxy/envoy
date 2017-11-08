@@ -7,6 +7,8 @@
 
 #include "common/common/assert.h"
 
+#include "server/config_validation/dispatcher.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -23,7 +25,10 @@ public:
   AsyncClient::Stream* start(StreamCallbacks& callbacks,
                              const Optional<std::chrono::milliseconds>& timeout,
                              bool buffer_body_for_retry) override;
-  Event::Dispatcher& dispatcher() override { NOT_IMPLEMENTED; }
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+private:
+  Event::ValidationDispatcher dispatcher_;
 };
 
 } // namespace Http

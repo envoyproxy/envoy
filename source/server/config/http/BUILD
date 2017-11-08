@@ -22,6 +22,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lua_lib",
+    srcs = ["lua.cc"],
+    hdrs = ["lua.h"],
+    external_deps = ["envoy_filter_http_lua"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:json_utility_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/http/filter/lua:lua_filter_lib",
+        "//source/common/json:config_schemas_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cors_lib",
     srcs = ["cors.cc"],
     hdrs = ["cors.h"],
@@ -55,21 +70,6 @@ envoy_cc_library(
         "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/http/filter:fault_filter_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "file_access_log_lib",
-    srcs = ["file_access_log.cc"],
-    hdrs = ["file_access_log.h"],
-    external_deps = ["envoy_filter_http_http_connection_manager"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:access_log_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/http/access_log:access_log_formatter_lib",
-        "//source/common/http/access_log:access_log_lib",
-        "//source/common/protobuf",
     ],
 )
 

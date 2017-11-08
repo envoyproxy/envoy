@@ -106,7 +106,7 @@ envoy_cc_test(
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/server/config/http:file_access_log_lib",
+        "//source/server/config/network:file_access_log_lib",
         "//test/common/http:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/filesystem:filesystem_mocks",

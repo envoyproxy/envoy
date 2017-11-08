@@ -6,9 +6,9 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/access_log_impl.h"
 #include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
@@ -40,7 +40,6 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 namespace {
 
@@ -71,8 +70,8 @@ public:
   }
   void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
   uint64_t bytesReceived() const override { return 1; }
-  Protocol protocol() const override { return protocol_; }
-  void protocol(Protocol protocol) override { protocol_ = protocol; }
+  Http::Protocol protocol() const override { return protocol_; }
+  void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
   std::chrono::microseconds duration() const override {
@@ -93,7 +92,7 @@ public:
   SystemTime start_time_;
   std::chrono::microseconds request_received_duration_{1000};
   std::chrono::microseconds response_received_duration_{2000};
-  Protocol protocol_{Protocol::Http11};
+  Http::Protocol protocol_{Http::Protocol::Http11};
   Optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   uint64_t duration_{3000};
@@ -111,8 +110,8 @@ public:
     ON_CALL(*file_, write(_)).WillByDefault(SaveArg<0>(&output_));
   }
 
-  TestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/"}};
-  TestHeaderMapImpl response_headers_;
+  Http::TestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_headers_;
   TestRequestInfo request_info_;
   std::shared_ptr<Filesystem::MockFile> file_;
   std::string output_;
@@ -303,7 +302,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
-  TestHeaderMapImpl header_map{};
+  Http::TestHeaderMapImpl header_map{};
   request_info_.hc_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
@@ -320,7 +319,7 @@ TEST_F(AccessLogImplTest, healthCheckFalse) {
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
-  TestHeaderMapImpl header_map{};
+  Http::TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -346,19 +345,19 @@ TEST_F(AccessLogImplTest, requestTracing) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   {
-    TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
+    Http::TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, request_info_);
   }
 
   {
-    TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
+    Http::TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&not_traceable, &response_headers_, request_info_);
   }
 
   {
-    TestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
+    Http::TestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, request_info_);
   }
@@ -409,14 +408,14 @@ TEST_F(AccessLogImplTest, andFilter) {
 
   {
     EXPECT_CALL(*file_, write(_));
-    TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, request_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    TestHeaderMapImpl header_map{};
+    Http::TestHeaderMapImpl header_map{};
     request_info_.hc_request_ = true;
     log->log(&header_map, &response_headers_, request_info_);
   }
@@ -439,14 +438,14 @@ TEST_F(AccessLogImplTest, orFilter) {
 
   {
     EXPECT_CALL(*file_, write(_));
-    TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, request_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_));
-    TestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
+    Http::TestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
     log->log(&header_map, &response_headers_, request_info_);
   }
 }
@@ -472,14 +471,14 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 
   {
     EXPECT_CALL(*file_, write(_));
-    TestHeaderMapImpl header_map{};
+    Http::TestHeaderMapImpl header_map{};
 
     log->log(&header_map, &response_headers_, request_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    TestHeaderMapImpl header_map{};
+    Http::TestHeaderMapImpl header_map{};
     request_info_.hc_request_ = true;
 
     log->log(&header_map, &response_headers_, request_info_);
@@ -524,7 +523,7 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   envoy::api::v2::filter::AccessLogFilter config;
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   DurationFilter filter(config.duration_filter(), runtime);
-  TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
   request_info.duration_ = 100000;
@@ -559,7 +558,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 
-  TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
 
   info.response_code_.value(400);
@@ -572,5 +571,4 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
 
 } // namespace
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

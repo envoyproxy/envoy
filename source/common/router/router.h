@@ -15,12 +15,12 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/access_log/access_log_impl.h"
+#include "common/access_log/request_info_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
-#include "common/http/access_log/access_log_impl.h"
-#include "common/http/access_log/request_info_impl.h"
 #include "common/http/utility.h"
 
 #include "api/filter/http/router.pb.h"
@@ -102,7 +102,7 @@ public:
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span()) {
     for (const auto& upstream_log : config.upstream_log()) {
-      upstream_logs_.push_back(Http::AccessLog::AccessLogFactory::fromProto(upstream_log, context));
+      upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
 
@@ -116,7 +116,7 @@ public:
   FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
-  std::list<Http::AccessLog::InstanceSharedPtr> upstream_logs_;
+  std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -266,7 +266,7 @@ private:
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
-    Http::AccessLog::RequestInfoImpl request_info_;
+    AccessLog::RequestInfoImpl request_info_;
     Http::HeaderMap* upstream_headers_{};
 
     bool calling_encode_headers_ : 1;
@@ -279,8 +279,7 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  Http::AccessLog::ResponseFlag
-  streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
+  AccessLog::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
