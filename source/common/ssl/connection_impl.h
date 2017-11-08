@@ -42,6 +42,7 @@ private:
   std::string getUriSanFromCertificate(X509* cert);
 
   // Network::ConnectionImpl
+  bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   IoResult doReadFromSocket() override;
   IoResult doWriteToSocket() override;

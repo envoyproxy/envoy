@@ -92,6 +92,7 @@ protected:
     uint64_t bytes_processed_;
   };
 
+  virtual bool canFlushClose() { return true; }
   virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();
   void raiseEvent(ConnectionEvent event);
