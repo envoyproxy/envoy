@@ -609,9 +609,8 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
   // Response header manipulation testing.
   EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
-  EXPECT_THAT((std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>(
-                  {std::make_tuple(Http::LowerCaseString("x-envoy-upstream-canary"), "true",
-                                   Router::Config::HeaderOp::Append)})),
+  EXPECT_THAT((std::list<HeaderAddition>(
+                  {{Http::LowerCaseString("x-envoy-upstream-canary"), "true", true}})),
               ContainerEq(config.responseHeadersToAdd()));
   EXPECT_THAT(std::list<Http::LowerCaseString>({Http::LowerCaseString("x-envoy-upstream-canary"),
                                                 Http::LowerCaseString("x-envoy-virtual-cluster")}),
@@ -705,9 +704,8 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeadersWithAppendFalse) {
   // Response header manipulation testing.
   EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
-  EXPECT_THAT((std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>(
-                  {std::make_tuple(Http::LowerCaseString("x-envoy-upstream-canary"), "true",
-                                   Router::Config::HeaderOp::Override)})),
+  EXPECT_THAT((std::list<HeaderAddition>(
+                  {{Http::LowerCaseString("x-envoy-upstream-canary"), "true", false}})),
               ContainerEq(config.responseHeadersToAdd()));
 }
 

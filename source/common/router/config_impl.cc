@@ -32,15 +32,11 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>
+Router::HeaderAddition
 make_header_to_add(const envoy::api::v2::HeaderValueOption& header_value_option) {
-  Router::Config::HeaderOp header_op =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true)
-          ? Router::Config::HeaderOp::Append
-          : Router::Config::HeaderOp::Override;
-
-  return std::make_tuple(Http::LowerCaseString(header_value_option.header().key()),
-                         header_value_option.header().value(), header_op);
+  return Router::HeaderAddition{Http::LowerCaseString(header_value_option.header().key()),
+                                header_value_option.header().value(),
+                                PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true)};
 }
 
 } // namespace

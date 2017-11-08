@@ -104,8 +104,7 @@ public:
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
-  const std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>&
-  requestHeadersToAdd() const {
+  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
@@ -148,8 +147,7 @@ private:
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
-  std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>
-      request_headers_to_add_;
+  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 };
 
@@ -300,8 +298,7 @@ public:
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
 
-  const std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>&
-  requestHeadersToAdd() const {
+  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
 
@@ -471,8 +468,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
-  std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>
-      request_headers_to_add_;
+  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
@@ -577,8 +573,7 @@ public:
   ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
              Upstream::ClusterManager& cm, bool validate_clusters_default);
 
-  const std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>&
-  requestHeadersToAdd() const {
+  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
 
@@ -593,8 +588,7 @@ public:
     return internal_only_headers_;
   }
 
-  const std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>&
-  responseHeadersToAdd() const override {
+  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
     return response_headers_to_add_;
   }
 
@@ -605,11 +599,9 @@ public:
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>
-      response_headers_to_add_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
-  std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>
-      request_headers_to_add_;
+  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 };
 
@@ -625,8 +617,7 @@ public:
     return internal_only_headers_;
   }
 
-  const std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>&
-  responseHeadersToAdd() const override {
+  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
     return response_headers_to_add_;
   }
 
@@ -636,8 +627,7 @@ public:
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<std::tuple<Http::LowerCaseString, std::string, Router::Config::HeaderOp>>
-      response_headers_to_add_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 

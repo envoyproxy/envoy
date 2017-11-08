@@ -7,7 +7,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <tuple>
 
 #include "envoy/common/optional.h"
 #include "envoy/http/access_log.h"
@@ -419,6 +418,34 @@ public:
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;
 
 /**
+ * Header to be added to a request or response.
+ */
+struct HeaderAddition {
+  /**
+   * The name of the header to add.
+   */
+  const Http::LowerCaseString header_;
+
+  /**
+   * The value of the header to add.
+   */
+  const std::string value_;
+
+  /**
+   * Indicates whether the value should be appended to existing values for the header (true) or
+   * replace them (false).
+   */
+  const bool append_;
+
+  /**
+   * Equality comparison.
+   */
+  bool operator==(const HeaderAddition& rhs) const {
+    return header_ == rhs.header_ && value_ == rhs.value_ && append_ == rhs.append_;
+  }
+};
+
+/**
  * The router configuration.
  */
 class Config {
@@ -442,17 +469,11 @@ public:
    */
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
 
-  /*
-   * Whether a given header should be appended to or override existing values.
-   */
-  enum class HeaderOp { Append, Override };
-
   /**
-   * Return a list of header key/value pairs will be appended to or override (per HeaderOp) every
-   * response that transits the router.
+   * Return a list of header key/value pairs will be appended to or override every response that
+   * transits the router.
    */
-  virtual const std::list<std::tuple<Http::LowerCaseString, std::string, HeaderOp>>&
-  responseHeadersToAdd() const PURE;
+  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
 
   /**
    * Return a list of upstream headers that will be stripped from every response that transits the

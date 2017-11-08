@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <tuple>
 
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"

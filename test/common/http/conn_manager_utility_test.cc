@@ -398,7 +398,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   route_config_.response_headers_to_remove_.push_back(LowerCaseString("custom_header"));
   route_config_.response_headers_to_add_.push_back(
-      std::make_tuple(LowerCaseString("to_add"), "foo", Router::Config::HeaderOp::Append));
+      Router::HeaderAddition{LowerCaseString("to_add"), "foo", true});
 
   {
     TestHeaderMapImpl response_headers{
@@ -441,7 +441,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
 
   // Values are overridden
   route_config_.response_headers_to_add_.push_back(
-      std::make_tuple(LowerCaseString("to_override"), "foo", Router::Config::HeaderOp::Override));
+      Router::HeaderAddition{LowerCaseString("to_override"), "foo", false});
   {
     TestHeaderMapImpl response_headers{
         {"connection", "foo"}, {"transfer-encoding", "foo"}, {"to_override", "existing"}};
