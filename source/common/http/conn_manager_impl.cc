@@ -392,7 +392,7 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
-    Http::AccessLog::InstanceSharedPtr handler) {
+    AccessLog::InstanceSharedPtr handler) {
   access_log_handlers_.push_back(handler);
 }
 

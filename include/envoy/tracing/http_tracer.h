@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/common/pure.h"
-#include "envoy/http/access_log.h"
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
@@ -102,7 +102,7 @@ public:
   virtual ~HttpTracer() {}
 
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                            const Http::AccessLog::RequestInfo& request_info) PURE;
+                            const AccessLog::RequestInfo& request_info) PURE;
 };
 
 typedef std::unique_ptr<HttpTracer> HttpTracerPtr;

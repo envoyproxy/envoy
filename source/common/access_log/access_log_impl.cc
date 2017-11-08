@@ -1,4 +1,4 @@
-#include "common/http/access_log/access_log_impl.h"
+#include "common/access_log/access_log_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -8,10 +8,10 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -19,7 +19,6 @@
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 
 ComparisonFilter::ComparisonFilter(const envoy::api::v2::filter::ComparisonFilter& config,
@@ -65,13 +64,14 @@ FilterPtr FilterFactory::fromProto(const envoy::api::v2::filter::AccessLogFilter
   }
 }
 
-bool TraceableRequestFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
+bool TraceableRequestFilter::evaluate(const RequestInfo& info,
+                                      const Http::HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.is_tracing && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
+bool StatusCodeFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&) {
   if (!info.responseCode().valid()) {
     return compareAgainstValue(0ULL);
   }
@@ -79,7 +79,7 @@ bool StatusCodeFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
+bool DurationFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&) {
   return compareAgainstValue(
       std::chrono::duration_cast<std::chrono::milliseconds>(info.duration()).count());
 }
@@ -88,8 +88,8 @@ RuntimeFilter::RuntimeFilter(const envoy::api::v2::filter::RuntimeFilter& config
                              Runtime::Loader& runtime)
     : runtime_(runtime), runtime_key_(config.runtime_key()) {}
 
-bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header) {
-  const HeaderEntry* uuid = request_header.RequestId();
+bool RuntimeFilter::evaluate(const RequestInfo&, const Http::HeaderMap& request_header) {
+  const Http::HeaderEntry* uuid = request_header.RequestId();
   uint16_t sampled_value;
   if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
     uint64_t runtime_value =
@@ -115,7 +115,7 @@ OrFilter::OrFilter(const envoy::api::v2::filter::OrFilter& config, Runtime::Load
 AndFilter::AndFilter(const envoy::api::v2::filter::AndFilter& config, Runtime::Loader& runtime)
     : OperatorFilter(config.filters(), runtime) {}
 
-bool OrFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
+bool OrFilter::evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) {
   bool result = false;
   for (auto& filter : filters_) {
     result |= filter->evaluate(info, request_headers);
@@ -128,7 +128,7 @@ bool OrFilter::evaluate(const RequestInfo& info, const HeaderMap& request_header
   return result;
 }
 
-bool AndFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
+bool AndFilter::evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) {
   bool result = true;
   for (auto& filter : filters_) {
     result &= filter->evaluate(info, request_headers);
@@ -141,7 +141,7 @@ bool AndFilter::evaluate(const RequestInfo& info, const HeaderMap& request_heade
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
+bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&) {
   return !info.healthCheck();
 }
 
@@ -167,9 +167,9 @@ FileAccessLog::FileAccessLog(const std::string& access_log_path, FilterPtr&& fil
   log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
-void FileAccessLog::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
-                        const RequestInfo& request_info) {
-  static HeaderMapImpl empty_headers;
+void FileAccessLog::log(const Http::HeaderMap* request_headers,
+                        const Http::HeaderMap* response_headers, const RequestInfo& request_info) {
+  static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
   }
@@ -189,5 +189,4 @@ void FileAccessLog::log(const HeaderMap* request_headers, const HeaderMap* respo
 }
 
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

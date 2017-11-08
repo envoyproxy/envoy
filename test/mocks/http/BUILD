@@ -13,9 +13,9 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/http:access_log_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:conn_pool_interface",
@@ -23,6 +23,7 @@ envoy_cc_mock(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/http:conn_manager_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/tracing:tracing_mocks",
