@@ -55,7 +55,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
 
   std::string original_text{};
   for (uint64_t i = 0; i < 20; ++i) {
-    TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, default_input_size * i, i);
     compressor.compress(compressor_input_buffer, compressor_output_buffer);
     original_text.append(TestUtility::bufferToString(compressor_input_buffer));
     compressor_input_buffer.drain(default_input_size * i);
@@ -89,7 +89,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithReducedInternalMemory) {
 
   std::string original_text{};
   for (uint64_t i = 0; i < 20; ++i) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
     compressor.compress(input_buffer, output_buffer);
     original_text.append(TestUtility::bufferToString(input_buffer));
     input_buffer.drain(default_input_size * i);
@@ -105,7 +105,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithReducedInternalMemory) {
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
-  ASSERT_EQ(original_text, decompressed_text);
+  EXPECT_EQ(original_text, decompressed_text);
 }
 
 TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
@@ -118,7 +118,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
 
   std::string original_text{};
   for (uint64_t i = 0; i < 20; ++i) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
     compressor.compress(input_buffer, output_buffer);
     original_text.append(TestUtility::bufferToString(input_buffer));
     input_buffer.drain(default_input_size * i);

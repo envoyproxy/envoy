@@ -57,14 +57,13 @@ TEST_F(ZlibCompressorImplTest, CompressWithReducedInternalMemory) {
                   memory_level);
 
   for (uint64_t i = 0; i < 10; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
     compressor.compress(input_buffer, output_buffer);
     input_buffer.drain(default_input_size * i);
     ASSERT_EQ(0, input_buffer.length());
   }
 
   compressor.flush(output_buffer);
-  EXPECT_EQ(6151, output_buffer.length());
 
   uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice compressed_slices[num_comp_slices];
@@ -94,7 +93,7 @@ TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
                   memory_level);
 
   for (uint64_t i = 0; i < 10; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
     compressor.compress(input_buffer, output_buffer);
 
     input_buffer.drain(default_input_size * i);
@@ -119,8 +118,6 @@ TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
     // FOOTER four-byte sequence (sync flush)
     EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
   }
-
-  EXPECT_EQ(output_buffer.length(), 6205);
 }
 
 TEST_F(ZlibCompressorImplTest, CompressSmallInputMemory) {
@@ -138,7 +135,7 @@ TEST_F(ZlibCompressorImplTest, CompressSmallInputMemory) {
   EXPECT_EQ(0, output_buffer.length());
 
   compressor.flush(output_buffer);
-  EXPECT_EQ(26, output_buffer.length());
+  EXPECT_LE(10, output_buffer.length());
 
   uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice compressed_slices[num_comp_slices];
@@ -169,7 +166,7 @@ TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
                   memory_level);
 
   for (uint64_t i = 0; i < 20; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
     compressor.compress(input_buffer, temp_buffer);
     input_buffer.drain(default_input_size * i);
     ASSERT_EQ(0, input_buffer.length());
@@ -180,9 +177,10 @@ TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
   compressor.flush(temp_buffer);
   ASSERT_TRUE(temp_buffer.length() > 0);
   output_buffer.move(temp_buffer);
+  const uint64_t first_n_compressed_bytes = output_buffer.length();
 
-  for (uint64_t i = 0; i < 5; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+  for (uint64_t i = 0; i < 15; i++) {
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i * 10);
     compressor.compress(input_buffer, temp_buffer);
     input_buffer.drain(default_input_size * i);
     ASSERT_EQ(0, input_buffer.length());
@@ -193,7 +191,7 @@ TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
   compressor.flush(temp_buffer);
   output_buffer.move(temp_buffer);
   ASSERT_EQ(0, temp_buffer.length());
-  EXPECT_EQ(13625, output_buffer.length());
+  EXPECT_GE(output_buffer.length(), first_n_compressed_bytes);
 
   uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice compressed_slices[num_comp_slices];
@@ -222,14 +220,13 @@ TEST_F(ZlibCompressorImplTest, CompressWithNotCommonParams) {
                   ZlibCompressorImpl::CompressionStrategy::Rle, gzip_window_bits, 1);
 
   for (uint64_t i = 0; i < 10; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i);
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
     compressor.compress(input_buffer, output_buffer);
     input_buffer.drain(default_input_size * i);
     ASSERT_EQ(0, input_buffer.length());
   }
 
   compressor.flush(output_buffer);
-  EXPECT_EQ(23145, output_buffer.length());
 
   uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice compressed_slices[num_comp_slices];

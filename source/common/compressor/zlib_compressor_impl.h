@@ -47,8 +47,8 @@ public:
   };
 
   /**
-   * Init must be called in order to initialize the compressor. It should be always called before
-   * calling compress.
+   * Init must be called in order to initialize the compressor. Once compressor is initialized, it
+   * cannot be initialized again. Init should run before compressing any data.
    * @param level @see CompressionLevel enum
    * @param strategy @see CompressionStrategy enum
    * @param window_bits sets the size of the history buffer. Larger values result in better

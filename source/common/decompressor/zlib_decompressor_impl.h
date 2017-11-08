@@ -21,15 +21,16 @@ public:
   ZlibDecompressorImpl(uint64_t chunk_size);
 
   /**
-   * Init must be called in order to initialize the decompressor. It should be called before calling
-   * decompress.
+   * Init must be called in order to initialize the decompressor. Once decompressor is initialized,
+   * it cannot be initialized again. Init should run before decompressing any data.
    * @param window_bits sets the size of the history buffer. It must be greater than or equal to
    * the window_bits value provided when data was compressed (zlib manual).
    */
   void init(int8_t window_bits);
 
   /**
-   * Returns adler checksum.
+   * @return uint64_t CRC-32 if a gzip stream is being written or Adler-32 for other compression
+   * types.
    */
   uint64_t checksum();
 

@@ -80,13 +80,13 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   return output;
 }
 
-void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_bytes,
+void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                                  uint64_t seed) {
-  std::string const sample = "Neque porro quisquam est qui dolorem ipsum..";
+  const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
   std::mt19937 generate(seed);
   std::uniform_int_distribution<> distribute(1, sample.length() - 1);
   std::string str{};
-  for (uint64_t n = 0; n < n_bytes; ++n) {
+  for (uint64_t n = 0; n < n_char; ++n) {
     str += sample.at(distribute(generate));
   }
   buffer.add(str);
