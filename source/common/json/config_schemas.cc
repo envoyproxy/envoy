@@ -988,6 +988,18 @@ const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::LUA_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "inline_code" : {"type" : "string"}
+    },
+    "required" : ["inline_code"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",

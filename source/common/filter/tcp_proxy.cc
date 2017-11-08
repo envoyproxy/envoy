@@ -10,10 +10,10 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
@@ -63,7 +63,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
   for (const Json::ObjectSharedPtr& json_access_log : config.getObjectArray("access_log", true)) {
     envoy::api::v2::filter::AccessLog v2_access_log;
     Config::FilterJson::translateAccessLog(*json_access_log, v2_access_log);
-    access_logs_.emplace_back(Http::AccessLog::AccessLogFactory::fromProto(v2_access_log, context));
+    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(v2_access_log, context));
   }
 }
 
@@ -215,14 +215,14 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     if (config_) {
       config_->stats().downstream_cx_no_route_.inc();
     }
-    request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
+    request_info_.setResponseFlag(AccessLog::ResponseFlag::NoRouteFound);
     onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
+    request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure();
     return Network::FilterStatus::StopIteration;
@@ -233,7 +233,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
-    request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
+    request_info_.setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream);
     onInitFailure();
     return Network::FilterStatus::StopIteration;
   }
@@ -271,7 +271,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 void TcpProxy::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
-  request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure);
+  request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
 
   // This will close the upstream connection as well.
   onConnectTimeoutError();
@@ -307,7 +307,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connect_timeout_timer_) {
-      request_info_.setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure);
+      request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
     }

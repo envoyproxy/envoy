@@ -21,6 +21,13 @@ namespace Http {
 namespace Http1 {
 
 ConnPoolImpl::~ConnPoolImpl() {
+  closeConnections();
+
+  // Make sure all clients are destroyed before we are destroyed.
+  dispatcher_.clearDeferredDeleteList();
+}
+
+void ConnPoolImpl::closeConnections() {
   while (!ready_clients_.empty()) {
     ready_clients_.front()->codec_client_->close();
   }
@@ -28,9 +35,6 @@ ConnPoolImpl::~ConnPoolImpl() {
   while (!busy_clients_.empty()) {
     busy_clients_.front()->codec_client_->close();
   }
-
-  // Make sure all clients are destroyed before we are destroyed.
-  dispatcher_.clearDeferredDeleteList();
 }
 
 void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {

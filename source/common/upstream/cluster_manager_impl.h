@@ -77,21 +77,31 @@ private:
  */
 class ClusterManagerInitHelper : Logger::Loggable<Logger::Id::upstream> {
 public:
+  enum class State {
+    // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
+    // are immediately initialized.
+    Loading,
+    // During this state we wait for all static clusters to fully initialize. This requires
+    // completing phase 1 clusters, initializing phase 2 clusters, and then waiting for them.
+    WaitingForStaticInitialize,
+    // If CDS is configured, this state tracks waiting for the first CDS response to populate
+    // clusters.
+    WaitingForCdsInitialize,
+    // During this state, all CDS populated clusters are undergoing either phase 1 or phase 2
+    // initialization.
+    CdsInitialized,
+    // All clusters are fully initialized.
+    AllClustersInitialized
+  };
+
   void addCluster(Cluster& cluster);
   void onStaticLoadComplete();
   void removeCluster(Cluster& cluster);
   void setCds(CdsApi* cds);
   void setInitializedCb(std::function<void()> callback);
+  State state() const { return state_; }
 
 private:
-  enum class State {
-    Loading,
-    WaitingForStaticInitialize,
-    WaitingForCdsInitialize,
-    CdsInitialized,
-    AllClustersInitialized
-  };
-
   void maybeFinishInitialize();
 
   CdsApi* cds_{};
@@ -211,6 +221,7 @@ private:
                                         const std::vector<HostSharedPtr>& hosts_added,
                                         const std::vector<HostSharedPtr>& hosts_removed,
                                         ThreadLocal::Slot& tls);
+    static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
@@ -234,6 +245,7 @@ private:
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
                                     const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed);
+  void postThreadLocalHealthFailure(const HostSharedPtr& host);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

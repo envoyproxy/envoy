@@ -3,10 +3,9 @@
 #include <chrono>
 #include <cstdint>
 
-#include "envoy/http/access_log.h"
+#include "envoy/access_log/access_log.h"
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 
 struct RequestInfoImpl : public RequestInfo {
@@ -14,9 +13,9 @@ struct RequestInfoImpl : public RequestInfo {
       : start_time_(std::chrono::system_clock::now()),
         start_time_monotonic_(std::chrono::steady_clock::now()) {}
 
-  RequestInfoImpl(Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
+  RequestInfoImpl(Http::Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
 
-  // Http::AccessLog::RequestInfo
+  // AccessLog::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
   Optional<std::chrono::microseconds> requestReceivedDuration() const override {
@@ -37,8 +36,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  Optional<Protocol> protocol() const override { return protocol_; }
-  void protocol(Protocol protocol) override { protocol_ = protocol; }
+  Optional<Http::Protocol> protocol() const override { return protocol_; }
+  void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
 
@@ -49,7 +48,7 @@ struct RequestInfoImpl : public RequestInfo {
                                                                  start_time_monotonic_);
   }
 
-  void setResponseFlag(Http::AccessLog::ResponseFlag response_flag) override {
+  void setResponseFlag(AccessLog::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }
 
@@ -67,7 +66,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   const std::string& getDownstreamAddress() const override { return downstream_address_; };
 
-  Optional<Protocol> protocol_;
+  Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
   Optional<std::chrono::microseconds> request_received_duration_{};
@@ -82,5 +81,4 @@ struct RequestInfoImpl : public RequestInfo {
 };
 
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

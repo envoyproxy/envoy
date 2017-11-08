@@ -167,7 +167,7 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::Http::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
@@ -177,7 +177,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::Http::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
@@ -203,7 +203,7 @@ bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                                const std::string& expected) {
   std::string actual = "";
-  Envoy::Http::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::AccessLog::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   request_info.downstream_address_ = "127.0.0.1";
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);

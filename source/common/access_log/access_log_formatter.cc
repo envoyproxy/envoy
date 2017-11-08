@@ -1,4 +1,4 @@
-#include "common/http/access_log/access_log_formatter.h"
+#include "common/access_log/access_log_formatter.h"
 
 #include <cstdint>
 #include <string>
@@ -10,7 +10,6 @@
 #include "fmt/format.h"
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 
 static const std::string UnspecifiedValueString = "-";
@@ -106,14 +105,14 @@ static const std::string Http10String = "HTTP/1.0";
 static const std::string Http11String = "HTTP/1.1";
 static const std::string Http2String = "HTTP/2";
 
-const std::string& AccessLogFormatUtils::protocolToString(Optional<Protocol> protocol) {
+const std::string& AccessLogFormatUtils::protocolToString(Optional<Http::Protocol> protocol) {
   if (protocol.valid()) {
     switch (protocol.value()) {
-    case Protocol::Http10:
+    case Http::Protocol::Http10:
       return Http10String;
-    case Protocol::Http11:
+    case Http::Protocol::Http11:
       return Http11String;
-    case Protocol::Http2:
+    case Http::Protocol::Http2:
       return Http2String;
     }
   } else {
@@ -306,7 +305,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
   }
 }
 
-std::string RequestInfoFormatter::format(const HeaderMap&, const HeaderMap&,
+std::string RequestInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                          const RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }
@@ -323,8 +322,8 @@ HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  const Optional<size_t>& max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-std::string HeaderFormatter::format(const HeaderMap& headers) const {
-  const HeaderEntry* header = headers.get(main_header_);
+std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
+  const Http::HeaderEntry* header = headers.get(main_header_);
 
   if (!header && !alternative_header_.get().empty()) {
     header = headers.get(alternative_header_);
@@ -366,5 +365,4 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
 }
 
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

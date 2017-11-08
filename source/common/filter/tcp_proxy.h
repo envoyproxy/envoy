@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/event/timer.h"
-#include "envoy/http/access_log.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -15,8 +15,8 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/request_info_impl.h"
 #include "common/common/logger.h"
-#include "common/http/access_log/request_info_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
@@ -65,7 +65,7 @@ public:
   const std::string& getRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return stats_; }
-  const std::vector<Http::AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
 
 private:
   struct Route {
@@ -82,7 +82,7 @@ private:
 
   std::vector<Route> routes_;
   const TcpProxyStats stats_;
-  std::vector<Http::AccessLog::InstanceSharedPtr> access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -184,7 +184,7 @@ protected:
   Stats::TimespanPtr connected_timespan_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  Http::AccessLog::RequestInfoImpl request_info_;
+  AccessLog::RequestInfoImpl request_info_;
 };
 
 } // Filter

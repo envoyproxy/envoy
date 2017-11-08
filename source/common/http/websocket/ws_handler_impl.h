@@ -23,7 +23,7 @@ namespace WebSocket {
  * All data will be proxied back and forth between the two connections, without any
  * knowledge of the underlying WebSocket protocol.
  */
-class WsHandlerImpl : public Filter::TcpProxy {
+class WsHandlerImpl : public Envoy::Filter::TcpProxy {
 public:
   WsHandlerImpl(HeaderMap& request_headers, const AccessLog::RequestInfo& request_info,
                 const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
