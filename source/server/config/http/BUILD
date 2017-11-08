@@ -74,21 +74,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "file_access_log_lib",
-    srcs = ["file_access_log.cc"],
-    hdrs = ["file_access_log.h"],
-    external_deps = ["envoy_filter_http_http_connection_manager"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:access_log_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/http/access_log:access_log_formatter_lib",
-        "//source/common/http/access_log:access_log_lib",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "grpc_http1_bridge_lib",
     srcs = ["grpc_http1_bridge.cc"],
     hdrs = ["grpc_http1_bridge.h"],
