@@ -139,7 +139,9 @@ public:
   MockListenerComponentFactory();
   ~MockListenerComponentFactory();
 
-  DrainManagerPtr createDrainManager() override { return DrainManagerPtr{createDrainManager_()}; }
+  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
+    return DrainManagerPtr{createDrainManager_(drain_type)};
+  }
 
   MOCK_METHOD2(createFilterFactoryList,
                std::vector<Configuration::NetworkFilterFactoryCb>(
@@ -148,7 +150,7 @@ public:
   MOCK_METHOD2(createListenSocket,
                Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                               bool bind_to_port));
-  MOCK_METHOD0(createDrainManager_, DrainManager*());
+  MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
 
   std::shared_ptr<Network::MockListenSocket> socket_;
