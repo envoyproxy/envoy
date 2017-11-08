@@ -153,7 +153,7 @@ TEST(RequestHeaderParserTest, EvaluateHeadersWithAppendFalse) {
   Http::TestHeaderMapImpl headerMap{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
 

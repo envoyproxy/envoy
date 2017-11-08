@@ -662,7 +662,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeadersWithAppendFalse) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
 
   envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromJson(json);
   disableHeaderValueOptionAppend(*route_config.mutable_response_headers_to_add());
