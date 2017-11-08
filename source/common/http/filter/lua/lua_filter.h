@@ -12,7 +12,7 @@ namespace Filter {
 namespace Lua {
 
 /**
- * Callbacks used by a a strem handler to access the filter.
+ * Callbacks used by a stream handler to access the filter.
  */
 class FilterCallbacks {
 public:
@@ -139,7 +139,7 @@ private:
 
   /**
    * @return a handle to the trailers or nil if there are no trailers. This call will cause the
-   *         script to yield of Envoy does not yet know if there are trailers or not.
+   *         script to yield if Envoy does not yet know if there are trailers or not.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTrailers);
 
