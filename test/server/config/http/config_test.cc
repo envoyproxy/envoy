@@ -16,6 +16,7 @@
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
+#include "server/config/http/lua.h"
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
 #include "server/config/http/zipkin_http_tracer.h"
@@ -223,6 +224,22 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
   NiceMock<MockFactoryContext> context;
   HealthCheckFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+}
+
+TEST(HttpFilterConfigTest, LuaFilterInJson) {
+  std::string json_string = R"EOF(
+  {
+    "inline_code" : "print(5)"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  LuaFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, RouterFilterInJson) {

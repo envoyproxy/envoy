@@ -39,6 +39,7 @@ public:
   static const std::string IP_TAGGING_HTTP_FILTER_SCHEMA;
   static const std::string RATE_LIMIT_HTTP_FILTER_SCHEMA;
   static const std::string ROUTER_HTTP_FILTER_SCHEMA;
+  static const std::string LUA_HTTP_FILTER_SCHEMA;
 
   // Cluster Schemas
   static const std::string CLUSTER_MANAGER_SCHEMA;
