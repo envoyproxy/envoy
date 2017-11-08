@@ -388,7 +388,7 @@ public:
    * @return a pointer to the cluster's health checker. If a health checker has not been installed,
    *         returns nullptr.
    */
-  virtual const HealthChecker* healthChecker() const PURE;
+  virtual HealthChecker* healthChecker() PURE;
 
   /**
    * @return the information about this upstream cluster.
@@ -399,6 +399,7 @@ public:
    * @return a pointer to the cluster's outlier detector. If an outlier detector has not been
    *         installed, returns nullptr.
    */
+  virtual Outlier::Detector* outlierDetector() PURE;
   virtual const Outlier::Detector* outlierDetector() const PURE;
 
   /**

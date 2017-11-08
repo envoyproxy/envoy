@@ -82,7 +82,7 @@ public:
    * Add a changed state callback to the detector. The callback will be called whenever any host
    * changes state (either ejected or brought back in) due to outlier status.
    */
-  virtual void addChangedStateCb(ChangeStateCb cb) const PURE;
+  virtual void addChangedStateCb(ChangeStateCb cb) PURE;
 
   /**
    * Returns the average success rate of the hosts in the Detector for the last aggregation

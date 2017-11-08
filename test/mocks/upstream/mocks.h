@@ -45,8 +45,9 @@ public:
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());
 
   // Upstream::Cluster
-  MOCK_CONST_METHOD0(healthChecker, const HealthChecker*());
+  MOCK_METHOD0(healthChecker, HealthChecker*());
   MOCK_CONST_METHOD0(info, ClusterInfoConstSharedPtr());
+  MOCK_METHOD0(outlierDetector, Outlier::Detector*());
   MOCK_CONST_METHOD0(outlierDetector, const Outlier::Detector*());
   MOCK_METHOD1(initialize, void(std::function<void()> callback));
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
@@ -129,7 +130,7 @@ public:
   MockHealthChecker();
   ~MockHealthChecker();
 
-  MOCK_CONST_METHOD1(addHostCheckCompleteCb, void(HostStatusCb callback));
+  MOCK_METHOD1(addHostCheckCompleteCb, void(HostStatusCb callback));
   MOCK_METHOD0(start, void());
 
   void runCallbacks(Upstream::HostSharedPtr host, bool changed_state) {
