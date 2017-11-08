@@ -225,6 +225,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
         com_github_gabime_spdlog(repository)
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
         com_github_lightstep_lightstep_tracer_cpp(repository)
+    if not ("googletest" in skip_targets or "com_google_googletest" in existing_rule_keys):
+        com_google_googletest()
     if not (skip_com_google_protobuf or "com_google_protobuf" in existing_rule_keys):
         com_google_protobuf()
 
@@ -287,6 +289,17 @@ def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
   native.bind(
       name="lightstep",
       actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+  )
+
+def com_google_googletest():
+  native.git_repository(
+      name = "com_google_googletest",
+      remote = "https://github.com/google/googletest",
+      commit = "43863938377a9ea1399c0596269e0890b5c5515a",
+  )
+  native.bind(
+      name = "googletest",
+      actual = "@com_google_googletest//:gtest",
   )
 
 def com_google_protobuf():
