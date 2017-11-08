@@ -223,6 +223,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
         com_github_fmtlib_fmt(repository)
     if not ("spdlog" in skip_targets or "com_github_gabime_spdlog" in existing_rule_keys):
         com_github_gabime_spdlog(repository)
+    if not ("opentracing" in skip_targets or "com_github_opentracing_opentracing_cpp" in existing_rule_keys):
+        com_github_opentracing_opentracing_cpp(repository)
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
         com_github_lightstep_lightstep_tracer_cpp(repository)
     if not ("googletest" in skip_targets or "com_google_googletest" in existing_rule_keys):
@@ -272,17 +274,31 @@ def com_github_gabime_spdlog(repository = ""):
       actual="@com_github_gabime_spdlog//:spdlog",
   )
 
+def com_github_opentracing_opentracing_cpp(repository = ""):
+  genrule_repository(
+      name = "com_github_opentracing_opentracing_cpp",
+      urls = [
+          "https://github.com/opentracing/opentracing-cpp/archive/v1.1.0.tar.gz",
+      ],
+      sha256 = "621b28eb5961d0622d5b37939b13379d75038366e3628f96cda411c8b94ac042",
+      strip_prefix = "opentracing-cpp-1.1.0",
+      genrule_cmd_file = repository + "//bazel/external:opentracing.genrule_cmd",
+      build_file = repository + "//bazel/external:opentracing.BUILD",
+  )
+  native.bind(
+      name="opentracing",
+      actual="@com_github_opentracing_opentracing_cpp//:opentracing",
+  )
+  
+
 def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
   genrule_repository(
       name = "com_github_lightstep_lightstep_tracer_cpp",
       urls = [
-          "https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_36/lightstep-tracer-cpp-0.36.tar.gz",
+          "https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.5.0.tar.gz",
       ],
-      sha256 = "f7477e67eca65f904c0b90a6bfec46d58cccfc998a8e75bc3259b6e93157ff84",
-      strip_prefix = "lightstep-tracer-cpp-0.36",
-      patches = [
-          repository + "//bazel/external:lightstep-missing-header.patch",
-      ],
+      sha256 = "10563addb4dee74d69809e59fd2c5377a323efa78941ab00bb4ce1402b3f1a33",
+      strip_prefix = "lightstep-tracer-cpp-0.5.0",
       genrule_cmd_file = repository + "//bazel/external:lightstep.genrule_cmd",
       build_file = repository + "//bazel/external:lightstep.BUILD",
   )

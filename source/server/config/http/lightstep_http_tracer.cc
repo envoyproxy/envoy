@@ -9,7 +9,6 @@
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
 
-#include "lightstep/options.h"
 #include "lightstep/tracer.h"
 
 namespace Envoy {
@@ -21,14 +20,10 @@ LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
                                              Server::Instance& server,
                                              Upstream::ClusterManager& cluster_manager) {
 
-  Envoy::Runtime::RandomGenerator& rand = server.random();
-
-  std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
+  std::unique_ptr<lightstep::LightStepTracerOptions> opts(new lightstep::LightStepTracerOptions());
   opts->access_token = server.api().fileReadToEnd(json_config.getString("access_token_file"));
   StringUtil::rtrim(opts->access_token);
-
-  opts->tracer_attributes["lightstep.component_name"] = server.localInfo().clusterName();
-  opts->guid_generator = [&rand]() { return rand.random(); };
+  opts->component_name = server.localInfo().clusterName();
 
   Tracing::DriverPtr lightstep_driver(
       new Tracing::LightStepDriver(json_config, cluster_manager, server.stats(),

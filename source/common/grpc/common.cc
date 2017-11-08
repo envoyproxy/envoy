@@ -218,6 +218,15 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   return body;
 }
 
+bool Common::deserializeBody(const std::string& body, Protobuf::Message& message) {
+  // http://www.grpc.io/docs/guides/wire.html
+  // There must be at least 5 bytes to contain the message header.
+  if (body.size() < 5) {
+    return false;
+  }
+  return message.ParseFromString(body.substr(5));
+}
+
 Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& service_full_name,
                                         const std::string& method_name) {

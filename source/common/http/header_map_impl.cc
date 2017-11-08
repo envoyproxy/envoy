@@ -399,6 +399,23 @@ void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
   }
 }
 
+HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
+                                        const HeaderEntry** entry) const {
+  StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
+  if (cb) {
+    StaticLookupResponse ref_lookup_response = cb(const_cast<HeaderMapImpl&>(*this));
+    *entry = *ref_lookup_response.entry_;
+    if (*entry) {
+      return Lookup::Found;
+    } else {
+      return Lookup::NotFound;
+    }
+  } else {
+    *entry = nullptr;
+    return Lookup::NotSupported;
+  }
+}
+
 void HeaderMapImpl::remove(const LowerCaseString& key) {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
