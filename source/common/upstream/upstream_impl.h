@@ -214,6 +214,7 @@ private:
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_locality_;
   HostListsConstSharedPtr healthy_hosts_per_locality_;
+  // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<const std::vector<HostSharedPtr>&,
                                   const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;
@@ -322,7 +323,9 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   // Upstream::Cluster
+  HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
+  Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
 

@@ -119,6 +119,30 @@ public:
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
 };
 
+/**
+ * Verify that connections are closed when requested.
+ */
+TEST_F(Http2ConnPoolImplTest, CloseConnections) {
+  InSequence s;
+  pool_.max_streams_ = 1;
+
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  expectClientConnect(0);
+
+  expectClientCreate();
+  ActiveTestRequest r2(*this, 1);
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  r2.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  expectClientConnect(1);
+
+  pool_.closeConnections();
+  EXPECT_CALL(*this, onClientDestroy()).Times(2);
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   expectClientCreate();
   EXPECT_CALL(cluster_->stats_store_,
