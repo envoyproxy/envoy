@@ -240,6 +240,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
         com_google_googletest()
     if not (skip_com_google_protobuf or "com_google_protobuf" in existing_rule_keys):
         com_google_protobuf()
+    if not ("subpar" in existing_rule_keys):
+        subpar()
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
@@ -411,4 +413,13 @@ def com_google_protobuf():
   native.bind(
       name = "protoc",
       actual = "@com_google_protobuf_cc//:protoc",
+  )
+
+def subpar():
+  # I'd love to name this `com_github_google_subpar`, but something in the Subpar
+  # code assumes its repository name is just `subpar`.
+  native.git_repository(
+      name = "subpar",
+      remote = "https://github.com/google/subpar",
+      commit = "eb23aa7a5361cabc02464476dd080389340a5522", # HEAD
   )
