@@ -5,8 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
@@ -469,7 +469,7 @@ public:
    * Add an access log handler that is called when the stream is destroyed.
    * @param handler supplies the handler to add.
    */
-  virtual void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) PURE;
+  virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 };
 
 /**

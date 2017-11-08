@@ -9,18 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "access_log_interface",
-    hdrs = ["access_log.h"],
-    deps = [
-        ":header_map_interface",
-        ":protocol_interface",
-        "//include/envoy/common:optional",
-        "//include/envoy/common:time_interface",
-        "//include/envoy/upstream:upstream_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "async_client_interface",
     hdrs = ["async_client.h"],
     deps = [
@@ -59,9 +47,9 @@ envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
-        ":access_log_interface",
         ":codec_interface",
         ":header_map_interface",
+        "//include/envoy/access_log:access_log_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
