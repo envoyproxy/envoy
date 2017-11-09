@@ -18,7 +18,7 @@ struct RequestInfoImpl : public RequestInfo {
   // AccessLog::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
-  Optional<std::chrono::microseconds> requestReceivedDuration() const override {
+  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override {
@@ -26,7 +26,7 @@ struct RequestInfoImpl : public RequestInfo {
         std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
   }
 
-  Optional<std::chrono::microseconds> responseReceivedDuration() const override {
+  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
     return response_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override {
@@ -36,7 +36,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  Optional<Http::Protocol> protocol() const override { return protocol_; }
+  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
   const Optional<uint32_t>& responseCode() const override { return response_code_; }

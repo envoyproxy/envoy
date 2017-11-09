@@ -373,10 +373,9 @@ public:
   TcpProxyTest() {
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
-    reconfigureAccessLogging(std::string());
   }
 
-  void reconfigureAccessLogging(const std::string& accessLogJson) {
+  void configure(const std::string& accessLogJson) {
     std::string json = R"EOF(
     {{
       "stat_prefix": "name",
@@ -396,8 +395,8 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(fmt::format(json, accessLogJson));
     config_.reset(new TcpProxyConfig(*config, factory_context_));
   }
-
-  void setup(bool return_connection) {
+  void setup(bool return_connection, const std::string& accessLogJson) {
+    configure(accessLogJson);
     if (return_connection) {
       connect_timer_ = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
       EXPECT_CALL(*connect_timer_, enableTimer(_));
@@ -427,6 +426,8 @@ public:
     EXPECT_EQ(Optional<uint64_t>(), filter_->computeHashKey());
     EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
   }
+
+  void setup(bool return_connection) { setup(return_connection, std::string()); }
 
   TcpProxyConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -516,14 +517,12 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
-  reconfigureAccessLogging(R"EOF(
+  setup(true, R"EOF(
       {
         "path": "unused",
         "format": "%RESPONSE_FLAGS%"
       }
     )EOF");
-
-  setup(true);
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connection_, write(BufferEqual(&buffer)));
@@ -541,20 +540,19 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
 }
 
 TEST_F(TcpProxyTest, NoHost) {
-  reconfigureAccessLogging(R"EOF(
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  setup(false, R"EOF(
       {
         "path": "unused",
         "format": "%RESPONSE_FLAGS%"
       }
     )EOF");
-
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
-  setup(false);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UH");
 }
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
+  configure("");
   filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
@@ -562,13 +560,12 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
-  reconfigureAccessLogging(R"EOF(
+  setup(true, R"EOF(
       {
         "path": "unused",
         "format": "%RESPONSE_FLAGS%"
       }
     )EOF");
-  setup(true);
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connection_, write(BufferEqual(&buffer)));
@@ -586,7 +583,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
-  reconfigureAccessLogging(R"EOF(
+  configure(R"EOF(
       {
         "path": "unused",
         "format": "%RESPONSE_FLAGS%"
@@ -611,25 +608,23 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
-  reconfigureAccessLogging(R"EOF(
+  setup(true, R"EOF(
       {
         "path": "unused",
         "format": "%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"
       }
     )EOF");
-  setup(true);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
 }
 
 TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
-  reconfigureAccessLogging(R"EOF(
+  setup(true, R"EOF(
       {
         "path": "unused",
         "format": "bytesreceived=%BYTES_RECEIVED% bytessent=%BYTES_SENT% datetime=%START_TIME% nonzeronum=%DURATION%"
       }
     )EOF");
-  setup(true);
 
   upstream_connection_->raiseEvent(Network::ConnectionEvent::Connected);
   Buffer::OwnedImpl buffer("a");

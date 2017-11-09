@@ -97,11 +97,11 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the start time to the last byte out.
 
   TCP
-    Total duration of the downstream connection.
+    Total duration in milliseconds of the downstream connection.
 
 %RESPONSE_FLAGS%
-  Additional details about the response or connection, if any. For TCP connections, the specified response code
-  does not apply.  Possible values are:
+  Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
+  the descriptions do not apply.  Possible values are:
 
   HTTP and TCP
     * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.

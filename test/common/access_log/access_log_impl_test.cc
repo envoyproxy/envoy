@@ -61,16 +61,16 @@ public:
   }
 
   SystemTime startTime() const override { return start_time_; }
-  Optional<std::chrono::microseconds> requestReceivedDuration() const override {
+  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
-  Optional<std::chrono::microseconds> responseReceivedDuration() const override {
+  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
     return request_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
   uint64_t bytesReceived() const override { return 1; }
-  Optional<Http::Protocol> protocol() const override { return protocol_; }
+  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
@@ -90,9 +90,9 @@ public:
   const std::string& getDownstreamAddress() const override { return downstream_address_; }
 
   SystemTime start_time_;
-  std::chrono::microseconds request_received_duration_{1000};
-  std::chrono::microseconds response_received_duration_{2000};
-  Http::Protocol protocol_{Http::Protocol::Http11};
+  Optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
+  Optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};
+  Optional<Http::Protocol> protocol_{Http::Protocol::Http11};
   Optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   uint64_t duration_{3000};

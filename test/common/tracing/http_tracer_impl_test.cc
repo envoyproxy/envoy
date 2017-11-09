@@ -246,10 +246,10 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
                                           {"x-forwarded-proto", "http"}};
   NiceMock<AccessLog::MockRequestInfo> request_info;
 
-  Http::Protocol protocol = Http::Protocol::Http2;
+  Optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
+  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
 
@@ -314,9 +314,9 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
                                           {"x-forwarded-proto", "https"}};
   NiceMock<AccessLog::MockRequestInfo> request_info;
 
-  Http::Protocol protocol = Http::Protocol::Http10;
+  Optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
+  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
@@ -356,8 +356,8 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   request_headers.insertEnvoyDownstreamServiceCluster().value(std::string("downstream_cluster"));
   request_headers.insertClientTraceId().value(std::string("client_trace_id"));
 
-  Http::Protocol protocol = Http::Protocol::Http10;
-  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
+  Optional<Http::Protocol> protocol = Http::Protocol::Http10;
+  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   const std::string service_node = "i-453";
 

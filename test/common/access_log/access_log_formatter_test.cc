@@ -94,29 +94,29 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    std::chrono::microseconds duration{5000};
-    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(Return(duration));
+    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(5000)};
+    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
     EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    EXPECT_CALL(request_info, requestReceivedDuration())
-        .WillOnce(Return(Optional<std::chrono::microseconds>()));
+    Optional<std::chrono::microseconds> duration;
+    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
     EXPECT_EQ("-", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    std::chrono::microseconds duration{10000};
-    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(Return(duration));
+    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(10000)};
+    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(ReturnRef(duration));
     EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    EXPECT_CALL(request_info, responseReceivedDuration())
-        .WillOnce(Return(Optional<std::chrono::microseconds>()));
+    Optional<std::chrono::microseconds> duration;
+    EXPECT_CALL(request_info, responseReceivedDuration()).WillOnce(ReturnRef(duration));
     EXPECT_EQ("-", response_duration_format.format(header, header, request_info));
   }
 
@@ -128,7 +128,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter protocol_format("PROTOCOL");
-    EXPECT_CALL(request_info, protocol()).WillOnce(Return(Http::Protocol::Http11));
+    Optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, request_info));
   }
 
@@ -252,8 +253,8 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%[]";
     FormatterImpl formatter(format);
 
-    Http::Protocol protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
+    Optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
 
     EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT[]",
               formatter.format(request_header, response_header, request_info));

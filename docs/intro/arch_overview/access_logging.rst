@@ -3,7 +3,8 @@
 Access logging
 ===================
 
-The HTTP connection manager and tcp proxy supports extensible access logging with the following
+The :ref:`HTTP connection manager <arch_overview_http_conn_man>` and
+:ref:`tcp proxy <arch_overview_tcp_proxy>` supports extensible access logging with the following
 features:
 
 * Any number of access logs per connection manager or tcp proxy.
