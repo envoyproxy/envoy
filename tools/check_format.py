@@ -71,9 +71,7 @@ def checkProtobufExternalDeps(file_path):
 
 def isBuildFile(file_path):
   basename = os.path.basename(file_path)
-  if basename in ["BUILD", "BUILD.bazel"]:
-    return True
-  if basename.endswith(".BUILD"):
+  if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
     return True
   return False
 
@@ -101,7 +99,7 @@ def checkFilePath(file_path):
 
 
 def fixFilePath(file_path):
-  if os.path.basename(file_path) == "BUILD":
+  if isBuildFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       printError("envoy_build_fixer rewrite failed for file: %s" % file_path)
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
