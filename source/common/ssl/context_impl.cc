@@ -540,11 +540,10 @@ void ServerContextImpl::updateConnection(SSL* ssl) {
   ASSERT(ctx_);
 
   SSL_set_SSL_CTX(ssl, ctx_.get());
-  SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
-  ASSERT(SSL_CTX_get_ex_data(ssl_ctx, sslContextIndex()) == this);
+  ASSERT(SSL_CTX_get_ex_data(ctx_.get(), sslContextIndex()) == this);
 
   // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
-  SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ssl_ctx), SSL_CTX_get_verify_callback(ssl_ctx));
+  SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx_.get()), SSL_CTX_get_verify_callback(ctx_.get()));
 
   int rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
   ASSERT(rc == 1);
