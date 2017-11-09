@@ -59,6 +59,7 @@ envoy_cc_library(
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
+        "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/redis:codec_interface",
         "//include/envoy/redis:command_splitter_interface",
