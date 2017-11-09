@@ -96,6 +96,7 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   // 3. Try "no SNI" match, i.e. ""
   // 4. Return no context and reject connection.
 
+  // TODO(PiotrSikora): make this lockless.
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
   auto& listener_map_exact = map_exact_[listener_name];
   auto ctx = listener_map_exact.find(server_name);
