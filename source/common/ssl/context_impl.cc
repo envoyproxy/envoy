@@ -530,13 +530,13 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
   // Update context if it changed.
   if (new_ctx != this) {
     ServerContextImpl* new_impl = dynamic_cast<ServerContextImpl*>(new_ctx);
-    new_impl->updateConnection(client_hello->ssl);
+    new_impl->updateConnectionContext(client_hello->ssl);
   }
 
   return ssl_select_cert_success;
 }
 
-void ServerContextImpl::updateConnection(SSL* ssl) {
+void ServerContextImpl::updateConnectionContext(SSL* ssl) {
   ASSERT(ctx_);
 
   SSL_set_SSL_CTX(ssl, ctx_.get());

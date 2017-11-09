@@ -142,7 +142,7 @@ public:
 
 private:
   ssl_select_cert_result_t processClientHello(const SSL_CLIENT_HELLO* client_hello);
-  void updateConnection(SSL* ssl);
+  void updateConnectionContext(SSL* ssl);
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
