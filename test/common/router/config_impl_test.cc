@@ -215,7 +215,7 @@ TEST(RouteMatcherTest, TestRoutes) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Base routing testing.
@@ -555,7 +555,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Request header manipulation testing.
@@ -1127,7 +1127,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   EXPECT_EQ(
@@ -2675,7 +2675,7 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   )EOF";
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
   const std::string downstream_addr = "127.0.0.1";
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
@@ -2729,7 +2729,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   )EOF";
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
       "Incorrect header configuration. Expected variable format %<variable_name>%, actual format "

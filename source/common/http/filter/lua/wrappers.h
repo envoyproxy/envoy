@@ -76,9 +76,15 @@ private:
 
   void checkModifiable(lua_State* state);
 
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    // Iterators do not survive yields.
+    iterator_.reset();
+  }
+
   HeaderMap& headers_;
   CheckModifiableCb cb_;
-  bool iterating_{};
+  Envoy::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
 
   friend class HeaderMapIterator;
 };

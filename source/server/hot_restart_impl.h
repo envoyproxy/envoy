@@ -189,6 +189,7 @@ private:
   }
 
   int bindDomainSocket(uint64_t id);
+  void initDomainSocketAddress(sockaddr_un* address);
   sockaddr_un createDomainSocketAddress(uint64_t id);
   void onGetListenSocket(RpcGetListenSocketRequest& rpc);
   void onSocketEvent();

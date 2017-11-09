@@ -10,7 +10,7 @@ def envoy_copts(repository, test = False):
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
-        "-std=c++0x",
+        "-std=c++14",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
         repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
@@ -170,7 +170,8 @@ def envoy_cc_binary(name,
                     visibility = None,
                     repository = "",
                     stamped = False,
-                    deps = []):
+                    deps = [],
+                    linkopts = envoy_linkopts()):
     # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
     if stamped:
         _git_stamped_genrule(repository, name)
@@ -180,7 +181,7 @@ def envoy_cc_binary(name,
         srcs = srcs,
         data = data,
         copts = envoy_copts(repository),
-        linkopts = envoy_linkopts(),
+        linkopts = linkopts,
         testonly = testonly,
         linkstatic = 1,
         visibility = visibility,

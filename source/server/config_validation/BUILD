@@ -31,6 +31,7 @@ envoy_cc_library(
     srcs = ["async_client.cc"],
     hdrs = ["async_client.h"],
     deps = [
+        ":dispatcher_lib",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:message_interface",
         "//source/common/common:assert_lib",

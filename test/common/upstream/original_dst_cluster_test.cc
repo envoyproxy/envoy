@@ -59,7 +59,7 @@ public:
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();
         });
-    cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
+    cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
   Stats::IsolatedStoreImpl stats_store_;

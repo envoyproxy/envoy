@@ -36,6 +36,7 @@ public:
   const std::string LoggingEnabled{"mongo.logging_enabled"};
   const std::string ProxyEnabled{"mongo.proxy_enabled"};
   const std::string ConnectionLoggingEnabled{"mongo.connection_logging_enabled"};
+  const std::string DrainCloseEnabled{"mongo.drain_close_enabled"};
 };
 
 typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;

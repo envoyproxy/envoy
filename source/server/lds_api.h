@@ -40,6 +40,7 @@ private:
   std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;
+  Upstream::ClusterManager& cm_;
   std::function<void()> initialize_callback_;
 };
 

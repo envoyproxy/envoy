@@ -8,7 +8,7 @@ recent Linux including Ubuntu 16 LTS.
 
 Envoy has the following requirements:
 
-* GCC 4.9+ (for C++11 regex support)
+* GCC 5+ (for C++14 support)
 * `backward <https://github.com/bombela/backward-cpp>`_ (last tested with 1.3)
 * `Bazel <https://github.com/bazelbuild/bazel>`_ (last tested with 0.5.3)
 * `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ (last tested with sha ae9f0616c58bddcbe7a6d80d29d796bee9aaff2e)

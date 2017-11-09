@@ -117,7 +117,7 @@ protected:
 
 TEST_F(SdsTest, Shutdown) {
   setupRequest();
-  cluster_->initialize();
+  cluster_->initialize([] {});
   EXPECT_CALL(request_, cancel());
   cluster_.reset();
 }
@@ -125,19 +125,18 @@ TEST_F(SdsTest, Shutdown) {
 TEST_F(SdsTest, PoolFailure) {
   setupPoolFailure();
   EXPECT_CALL(*timer_, enableTimer(_));
-  cluster_->initialize();
+  cluster_->initialize([] {});
 }
 
 TEST_F(SdsTest, NoHealthChecker) {
   InSequence s;
   setupRequest();
-  cluster_->initialize();
 
   cluster_->addMemberUpdateCb(
       [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
         membership_updated_.ready();
       });
-  cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
+  cluster_->initialize([&]() -> void { membership_updated_.ready(); });
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -230,10 +229,9 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster_->setHealthChecker(health_checker);
-  cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   setupRequest();
-  cluster_->initialize();
+  cluster_->initialize([&]() -> void { membership_updated_.ready(); });
 
   // Load in all of the hosts the first time, this will setup first pass health checking. We expect
   // all the hosts to load in unhealthy.
@@ -352,7 +350,7 @@ TEST_F(SdsTest, HealthChecker) {
 
 TEST_F(SdsTest, Failure) {
   setupRequest();
-  cluster_->initialize();
+  cluster_->initialize([] {});
 
   std::string bad_response_json = R"EOF(
   {
@@ -373,7 +371,7 @@ TEST_F(SdsTest, Failure) {
 
 TEST_F(SdsTest, FailureArray) {
   setupRequest();
-  cluster_->initialize();
+  cluster_->initialize([] {});
 
   std::string bad_response_json = R"EOF(
   []

@@ -126,6 +126,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "lua_integration_test",
+    srcs = [
+        "lua_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_upstream_integration_test",
     srcs = [
         "http2_upstream_integration_test.cc",
@@ -247,16 +257,17 @@ envoy_cc_test_library(
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
-        "//source/server/config/http:file_access_log_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:lightstep_lib",
+        "//source/server/config/http:lua_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/http:zipkin_lib",
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:echo_lib",
+        "//source/server/config/network:file_access_log_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:mongo_proxy_lib",
         "//source/server/config/network:ratelimit_lib",
