@@ -73,8 +73,7 @@ to customize the runtime values for individual clusters on top of global default
 Comments
 --------
 
-Lines starting with the ``#`` character at the beginning of a file are treated as comments.
-Multiple lines are allowed as long as they are all at the beginning of the file.
+Lines starting with ``#`` as the first character are treated as comments.
 
 Comments can be used to provide context on an existing value.
 Comments are also useful in an otherwise empty file to keep a placeholder for deployment in
