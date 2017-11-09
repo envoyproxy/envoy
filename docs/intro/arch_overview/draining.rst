@@ -30,5 +30,6 @@ modify_only
 
 Note that although draining is a per-listener concept, it must be supported at the network filter
 level. Currently the only filters that support graceful draining are
-:ref:`HTTP connection manager <config_http_conn_man>` and :ref:`Mongo
-<config_network_filters_mongo_proxy>`.
+:ref:`HTTP connection manager <config_http_conn_man>`,
+:ref:`Redis <config_network_filters_redis_proxy>`, and
+:ref:`Mongo <config_network_filters_mongo_proxy>`.
