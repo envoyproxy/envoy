@@ -96,7 +96,7 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
     const opentracing::expected<void> was_successful =
         span_->tracer().Inject(span_->context(), oss);
     if (!was_successful) {
-      ENVOY_LOG(warn, "Failed to inject span context: {}", was_successful.error().message());
+      ENVOY_LOG(debug, "Failed to inject span context: {}", was_successful.error().message());
       return;
     }
     const std::string current_span_context = oss.str();
@@ -110,7 +110,7 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
     const opentracing::expected<void> was_successful =
         span_->tracer().Inject(span_->context(), writer);
     if (!was_successful) {
-      ENVOY_LOG(warn, "Failed to inject span context: {}", was_successful.error().message());
+      ENVOY_LOG(debug, "Failed to inject span context: {}", was_successful.error().message());
       return;
     }
   }
@@ -141,7 +141,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
     if (parent_span_ctx_maybe) {
       parent_span_ctx = std::move(*parent_span_ctx_maybe);
     } else {
-      ENVOY_LOG(warn, "Failed to extract span context: {}",
+      ENVOY_LOG(debug, "Failed to extract span context: {}",
                 parent_span_ctx_maybe.error().message());
     }
   } else if (use_tracer_propagation) {
@@ -151,7 +151,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
     if (parent_span_ctx_maybe) {
       parent_span_ctx = std::move(*parent_span_ctx_maybe);
     } else {
-      ENVOY_LOG(warn, "Failed to extract span context: {}",
+      ENVOY_LOG(debug, "Failed to extract span context: {}",
                 parent_span_ctx_maybe.error().message());
     }
   }
