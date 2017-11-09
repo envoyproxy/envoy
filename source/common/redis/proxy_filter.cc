@@ -91,7 +91,7 @@ void ProxyFilter::onResponse(PendingRequest& request, RespValuePtr&& value) {
     callbacks_->connection().write(encoder_buffer_);
   }
 
-  // fixfix
+  // Check for drain close only if there are no pending responses.
   if (pending_requests_.empty() && config_->drain_decision_.drainClose() &&
       config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
     config_->stats_.downstream_cx_drain_close_.inc();
