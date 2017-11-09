@@ -212,7 +212,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Determine if there is a redirect for the request.
   if (route_->redirectEntry()) {
     config_.stats_.rq_redirect_.inc();
-    Http::Utility::sendRedirect(*callbacks_, route_->redirectEntry()->newPath(headers));
+    Http::Utility::sendRedirect(*callbacks_, route_->redirectEntry()->newPath(headers),
+                                route_->redirectEntry()->redirectResponseCode());
     return Http::FilterHeadersStatus::StopIteration;
   }
 

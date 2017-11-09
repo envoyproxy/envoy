@@ -232,7 +232,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      redirect_response_code_(
+          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
