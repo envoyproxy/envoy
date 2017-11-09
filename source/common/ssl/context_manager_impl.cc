@@ -31,7 +31,7 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
   if (server_names.empty()) {
     auto ctx = listener_map_exact.find(EMPTY_STRING);
     if (ctx != listener_map_exact.end() && ctx->second == context) {
-      listener_map_exact.erase(EMPTY_STRING);
+      listener_map_exact.erase(ctx);
     }
   } else {
     auto& listener_map_wildcard = map_wildcard_[listener_name];
@@ -39,12 +39,12 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
       if (name.size() > 2 && name[0] == '*' && name[1] == '.') {
         auto ctx = listener_map_wildcard.find(name);
         if (ctx != listener_map_wildcard.end() && ctx->second == context) {
-          listener_map_wildcard.erase(name);
+          listener_map_wildcard.erase(ctx);
         }
       } else {
         auto ctx = listener_map_exact.find(name);
         if (ctx != listener_map_exact.end() && ctx->second == context) {
-          listener_map_exact.erase(name);
+          listener_map_exact.erase(ctx);
         }
       }
     }
