@@ -14,9 +14,9 @@ namespace Envoy {
  * Note that there is heavy resistence in Envoy to adding this type of singleton
  * if data will persist with state changes across tests, as it becomes difficult
  * to write clean unit tests if a state change in one test will persist into
- * another test.  Be wary of using it.  A example of acceptable usage is OsSyscallsImpl,
+ * another test. Be wary of using it. A example of acceptable usage is OsSyscallsImpl,
  * where the functions are not strictly speaking const, but affect the OS rather than the
- * class itself.  An example of unacceptable usage upstream would be for
+ * class itself. An example of unacceptable usage upstream would be for
  * globally accessible stat counters, it would have the aforementioned problem
  * where state "leaks" across tests.
  *
