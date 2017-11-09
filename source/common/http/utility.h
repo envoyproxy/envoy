@@ -144,7 +144,7 @@ public:
    * Send a redirect response.
    * @param callbacks supplies the filter callbacks to use.
    * @param new_path supplies the redirect target.
-   * @param status_code supplies the response code to use.
+   * @param response_code supplies the response code to use.
    */
   static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
                            Code response_code);

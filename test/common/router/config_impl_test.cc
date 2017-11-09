@@ -2927,6 +2927,21 @@ TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
   }
 }
 
+TEST(ConfigUtility, ParseResponseCode) {
+  const std::vector<std::pair<envoy::api::v2::RedirectAction::RedirectResponseCode, Http::Code>>
+      test_set = {std::make_pair(envoy::api::v2::RedirectAction::MOVED_PERMANENTLY,
+                                 Http::Code::MovedPermanently),
+                  std::make_pair(envoy::api::v2::RedirectAction::FOUND, Http::Code::Found),
+                  std::make_pair(envoy::api::v2::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
+                  std::make_pair(envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT,
+                                 Http::Code::TemporaryRedirect),
+                  std::make_pair(envoy::api::v2::RedirectAction::PERMANENT_REDIRECT,
+                                 Http::Code::PermanentRedirect)};
+  for (const auto& test_case : test_set) {
+    EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
