@@ -24,6 +24,8 @@ public:
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
+   * The skip_context_update parameter is used for fast-path (avoiding lock & context looup)x
+   * on listeners with a single filter chain and no SNI restrictions.
    */
   virtual ServerContextPtr createSslServerContext(const std::string& listener_name,
                                                   const std::vector<std::string>& server_names,
