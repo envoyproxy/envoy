@@ -74,62 +74,6 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(4096UL, string2.size());
   }
 
-  // Static move operator
-  {
-    std::string static_string("HELLO");
-    HeaderString string1(static_string);
-    std::string static_string2("GOODBYE");
-    HeaderString string2(static_string2);
-
-    string2 = std::move(string1);
-    EXPECT_STREQ("HELLO", string2.c_str());
-    EXPECT_EQ(static_string.c_str(), string1.c_str());
-    EXPECT_EQ(static_string.c_str(), string2.c_str());
-    EXPECT_EQ(5U, string1.size());
-    EXPECT_EQ(5U, string2.size());
-  }
-
-  // Inline move operator
-  {
-    HeaderString string;
-    string.setCopy("hello", 5);
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
-    HeaderString string2;
-    string2.setCopy("goodbye", 7);
-    EXPECT_EQ(HeaderString::Type::Inline, string2.type());
-
-    string2 = std::move(string);
-    EXPECT_TRUE(string.empty());
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
-    EXPECT_EQ(HeaderString::Type::Inline, string2.type());
-    string.append("world", 5);
-    EXPECT_STREQ("world", string.c_str());
-    EXPECT_EQ(5UL, string.size());
-    EXPECT_STREQ("hello", string2.c_str());
-    EXPECT_EQ(5UL, string2.size());
-  }
-
-  // Dynamic move operator
-  {
-    std::string large(4096, 'a');
-    std::string large2(4096, 'b');
-    HeaderString string;
-    string.setCopy(large.c_str(), large.size());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
-    HeaderString string2;
-    string2.setCopy(large2.c_str(), large2.size());
-
-    string2 = std::move(string);
-    EXPECT_TRUE(string.empty());
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string2.type());
-    string.append("c", 1);
-    EXPECT_STREQ("c", string.c_str());
-    EXPECT_EQ(1UL, string.size());
-    EXPECT_STREQ(large.c_str(), string2.c_str());
-    EXPECT_EQ(4096UL, string2.size());
-  }
-
   // Static to inline number.
   {
     std::string static_string("HELLO");
@@ -336,18 +280,6 @@ TEST(HeaderMapImplTest, MoveIntoInline) {
   EXPECT_STREQ("hello", headers.Host()->value().c_str());
 }
 
-TEST(HeaderMapImplTest, SetViaMoveIntoInline) {
-  HeaderMapImpl headers;
-  HeaderString key;
-  key.setCopy(Headers::get().Host.get().c_str(), Headers::get().Host.get().size());
-  HeaderString value;
-  value.setCopy("hello", 5);
-
-  headers.setViaMove(std::move(key), std::move(value));
-  EXPECT_STREQ(":authority", headers.Host()->key().c_str());
-  EXPECT_STREQ("hello", headers.Host()->value().c_str());
-}
-
 TEST(HeaderMapImplTest, Remove) {
   HeaderMapImpl headers;
 
@@ -442,7 +374,7 @@ TEST(HeaderMapImplTest, DoubleInlineSet) {
   HeaderMapImpl headers;
   headers.setReferenceKey(Headers::get().ContentLength, 5);
   headers.setReferenceKey(Headers::get().ContentLength, 6);
-  EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
+  EXPECT_STREQ("6", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
 }
 
@@ -594,17 +526,17 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
 
 TEST(HeaderMapImplTest, Iterate) {
   TestHeaderMapImpl headers;
-  headers.setCopy(LowerCaseString("hello"), "xxxxx");
-  headers.addCopy("foo", "bar");
+  headers.setCopy("hello", "world");
+  headers.addCopy("foo", "xxx");
   headers.addCopy("world", "hello");
-  headers.setCopy(LowerCaseString("hello"), "world");
+  headers.setCopy("foo", "bar"); // set moves key to end
 
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
 
   EXPECT_CALL(cb, Call("hello", "world"));
-  EXPECT_CALL(cb, Call("foo", "bar"));
   EXPECT_CALL(cb, Call("world", "hello"));
+  EXPECT_CALL(cb, Call("foo", "bar"));
   headers.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
@@ -617,7 +549,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
   headers.addCopy("foo", "bar");
-  headers.setCopy(LowerCaseString("world"), std::string("hello"));
+  headers.setCopy("world", "hello");
 
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;

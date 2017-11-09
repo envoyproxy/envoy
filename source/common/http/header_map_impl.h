@@ -48,11 +48,6 @@ public:
   void addViaMove(HeaderString&& key, HeaderString&& value);
 
   /**
-   * Set a header via full move.
-   */
-  void setViaMove(HeaderString&& key, HeaderString&& value);
-
-  /**
    * For testing. Equality is based on equality of the backing list. This is an exact match
    * comparison (order matters).
    */
@@ -87,7 +82,6 @@ protected:
     const HeaderString& key() const override { return key_; }
     void value(const char* value, uint32_t size) override;
     void value(const std::string& value) override;
-    void value(HeaderString&& value) override;
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
     const HeaderString& value() const override { return value_; }
@@ -127,7 +121,6 @@ protected:
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
-  void updateByKey(HeaderString&& key, HeaderString&& value);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);

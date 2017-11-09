@@ -129,14 +129,6 @@ public:
    */
   Type type() const { return type_; }
 
-  /**
-   * Move the rhs value into this HeaderString.
-   * @param rhs an existing HeaderString whose contents MUST point to data that will live beyond
-   *        the lifetime of any request/response using the string (since a codec may optimize for
-   *        zero copy).
-   */
-  HeaderString& operator=(HeaderString&& rhs);
-
   bool operator==(const char* rhs) const { return 0 == strcmp(c_str(), rhs); }
   bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
 
@@ -178,11 +170,6 @@ public:
    * Set the header value by copying data into it.
    */
   virtual void value(const std::string& value) PURE;
-
-  /**
-   * Set the header value by moving data into it.
-   */
-  virtual void value(HeaderString&& value) PURE;
 
   /**
    * Set the header value by copying an integer into it.
