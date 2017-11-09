@@ -9,7 +9,6 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/common/hex.h"
 
 #include "fmt/format.h"
@@ -495,7 +494,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
 
 ssl_select_cert_result_t
 ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
-  std::string server_name = EMPTY_STRING;
+  std::string server_name;
   const uint8_t* data;
   size_t len;
 
@@ -512,8 +511,7 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
         CBS_len(&server_name_list) == 0 && CBS_len(&extension) == 0 &&
         name_type == TLSEXT_NAMETYPE_host_name && CBS_len(&host_name) != 0 &&
         CBS_len(&host_name) <= TLSEXT_MAXLEN_host_name && !CBS_contains_zero_byte(&host_name)) {
-      server_name =
-          std::string(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
+      server_name.assign(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
     }
   }
 
