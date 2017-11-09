@@ -35,7 +35,7 @@ public:
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time) override;
 
-  virtual const opentracing::Tracer& tracer() const = 0;
+  virtual const opentracing::Tracer& tracer() const PURE;
 
   virtual bool useSingleHeaderPropagation() const { return true; }
   virtual bool useTracerPropagation() const { return true; }
