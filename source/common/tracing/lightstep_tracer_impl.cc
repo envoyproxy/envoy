@@ -19,7 +19,7 @@ namespace {
 class LightStepLogger : Logger::Loggable<Logger::Id::tracing> {
 public:
   void operator()(lightstep::LogLevel level, opentracing::string_view message) const {
-    fmt::StringRef fmt_message{message.data(), message.size()};
+    const fmt::StringRef fmt_message{message.data(), message.size()};
     switch (level) {
     case lightstep::LogLevel::debug:
       ENVOY_LOG(debug, "{}", fmt_message);
@@ -49,7 +49,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
                                    lightstep::CollectorMethodName());
   message->body() = Grpc::Common::serializeBody(request);
 
-  uint64_t timeout =
+  const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
   driver_.clusterManager()
       .httpAsyncClientForCluster(driver_.cluster()->name())
@@ -102,7 +102,7 @@ LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
 const opentracing::Tracer& LightStepDriver::TlsLightStepTracer::tracer() const { return *tracer_; }
 
 void LightStepDriver::TlsLightStepTracer::enableTimer() {
-  uint64_t flush_interval =
+  const uint64_t flush_interval =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
@@ -133,10 +133,8 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
     tls_options.use_thread = false;
     tls_options.use_single_key_propagation = true;
     tls_options.logger_sink = LightStepLogger{};
-    tls_options.max_buffered_spans = std::function<size_t()>{[this] {
-      auto result = runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
-      return result;
-    }};
+    tls_options.max_buffered_spans = std::function<size_t()>{
+        [this] { return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U); }};
     tls_options.metrics_observer.reset(new LightStepMetricsObserver{*this});
     tls_options.transporter.reset(new LightStepTransporter{*this});
     std::shared_ptr<lightstep::LightStepTracer> tracer =
