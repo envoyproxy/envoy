@@ -46,6 +46,12 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::st
   return route_config;
 }
 
+envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::RouteConfiguration route_config;
+  MessageUtil::loadFromYaml(yaml, route_config);
+  return route_config;
+}
+
 TEST(RouteMatcherTest, TestRoutes) {
   std::string json = R"EOF(
 {
@@ -2939,6 +2945,33 @@ TEST(ConfigUtility, ParseResponseCode) {
                                  Http::Code::PermanentRedirect)};
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
+  }
+}
+
+TEST(RouteConfigurationV2, RedirectCode) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/"}
+        redirect: { host_redirect: new.lyft.com, response_code: TEMPORARY_REDIRECT }
+
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
+    EXPECT_EQ("http://new.lyft.com/foo",
+              config.route(headers, 0)->redirectEntry()->newPath(headers));
+    EXPECT_EQ(Http::Code::TemporaryRedirect,
+              config.route(headers, 0)->redirectEntry()->redirectResponseCode());
   }
 }
 

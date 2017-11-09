@@ -688,7 +688,7 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
     for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
       } else if (domain.size() > 0 && '*' == domain[0]) {
