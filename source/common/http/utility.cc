@@ -243,9 +243,10 @@ void Utility::sendLocalReply(
   }
 }
 
-void Utility::sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path) {
+void Utility::sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
+                           Code response_code) {
   HeaderMapPtr response_headers{
-      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(Code::MovedPermanently))},
+      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))},
                         {Headers::get().Location, new_path}}};
 
   callbacks.encodeHeaders(std::move(response_headers), true);
