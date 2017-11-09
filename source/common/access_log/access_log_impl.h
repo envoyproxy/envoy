@@ -5,16 +5,14 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/http/access_log.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/accesslog.pb.h"
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 
 /**
@@ -51,8 +49,8 @@ public:
   StatusCodeFilter(const envoy::api::v2::filter::StatusCodeFilter& config, Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -63,8 +61,8 @@ public:
   DurationFilter(const envoy::api::v2::filter::DurationFilter& config, Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -86,8 +84,8 @@ class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::api::v2::filter::AndFilter& config, Runtime::Loader& runtime);
 
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -97,8 +95,8 @@ class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::api::v2::filter::OrFilter& config, Runtime::Loader& runtime);
 
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -108,8 +106,8 @@ class NotHealthCheckFilter : public Filter {
 public:
   NotHealthCheckFilter() {}
 
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -117,8 +115,8 @@ public:
  */
 class TraceableRequestFilter : public Filter {
 public:
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -128,17 +126,13 @@ class RuntimeFilter : public Filter {
 public:
   RuntimeFilter(const envoy::api::v2::filter::RuntimeFilter& config, Runtime::Loader& runtime);
 
-  // Http::AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
 
 private:
   Runtime::Loader& runtime_;
   const std::string runtime_key_;
 };
-
-InstanceSharedPtr instanceFromProto(const envoy::api::v2::filter::AccessLog& config,
-                                    Runtime::Loader& runtime,
-                                    Envoy::AccessLog::AccessLogManager& log_manager);
 
 /**
  * Access log factory that reads the configuration from proto.
@@ -160,8 +154,8 @@ public:
   FileAccessLog(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
                 Envoy::AccessLog::AccessLogManager& log_manager);
 
-  // Http::AccessLog::Instance
-  void log(const HeaderMap* request_headers, const HeaderMap* response_headers,
+  // AccessLog::Instance
+  void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const RequestInfo& request_info) override;
 
 private:
@@ -171,5 +165,4 @@ private:
 };
 
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

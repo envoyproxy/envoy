@@ -79,7 +79,7 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, decodingBuffer()).WillByDefault(Return(buffer_.get()));
+  ON_CALL(*this, decodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
 
   ON_CALL(*this, addDownstreamWatermarkCallbacks(_))
       .WillByDefault(Invoke([this](DownstreamWatermarkCallbacks& callbacks) -> void {
@@ -98,7 +98,7 @@ MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, encodingBuffer()).WillByDefault(Return(buffer_.get()));
+  ON_CALL(*this, encodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
 }
 
@@ -165,23 +165,5 @@ MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // namespace ConnectionPool
-} // namespace Http
-
-namespace Http {
-namespace AccessLog {
-
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
-
-MockRequestInfo::MockRequestInfo() {
-  ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_));
-  ON_CALL(*this, startTime()).WillByDefault(Return(start_time_));
-  ON_CALL(*this, requestReceivedDuration()).WillByDefault(Return(request_received_duration_));
-  ON_CALL(*this, responseReceivedDuration()).WillByDefault(Return(response_received_duration_));
-}
-
-MockRequestInfo::~MockRequestInfo() {}
-
-} // namespace AccessLog
 } // namespace Http
 } // namespace Envoy

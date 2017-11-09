@@ -264,5 +264,13 @@ void FilterJson::translateFaultFilter(const Json::Object& config,
   }
 }
 
+void FilterJson::translateRouter(const Json::Object& json_router,
+                                 envoy::api::v2::filter::http::Router& router) {
+  json_router.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
+
+  router.mutable_dynamic_stats()->set_value(json_router.getBoolean("dynamic_stats", true));
+  router.set_start_child_span(json_router.getBoolean("start_child_span", false));
+}
+
 } // namespace Config
 } // namespace Envoy

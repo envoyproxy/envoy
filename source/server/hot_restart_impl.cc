@@ -112,6 +112,7 @@ HotRestartImpl::HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls)
 
   my_domain_socket_ = bindDomainSocket(options.restartEpoch(), os_sys_calls);
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
+  initDomainSocketAddress(&parent_address_);
   if (options.restartEpoch() != 0) {
     parent_address_ = createDomainSocketAddress((options.restartEpoch() + -1));
   }
@@ -171,6 +172,11 @@ int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls)
   return fd;
 }
 
+void HotRestartImpl::initDomainSocketAddress(sockaddr_un* address) {
+  memset(address, 0, sizeof(*address));
+  address->sun_family = AF_UNIX;
+}
+
 sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
   // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
   // starts up it will kill the oldest parent.
@@ -179,8 +185,7 @@ sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
 
   // This creates an anonymous domain socket name (where the first byte of the name of \0).
   sockaddr_un address;
-  memset(&address, 0, sizeof(address));
-  address.sun_family = AF_UNIX;
+  initDomainSocketAddress(&address);
   StringUtil::strlcpy(&address.sun_path[1],
                       fmt::format("envoy_domain_socket_{}", options_.baseId() + id).c_str(),
                       sizeof(address.sun_path) - 1);

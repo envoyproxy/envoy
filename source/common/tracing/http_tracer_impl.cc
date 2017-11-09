@@ -2,10 +2,10 @@
 
 #include <string>
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
-#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Tracing {
 
 // TODO(mattklein123) PERF: Avoid string creations/copies in this entire file.
-static std::string buildResponseCode(const Http::AccessLog::RequestInfo& info) {
+static std::string buildResponseCode(const AccessLog::RequestInfo& info) {
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
 
@@ -86,7 +86,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   NOT_REACHED
 }
 
-Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& request_info,
+Decision HttpTracerUtility::isTracing(const AccessLog::RequestInfo& request_info,
                                       const Http::HeaderMap& request_headers) {
   // Exclude HC requests immediately.
   if (request_info.healthCheck()) {
@@ -116,7 +116,7 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                                     const Http::AccessLog::RequestInfo& request_info,
+                                     const AccessLog::RequestInfo& request_info,
                                      const Config& tracing_config) {
   // Pre response data.
   if (request_headers) {
@@ -127,7 +127,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag("user_agent", valueOrDefault(request_headers->UserAgent(), "-"));
     span.setTag("http.protocol",
-                Http::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol()));
+                AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol()));
 
     if (request_headers->ClientTraceId()) {
       span.setTag("guid:x-client-trace-id",
@@ -151,7 +151,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   // Post response data.
   span.setTag("http.status_code", buildResponseCode(request_info));
   span.setTag("response_size", std::to_string(request_info.bytesSent()));
-  span.setTag("response_flags", Http::AccessLog::ResponseFlagUtils::toShortString(request_info));
+  span.setTag("response_flags", AccessLog::ResponseFlagUtils::toShortString(request_info));
 
   if (!request_info.responseCode().valid() ||
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
@@ -165,7 +165,7 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
     : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
-                                  const Http::AccessLog::RequestInfo& request_info) {
+                                  const AccessLog::RequestInfo& request_info) {
   std::string span_name = HttpTracerUtility::toString(config.operationName());
 
   if (config.operationName() == OperationName::Egress) {

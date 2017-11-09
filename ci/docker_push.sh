@@ -25,21 +25,21 @@ then
    tar -xz -C /tmp -f /tmp/docker-"$VER".tgz
    mv /tmp/docker/* /usr/bin
 
-   docker build -f ci/Dockerfile-envoy-image -t lyft/envoy:latest .
+   docker build -f ci/Dockerfile-envoy-image -t envoyproxy/envoy:latest .
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
-   docker push lyft/envoy:latest
-   docker tag lyft/envoy:latest lyft/envoy:"$CIRCLE_SHA1"
-   docker push lyft/envoy:"$CIRCLE_SHA1"
+   docker push envoyproxy/envoy:latest
+   docker tag envoyproxy/envoy:latest envoyproxy/envoy:"$CIRCLE_SHA1"
+   docker push envoyproxy/envoy:"$CIRCLE_SHA1"
 
-   docker build -f ci/Dockerfile-envoy-alpine -t lyft/envoy-alpine:latest .
-   docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:"$CIRCLE_SHA1"
-   docker push lyft/envoy-alpine:"$CIRCLE_SHA1"
-   docker push lyft/envoy-alpine:latest
+   docker build -f ci/Dockerfile-envoy-alpine -t envoyproxy/envoy-alpine:latest .
+   docker tag envoyproxy/envoy-alpine:latest envoyproxy/envoy-alpine:"$CIRCLE_SHA1"
+   docker push envoyproxy/envoy-alpine:"$CIRCLE_SHA1"
+   docker push envoyproxy/envoy-alpine:latest
 
-   docker build -f ci/Dockerfile-envoy-alpine-debug -t lyft/envoy-alpine-debug:latest .
-   docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
-   docker push lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
-   docker push lyft/envoy-alpine-debug:latest
+   docker build -f ci/Dockerfile-envoy-alpine-debug -t envoyproxy/envoy-alpine-debug:latest .
+   docker tag envoyproxy/envoy-alpine-debug:latest envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1"
+   docker push envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1"
+   docker push envoyproxy/envoy-alpine-debug:latest
 
    # This script tests the docker examples.
    # TODO(mattklein123): This almost always times out on Travis. Do not run for now until we

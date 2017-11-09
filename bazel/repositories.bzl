@@ -112,8 +112,8 @@ def envoy_api_deps(skip_targets):
   if 'envoy_api' not in skip_targets:
     native.git_repository(
         name = "envoy_api",
-        remote = REPO_LOCATIONS["envoy_api"],
-        commit = "6e3e1a784cc583f1fe1a7fd3ed109a8f54e0b1b4",
+        remote = REPO_LOCATIONS["data-plane-api"],
+        commit = "4d18e6d236a6476782076b217cd62d43c30a7dfe",
     )
 
     api_bind_targets = [
@@ -145,14 +145,15 @@ def envoy_api_deps(skip_targets):
             actual = "@envoy_api//api/filter:" + t + "_cc",
         )
     http_filter_bind_targets = [
-        "http_connection_manager",
-        "router",
         "buffer",
-        "transcoder",
-        "rate_limit",
-        "ip_tagging",
-        "health_check",
         "fault",
+        "health_check",
+        "http_connection_manager",
+        "ip_tagging",
+        "lua",
+        "rate_limit",
+        "router",
+        "transcoder",
     ]
     for t in http_filter_bind_targets:
         native.bind(
@@ -230,14 +231,30 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     existing_rule_keys = native.existing_rules().keys()
+    if not ("backward" in skip_targets or "com_github_bombela_backward" in existing_rule_keys):
+        com_github_bombela_backward(repository)
+    if not ("xxhash" in skip_targets or "com_github_cyan4973_xxhash" in existing_rule_keys):
+        com_github_cyan4973_xxhash(repository)
+    if not ("tclap" in skip_targets or "com_github_eile_tclap" in existing_rule_keys):
+        com_github_eile_tclap(repository)
     if not ("fmtlib" in skip_targets or "com_github_fmtlib_fmt" in existing_rule_keys):
         com_github_fmtlib_fmt(repository)
     if not ("spdlog" in skip_targets or "com_github_gabime_spdlog" in existing_rule_keys):
         com_github_gabime_spdlog(repository)
+    if not ("gcovr" in skip_targets or "com_github_gcovr_gcovr" in existing_rule_keys):
+        com_github_gcovr_gcovr(repository)
     if not ("lightstep" in skip_targets or "com_github_lightstep_lightstep_tracer_cpp" in existing_rule_keys):
         com_github_lightstep_lightstep_tracer_cpp(repository)
+    if not ("http_parser" in skip_targets or "com_github_nodejs_http_parser" in existing_rule_keys):
+        com_github_nodejs_http_parser(repository)
+    if not ("rapidjson" in skip_targets or "com_github_tencent_rapidjson" in existing_rule_keys):
+        com_github_tencent_rapidjson(repository)
+    if not ("googletest" in skip_targets or "com_google_googletest" in existing_rule_keys):
+        com_google_googletest()
     if not (skip_com_google_protobuf or "com_google_protobuf" in existing_rule_keys):
         com_google_protobuf()
+    if not ("subpar" in existing_rule_keys):
+        subpar()
 
     for t in TARGET_RECIPES:
         if t not in skip_targets:
@@ -251,6 +268,42 @@ def envoy_dependencies(path = "@envoy_deps//", skip_com_google_protobuf = False,
     go_deps(skip_targets)
     envoy_api_deps(skip_targets)
     abseil_deps(skip_targets)
+
+def com_github_bombela_backward(repository = ""):
+  native.new_git_repository(
+      name = "com_github_bombela_backward",
+      remote = "https://github.com/bombela/backward-cpp",
+      commit = "cd1c4bd9e48afe812a0e996d335298c455afcd92", # v1.3
+      build_file = repository + "//bazel/external:backward.BUILD",
+  )
+  native.bind(
+      name = "backward",
+      actual = "@com_github_bombela_backward//:backward",
+  )
+
+def com_github_cyan4973_xxhash(repository = ""):
+  native.new_git_repository(
+      name = "com_github_cyan4973_xxhash",
+      remote = "https://github.com/Cyan4973/xxHash",
+      commit = "50a564c33c36b3f0c83f027dd21c25cba2967c72", # v0.6.3
+      build_file = repository + "//bazel/external:xxhash.BUILD",
+  )
+  native.bind(
+      name = "xxhash",
+      actual = "@com_github_cyan4973_xxhash//:xxhash",
+  )
+
+def com_github_eile_tclap(repository = ""):
+  native.new_git_repository(
+      name = "com_github_eile_tclap",
+      remote = "https://github.com/eile/tclap",
+      commit = "3627d9402e529770df9b0edf2aa8c0e0d6c6bb41", # tclap-1-2-1-release-final
+      build_file = repository + "//bazel/external:tclap.BUILD",
+  )
+  native.bind(
+      name = "tclap",
+      actual = "@com_github_eile_tclap//:tclap",
+  )
 
 def com_github_fmtlib_fmt(repository = ""):
   native.new_http_archive(
@@ -282,6 +335,18 @@ def com_github_gabime_spdlog(repository = ""):
       actual="@com_github_gabime_spdlog//:spdlog",
   )
 
+def com_github_gcovr_gcovr(repository = ""):
+  native.new_git_repository(
+      name = "com_github_gcovr_gcovr",
+      remote = "https://github.com/gcovr/gcovr",
+      commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
+      build_file = repository + "//bazel/external:gcovr.BUILD",
+  )
+  native.bind(
+      name = "gcovr",
+      actual = "@com_github_gcovr_gcovr//:gcovr",
+  )
+
 def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
   genrule_repository(
       name = "com_github_lightstep_lightstep_tracer_cpp",
@@ -299,6 +364,41 @@ def com_github_lightstep_lightstep_tracer_cpp(repository = ""):
   native.bind(
       name="lightstep",
       actual="@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+  )
+
+def com_github_tencent_rapidjson(repository = ""):
+  native.new_git_repository(
+      name = "com_github_tencent_rapidjson",
+      remote = "https://github.com/tencent/rapidjson",
+      commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51", # v1.1.0
+      build_file = repository + "//bazel/external:rapidjson.BUILD",
+  )
+  native.bind(
+      name = "rapidjson",
+      actual = "@com_github_tencent_rapidjson//:rapidjson",
+  )
+
+def com_github_nodejs_http_parser(repository = ""):
+  native.new_git_repository(
+      name = "com_github_nodejs_http_parser",
+      remote = "https://github.com/nodejs/http-parser",
+      commit = "feae95a3a69f111bc1897b9048d9acbc290992f9", # v2.7.1
+      build_file = repository + "//bazel/external:http-parser.BUILD",
+  )
+  native.bind(
+      name = "http_parser",
+      actual = "@com_github_nodejs_http_parser//:http_parser",
+  )
+
+def com_google_googletest():
+  native.git_repository(
+      name = "com_google_googletest",
+      remote = "https://github.com/google/googletest",
+      commit = "43863938377a9ea1399c0596269e0890b5c5515a",
+  )
+  native.bind(
+      name = "googletest",
+      actual = "@com_google_googletest//:gtest",
   )
 
 def com_google_protobuf():
@@ -327,4 +427,13 @@ def com_google_protobuf():
   native.bind(
       name = "protoc",
       actual = "@com_google_protobuf_cc//:protoc",
+  )
+
+def subpar():
+  # I'd love to name this `com_github_google_subpar`, but something in the Subpar
+  # code assumes its repository name is just `subpar`.
+  native.git_repository(
+      name = "subpar",
+      remote = "https://github.com/google/subpar",
+      commit = "eb23aa7a5361cabc02464476dd080389340a5522", # HEAD
   )

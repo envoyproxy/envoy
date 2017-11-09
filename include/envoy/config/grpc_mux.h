@@ -57,7 +57,7 @@ public:
   /**
    * Start a configuration subscription asynchronously for some API type and resources.
    * @param type_url type URL corresponding to xDS API, e.g.
-   *                 type.googleapis.com/envoy.api.v2.Cluster.
+   * type.googleapis.com/envoy.api.v2.Cluster.
    * @param resources vector of resource names to watch for. If this is empty, then all
    *                  resources for type_url will result in callbacks.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
@@ -68,6 +68,23 @@ public:
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
                                     const std::vector<std::string>& resources,
                                     GrpcMuxCallbacks& callbacks) PURE;
+
+  /**
+   * Pause discovery requests for a given API type. This is useful when we're processing an update
+   * for LDS or CDS and don't want a flood of updates for RDS or EDS respectively. Discovery
+   * requests may later be resumed with resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster.
+   */
+  virtual void pause(const std::string& type_url) PURE;
+
+  /**
+   * Resume discovery requests for a given API type. This will send a discovery request if one would
+   * have been sent during the pause.
+   * @param type_url type URL corresponding to xDS API,
+   * e.g.type.googleapis.com/envoy.api.v2.Cluster.
+   */
+  virtual void resume(const std::string& type_url) PURE;
 };
 
 typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;

@@ -123,6 +123,7 @@ envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
+    external_deps = ["envoy_filter_http_router"],
     deps = [
         ":config_lib",
         ":retry_state_lib",
@@ -136,10 +137,13 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/router:shadow_writer_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/access_log:access_log_lib",
+        "//source/common/access_log:request_info_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -191,8 +195,8 @@ envoy_cc_library(
     srcs = ["req_header_formatter.cc"],
     hdrs = ["req_header_formatter.h"],
     deps = [
+        "//source/common/access_log:access_log_formatter_lib",
         "//source/common/config:rds_json_lib",
-        "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )

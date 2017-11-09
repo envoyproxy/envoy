@@ -1,5 +1,7 @@
 #pragma once
 
+#include <http_parser.h>
+
 #include <array>
 #include <cstdint>
 #include <list>
@@ -15,8 +17,6 @@
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
-
-#include "http_parser.h"
 
 namespace Envoy {
 namespace Http {

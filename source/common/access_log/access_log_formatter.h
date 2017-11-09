@@ -4,10 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/access_log.h"
+#include "envoy/access_log/access_log.h"
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 
 /**
@@ -54,7 +53,7 @@ private:
 class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
-  static const std::string& protocolToString(Protocol protocol);
+  static const std::string& protocolToString(Http::Protocol protocol);
 
 private:
   AccessLogFormatUtils();
@@ -70,7 +69,8 @@ public:
   FormatterImpl(const std::string& format);
 
   // Formatter::format
-  std::string format(const HeaderMap& request_headers, const HeaderMap& response_headers,
+  std::string format(const Http::HeaderMap& request_headers,
+                     const Http::HeaderMap& response_headers,
                      const RequestInfo& request_info) const override;
 
 private:
@@ -86,7 +86,8 @@ public:
   PlainStringFormatter(const std::string& str);
 
   // Formatter::format
-  std::string format(const HeaderMap&, const HeaderMap&, const RequestInfo&) const override;
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+                     const RequestInfo&) const override;
 
 private:
   std::string str_;
@@ -97,11 +98,11 @@ public:
   HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                   const Optional<size_t>& max_length);
 
-  std::string format(const HeaderMap& headers) const;
+  std::string format(const Http::HeaderMap& headers) const;
 
 private:
-  LowerCaseString main_header_;
-  LowerCaseString alternative_header_;
+  Http::LowerCaseString main_header_;
+  Http::LowerCaseString alternative_header_;
   Optional<size_t> max_length_;
 };
 
@@ -114,7 +115,7 @@ public:
                          const Optional<size_t>& max_length);
 
   // Formatter::format
-  std::string format(const HeaderMap& request_headers, const HeaderMap&,
+  std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
                      const RequestInfo&) const override;
 };
 
@@ -127,7 +128,7 @@ public:
                           const Optional<size_t>& max_length);
 
   // Formatter::format
-  std::string format(const HeaderMap&, const HeaderMap& response_headers,
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
                      const RequestInfo&) const override;
 };
 
@@ -139,7 +140,7 @@ public:
   RequestInfoFormatter(const std::string& field_name);
 
   // Formatter::format
-  std::string format(const HeaderMap&, const HeaderMap&,
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
                      const RequestInfo& request_info) const override;
 
 private:
@@ -147,5 +148,4 @@ private:
 };
 
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

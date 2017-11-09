@@ -18,17 +18,17 @@ then
 
    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
-   docker pull lyft/envoy:"$CIRCLE_SHA1"
-   docker tag lyft/envoy:"$CIRCLE_SHA1" lyft/envoy:"$CIRCLE_TAG"
-   docker push lyft/envoy:"$CIRCLE_TAG"
+   docker pull envoyproxy/envoy:"$CIRCLE_SHA1"
+   docker tag envoyproxy/envoy:"$CIRCLE_SHA1" envoyproxy/envoy:"$CIRCLE_TAG"
+   docker push envoyproxy/envoy:"$CIRCLE_TAG"
 
-   docker pull lyft/envoy-alpine:"$CIRCLE_SHA1"
-   docker tag lyft/envoy-alpine:"$CIRCLE_SHA1" lyft/envoy-alpine:"$CIRCLE_TAG"
-   docker push lyft/envoy-alpine:"$CIRCLE_TAG"
+   docker pull envoyproxy/envoy-alpine:"$CIRCLE_SHA1"
+   docker tag envoyproxy/envoy-alpine:"$CIRCLE_SHA1" envoyproxy/envoy-alpine:"$CIRCLE_TAG"
+   docker push envoyproxy/envoy-alpine:"$CIRCLE_TAG"
 
-   docker pull lyft/envoy-alpine-debug:"$CIRCLE_SHA1"
-   docker tag lyft/envoy-alpine-debug:"$CIRCLE_SHA1" lyft/envoy-alpine-debug:"$CIRCLE_TAG"
-   docker push lyft/envoy-alpine-debug:"$CIRCLE_TAG"
+   docker pull envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1"
+   docker tag envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1" envoyproxy/envoy-alpine-debug:"$CIRCLE_TAG"
+   docker push envoyproxy/envoy-alpine-debug:"$CIRCLE_TAG"
 else
    echo 'Ignoring non-tag event for docker tag.'
 fi

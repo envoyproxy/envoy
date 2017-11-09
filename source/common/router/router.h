@@ -12,14 +12,19 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/access_log/access_log_impl.h"
+#include "common/access_log/request_info_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
 #include "common/http/utility.h"
+
+#include "api/filter/http/router.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -91,6 +96,17 @@ public:
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         shadow_writer_(std::move(shadow_writer)) {}
 
+  FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
+               ShadowWriterPtr&& shadow_writer, const envoy::api::v2::filter::http::Router& config)
+      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
+                     context.runtime(), context.random(), std::move(shadow_writer),
+                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
+                     config.start_child_span()) {
+    for (const auto& upstream_log : config.upstream_log()) {
+      upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
+    }
+  }
+
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
   Stats::Scope& scope_;
@@ -101,6 +117,7 @@ public:
   FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
+  std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -194,6 +211,7 @@ private:
     void onPerTryTimeout();
 
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+      request_info_.onUpstreamHostSelected(host);
       upstream_host_ = host;
       parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
     }
@@ -249,6 +267,8 @@ private:
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
+    AccessLog::RequestInfoImpl request_info_;
+    Http::HeaderMap* upstream_headers_{};
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -260,8 +280,7 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  Http::AccessLog::ResponseFlag
-  streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
+  AccessLog::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
@@ -279,7 +298,7 @@ private:
   void maybeDoShadowing();
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream);
+  void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
   void onUpstreamComplete();
