@@ -60,7 +60,7 @@ envoy_cc_test_library(
     name = "registry_lib",
     hdrs = ["registry.h"],
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry",
     ],
 )
 
