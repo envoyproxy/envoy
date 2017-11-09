@@ -105,6 +105,7 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   }
 
   // Try to construct and match wildcard domain.
+  // Theoretically, 5 is the minimum legal domain length for the wildcard certificate (i.e. *.a.b).
   if (server_name.size() >= 5) {
     size_t pos = server_name.find('.');
     if (pos > 0) {
