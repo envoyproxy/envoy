@@ -60,8 +60,8 @@ public:
                            const std::vector<HeaderData>& request_headers);
 
   /**
-   * Returns the HTTP Status Code enum parsed from proto.
-   * @param code supplies the RedirectResponseCode enum support for Redirect Actions.
+   * Returns the redirect HTTP Status Code enum parsed from proto.
+   * @param code supplies the RedirectResponseCode enum.
    * @return Returns the Http::Code version of the RedirectResponseCode.
    */
   static Http::Code

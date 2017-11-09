@@ -52,7 +52,6 @@ class SslRedirector : public RedirectEntry {
 public:
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-
   Http::Code redirectResponseCode() const override { return Http::Code::MovedPermanently; }
 };
 

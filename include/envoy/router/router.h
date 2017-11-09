@@ -38,7 +38,7 @@ public:
 
   /**
    * Returns the HTTP status code to use when redirecting a request.
-   * @return HTTP::Code the redirect response Code.
+   * @return Http::Code the redirect response Code.
    */
   virtual Http::Code redirectResponseCode() const PURE;
 };
