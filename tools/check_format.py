@@ -68,6 +68,7 @@ def checkProtobufExternalDeps(file_path):
       return False
     return True
 
+
 def isBuildFile(file_path):
   basename = os.path.basename(file_path)
   if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
