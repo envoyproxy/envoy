@@ -703,6 +703,59 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Test that we close all HTTP connection pool connections when there is a host health failure.
+TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
+
+  InSequence s;
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+  cluster1->info_->name_ = "some_cluster";
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  cluster1->hosts_ = {test_host};
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+  MockHealthChecker health_checker;
+  ON_CALL(*cluster1, healthChecker()).WillByDefault(Return(&health_checker));
+
+  Outlier::MockDetector outlier_detector;
+  ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+
+  create(parseBootstrapFromJson(json));
+
+  Http::ConnectionPool::MockInstance* cp1 = new Http::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
+  cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default, nullptr);
+
+  outlier_detector.runCallbacks(test_host);
+  health_checker.runCallbacks(test_host, false);
+
+  EXPECT_CALL(*cp1, closeConnections());
+  test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector.runCallbacks(test_host);
+
+  Http::ConnectionPool::MockInstance* cp2 = new Http::ConnectionPool::MockInstance();
+  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
+  cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High, nullptr);
+
+  EXPECT_CALL(*cp1, closeConnections());
+  EXPECT_CALL(*cp2, closeConnections());
+  test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(test_host, true);
+
+  test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector.runCallbacks(test_host);
+  test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(test_host, true);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   const std::string json = R"EOF(
   {
