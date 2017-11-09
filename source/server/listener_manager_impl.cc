@@ -94,13 +94,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
 
   // Skip lookup and update of the SSL Context if there is only one filter chain
   // and it doesn't enforce any SNI restrictions.
-  bool skip_context_update;
-  if (config.filter_chains().size() == 1 &&
-      config.filter_chains()[0].filter_chain_match().sni_domains().empty()) {
-    skip_context_update = true;
-  } else {
-    skip_context_update = false;
-  }
+  bool skip_context_update = (config.filter_chains().size() == 1 &&
+                              config.filter_chains()[0].filter_chain_match().sni_domains().empty());
 
   size_t has_tls = 0;
   size_t has_stk = 0;
