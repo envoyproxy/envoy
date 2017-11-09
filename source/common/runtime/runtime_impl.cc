@@ -224,25 +224,18 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       // theoretically lead to issues.
       ENVOY_LOG(debug, "reading file: {}", full_path);
       Entry entry;
-      entry.string_value_ = Filesystem::fileReadToEnd(full_path);
 
-      // Trim whitespace.
-      StringUtil::rtrim(entry.string_value_);
-
-      // Remove any comments. Comments are only allowed at the beginning of the file. A comment
-      // is a line starting with a '#' character. Comments can span multiple lines if each line
-      // starts with a '#' character. Comments are useful for placeholder files with no value.
-      while (!entry.string_value_.empty()) {
-        if (entry.string_value_.at(0) == '#') {
-          size_t index_end = entry.string_value_.find('\n');
-          if (index_end == std::string::npos) {
-            index_end = entry.string_value_.size() - 1;
-          }
-          entry.string_value_.erase(0, index_end + 1);
-        } else {
-          break;
+      // Read the file and remove any comments. A comment is a line starting with a '#' character.
+      // Comments are useful for placeholder files with no value.
+      const std::vector<std::string> lines =
+          StringUtil::split(Filesystem::fileReadToEnd(full_path), "\n");
+      for (const std::string& line : lines) {
+        if (!line.empty() && line.at(0) == '#') {
+          continue;
         }
+        entry.string_value_ += line + "\n";
       }
+      StringUtil::rtrim(entry.string_value_);
 
       // As a perf optimization, attempt to convert the string into an integer. If we don't
       // succeed that's fine.
