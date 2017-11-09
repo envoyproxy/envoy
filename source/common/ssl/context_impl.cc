@@ -494,6 +494,10 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
 
 ssl_select_cert_result_t
 ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
+  if (skip_context_update_) {
+    return ssl_select_cert_success;
+  }
+
   std::string server_name;
   const uint8_t* data;
   size_t len;
@@ -513,10 +517,6 @@ ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
         CBS_len(&host_name) <= TLSEXT_MAXLEN_host_name && !CBS_contains_zero_byte(&host_name)) {
       server_name.assign(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
     }
-  }
-
-  if (skip_context_update_) {
-    return ssl_select_cert_success;
   }
 
   ServerContext* new_ctx = parent_.findSslServerContext(listener_name_, server_name);
