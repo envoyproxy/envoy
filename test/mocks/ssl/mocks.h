@@ -38,8 +38,8 @@ public:
                ServerContext*(const std::string& listener_name,
                               const std::vector<std::string>& server_names, Stats::Scope& stats,
                               ServerContextConfig& config, bool skip_context_update));
-  MOCK_METHOD2(findSslServerContext, ServerContext*(const std::string&, const std::string&));
-  MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
+  MOCK_CONST_METHOD2(findSslServerContext, ServerContext*(const std::string&, const std::string&));
+  MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(Context&)> callback));
 };
 

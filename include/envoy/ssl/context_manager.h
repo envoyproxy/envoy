@@ -37,12 +37,12 @@ public:
    * @return ServerContext or nullptr in case there is no match.
    */
   virtual ServerContext* findSslServerContext(const std::string& listener_name,
-                                              const std::string& server_name) PURE;
+                                              const std::string& server_name) const PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire.
    */
-  virtual size_t daysUntilFirstCertExpires() PURE;
+  virtual size_t daysUntilFirstCertExpires() const PURE;
 
   /**
    * Iterate through all currently allocated contexts.

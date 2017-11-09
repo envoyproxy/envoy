@@ -40,14 +40,14 @@ public:
                                                Stats::Scope& scope, ServerContextConfig& config,
                                                bool skip_context_update) override;
   Ssl::ServerContext* findSslServerContext(const std::string& listener_name,
-                                           const std::string& server_name) override;
-  size_t daysUntilFirstCertExpires() override;
+                                           const std::string& server_name) const override;
+  size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(Context&)> callback) override;
 
 private:
   Runtime::Loader& runtime_;
   std::list<Context*> contexts_;
-  std::shared_timed_mutex contexts_lock_;
+  mutable std::shared_timed_mutex contexts_lock_;
   std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_exact_;
   std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_wildcard_;
 };

@@ -89,7 +89,7 @@ ServerContextPtr ContextManagerImpl::createSslServerContext(
 }
 
 ServerContext* ContextManagerImpl::findSslServerContext(const std::string& listener_name,
-                                                        const std::string& server_name) {
+                                                        const std::string& server_name) const {
   // Find Ssl::ServerContext to use. The algorithm for "www.example.com" is as follows:
   // 1. Try exact match on domain, i.e. "www.example.com"
   // 2. Try exact match on wildcard, i.e. "*.example.com"
@@ -98,10 +98,13 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
 
   // TODO(PiotrSikora): make this lockless.
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
-  auto& listener_map_exact = map_exact_[listener_name];
-  auto ctx = listener_map_exact.find(server_name);
-  if (ctx != listener_map_exact.end()) {
-    return ctx->second;
+
+  auto listener_map_exact = map_exact_.find(listener_name);
+  if (listener_map_exact != map_exact_.end()) {
+    auto ctx = listener_map_exact->second.find(server_name);
+    if (ctx != listener_map_exact->second.end()) {
+      return ctx->second;
+    }
   }
 
   // Try to construct and match wildcard domain.
@@ -112,24 +115,28 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
       size_t rpos = server_name.rfind('.');
       if (rpos > pos + 1 && rpos != server_name.size() - 1) {
         std::string wildcard = '*' + server_name.substr(pos);
-        auto& listener_map_wildcard = map_wildcard_[listener_name];
-        auto ctx = listener_map_wildcard.find(wildcard);
-        if (ctx != listener_map_wildcard.end()) {
-          return ctx->second;
+        auto listener_map_wildcard = map_wildcard_.find(listener_name);
+        if (listener_map_wildcard != map_wildcard_.end()) {
+          auto ctx = listener_map_wildcard->second.find(wildcard);
+          if (ctx != listener_map_wildcard->second.end()) {
+            return ctx->second;
+          }
         }
       }
     }
   }
 
-  ctx = listener_map_exact.find(EMPTY_STRING);
-  if (ctx != listener_map_exact.end()) {
-    return ctx->second;
+  if (listener_map_exact != map_exact_.end()) {
+    auto ctx = listener_map_exact->second.find(EMPTY_STRING);
+    if (ctx != listener_map_exact->second.end()) {
+      return ctx->second;
+    }
   }
 
   return nullptr;
 }
 
-size_t ContextManagerImpl::daysUntilFirstCertExpires() {
+size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
   size_t ret = std::numeric_limits<int>::max();
   for (Context* context : contexts_) {
