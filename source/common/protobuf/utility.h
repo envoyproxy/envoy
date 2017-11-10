@@ -35,6 +35,13 @@
        ? Protobuf::util::TimeUtil::DurationToMilliseconds((message).field_name())                  \
        : throw MissingFieldException(#field_name, (message)))
 
+// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw a
+// MissingFieldException.
+#define PROTOBUF_GET_SECONDS_REQUIRED(message, field_name)                                         \
+  ((message).has_##field_name()                                                                    \
+       ? Protobuf::util::TimeUtil::DurationToSeconds((message).field_name())                       \
+       : throw MissingFieldException(#field_name, (message)))
+
 namespace Envoy {
 
 class MissingFieldException : public EnvoyException {
