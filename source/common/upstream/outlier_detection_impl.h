@@ -225,10 +225,8 @@ private:
   void ejectHost(HostSharedPtr host, EjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
-  void onConsecutive5xxWorker(HostSharedPtr host);
-  void onConsecutiveGatewayFailureWorker(HostSharedPtr host);
-  void notifyMainThreadConsecutiveError(HostSharedPtr host, std::function<void(std::shared_ptr<DetectorImpl>, HostSharedPtr)> f);
-  bool shouldSkipEjection(HostSharedPtr host);
+  void onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
   bool enforceEjection(EjectionType type);

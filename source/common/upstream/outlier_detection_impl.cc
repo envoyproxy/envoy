@@ -238,7 +238,7 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
                                       POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, std::function<void(std::shared_ptr<DetectorImpl>, HostSharedPtr)> f) {
+void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
   // NOTE: Unfortunately consecutive errors are complicated from a threading perspective because
   //       we catch consecutive errors on worker threads and then post back to the main thread.
@@ -250,60 +250,50 @@ void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, std::fun
   //          pointer, the detector/cluster must still exist so we can safely fire callbacks.
   //          Otherwise we do nothing since the detector/cluster is already gone.
   std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host, f]() -> void {
+  dispatcher_.post([weak_this, host, type]() -> void {
     std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
     if (shared_this) {
-      f(shared_this, host);
+      shared_this->onConsecutiveErrorWorker(host, type);
     }
   });
 }
 
 void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
-    notifyMainThreadConsecutiveError(host, [](std::shared_ptr<DetectorImpl> shared_this, HostSharedPtr host) -> void { shared_this->onConsecutive5xxWorker(host); });
+    notifyMainThreadConsecutiveError(host, EjectionType::Consecutive5xx);
 }
 
 void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
-    notifyMainThreadConsecutiveError(host, [](std::shared_ptr<DetectorImpl> shared_this, HostSharedPtr host) -> void { shared_this->onConsecutiveGatewayFailureWorker(host); });
+    notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
 }
 
-bool DetectorImpl::shouldSkipEjection(HostSharedPtr host) {
+void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_monitors_.count(host) == 0) {
-    return true;
+    return;
   }
   if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-    return true;
-  }
-  return false;
-}
-
-void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
-  if (shouldSkipEjection(host)) {
     return;
   }
 
-  stats_.ejections_consecutive_5xx_.inc();
-  ejectHost(host, EjectionType::Consecutive5xx);
-  // Reset the DetectorHostMonitor's consecutive_5xx_ counter. The reset is performed here
-  // on the onConsecutive5xxWorker call to prevent thread thrashing. The consecutive_5xx_
-  // counter needs to be reset in order to allow the monitor to detect a bout of consecutive
-  // 5xx responses even if the monitor is not charged with an interleaved non-5xx code.
-  host_monitors_[host]->resetConsecutive5xx();
-}
 
-void DetectorImpl::onConsecutiveGatewayFailureWorker(HostSharedPtr host) {
-  if (shouldSkipEjection(host)) {
-    return;
+  // We also reset the appropriate counter here to allow the monitor to detect a bout of consecutive
+  // error responses even if the monitor is not charged with an interleaved non-error code.
+  switch (type) {
+    case EjectionType::Consecutive5xx:
+      stats_.ejections_consecutive_5xx_.inc();
+      ejectHost(host, EjectionType::Consecutive5xx);
+      host_monitors_[host]->resetConsecutive5xx();
+      break;
+    case EjectionType::ConsecutiveGatewayFailure:
+      stats_.ejections_consecutive_gateway_failure_.inc();
+      ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
+      host_monitors_[host]->resetConsecutiveGatewayFailure();
+      break;
+    default:
+      break;
   }
 
-  stats_.ejections_consecutive_gateway_failure_.inc();
-  ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
-  // Reset the DetectorHostMonitor's consecutive_gateway_failure_ counter. The reset is performed here
-  // on the onConsecutiveGatewayFailureWorker call to prevent thread thrashing. The consecutive_gateway_failure_
-  // counter needs to be reset in order to allow the monitor to detect a bout of consecutive
-  // failures responses even if the monitor is not charged with an interleaved non-failure code.
-  host_monitors_[host]->resetConsecutiveGatewayFailure();
 }
 
 Utility::EjectionPair Utility::successRateEjectionThreshold(
