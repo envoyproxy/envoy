@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
@@ -62,7 +63,11 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
 
     Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                              lightstep::CollectorMethodName(), true);
-    if (!Grpc::Common::deserializeBody(response->bodyAsString(), *active_response_)) {
+    // http://www.grpc.io/docs/guides/wire.html
+    // First 5 bytes contain the message header.
+    response->body()->drain(5);
+    Buffer::ZeroCopyInputStreamImpl stream{std::move(response->body())};
+    if (!active_response_->ParseFromZeroCopyStream(&stream)) {
       throw EnvoyException("Failed to parse LightStep collector response");
     }
     active_callback_->OnSuccess();

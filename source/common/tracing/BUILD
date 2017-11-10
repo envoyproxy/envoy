@@ -26,6 +26,7 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_formatter_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",

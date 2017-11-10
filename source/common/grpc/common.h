@@ -113,11 +113,6 @@ public:
   static Buffer::InstancePtr serializeBody(const Protobuf::Message& message);
 
   /**
-   * Deserialize protobuf message.
-   */
-  static bool deserializeBody(const std::string& body, Protobuf::Message& message);
-
-  /**
    * Prepare headers for protobuf service.
    */
   static Http::MessagePtr prepareHeaders(const std::string& upstream_cluster,
