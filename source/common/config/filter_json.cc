@@ -266,6 +266,16 @@ void FilterJson::translateFaultFilter(const Json::Object& json_fault,
   }
 }
 
+void FilterJson::translateHealthCheckFilter(
+    const Json::Object& json_health_check,
+    envoy::api::v2::filter::http::HealthCheck& health_check) {
+  json_health_check.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_BOOL(json_health_check, health_check, pass_through_mode);
+  JSON_UTIL_SET_DURATION(json_health_check, health_check, cache_time);
+  JSON_UTIL_SET_STRING(json_health_check, health_check, endpoint);
+}
+
 void FilterJson::translateRouter(const Json::Object& json_router,
                                  envoy::api::v2::filter::http::Router& router) {
   json_router.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);

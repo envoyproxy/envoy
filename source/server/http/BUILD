@@ -52,6 +52,7 @@ envoy_cc_library(
     name = "health_check_lib",
     srcs = ["health_check.cc"],
     hdrs = ["health_check.h"],
+    external_deps = ["envoy_filter_http_health_check"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -60,12 +61,13 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
 )
