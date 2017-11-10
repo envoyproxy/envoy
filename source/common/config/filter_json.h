@@ -52,11 +52,11 @@ public:
 
   /**
    * Translate a v1 JSON Fault filter object to v2 envoy::api::v2::filter::http::HTTPFault.
-   * @param config source v1 JSON HTTP Fault Filter object.
+   * @param json_fault source v1 JSON HTTP Fault Filter object.
    * @param fault destination v2
    * envoy::api::v2::filter::http::HTTPFault.
    */
-  static void translateFaultFilter(const Json::Object& config,
+  static void translateFaultFilter(const Json::Object& json_fault,
                                    envoy::api::v2::filter::http::HTTPFault& fault);
 
   /*
@@ -69,7 +69,7 @@ public:
 
   /**
    * Translate a v1 JSON Buffer filter object to v2 envoy::api::v2::filter::http::Buffer.
-   * @param config source v1 JSON HTTP Buffer Filter object.
+   * @param json_buffer source v1 JSON HTTP Buffer Filter object.
    * @param buffer destination v2
    * envoy::api::v2::filter::http::Buffer.
    */
