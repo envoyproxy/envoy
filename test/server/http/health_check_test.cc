@@ -233,7 +233,7 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSetProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
-  config.mutable_endpoint()->set_value("foo");
+  config.set_endpoint("foo");
   config.mutable_cache_time()->set_seconds(10);
 
   EXPECT_THROW(
@@ -247,7 +247,7 @@ TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSetProto)
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
-  config.mutable_endpoint()->set_value("foo");
+  config.set_endpoint("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 
@@ -256,10 +256,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::api::v2::filter::http::HealthCheck config =
       *dynamic_cast<envoy::api::v2::filter::http::HealthCheck*>(
-          factory.createEmptyConfigProto().get());
+          healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
-  config.mutable_endpoint()->set_value("foo");
+  config.set_endpoint("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 } // namespace Envoy
