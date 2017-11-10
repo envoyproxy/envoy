@@ -24,8 +24,8 @@ public:
   SpanPtr spawnChild(const Config& config, const std::string& name, SystemTime start_time) override;
 
 private:
-  bool use_single_header_propagation_;
-  bool use_tracer_propagation_;
+  const bool use_single_header_propagation_;
+  const bool use_tracer_propagation_;
   std::unique_ptr<opentracing::Span> span_;
 };
 
