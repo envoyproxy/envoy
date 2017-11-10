@@ -65,6 +65,16 @@ public:
    */
   static void translateRouter(const Json::Object& json_router,
                               envoy::api::v2::filter::http::Router& router);
+
+  /**
+   * Translate a v1 JSON Buffer filter object to v2 envoy::api::v2::filter::http::Buffer.
+   * @param config source v1 JSON HTTP Buffer Filter object.
+   * @param buffer destination v2
+   * envoy::api::v2::filter::http::Buffer.
+   */
+  static void translateBufferFilter(const Json::Object& config,
+                                    envoy::api::v2::filter::http::HTTPFault& fault);
+
 };
 
 } // namespace Config

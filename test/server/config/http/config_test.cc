@@ -37,7 +37,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-TEST(HttpFilterConfigTest, BufferFilter) {
+TEST(HttpFilterConfigTest, CorrectBufferFilterInJson) {
   std::string json_string = R"EOF(
   {
     "max_request_bytes" : 1028,
@@ -54,7 +54,7 @@ TEST(HttpFilterConfigTest, BufferFilter) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, BadBufferFilterConfig) {
+TEST(HttpFilterConfigTest, BadBufferFilterConfigInJson) {
   std::string json_string = R"EOF(
   {
     "max_request_bytes" : 1028,
@@ -66,6 +66,35 @@ TEST(HttpFilterConfigTest, BadBufferFilterConfig) {
   NiceMock<MockFactoryContext> context;
   BufferFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+}
+
+TEST(HttpFilterConfigTest, CorrectBufferFilterInProto) {
+  envoy::api::v2::filter::http::Buffer config{};
+  config.mutable_max_request_bytes()->set_value(1028);
+  config.mutable_max_request_time()->set_seconds(2);
+
+  NiceMock<MockFactoryContext> context;
+  BufferFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, BufferFilterWithEmptyProto) {
+  BufferFilterConfig factory;
+  envoy::api::v2::filter::http::Buffer config =
+      *dynamic_cast<envoy::api::v2::filter::http::Buffer*>(
+          factory.createEmptyConfigProto().get());
+
+  config.mutable_max_request_bytes()->set_value(1028);
+  config.mutable_max_request_time()->set_seconds(2);
+
+  NiceMock<MockFactoryContext> context;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, RateLimitFilter) {

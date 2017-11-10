@@ -274,5 +274,13 @@ void FilterJson::translateRouter(const Json::Object& json_router,
   router.set_start_child_span(json_router.getBoolean("start_child_span", false));
 }
 
+void FilterJson::translateBufferFilter(const Json::Object& json_buffer,
+                                       envoy::api::v2::filter::http::Buffer& buffer) {
+  json_buffer.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
+
+  buffer.mutable_max_request_bytes()->set_value(json_buffer.getInteger("max_request_bytes"));
+  JSON_UTIL_SET_DURATION_SECONDS(json_buffer, buffer, max_request_time);
+}
+
 } // namespace Config
 } // namespace Envoy
