@@ -2,6 +2,7 @@
 
 #include "envoy/json/json_object.h"
 
+#include "api/filter/http/buffer.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
