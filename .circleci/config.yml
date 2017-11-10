@@ -1,6 +1,3 @@
-# TODO(mattklein123): See if there is a way to put build SHA into a variable.
-# In the meantime, it's required to edit the SHA in this file as well as envoy_build_sha.sh.
-
 references:
   envoy-build-image: &envoy-build-image
     envoyproxy/envoy-build:516cdcd55326648978f8db1fe3a774ec759f5a13
