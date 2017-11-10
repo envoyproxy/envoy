@@ -25,7 +25,8 @@ Each individual listener configuration has the following format:
     "bind_to_port": "...",
     "use_proxy_proto": "...",
     "use_original_dst": "...",
-    "per_connection_buffer_limit_bytes": "..."
+    "per_connection_buffer_limit_bytes": "...",
+    "drain_type": "..."
   }
 
 .. _config_listeners_name:
@@ -78,6 +79,13 @@ use_original_dst
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the listener's new connection read and write buffers.
   If unspecified, an implementation defined default is applied (1MiB).
+
+.. _config_listeners_drain_type:
+
+drain_type
+  *(optional, string)* The type of draining that the listener does. Allowed values include *default*
+  and *modify_only*. See the :ref:`draining <arch_overview_draining>` architecture overview for
+  more information.
 
 Statistics
 ----------
