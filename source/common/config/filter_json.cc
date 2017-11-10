@@ -271,8 +271,7 @@ void FilterJson::translateHealthCheckFilter(
     envoy::api::v2::filter::http::HealthCheck& health_check) {
   json_health_check.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
 
-  health_check.mutable_pass_through_mode()->set_value(
-      json_health_check.getBoolean("pass_through_mode"));
+  JSON_UTIL_SET_BOOL(json_health_check, health_check, pass_through_mode);
   JSON_UTIL_SET_DURATION(json_health_check, health_check, cache_time);
   JSON_UTIL_SET_STRING(json_health_check, health_check, endpoint);
 }
