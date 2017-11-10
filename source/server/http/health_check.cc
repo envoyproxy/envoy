@@ -8,6 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
+#include "common/config/filter_json.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
@@ -23,7 +24,7 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb HealthCheckFilterConfig::createHealthCheckFilter(
-    const envoy::api::v2::filter::http::HealthCheck& health_check, const std::string& stats_prefix,
+    const envoy::api::v2::filter::http::HealthCheck& health_check, const std::string&,
     FactoryContext& context) {
   ASSERT(health_check.has_pass_through_mode());
   ASSERT(!health_check.endpoint().empty());
