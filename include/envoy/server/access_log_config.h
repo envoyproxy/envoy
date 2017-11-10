@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/http/access_log.h"
+#include "envoy/access_log/access_log.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
@@ -28,9 +28,9 @@ public:
    * was specified in the configuration, argument will be nullptr.
    * @param context general filter context through which persistent resources can be accessed.
    */
-  virtual Http::AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, Http::AccessLog::FilterPtr&& filter,
-                          FactoryContext& context) PURE;
+  virtual AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
+                                                               AccessLog::FilterPtr&& filter,
+                                                               FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which

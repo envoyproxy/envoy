@@ -110,6 +110,11 @@ TEST_F(RuntimeImplTest, All) {
   EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
 
+  // Files with comments.
+  EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
+  EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));
+  EXPECT_EQ("", loader->snapshot().get("file7"));
+
   // Feature enablement.
   EXPECT_CALL(generator, random()).WillOnce(Return(1));
   EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1));

@@ -4,15 +4,15 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/access_log.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/access_log/access_log_formatter.h"
+#include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
-#include "common/http/access_log/access_log_formatter.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"

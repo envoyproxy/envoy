@@ -15,5 +15,6 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/mocks/upstream:host_mocks",
     ],
 )

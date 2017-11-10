@@ -87,6 +87,11 @@ public:
   virtual void addDrainedCallback(DrainedCb cb) PURE;
 
   /**
+   * Close all connections currently owned by the pool.
+   */
+  virtual void closeConnections() PURE;
+
+  /**
    * Create a new stream on the pool.
    * @param response_decoder supplies the decoder events to fire when the response is
    *                         available.

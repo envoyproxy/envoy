@@ -45,5 +45,23 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
+Http::Code ConfigUtility::parseRedirectResponseCode(
+    const envoy::api::v2::RedirectAction::RedirectResponseCode& code) {
+  switch (code) {
+  case envoy::api::v2::RedirectAction::MOVED_PERMANENTLY:
+    return Http::Code::MovedPermanently;
+  case envoy::api::v2::RedirectAction::FOUND:
+    return Http::Code::Found;
+  case envoy::api::v2::RedirectAction::SEE_OTHER:
+    return Http::Code::SeeOther;
+  case envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT:
+    return Http::Code::TemporaryRedirect;
+  case envoy::api::v2::RedirectAction::PERMANENT_REDIRECT:
+    return Http::Code::PermanentRedirect;
+  default:
+    NOT_IMPLEMENTED;
+  }
+}
+
 } // namespace Router
 } // namespace Envoy

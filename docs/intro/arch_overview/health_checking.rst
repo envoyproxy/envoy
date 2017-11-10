@@ -27,6 +27,11 @@ Passive health checking
 Envoy also supports passive health checking via :ref:`outlier detection
 <arch_overview_outlier_detection>`.
 
+Connection pool interactions
+----------------------------
+
+See :ref:`here <arch_overview_conn_pool_health_checking>` for more information.
+
 .. _arch_overview_health_checking_filter:
 
 HTTP health checking filter

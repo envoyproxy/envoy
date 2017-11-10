@@ -89,6 +89,8 @@ void FilterJson::translateAccessLogFilter(
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
                                     envoy::api::v2::filter::AccessLog& access_log) {
+  json_access_log.validateSchema(Json::Schema::ACCESS_LOG_SCHEMA);
+
   envoy::api::v2::filter::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);

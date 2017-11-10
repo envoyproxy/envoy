@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/common/utility.h"
-#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -21,7 +21,6 @@ using testing::ReturnRef;
 using testing::_;
 
 namespace Envoy {
-namespace Http {
 namespace AccessLog {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
@@ -65,14 +64,15 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 }
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
-  EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Protocol::Http10));
-  EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Protocol::Http11));
-  EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Protocol::Http2));
+  EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
+  EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Http::Protocol::Http11));
+  EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Http::Protocol::Http2));
+  EXPECT_EQ("-", AccessLogFormatUtils::protocolToString({}));
 }
 
 TEST(AccessLogFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
-  TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
   MockRequestInfo request_info;
 
   EXPECT_EQ("plain", formatter.format(header, header, request_info));
@@ -82,7 +82,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   EXPECT_THROW(RequestInfoFormatter formatter("unknown_field"), EnvoyException);
 
   NiceMock<MockRequestInfo> request_info;
-  TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
     RequestInfoFormatter start_time_format("START_TIME");
@@ -94,16 +94,30 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    std::chrono::microseconds duration{5000};
-    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(Return(duration));
+    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(5000)};
+    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
     EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
   }
 
   {
+    RequestInfoFormatter request_duration_format("REQUEST_DURATION");
+    Optional<std::chrono::microseconds> duration;
+    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
+    EXPECT_EQ("-", request_duration_format.format(header, header, request_info));
+  }
+
+  {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    std::chrono::microseconds duration{10000};
-    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(Return(duration));
+    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(10000)};
+    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(ReturnRef(duration));
     EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
+    Optional<std::chrono::microseconds> duration;
+    EXPECT_CALL(request_info, responseReceivedDuration()).WillOnce(ReturnRef(duration));
+    EXPECT_EQ("-", response_duration_format.format(header, header, request_info));
   }
 
   {
@@ -114,7 +128,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter protocol_format("PROTOCOL");
-    EXPECT_CALL(request_info, protocol()).WillOnce(Return(Protocol::Http11));
+    Optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, request_info));
   }
 
@@ -178,8 +193,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   MockRequestInfo request_info;
-  TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
-  TestHeaderMapImpl response_header{{":method", "PUT"}};
+  Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_header{{":method", "PUT"}};
 
   {
     RequestHeaderFormatter formatter(":Method", "", Optional<size_t>());
@@ -204,8 +219,8 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
 
 TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   MockRequestInfo request_info;
-  TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
-  TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
+  Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
   {
     ResponseHeaderFormatter formatter(":method", "", Optional<size_t>());
@@ -230,16 +245,16 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   MockRequestInfo request_info;
-  TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
 
   {
     const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%[]";
     FormatterImpl formatter(format);
 
-    Protocol protocol = Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
+    Optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
 
     EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT[]",
               formatter.format(request_header, response_header, request_info));
@@ -288,5 +303,4 @@ TEST(AccessLogFormatterTest, ParserFailures) {
 }
 
 } // namespace AccessLog
-} // namespace Http
 } // namespace Envoy

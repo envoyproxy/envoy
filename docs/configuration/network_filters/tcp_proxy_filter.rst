@@ -12,6 +12,7 @@ TCP proxy :ref:`architecture overview <arch_overview_tcp_proxy>`.
     "config": {
       "stat_prefix": "...",
       "route_config": "{...}"
+      "access_log": "[]"
     }
   }
 
@@ -22,6 +23,10 @@ TCP proxy :ref:`architecture overview <arch_overview_tcp_proxy>`.
 stat_prefix
   *(required, string)* The prefix to use when emitting :ref:`statistics
   <config_network_filters_tcp_proxy_stats>`.
+
+:ref:`access_log <config_access_log>`
+  *(optional, array)* Configuration for :ref:`access logs <arch_overview_access_logs>`
+  emitted by the this tcp_proxy.
 
 .. _config_network_filters_tcp_proxy_route_config:
 

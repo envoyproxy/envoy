@@ -183,10 +183,30 @@ struct ActiveTestRequest {
 };
 
 /**
+ * Verify that connections are closed when requested.
+ */
+TEST_F(Http1ConnPoolImplTest, CloseConnections) {
+  cluster_->resource_manager_.reset(
+      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
+  InSequence s;
+
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  ActiveTestRequest r2(*this, 1, ActiveTestRequest::Type::CreateConnection);
+  r2.startRequest();
+
+  r1.completeResponse(false);
+
+  conn_pool_.closeConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
  * Test all timing stats are set.
  */
 TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
-
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   EXPECT_CALL(cluster_->stats_store_,

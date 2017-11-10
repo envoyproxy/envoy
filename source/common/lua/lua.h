@@ -280,6 +280,16 @@ public:
       this->object_.first->markLive();
     }
   }
+
+  void reset(const std::pair<T*, lua_State*>& object, bool leave_on_stack) {
+    markDead();
+    LuaRef<T>::reset(object, leave_on_stack);
+  }
+
+  void reset() {
+    markDead();
+    LuaRef<T>::reset();
+  }
 };
 
 /**

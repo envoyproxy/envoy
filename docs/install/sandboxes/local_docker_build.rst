@@ -8,7 +8,7 @@ putting that in a clean Ubuntu container.
 
 **Step 1: Build Envoy**
 
-Using ``lyft/envoy-build`` you will compile Envoy.
+Using ``envoyproxy/envoy-build`` you will compile Envoy.
 This image has all software needed to build Envoy. From your Envoy directory::
 
   $ pwd

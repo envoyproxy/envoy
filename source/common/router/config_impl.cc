@@ -232,7 +232,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      redirect_response_code_(
+          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -320,8 +322,8 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
+                                                const AccessLog::RequestInfo& request_info) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
   request_headers_parser_->evaluateRequestHeaders(headers, request_info);
@@ -502,7 +504,7 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
 
 void PrefixRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+    Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, prefix_);
@@ -521,8 +523,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
+                                                const AccessLog::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, path_);
@@ -562,8 +564,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader),
       regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
 
-void RegexRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const Http::AccessLog::RequestInfo& request_info) const {
+void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
+                                                 const AccessLog::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   const Http::HeaderString& path = headers.Path()->value();
@@ -686,7 +688,7 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
     for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
       } else if (domain.size() > 0 && '*' == domain[0]) {
