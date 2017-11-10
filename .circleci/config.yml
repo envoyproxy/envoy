@@ -63,8 +63,9 @@ jobs:
        - run: ci/build_container/docker_push.sh
    docs:
      docker:
-       - image: circleci/python:2.7
+       - image: *envoy-build-image
      resource_class: small
+     working_directory: /source
      steps:
        - checkout
        - run: ci/do_circle_ci.sh docs
