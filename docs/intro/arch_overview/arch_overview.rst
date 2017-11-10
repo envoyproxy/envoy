@@ -26,6 +26,7 @@ Architecture overview
   runtime
   tracing
   tcp_proxy
+  access_logging
   mongo
   dynamo
   redis

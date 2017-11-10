@@ -10,6 +10,9 @@ public:
   // Top Level Config Schemas
   static const std::string TOP_LEVEL_CONFIG_SCHEMA;
 
+  // Access log Schema
+  static const std::string ACCESS_LOG_SCHEMA;
+
   // Listener Schema
   static const std::string LISTENER_SCHEMA;
   static const std::string LDS_SCHEMA;

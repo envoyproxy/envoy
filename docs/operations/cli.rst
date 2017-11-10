@@ -98,7 +98,7 @@ following are the command line options that Envoy supports.
   This setting is used during file creation to determine the duration between flushes
   of buffers to files. The buffer will flush every time it gets full, or every time
   the interval has elapsed, whichever comes first. Adjusting this setting is useful
-  when tailing :ref:`access logs <arch_overview_http_access_logs>` in order to
+  when tailing :ref:`access logs <arch_overview_access_logs>` in order to
   get more (or less) immediate flushing.
 
 .. option:: --drain-time-s <integer>

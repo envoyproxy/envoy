@@ -24,7 +24,7 @@ public:
   GrpcHttp1BridgeFilterTest() : filter_(cm_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
-    ON_CALL(decoder_callbacks_.request_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
+    ON_CALL(decoder_callbacks_.request_info_, protocol()).WillByDefault(ReturnRef(protocol_));
   }
 
   ~GrpcHttp1BridgeFilterTest() { filter_.onDestroy(); }
@@ -33,7 +33,7 @@ public:
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  Http::Protocol protocol_{Http::Protocol::Http11};
+  Optional<Http::Protocol> protocol_{Http::Protocol::Http11};
 };
 
 TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {

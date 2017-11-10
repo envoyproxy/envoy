@@ -1,4 +1,4 @@
-.. _config_http_conn_man_access_log:
+.. _config_access_log:
 
 Access logging
 ==============
@@ -7,7 +7,7 @@ Configuration
 -------------------------
 
 Access logs are configured as part of the :ref:`HTTP connection manager config
-<config_http_conn_man>`.
+<config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
 
 .. code-block:: json
 
@@ -21,25 +21,25 @@ Access logs are configured as part of the :ref:`HTTP connection manager config
     ]
   }
 
-.. _config_http_conn_man_access_log_path_param:
+.. _config_access_log_path_param:
 
 path
   *(required, string)* Path the access log is written to.
 
-.. _config_http_conn_man_access_log_format_param:
+.. _config_access_log_format_param:
 
 format
   *(optional, string)* Access log format. Envoy supports :ref:`custom access log formats
-  <config_http_con_manager_access_log_format>` as well as a :ref:`default format
-  <config_http_con_manager_access_log_default_format>`.
+  <config_access_log_format>` as well as a :ref:`default format
+  <config_access_log_default_format>`.
 
-.. _config_http_conn_man_access_log_filter_param:
+.. _config_access_log_filter_param:
 
 filter
   *(optional, object)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
   determine if the access log needs to be written.
 
-.. _config_http_con_manager_access_log_format:
+.. _config_access_log_format:
 
 Format rules
 ------------
@@ -47,45 +47,76 @@ Format rules
 The access log format string contains either command operators or other characters interpreted as a
 plain string. The access log formatter does not make any assumptions about a new line separator, so one
 has to specified as part of the format string.
-See the :ref:`default format <config_http_con_manager_access_log_default_format>` for an example.
+See the :ref:`default format <config_access_log_default_format>` for an example.
 Note that the access log line will contain a '-' character for every not set/empty value.
+
+The same format strings are used by different types of access logs (such as HTTP and TCP).  Some
+fields may have slightly different meanings, depending on what type of log it is.  Differences
+are noted.
 
 The following command operators are supported:
 
 %START_TIME%
-  Request start time including milliseconds.
+  HTTP
+    Request start time including milliseconds.
+
+  TCP
+    Downstream connection start time including milliseconds.
 
 %BYTES_RECEIVED%
-  Body bytes received.
+  HTTP
+    Body bytes received.
+
+  TCP
+    Downstream bytes received on connection.
 
 %PROTOCOL%
-  Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+  HTTP
+    Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+
+  TCP
+    Not implemented ("-").
 
 %RESPONSE_CODE%
-  HTTP response code. Note that a response code of '0' means that the server never sent the
-  beginning of a response. This generally means that the (downstream) client disconnected.
+  HTTP
+    HTTP response code. Note that a response code of '0' means that the server never sent the
+    beginning of a response. This generally means that the (downstream) client disconnected.
+
+  TCP
+    Not implemented ("-").
 
 %BYTES_SENT%
-  Body bytes sent.
+  HTTP
+    Body bytes sent.
+
+  TCP
+    Downstream bytes sent on connection.
 
 %DURATION%
-  Total duration in milliseconds of the request from the start time to the last byte out.
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte out.
+
+  TCP
+    Total duration in milliseconds of the downstream connection.
 
 %RESPONSE_FLAGS%
-  Additional details about the response, if any. Possible values are:
+  Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
+  the descriptions do not apply.  Possible values are:
 
-  * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
-  * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
-  * **UT**: Upstream request timeout in addition to 504 response code.
-  * **LR**: Connection local reset in addition to 503 response code.
-  * **UR**: Upstream remote reset in addition to 503 response code.
-  * **UF**: Upstream connection failure in addition to 503 response code.
-  * **UC**: Upstream connection termination in addition to 503 response code.
-  * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-  * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
-  * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-  * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-  * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+  HTTP and TCP
+    * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
+    * **UF**: Upstream connection failure in addition to 503 response code.
+    * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
+    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+  HTTP only
+    * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
+    * **UT**: Upstream request timeout in addition to 504 response code.
+    * **LR**: Connection local reset in addition to 503 response code.
+    * **UR**: Upstream remote reset in addition to 503 response code.
+    * **UC**: Upstream connection termination in addition to 503 response code.
+    * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+    * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+    * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
@@ -94,15 +125,24 @@ The following command operators are supported:
   Upstream cluster to which the upstream host belongs to.
 
 %REQ(X?Y):Z%
-  An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
-  optional parameter denoting string truncation up to Z characters long. The value is taken from the
-  HTTP request header named X first and if it's not set, then request header Y is used. If none of
-  the headers are present '-' symbol will be in the log.
+  HTTP
+    An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
+    optional parameter denoting string truncation up to Z characters long. The value is taken from
+    the HTTP request header named X first and if it's not set, then request header Y is used. If
+    none of the headers are present '-' symbol will be in the log.
+
+  TCP
+    Not implemented ("-").
 
 %RESP(X?Y):Z%
-  Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
+  HTTP
+    Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
 
-.. _config_http_con_manager_access_log_default_format:
+  TCP
+    Not implemented ("-").
+
+
+.. _config_access_log_default_format:
 
 Default format
 --------------
