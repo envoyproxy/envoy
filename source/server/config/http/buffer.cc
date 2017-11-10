@@ -16,14 +16,14 @@ namespace Configuration {
 
 HttpFilterFactoryCb
 BufferFilterConfig::createBufferFilter(const envoy::api::v2::filter::http::Buffer& buffer,
-                                     const std::string& stats_prefix, FactoryContext& context) {
+                                       const std::string& stats_prefix, FactoryContext& context) {
   ASSERT(buffer.has_max_request_bytes());
   ASSERT(buffer.has_max_request_time());
 
   Http::BufferFilterConfigConstSharedPtr config(new Http::BufferFilterConfig{
       Http::BufferFilter::generateStats(stats_prefix, context.scope()),
-        static_cast<uint64_t>(buffer.max_request_bytes()),
-        std::chrono::seconds(PROTOBUF_GET_MS_REQUIRED(buffer, max_request_time)/1000)});
+      static_cast<uint64_t>(buffer.max_request_bytes()),
+      std::chrono::seconds(PROTOBUF_GET_MS_REQUIRED(buffer, max_request_time) / 1000)});
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new Http::BufferFilter(config)});
@@ -38,11 +38,10 @@ HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& 
   return createBufferFilter(buffer, stats_prefix, context);
 }
 
-HttpFilterFactoryCb BufferFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                     const std::string& stats_prefix,
-                                                                     FactoryContext& context) {
+HttpFilterFactoryCb BufferFilterConfig::createFilterFactoryFromProto(
+    const Protobuf::Message& config, const std::string& stats_prefix, FactoryContext& context) {
   return createBufferFilter(dynamic_cast<const envoy::api::v2::filter::http::Buffer&>(config),
-                           stats_prefix, context);
+                            stats_prefix, context);
 }
 
 /**

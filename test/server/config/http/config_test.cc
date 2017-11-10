@@ -84,8 +84,7 @@ TEST(HttpFilterConfigTest, CorrectBufferFilterInProto) {
 TEST(HttpFilterConfigTest, BufferFilterWithEmptyProto) {
   BufferFilterConfig factory;
   envoy::api::v2::filter::http::Buffer config =
-      *dynamic_cast<envoy::api::v2::filter::http::Buffer*>(
-          factory.createEmptyConfigProto().get());
+      *dynamic_cast<envoy::api::v2::filter::http::Buffer*>(factory.createEmptyConfigProto().get());
 
   config.mutable_max_request_bytes()->set_value(1028);
   config.mutable_max_request_time()->set_seconds(2);

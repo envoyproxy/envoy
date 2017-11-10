@@ -74,7 +74,6 @@ public:
    */
   static void translateBufferFilter(const Json::Object& config,
                                     envoy::api::v2::filter::http::HTTPFault& fault);
-
 };
 
 } // namespace Config
