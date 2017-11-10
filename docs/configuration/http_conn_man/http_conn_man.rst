@@ -167,8 +167,8 @@ drain_timeout_ms
   when a connection hits the idle timeout or during general server draining. The default grace
   period is 5000 milliseconds (5 seconds) if this option is not specified.
 
-:ref:`access_log <config_http_conn_man_access_log>`
-  *(optional, array)* Configuration for :ref:`HTTP access logs <arch_overview_http_access_logs>`
+:ref:`access_log <config_access_log>`
+  *(optional, array)* Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
   emitted by the connection manager.
 
 .. _config_http_conn_man_use_remote_address:
@@ -218,7 +218,6 @@ generate_request_id
 
   route_config/route_config
   filters
-  access_log
   tracing
   headers
   header_sanitizing

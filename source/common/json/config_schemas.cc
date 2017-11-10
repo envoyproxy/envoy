@@ -3,6 +3,132 @@
 #include <string>
 
 namespace Envoy {
+const std::string Json::Schema::ACCESS_LOG_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions": {
+      "status_code" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["status_code"]
+          },
+          "op" : {
+            "type" : "string",
+            "enum" : [">=", "="]
+          },
+          "value" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 599
+          },
+          "runtime_key" : {"type" : "string"}
+        },
+        "required" : ["type", "op", "value"],
+        "additionalProperties" : false
+      },
+      "duration" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["duration"]
+          },
+          "op" : {
+            "type" : "string",
+            "enum" : [">=", "="]
+          },
+          "value" : {
+            "type" : "integer",
+            "minimum" : 0
+          },
+          "runtime_key" : {"type" : "string"}
+        },
+        "required" : ["type", "op", "value"],
+        "additionalProperties" : false
+      },
+      "not_healthcheck" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["not_healthcheck"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      },
+      "traceable_request" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["traceable_request"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      },
+      "runtime" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["runtime"]
+          },
+          "key" : {"type" : "string"}
+        },
+        "required" : ["type", "key"],
+        "additionalProperties" : false
+      },
+      "logical_filter" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["logical_and", "logical_or"]
+          },
+          "filters" : {
+            "type" : "array",
+            "minItems" : 2,
+            "items" : {
+              "oneOf" : [
+                {"$ref" : "#/definitions/status_code"},
+                {"$ref" : "#/definitions/duration"},
+                {"$ref" : "#/definitions/not_healthcheck"},
+                {"$ref" : "#/definitions/logical_filter"},
+                {"$ref" : "#/definitions/traceable_request"},
+                {"$ref" : "#/definitions/runtime"}
+              ]
+            }
+          }
+        },
+        "required" : ["type", "filters"],
+        "additionalProperties" : false
+      }
+    },
+    "type" : "object",
+    "properties" : {
+      "path" : {"type" : "string"},
+      "format" : {"type" : "string"},
+      "filter" : {
+        "type" : "object",
+        "oneOf" : [
+          {"$ref" : "#/definitions/not_healthcheck"},
+          {"$ref" : "#/definitions/status_code"},
+          {"$ref" : "#/definitions/duration"},
+          {"$ref" : "#/definitions/traceable_request"},
+          {"$ref" : "#/definitions/runtime"},
+          {"$ref" : "#/definitions/logical_filter"}
+        ]
+      }
+    },
+    "required" : ["path"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -124,106 +250,6 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "definitions" : {
-      "status_code" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["status_code"]
-          },
-          "op" : {
-            "type" : "string",
-            "enum" : [">=", "="]
-          },
-          "value" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "maximum" : 599
-          },
-          "runtime_key" : {"type" : "string"}
-        },
-        "required" : ["type", "op", "value"],
-        "additionalProperties" : false
-      },
-      "duration" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["duration"]
-          },
-          "op" : {
-            "type" : "string",
-            "enum" : [">=", "="]
-          },
-          "value" : {
-            "type" : "integer",
-            "minimum" : 0
-          },
-          "runtime_key" : {"type" : "string"}
-        },
-        "required" : ["type", "op", "value"],
-        "additionalProperties" : false
-      },
-      "not_healthcheck" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["not_healthcheck"]
-          }
-        },
-        "required" : ["type"],
-        "additionalProperties" : false
-      },
-      "traceable_request" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["traceable_request"]
-          }
-        },
-        "required" : ["type"],
-        "additionalProperties" : false
-      },
-      "runtime" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["runtime"]
-          },
-          "key" : {"type" : "string"}
-        },
-        "required" : ["type", "key"],
-        "additionalProperties" : false
-      },
-      "logical_filter" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["logical_and", "logical_or"]
-          },
-          "filters" : {
-            "type" : "array",
-            "minItems" : 2,
-            "items" : {
-              "oneOf" : [
-                {"$ref" : "#/definitions/status_code"},
-                {"$ref" : "#/definitions/duration"},
-                {"$ref" : "#/definitions/not_healthcheck"},
-                {"$ref" : "#/definitions/logical_filter"},
-                {"$ref" : "#/definitions/traceable_request"},
-                {"$ref" : "#/definitions/runtime"}
-              ]
-            }
-          }
-        },
-        "required" : ["type", "filters"],
-        "additionalProperties" : false
-      },
       "tracing" : {
         "type" : "object",
         "properties" : {
@@ -309,29 +335,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "server_name" : {"type" : "string"},
       "idle_timeout_s" : {"type" : "integer"},
       "drain_timeout_ms" : {"type" : "integer"},
-      "access_log" : {
-        "type" : "array",
-        "items" : {
-          "type" : "object",
-          "properties" : {
-            "path" : {"type" : "string"},
-            "format" : {"type" : "string"},
-            "filter" : {
-              "type" : "object",
-              "oneOf" : [
-                {"$ref" : "#/definitions/not_healthcheck"},
-                {"$ref" : "#/definitions/status_code"},
-                {"$ref" : "#/definitions/duration"},
-                {"$ref" : "#/definitions/traceable_request"},
-                {"$ref" : "#/definitions/runtime"},
-                {"$ref" : "#/definitions/logical_filter"}
-              ]
-            }
-          },
-          "required" : ["path"],
-          "additionalProperties" : false
-        }
-      },
+      "access_log" : { "type": "array" },
       "use_remote_address" : {"type" : "boolean"},
       "forward_client_cert" : {
           "type" : "string",
@@ -505,7 +509,8 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
             }
           },
           "additionalProperties": false
-        }
+        },
+        "access_log" : { "type": "array" }
       },
       "required": ["stat_prefix", "route_config"],
       "additionalProperties": false
