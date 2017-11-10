@@ -105,7 +105,7 @@ MockCluster::MockCluster() {
   ON_CALL(*this, hostsPerLocality()).WillByDefault(ReturnRef(hosts_per_locality_));
   ON_CALL(*this, healthyHostsPerLocality()).WillByDefault(ReturnRef(healthy_hosts_per_locality_));
   ON_CALL(*this, info()).WillByDefault(Return(info_));
-  ON_CALL(*this, setInitializedCb(_))
+  ON_CALL(*this, initialize(_))
       .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
         EXPECT_EQ(nullptr, initialize_callback_);
         initialize_callback_ = callback;
@@ -131,6 +131,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
+  ON_CALL(*this, adsMux()).WillByDefault(ReturnRef(ads_mux_));
 
   // Matches are LIFO so "" will match first.
   ON_CALL(*this, get(_)).WillByDefault(Return(&thread_local_cluster_));

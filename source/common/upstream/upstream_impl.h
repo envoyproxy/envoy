@@ -324,6 +324,7 @@ public:
   // Upstream::Cluster
   ClusterInfoConstSharedPtr info() const override { return info_; }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
+  void initialize(std::function<void()> callback) override;
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
@@ -336,7 +337,18 @@ protected:
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
   void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                           const std::vector<HostSharedPtr>& hosts_removed) override;
-  void blockHcUpdates(bool block);
+
+  /**
+   * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
+   * query DNS, contact EDS, etc.
+   */
+  virtual void startPreInit() PURE;
+
+  /**
+   * Called by every concrete cluster when pre-init is complete. At this point, shared init takes
+   * over and determines if there is an initial health check pass needed, etc.
+   */
+  void onPreInitComplete();
 
   static const HostListsConstSharedPtr empty_host_lists_;
 
@@ -348,9 +360,12 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
+  void finishInitialization();
   void reloadHealthyHosts();
 
-  bool block_hc_updates_{};
+  bool initialization_started_{};
+  std::function<void()> initialization_complete_callback_;
+  uint64_t pending_initialize_health_checks_{};
 };
 
 /**
@@ -364,25 +379,19 @@ public:
                     ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
-  void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-  void setInitializedCb(std::function<void()> callback) override { callback(); }
+
+private:
+  // ClusterImplBase
+  void startPreInit() override;
+
+  HostVectorSharedPtr initial_hosts_;
 };
 
 /**
  * Base for all dynamic cluster types.
  */
 class BaseDynamicClusterImpl : public ClusterImplBase {
-public:
-  // Upstream::Cluster
-  void setInitializedCb(std::function<void()> callback) override {
-    if (initialized_) {
-      callback();
-    } else {
-      initialize_callback_ = callback;
-    }
-  }
-
 protected:
   using ClusterImplBase::ClusterImplBase;
 
@@ -390,10 +399,6 @@ protected:
                              std::vector<HostSharedPtr>& current_hosts,
                              std::vector<HostSharedPtr>& hosts_added,
                              std::vector<HostSharedPtr>& hosts_removed, bool depend_on_hc);
-
-  std::function<void()> initialize_callback_;
-  // Set once the first resolve completes.
-  bool initialized_ = false;
 };
 
 /**
@@ -408,7 +413,6 @@ public:
                        Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
-  void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
@@ -430,6 +434,9 @@ private:
 
   void updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
                       const std::vector<HostSharedPtr>& hosts_removed);
+
+  // ClusterImplBase
+  void startPreInit() override;
 
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;

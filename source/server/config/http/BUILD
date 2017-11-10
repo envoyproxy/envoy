@@ -151,9 +151,11 @@ envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
+    external_deps = ["envoy_filter_http_router"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/json:config_schemas_lib",
         "//source/common/router:router_lib",

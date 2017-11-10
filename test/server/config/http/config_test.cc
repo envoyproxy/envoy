@@ -2,10 +2,12 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/router/router.h"
 
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
@@ -23,9 +25,11 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/http/router.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
@@ -144,11 +148,19 @@ TEST(HttpFilterConfigTest, CorrectFaultFilterInProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, EmptyFaultFilterInProto) {
+TEST(HttpFilterConfigTest, InvalidFaultFilterInProto) {
   envoy::api::v2::filter::http::HTTPFault config{};
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
+}
+
+TEST(HttpFilterConfigTest, FaultFilterWithEmptyProto) {
+  NiceMock<MockFactoryContext> context;
+  FaultFilterConfig factory;
+  EXPECT_THROW(
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context),
+      EnvoyException);
 }
 
 TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
@@ -213,7 +225,7 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(HttpFilterConfigTest, RouterFilter) {
+TEST(HttpFilterConfigTest, RouterFilterInJson) {
   std::string json_string = R"EOF(
   {
     "dynamic_stats" : true,
@@ -242,6 +254,28 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   NiceMock<MockFactoryContext> context;
   RouterFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+}
+
+TEST(HttpFilterConigTest, RouterV2Filter) {
+  envoy::api::v2::filter::http::Router router_config;
+  router_config.mutable_dynamic_stats()->set_value(true);
+
+  NiceMock<MockFactoryContext> context;
+  RouterFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
+  NiceMock<MockFactoryContext> context;
+  RouterFilterConfig factory;
+  HttpFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, IpTaggingFilter) {

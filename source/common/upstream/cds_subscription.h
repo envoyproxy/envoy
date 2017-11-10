@@ -56,7 +56,7 @@ private:
 
   std::string version_info_;
   const LocalInfo::LocalInfo& local_info_;
-  Config::SubscriptionCallbacks<envoy::api::v2::Cluster>* callbacks_;
+  Config::SubscriptionCallbacks<envoy::api::v2::Cluster>* callbacks_ = nullptr;
   Config::SubscriptionStats stats_;
   const Optional<envoy::api::v2::ConfigSource>& eds_config_;
 };

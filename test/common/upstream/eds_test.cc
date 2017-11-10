@@ -56,7 +56,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("wrong name");
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
   cluster_->onConfigUpdateFailed(nullptr);
   EXPECT_TRUE(initialized);
@@ -65,7 +65,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
 // Validate that onConfigUpdate() with empty cluster vector size ignores config.
 TEST_F(EdsTest, OnConfigUpdateEmpty) {
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   cluster_->onConfigUpdate({});
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_empty").value());
   EXPECT_TRUE(initialized);
@@ -75,7 +75,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
 TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   cluster_load_assignment = resources.Add();
@@ -91,7 +91,7 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 }
@@ -110,7 +110,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("name");
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 }
@@ -139,7 +139,7 @@ TEST_F(EdsTest, EndpointMetadata) {
       .set_bool_value(true);
 
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
@@ -190,7 +190,7 @@ TEST_F(EdsTest, EndpointLocality) {
       ->set_address("2.3.4.5");
 
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
@@ -233,7 +233,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
   add_hosts_to_locality("", "us-east-1a", "", 1);
 
   bool initialized = false;
-  cluster_->setInitializedCb([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 

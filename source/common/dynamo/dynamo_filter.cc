@@ -23,9 +23,10 @@ Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, 
   if (enabled_) {
     start_decode_ = std::chrono::steady_clock::now();
     operation_ = RequestParser::parseOperation(headers);
+    return Http::FilterHeadersStatus::StopIteration;
+  } else {
+    return Http::FilterHeadersStatus::Continue;
   }
-
-  return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus DynamoFilter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -33,7 +34,7 @@ Http::FilterDataStatus DynamoFilter::decodeData(Buffer::Instance& data, bool end
     onDecodeComplete(data);
   }
 
-  if (end_stream) {
+  if (!enabled_ || end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete request has been processed.
@@ -91,16 +92,19 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
 }
 
 Http::FilterHeadersStatus DynamoFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
   if (enabled_) {
     response_headers_ = &headers;
 
     if (end_stream) {
       Buffer::OwnedImpl empty;
       onEncodeComplete(empty);
+    } else {
+      status = Http::FilterHeadersStatus::StopIteration;
     }
   }
 
-  return Http::FilterHeadersStatus::Continue;
+  return status;
 }
 
 Http::FilterDataStatus DynamoFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -108,7 +112,7 @@ Http::FilterDataStatus DynamoFilter::encodeData(Buffer::Instance& data, bool end
     onEncodeComplete(data);
   }
 
-  if (end_stream) {
+  if (!enabled_ || end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete response has been processed.
