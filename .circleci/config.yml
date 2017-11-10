@@ -67,7 +67,7 @@ jobs:
      resource_class: small
      steps:
        - checkout
-       - run: docs/build.sh
+       - run: ci/do_circle_ci.sh bazel.docs
        - add_ssh_keys
        - run: docs/publish.sh
    mac:
