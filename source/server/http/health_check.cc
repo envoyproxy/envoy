@@ -49,6 +49,9 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createHealthCheckFilter(
   };
 }
 
+/**
+ * Config registration for the health check filter. @see NamedHttpFilterConfigFactory.
+ */
 HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                                  const std::string& stats_prefix,
                                                                  FactoryContext& context) {
@@ -65,34 +68,12 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProto(
 }
 
 /**
- * Config registration for the health check filter. @see NamedHttpFilterConfigFactory.
- */
-HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Object& config,
-                                                                 const std::string&,
-                                                                 FactoryContext& context) {
-  throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");
-}
-
-HealthCheckCacheManagerSharedPtr cache_manager;
-if (cache_time_ms > 0) {
-  cache_manager.reset(
-      new HealthCheckCacheManager(context.dispatcher(), std::chrono::milliseconds(cache_time_ms)));
-}
-
-return [&context, pass_through_mode, cache_manager,
-        hc_endpoint](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-  callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
-      new HealthCheckFilter(context, pass_through_mode, cache_manager, hc_endpoint)});
-};
-} // namespace Configuration
-
-/**
  * Static registration for the health check filter. @see RegisterFactory.
  */
 static Registry::RegisterFactory<HealthCheckFilterConfig, NamedHttpFilterConfigFactory> register_;
 
+} // namespace Configuration
 } // namespace Server
-} // namespace Envoy
 
 HealthCheckCacheManager::HealthCheckCacheManager(Event::Dispatcher& dispatcher,
                                                  std::chrono::milliseconds timeout)

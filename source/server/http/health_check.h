@@ -29,17 +29,16 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::HealthCheck()};
   }
 
-  std::string name() override {
-    return Config::HttpFilterNames::get().HEALTH_CHECK;
+  std::string name() override { return Config::HttpFilterNames::get().HEALTH_CHECK; }
 
-  private:
-    HttpFilterFactoryCb createHealthCheckFilter(
-        const envoy::api::v2::filter::http::HealthCheck& health_check,
-        const std::string& stats_prefix, FactoryContext& context);
-  };
+private:
+  HttpFilterFactoryCb
+  createHealthCheckFilter(const envoy::api::v2::filter::http::HealthCheck& health_check,
+                          const std::string& stats_prefix, FactoryContext& context);
+};
 
 } // namespace Configuration
-} // namespace Configuration
+} // namespace Server
 
 /**
  * Shared cache manager used by all instances of a health check filter configuration as well as
@@ -112,4 +111,4 @@ private:
   HealthCheckCacheManagerSharedPtr cache_manager_{};
   const std::string endpoint_;
 };
-} // namespace Server
+} // namespace Envoy
