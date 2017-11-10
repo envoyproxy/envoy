@@ -89,6 +89,8 @@ void FilterJson::translateAccessLogFilter(
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
                                     envoy::api::v2::filter::AccessLog& access_log) {
+  json_access_log.validateSchema(Json::Schema::ACCESS_LOG_SCHEMA);
+
   envoy::api::v2::filter::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
@@ -229,12 +231,12 @@ void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
   }
 }
 
-void FilterJson::translateFaultFilter(const Json::Object& config,
+void FilterJson::translateFaultFilter(const Json::Object& json_fault,
                                       envoy::api::v2::filter::http::HTTPFault& fault) {
-  config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
+  json_fault.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
 
-  const Json::ObjectSharedPtr config_abort = config.getObject("abort", true);
-  const Json::ObjectSharedPtr config_delay = config.getObject("delay", true);
+  const Json::ObjectSharedPtr config_abort = json_fault.getObject("abort", true);
+  const Json::ObjectSharedPtr config_delay = json_fault.getObject("delay", true);
 
   if (!config_abort->empty()) {
     auto* abort_fault = fault.mutable_abort();
@@ -251,14 +253,14 @@ void FilterJson::translateFaultFilter(const Json::Object& config,
     JSON_UTIL_SET_DURATION_FROM_FIELD(*config_delay, *delay, fixed_delay, fixed_duration);
   }
 
-  for (const auto json_header_matcher : config.getObjectArray("headers", true)) {
+  for (const auto json_header_matcher : json_fault.getObjectArray("headers", true)) {
     auto* header_matcher = fault.mutable_headers()->Add();
     RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
   }
 
-  JSON_UTIL_SET_STRING(config, fault, upstream_cluster);
+  JSON_UTIL_SET_STRING(json_fault, fault, upstream_cluster);
 
-  for (auto json_downstream_node : config.getStringArray("downstream_nodes", true)) {
+  for (auto json_downstream_node : json_fault.getStringArray("downstream_nodes", true)) {
     auto* downstream_node = fault.mutable_downstream_nodes()->Add();
     *downstream_node = json_downstream_node;
   }
@@ -270,6 +272,14 @@ void FilterJson::translateRouter(const Json::Object& json_router,
 
   router.mutable_dynamic_stats()->set_value(json_router.getBoolean("dynamic_stats", true));
   router.set_start_child_span(json_router.getBoolean("start_child_span", false));
+}
+
+void FilterJson::translateBufferFilter(const Json::Object& json_buffer,
+                                       envoy::api::v2::filter::http::Buffer& buffer) {
+  json_buffer.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_INTEGER(json_buffer, buffer, max_request_bytes);
+  JSON_UTIL_SET_DURATION_SECONDS(json_buffer, buffer, max_request_time);
 }
 
 } // namespace Config

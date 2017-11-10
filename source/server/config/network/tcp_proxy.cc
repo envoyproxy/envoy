@@ -13,8 +13,7 @@ namespace Configuration {
 
 NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Object& config,
                                                                   FactoryContext& context) {
-  Filter::TcpProxyConfigSharedPtr filter_config(
-      new Filter::TcpProxyConfig(config, context.clusterManager(), context.scope()));
+  Filter::TcpProxyConfigSharedPtr filter_config(new Filter::TcpProxyConfig(config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         new Filter::TcpProxy(filter_config, context.clusterManager())});

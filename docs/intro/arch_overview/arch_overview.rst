@@ -26,10 +26,12 @@ Architecture overview
   runtime
   tracing
   tcp_proxy
+  access_logging
   mongo
   dynamo
   redis
   hot_restart
   dynamic_configuration
   init
+  draining
   scripting

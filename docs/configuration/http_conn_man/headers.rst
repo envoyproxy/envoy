@@ -203,7 +203,7 @@ is one of the few areas where a thin client library is needed to perform this du
 is out of scope for this documentation. If *x-request-id* is propagated across all hosts, the
 following features are available:
 
-* Stable :ref:`access logging <config_http_conn_man_access_log>` via the
+* Stable :ref:`access logging <config_access_log>` via the
   :ref:`runtime filter<config_http_con_manager_access_log_filters_runtime>`.
 * Stable tracing when performing random sampling via the :ref:`tracing.random_sampling
   <config_http_conn_man_runtime_random_sampling>` runtime setting or via forced tracing using the

@@ -70,6 +70,14 @@ that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will firs
 If found, the value will override any value found in the primary lookup path. This allows the user
 to customize the runtime values for individual clusters on top of global defaults.
 
+Comments
+--------
+
+Lines starting with ``#`` as the first character are treated as comments.
+
+Comments can be used to provide context on an existing value. Comments are also useful in an
+otherwise empty file to keep a placeholder for deployment in a time of need.
+
 Updating runtime values via symbolic link swap
 ----------------------------------------------
 

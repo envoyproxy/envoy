@@ -2,6 +2,7 @@
 
 #include "envoy/json/json_object.h"
 
+#include "api/filter/http/buffer.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
@@ -51,11 +52,11 @@ public:
 
   /**
    * Translate a v1 JSON Fault filter object to v2 envoy::api::v2::filter::http::HTTPFault.
-   * @param config source v1 JSON HTTP Fault Filter object.
+   * @param json_fault source v1 JSON HTTP Fault Filter object.
    * @param fault destination v2
    * envoy::api::v2::filter::http::HTTPFault.
    */
-  static void translateFaultFilter(const Json::Object& config,
+  static void translateFaultFilter(const Json::Object& json_fault,
                                    envoy::api::v2::filter::http::HTTPFault& fault);
 
   /*
@@ -65,6 +66,15 @@ public:
    */
   static void translateRouter(const Json::Object& json_router,
                               envoy::api::v2::filter::http::Router& router);
+
+  /**
+   * Translate a v1 JSON Buffer filter object to v2 envoy::api::v2::filter::http::Buffer.
+   * @param json_buffer source v1 JSON HTTP Buffer Filter object.
+   * @param buffer destination v2
+   * envoy::api::v2::filter::http::Buffer.
+   */
+  static void translateBufferFilter(const Json::Object& json_buffer,
+                                    envoy::api::v2::filter::http::Buffer& buffer);
 };
 
 } // namespace Config

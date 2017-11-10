@@ -14,6 +14,12 @@ inline envoy::api::v2::Listener parseListenerFromJson(const std::string& json_st
   return listener;
 }
 
+inline envoy::api::v2::Listener parseListenerFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::Listener listener;
+  MessageUtil::loadFromYaml(yaml, listener);
+  return listener;
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
