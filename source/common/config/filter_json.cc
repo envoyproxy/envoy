@@ -273,7 +273,7 @@ void FilterJson::translateHealthCheckFilter(
 
   health_check.mutable_pass_through_mode()->set_value(
       json_health_check.getBoolean("pass_through_mode"));
-  JSON_UTIL_SET_DURATION_FROM_FIELD(json_health_check, health_check, cache_time);
+  JSON_UTIL_SET_DURATION(json_health_check, health_check, cache_time);
   JSON_UTIL_SET_STRING(json_health_check, health_check, endpoint);
 }
 
