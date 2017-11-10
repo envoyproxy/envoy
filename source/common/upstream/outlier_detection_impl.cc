@@ -54,9 +54,9 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       return;
     }
     if (Http::CodeUtility::isGatewayError(response_code)) {
-      if (++consecutive_gateway_failure_ ==
-          detector->runtime().snapshot().getInteger("outlier_detection.consecutive_gateway_failure",
-                                                  detector->config().consecutiveGatewayFailure())) {
+      if (++consecutive_gateway_failure_ == detector->runtime().snapshot().getInteger(
+                                                "outlier_detection.consecutive_gateway_failure",
+                                                detector->config().consecutiveGatewayFailure())) {
         detector->onConsecutiveGatewayFailure(host_.lock());
       }
     } else {
@@ -81,8 +81,8 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& 
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, base_ejection_time, 30000))),
       consecutive_5xx_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_5xx, 5))),
-      consecutive_gateway_failure_(
-                static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_gateway_failure, 5))),
+      consecutive_gateway_failure_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_gateway_failure, 5))),
       max_ejection_percent_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_ejection_percent, 10))),
       success_rate_minimum_hosts_(static_cast<uint64_t>(
@@ -197,8 +197,9 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
                                               config_.enforcingConsecutive5xx());
   case EjectionType::ConsecutiveGatewayFailure:
-      return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_gateway_failure",
-                                                config_.enforcingConsecutiveGatewayFailure());
+    return runtime_.snapshot().featureEnabled(
+        "outlier_detection.enforcing_consecutive_gateway_failure",
+        config_.enforcingConsecutiveGatewayFailure());
   case EjectionType::SuccessRate:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
                                               config_.enforcingSuccessRate());
@@ -259,11 +260,11 @@ void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, Ejection
 }
 
 void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
-    notifyMainThreadConsecutiveError(host, EjectionType::Consecutive5xx);
+  notifyMainThreadConsecutiveError(host, EjectionType::Consecutive5xx);
 }
 
 void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
-    notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
+  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
 }
 
 void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type) {
@@ -276,24 +277,22 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
     return;
   }
 
-
   // We also reset the appropriate counter here to allow the monitor to detect a bout of consecutive
   // error responses even if the monitor is not charged with an interleaved non-error code.
   switch (type) {
-    case EjectionType::Consecutive5xx:
-      stats_.ejections_consecutive_5xx_.inc();
-      ejectHost(host, EjectionType::Consecutive5xx);
-      host_monitors_[host]->resetConsecutive5xx();
-      break;
-    case EjectionType::ConsecutiveGatewayFailure:
-      stats_.ejections_consecutive_gateway_failure_.inc();
-      ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
-      host_monitors_[host]->resetConsecutiveGatewayFailure();
-      break;
-    default:
-      break;
+  case EjectionType::Consecutive5xx:
+    stats_.ejections_consecutive_5xx_.inc();
+    ejectHost(host, EjectionType::Consecutive5xx);
+    host_monitors_[host]->resetConsecutive5xx();
+    break;
+  case EjectionType::ConsecutiveGatewayFailure:
+    stats_.ejections_consecutive_gateway_failure_.inc();
+    ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
+    host_monitors_[host]->resetConsecutiveGatewayFailure();
+    break;
+  default:
+    break;
   }
-
 }
 
 Utility::EjectionPair Utility::successRateEjectionThreshold(
