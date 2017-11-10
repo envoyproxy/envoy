@@ -3,6 +3,7 @@
 #include "envoy/json/json_object.h"
 
 #include "api/filter/http/fault.pb.h"
+#include "api/filter/http/health_check.pb.h"
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
@@ -57,6 +58,15 @@ public:
    */
   static void translateFaultFilter(const Json::Object& config,
                                    envoy::api::v2::filter::http::HTTPFault& fault);
+
+  /**
+   * Translate a v1 JSON Health Check filter object to v2 envoy::api::v2::filter::http::HealthCheck.
+   * @param config source v1 JSON Health Check Filter object.
+   * @param health_check destination v2
+   * envoy::api::v2::filter::http::HealthCheck.
+   */
+  static void translateHealthCheckFilter(const Json::Object& config,
+                                         envoy::api::v2::filter::http::HealthCheck& health_check);
 
   /*
    * Translate a v1 JSON Router object to v2 envoy::api::v2::filter::http::Router.
