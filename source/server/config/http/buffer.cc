@@ -20,11 +20,10 @@ BufferFilterConfig::createBufferFilter(const envoy::api::v2::filter::http::Buffe
   ASSERT(buffer.has_max_request_bytes());
   ASSERT(buffer.has_max_request_time());
 
-  Http::BufferFilterConfigConstSharedPtr config(
-      new Http::BufferFilterConfig{Http::BufferFilter::generateStats(stats_prefix, context.scope()),
-                                   static_cast<uint64_t>(buffer.max_request_bytes().value()),
-                                   std::chrono::duration_cast<std::chrono::seconds>(
-                                       PROTOBUF_GET_MS_REQUIRED(buffer, max_request_time))});
+  Http::BufferFilterConfigConstSharedPtr config(new Http::BufferFilterConfig{
+      Http::BufferFilter::generateStats(stats_prefix, context.scope()),
+      static_cast<uint64_t>(buffer.max_request_bytes().value()),
+      std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(buffer, max_request_time))});
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new Http::BufferFilter(config)});
