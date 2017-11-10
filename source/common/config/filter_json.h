@@ -73,8 +73,8 @@ public:
    * @param buffer destination v2
    * envoy::api::v2::filter::http::Buffer.
    */
-  static void translateBufferFilter(const Json::Object& config,
-                                    envoy::api::v2::filter::http::HTTPFault& fault);
+  static void translateBufferFilter(const Json::Object& json_buffer,
+                                    envoy::api::v2::filter::http::Buffer& buffer);
 };
 
 } // namespace Config
