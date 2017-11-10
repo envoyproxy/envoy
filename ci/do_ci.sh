@@ -153,6 +153,19 @@ elif [[ "$1" == "check_format" ]]; then
   cd "${ENVOY_SRCDIR}"
   ./tools/check_format.py check
   exit 0
+elif [[ "$1" == "docs" ]]; then
+  DOCS_BUILD_DIR="${BUILD_DIR}"/docs
+  rm -rf "${DOCS_BUILD_DIR}" generated/docs generated/rst
+  mkdir -p "${DOCS_BUILD_DIR}"
+  ENVOY_API=$(bazel/git_repository_info.py envoy_api)
+  read -a GIT_INFO <<< "${ENVOY_API}"
+  pushd "${DOCS_BUILD_DIR}"
+  git clone "${GIT_INFO[0]}"
+  cd data-plane-api
+  git checkout "${GIT_INFO[1]}"
+  ./docs/build.sh
+  popd
+  rsync -av "${DOCS_BUILD_DIR}"/data-plane-api/generated/* generated/
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1
