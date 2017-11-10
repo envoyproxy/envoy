@@ -64,7 +64,7 @@ jobs:
    docs:
      docker:
        - image: *envoy-build-image
-     resource_class: small
+     resource_class: xlarge
      working_directory: /source
      steps:
        - checkout
