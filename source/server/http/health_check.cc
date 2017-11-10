@@ -8,9 +8,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/config/filter_json.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
