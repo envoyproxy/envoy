@@ -369,7 +369,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
 
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
-  ENVOY_STREAM_LOG(info, "request complete: path: {}", *callbacks_, path);
+  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::Code code = parent_.runCallback(path, response);

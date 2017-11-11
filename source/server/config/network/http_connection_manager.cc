@@ -224,8 +224,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const ProtobufTypes::String& string_name = filters[i].name();
     const auto& proto_config = filters[i];
 
-    ENVOY_LOG(info, "    filter #{}", i);
-    ENVOY_LOG(info, "      name: {}", string_name);
+    ENVOY_LOG(debug, "    filter #{}", i);
+    ENVOY_LOG(debug, "      name: {}", string_name);
 
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(proto_config.config());

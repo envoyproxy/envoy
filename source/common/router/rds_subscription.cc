@@ -64,7 +64,7 @@ void RdsSubscription::onFetchFailure(const EnvoyException* e) {
   if (e) {
     ENVOY_LOG(warn, "rds: fetch failure: {}", e->what());
   } else {
-    ENVOY_LOG(info, "rds: fetch failure: network error");
+    ENVOY_LOG(debug, "rds: fetch failure: network error");
   }
 }
 
