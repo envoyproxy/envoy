@@ -6,6 +6,10 @@
 #include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
+#include "common/protobuf/protobuf.h"
+
+#include "api/address.pb.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -37,6 +41,11 @@ public:
    * @return true if the ranges are identical.
    */
   bool operator==(const CidrRange& other) const;
+
+  /**
+   * @return Ip address data IFF length >= 0, otherwise nullptr.
+   */
+  const Ip* ip() const;
 
   /**
    * @return Ipv4 address data IFF length >= 0 and version() == IpVersion::v4, otherwise nullptr.
@@ -100,6 +109,11 @@ public:
   static CidrRange create(const std::string& range);
 
   /**
+   * Constructs a CidrRange from envoy::api::v2::CidrRange.
+   */
+  static CidrRange create(const envoy::api::v2::CidrRange& cidr);
+
+  /**
    * Given an IP address and a length of high order bits to keep, returns an address
    * where those high order bits are unmodified, and the remaining bits are all zero.
    * length_io is reduced to be at most 32 for IPv4 address and at most 128 for IPv6
@@ -127,6 +141,7 @@ class IpList {
 public:
   IpList(const std::vector<std::string>& subnets);
   IpList(const Json::Object& config, const std::string& member_name);
+  IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::CidrRange>& cidrs);
   IpList(){};
 
   bool contains(const Instance& address) const;

@@ -7,6 +7,7 @@
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
+#include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -75,6 +76,14 @@ public:
    */
   static void translateBufferFilter(const Json::Object& json_buffer,
                                     envoy::api::v2::filter::http::Buffer& buffer);
+
+  /**
+   * Translate a v1 JSON TCP proxy filter object to a v2 envoy::api::v2::filter::network::TcpProxy.
+   * @param json_tcp_proxy source v1 JSON TCP proxy object.
+   * @param tcp_proxy destination v2 envoy::api::v2::filter::network::TcpProxy.
+   */
+  static void translateTcpProxy(const Json::Object& json_tcp_proxy,
+                                envoy::api::v2::filter::network::TcpProxy& tcp_proxy);
 };
 
 } // namespace Config

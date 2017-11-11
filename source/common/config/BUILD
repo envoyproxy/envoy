@@ -93,6 +93,7 @@ envoy_cc_library(
         "envoy_filter_http_fault",
         "envoy_filter_http_router",
         "envoy_filter_network_mongo_proxy",
+        "envoy_filter_network_tcp_proxy",
     ],
     deps = [
         ":json_utility_lib",
@@ -104,6 +105,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/json:config_schemas_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
     ],

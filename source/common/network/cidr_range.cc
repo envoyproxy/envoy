@@ -55,6 +55,13 @@ bool CidrRange::operator==(const CidrRange& other) const {
   }
 }
 
+const Ip* CidrRange::ip() const {
+  if (address_ != nullptr) {
+    return address_->ip();
+  }
+  return nullptr;
+}
+
 const Ipv4* CidrRange::ipv4() const {
   if (address_ != nullptr) {
     return address_->ip()->ipv4();
@@ -138,6 +145,10 @@ CidrRange CidrRange::create(InstanceConstSharedPtr address, int length) {
 // static
 CidrRange CidrRange::create(const std::string& address, int length) {
   return create(Utility::parseInternetAddress(address), length);
+}
+
+CidrRange CidrRange::create(const envoy::api::v2::CidrRange& cidr) {
+  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
 // static
@@ -231,6 +242,19 @@ IpList::IpList(const std::vector<std::string>& subnets) {
     } else {
       throw EnvoyException(
           fmt::format("invalid ip/mask combo '{}' (format is <ip>/<# mask bits>)", entry));
+    }
+  }
+}
+
+IpList::IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::CidrRange>& cidrs) {
+  for (const envoy::api::v2::CidrRange& entry : cidrs) {
+    CidrRange list_entry = CidrRange::create(entry);
+    if (list_entry.isValid()) {
+      ip_list_.push_back(list_entry);
+    } else {
+      throw EnvoyException(
+          fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
+                      entry.address_prefix(), entry.prefix_len().value()));
     }
   }
 }
