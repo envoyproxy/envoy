@@ -66,11 +66,31 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   // Remove the line feed at the end
   StringUtil::rtrim(proxy_line);
 
-  // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
-  // SOURCE_PORT DESTINATION_PORT.
+  // Parse proxy protocol line with format: PROXY TCP4/TCP6/UNKNOWN SOURCE_ADDRESS
+  // DESTINATION_ADDRESS SOURCE_PORT DESTINATION_PORT.
   const auto line_parts = StringUtil::split(proxy_line, " ", true);
 
-  if (line_parts.size() != 6 || line_parts[0] != "PROXY") {
+  if (line_parts.size() < 2 || line_parts[0] != "PROXY") {
+    throw EnvoyException("failed to read proxy protocol");
+  }
+
+  if (line_parts[1] == "UNKNOWN") {
+    // at this point we know it's a proxy protocol line, so we can remove it from the socket
+    // and continue
+    auto local_address = Envoy::Network::Address::addressFromFd(fd_);
+    auto remote_address = Envoy::Network::Address::peerAddressFromFd(fd_);
+    ListenerImpl& listener = listener_;
+    int fd = fd_;
+    fd_ = -1;
+
+    removeFromList(parent_.connections_);
+
+    listener.newConnection(fd, remote_address, local_address, true);
+    return;
+  }
+
+  // if protocol not UNKNOWN, src and dst adresses have to be present
+  if (line_parts.size() != 6) {
     throw EnvoyException("failed to read proxy protocol");
   }
 
