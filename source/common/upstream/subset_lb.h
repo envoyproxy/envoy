@@ -21,7 +21,8 @@ class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::ups
 public:
   SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets);
+                     Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
+                     const envoy::api::v2::Cluster::RingHashLbConfig lb_ring_hash_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -97,6 +98,7 @@ private:
   const HostSetImpl& emptyHostSet() { CONSTRUCT_ON_FIRST_USE(HostSetImpl); };
 
   const LoadBalancerType lb_type_;
+  const envoy::api::v2::Cluster::RingHashLbConfig lb_ring_hash_config_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;

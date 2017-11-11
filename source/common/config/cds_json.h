@@ -12,6 +12,13 @@ namespace Config {
 class CdsJson {
 public:
   /**
+   * TODO(danielhochman)
+   */
+  static void
+  translateRingHashLbConfig(const Json::Object& json_ring_hash_lb_config,
+                            envoy::api::v2::Cluster::RingHashLbConfig& ring_hash_lb_config);
+
+  /**
    * Translate a v1 JSON health check object to v2 envoy::api::v2::HealthCheck.
    * @param json_health_check source v1 JSON health check object.
    * @param health_check destination v2 envoy::api::v2::HealthCheck.

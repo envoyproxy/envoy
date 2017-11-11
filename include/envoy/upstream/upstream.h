@@ -313,6 +313,11 @@ public:
   virtual LoadBalancerType lbType() const PURE;
 
   /**
+   * TODO(danielhochman)
+   */
+  virtual const envoy::api::v2::Cluster::RingHashLbConfig lbRingHashConfig() const PURE;
+
+  /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
    *         Different filters may handle this situation in different ways. The implementation
    *         of this routine is typically based on randomness and may not return the same answer
