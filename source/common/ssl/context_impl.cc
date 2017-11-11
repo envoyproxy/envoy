@@ -35,6 +35,12 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
   RELEASE_ASSERT(rc == 1);
 
+  rc = SSL_CTX_set_min_proto_version(ctx_.get(), config.minProtocolVersion());
+  RELEASE_ASSERT(rc == 1);
+
+  rc = SSL_CTX_set_max_proto_version(ctx_.get(), config.maxProtocolVersion());
+  RELEASE_ASSERT(rc == 1);
+
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
     throw EnvoyException(
         fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
@@ -91,8 +97,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
           fmt::format("Failed to load private key file {}", config.privateKeyFile()));
     }
   }
-
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv3);
 
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
