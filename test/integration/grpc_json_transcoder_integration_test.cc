@@ -163,7 +163,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
           {":method", "GET"}, {":path", "/shelves/100?"}, {":authority", "host"}},
       "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
       Http::TestHeaderMapImpl{
-          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 100 Not Found"}},
+          {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 100 Not Found"}},
       "");
 }
 
