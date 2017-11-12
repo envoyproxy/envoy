@@ -194,7 +194,7 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
-  Ssl::ServerContext* sslContext() override {
+  Ssl::ServerContext* defaultSslContext() override {
     return tls_contexts_.empty() ? nullptr : tls_contexts_[0].get();
   }
   bool useProxyProto() override { return use_proxy_proto_; }
