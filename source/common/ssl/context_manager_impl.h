@@ -42,7 +42,7 @@ public:
   Ssl::ServerContext* findSslServerContext(const std::string& listener_name,
                                            const std::string& server_name) const override;
   size_t daysUntilFirstCertExpires() const override;
-  void iterateContexts(std::function<void(Context&)> callback) override;
+  void iterateContexts(std::function<void(const Context&)> callback) override;
 
 private:
   Runtime::Loader& runtime_;

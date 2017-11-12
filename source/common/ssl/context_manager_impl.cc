@@ -145,8 +145,8 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
   return ret;
 }
 
-void ContextManagerImpl::iterateContexts(std::function<void(Context&)> callback) {
-  std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
+void ContextManagerImpl::iterateContexts(std::function<void(const Context&)> callback) {
+  std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
   for (Context* context : contexts_) {
     callback(*context);
   }

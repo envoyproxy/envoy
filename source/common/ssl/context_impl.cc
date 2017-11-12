@@ -266,7 +266,7 @@ SslStats ContextImpl::generateStats(Stats::Scope& store) {
                         POOL_HISTOGRAM_PREFIX(store, prefix))};
 }
 
-size_t ContextImpl::daysUntilFirstCertExpires() {
+size_t ContextImpl::daysUntilFirstCertExpires() const {
   int daysUntilExpiration = getDaysUntilExpiration(ca_cert_.get());
   daysUntilExpiration =
       std::min<int>(getDaysUntilExpiration(cert_chain_.get()), daysUntilExpiration);
@@ -276,7 +276,7 @@ size_t ContextImpl::daysUntilFirstCertExpires() {
   return daysUntilExpiration;
 }
 
-int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) {
+int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) const {
   if (cert == nullptr) {
     return std::numeric_limits<int>::max();
   }
@@ -287,7 +287,7 @@ int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) {
   return 0;
 }
 
-std::string ContextImpl::getCaCertInformation() {
+std::string ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
     return "";
   }
@@ -296,7 +296,7 @@ std::string ContextImpl::getCaCertInformation() {
                      getDaysUntilExpiration(ca_cert_.get()));
 }
 
-std::string ContextImpl::getCertChainInformation() {
+std::string ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
     return "";
   }
@@ -305,9 +305,9 @@ std::string ContextImpl::getCertChainInformation() {
                      getDaysUntilExpiration(cert_chain_.get()));
 }
 
-std::string ContextImpl::getSerialNumber(X509* cert) {
+std::string ContextImpl::getSerialNumber(const X509* cert) {
   ASSERT(cert);
-  ASN1_INTEGER* serial_number = X509_get_serialNumber(cert);
+  ASN1_INTEGER* serial_number = X509_get_serialNumber(const_cast<X509*>(cert));
   BIGNUM num_bn;
   BN_init(&num_bn);
   ASN1_INTEGER_to_BN(serial_number, &num_bn);

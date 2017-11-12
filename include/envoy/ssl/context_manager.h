@@ -47,7 +47,7 @@ public:
   /**
    * Iterate through all currently allocated contexts.
    */
-  virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
+  virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
 };
 
 } // namespace Ssl

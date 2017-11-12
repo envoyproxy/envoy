@@ -40,7 +40,7 @@ public:
                               ServerContextConfig& config, bool skip_context_update));
   MOCK_CONST_METHOD2(findSslServerContext, ServerContext*(const std::string&, const std::string&));
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
-  MOCK_METHOD1(iterateContexts, void(std::function<void(Context&)> callback));
+  MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
 };
 
 class MockConnection : public Connection {
@@ -60,9 +60,9 @@ public:
   MockClientContext();
   ~MockClientContext();
 
-  MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
-  MOCK_METHOD0(getCaCertInformation, std::string());
-  MOCK_METHOD0(getCertChainInformation, std::string());
+  MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
+  MOCK_CONST_METHOD0(getCaCertInformation, std::string());
+  MOCK_CONST_METHOD0(getCertChainInformation, std::string());
 };
 
 } // namespace Ssl
