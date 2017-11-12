@@ -108,20 +108,14 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   }
 
   // Try to construct and match wildcard domain.
-  // Theoretically, 5 is the minimum legal domain length for the wildcard certificate (i.e. *.a.b).
-  if (server_name.size() >= 5) {
-    size_t pos = server_name.find('.');
-    if (pos > 0) {
-      size_t rpos = server_name.rfind('.');
-      if (rpos > pos + 1 && rpos != server_name.size() - 1) {
-        std::string wildcard = '*' + server_name.substr(pos);
-        auto listener_map_wildcard = map_wildcard_.find(listener_name);
-        if (listener_map_wildcard != map_wildcard_.end()) {
-          auto ctx = listener_map_wildcard->second.find(wildcard);
-          if (ctx != listener_map_wildcard->second.end()) {
-            return ctx->second;
-          }
-        }
+  size_t pos = server_name.find('.');
+  if (pos > 0 && pos < server_name.size() - 1) {
+    std::string wildcard = '*' + server_name.substr(pos);
+    auto listener_map_wildcard = map_wildcard_.find(listener_name);
+    if (listener_map_wildcard != map_wildcard_.end()) {
+      auto ctx = listener_map_wildcard->second.find(wildcard);
+      if (ctx != listener_map_wildcard->second.end()) {
+        return ctx->second;
       }
     }
   }
