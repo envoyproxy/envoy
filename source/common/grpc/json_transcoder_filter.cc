@@ -347,7 +347,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     return Http::FilterTrailersStatus::Continue;
   }
 
-  Optional<Status::GrpcStatus> grpc_status = Common::getGrpcStatus(trailers);
+  const Optional<Status::GrpcStatus> grpc_status = Common::getGrpcStatus(trailers);
   if (!grpc_status.valid() || grpc_status.value() == Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
