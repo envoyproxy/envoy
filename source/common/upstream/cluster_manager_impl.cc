@@ -625,7 +625,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       break;
     }
     case LoadBalancerType::RingHash: {
-      (void)(cluster->lbRingHashConfig());
       lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
                                          parent.parent_.random_, cluster->lbRingHashConfig()));
       break;
