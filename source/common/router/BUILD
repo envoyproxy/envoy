@@ -42,6 +42,7 @@ envoy_cc_library(
     hdrs = ["config_utility.h"],
     external_deps = ["envoy_rds"],
     deps = [
+        "//include/envoy/http:codes_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",

@@ -444,6 +444,7 @@ public:
   // Http::ConnectionPool::Instance
   MOCK_CONST_METHOD0(protocol, Http::Protocol());
   MOCK_METHOD1(addDrainedCallback, void(DrainedCb cb));
+  MOCK_METHOD0(closeConnections, void());
   MOCK_METHOD2(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
                                        Http::ConnectionPool::Callbacks& callbacks));
 

@@ -65,8 +65,9 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   }
 }
 
-DrainManagerPtr ProdListenerComponentFactory::createDrainManager() {
-  return DrainManagerPtr{new DrainManagerImpl(server_)};
+DrainManagerPtr
+ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::DrainType drain_type) {
+  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
@@ -85,7 +86,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
       workers_started_(workers_started), hash_(hash),
-      local_drain_manager_(parent.factory_.createDrainManager()) {
+      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() == 1);

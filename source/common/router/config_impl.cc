@@ -242,7 +242,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      redirect_response_code_(
+          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -694,7 +696,7 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
     for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
       } else if (domain.size() > 0 && '*' == domain[0]) {

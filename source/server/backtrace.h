@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/common/logger.h"
+#include <backward.hpp>
 
-#include "backward.hpp"
+#include "common/common/logger.h"
 
 namespace Envoy {
 #define BACKTRACE_LOG()                                                                            \

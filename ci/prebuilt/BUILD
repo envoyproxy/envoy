@@ -10,12 +10,6 @@ cc_library(
 )
 
 cc_library(
-    name = "backward",
-    hdrs = ["thirdparty_build/include/backward.hpp"],
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "crypto",
     srcs = ["thirdparty_build/lib/libcrypto.a"],
     hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
@@ -36,13 +30,6 @@ cc_library(
 )
 
 cc_library(
-    name = "http_parser",
-    srcs = ["thirdparty_build/lib/libhttp_parser.a"],
-    hdrs = glob(["thirdparty_build/include/http_parser.h"]),
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "luajit",
     srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
     hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
@@ -59,21 +46,9 @@ cc_library(
 )
 
 cc_library(
-    name = "rapidjson",
-    hdrs = glob(["thirdparty/rapidjson/include/**/*.h"]),
-    includes = ["thirdparty/rapidjson/include"],
-)
-
-cc_library(
     name = "ssl",
     srcs = ["thirdparty_build/lib/libssl.a"],
     deps = [":crypto"],
-)
-
-cc_library(
-    name = "tclap",
-    hdrs = glob(["thirdparty/tclap/include/**/*.h"]),
-    includes = ["thirdparty/tclap/include"],
 )
 
 cc_library(
@@ -81,13 +56,6 @@ cc_library(
     srcs = ["thirdparty_build/lib/libtcmalloc_and_profiler.a"],
     hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
     strip_include_prefix = "thirdparty_build/include",
-)
-
-cc_library(
-    name = "xxhash",
-    srcs = ["thirdparty_build/lib/xxhash.a"],
-    hdrs = ["thirdparty_build/include/xxhash.h"],
-    includes = ["thirdparty_build/include"],
 )
 
 cc_library(

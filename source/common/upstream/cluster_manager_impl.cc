@@ -351,6 +351,23 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
         postThreadLocalClusterUpdate(primary_cluster_reference, hosts_added, hosts_removed);
       });
 
+  if (new_cluster->healthChecker() != nullptr) {
+    new_cluster->healthChecker()->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, bool changed_state) {
+          if (changed_state && host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+            postThreadLocalHealthFailure(host);
+          }
+        });
+  }
+
+  if (new_cluster->outlierDetector() != nullptr) {
+    new_cluster->outlierDetector()->addChangedStateCb([this](HostSharedPtr host) {
+      if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+        postThreadLocalHealthFailure(host);
+      }
+    });
+  }
+
   // emplace() will do nothing if the key already exists. Always erase first.
   size_t num_erased = primary_clusters_.erase(primary_cluster_reference.info()->name());
   primary_clusters_.emplace(
@@ -399,7 +416,6 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
     return;
   }
 
-  const std::string& name = primary_cluster.info()->name();
   HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(primary_cluster.hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(
       new std::vector<HostSharedPtr>(primary_cluster.healthyHosts()));
@@ -408,12 +424,21 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
   HostListsConstSharedPtr healthy_hosts_per_locality_copy(
       new std::vector<std::vector<HostSharedPtr>>(primary_cluster.healthyHostsPerLocality()));
 
-  tls_->runOnAllThreads([this, name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-                         healthy_hosts_per_locality_copy, hosts_added, hosts_removed]() -> void {
-    ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-        healthy_hosts_per_locality_copy, hosts_added, hosts_removed, *tls_);
-  });
+  tls_->runOnAllThreads([
+    this, name = primary_cluster.info()->name(), hosts_copy, healthy_hosts_copy,
+    hosts_per_locality_copy, healthy_hosts_per_locality_copy, hosts_added, hosts_removed
+  ]()
+                            ->void {
+                              ThreadLocalClusterManagerImpl::updateClusterMembership(
+                                  name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+                                  healthy_hosts_per_locality_copy, hosts_added, hosts_removed,
+                                  *tls_);
+                            });
+}
+
+void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
+  tls_->runOnAllThreads(
+      [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
 Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
@@ -548,6 +573,28 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
       std::move(healthy_hosts_per_locality), hosts_added, hosts_removed);
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
+    const HostSharedPtr& host, ThreadLocal::Slot& tls) {
+
+  // Close all HTTP connection pool connections in the case of a host health failure. If outlier/
+  // health is due to ECMP flow hashing issues for example, a new set of connections might do
+  // better.
+  // TODO(mattklein123): This function is currently very specific, but in the future when we do
+  // more granular host set changes, we should be able to capture single host changes and make them
+  // more targeted.
+  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
+  const auto& container = config.host_http_conn_pool_map_.find(host);
+  if (container != config.host_http_conn_pool_map_.end()) {
+    for (const Http::ConnectionPool::InstancePtr& pool : container->second.pools_) {
+      if (pool == nullptr) {
+        continue;
+      }
+
+      pool->closeConnections();
+    }
+  }
+}
+
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster)
     : parent_(parent), cluster_info_(cluster),
@@ -613,6 +660,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
+    ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return nullptr;
   }

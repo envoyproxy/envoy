@@ -39,7 +39,8 @@ TEST(RequestHeaderFormatterTest, TestFormatWithClientIpVariable) {
 
 TEST(RequestHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
-  ON_CALL(request_info, protocol()).WillByDefault(Return(Envoy::Http::Protocol::Http11));
+  Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
   const std::string variable = "PROTOCOL";
   RequestHeaderFormatter requestHeaderFormatter(variable, false);
   const std::string formatted_string = requestHeaderFormatter.format(request_info);

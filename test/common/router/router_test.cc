@@ -1405,9 +1405,24 @@ TEST_F(RouterTest, AltStatName) {
 TEST_F(RouterTest, Redirect) {
   MockRedirectEntry redirect;
   EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(redirect, redirectResponseCode()).WillOnce(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, RedirectFound) {
+  MockRedirectEntry redirect;
+  EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(redirect, redirectResponseCode()).WillOnce(Return(Http::Code::Found));
+  EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);

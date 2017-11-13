@@ -52,6 +52,7 @@ class SslRedirector : public RedirectEntry {
 public:
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  Http::Code redirectResponseCode() const override { return Http::Code::MovedPermanently; }
 };
 
 class SslRedirectRoute : public Route {
@@ -330,6 +331,7 @@ public:
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  Http::Code redirectResponseCode() const override { return redirect_response_code_; }
 
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
@@ -475,6 +477,7 @@ private:
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
+  const Http::Code redirect_response_code_;
 };
 
 /**
