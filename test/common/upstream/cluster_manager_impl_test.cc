@@ -345,6 +345,25 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
       "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
 }
 
+TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [{
+      "name": "redis_cluster",
+      "lb_type": "ring_hash",
+      "ring_hash_lb_config": {
+        "minimum_ring_size": 125,
+        "use_std_hash": true
+      },
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
+    }]
+  }
+  )EOF";
+  create(parseBootstrapFromJson(json));
+}
+
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string json = R"EOF(
   {
