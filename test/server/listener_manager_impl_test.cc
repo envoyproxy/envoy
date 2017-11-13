@@ -48,9 +48,11 @@ public:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(bool need_init) {
+  ListenerHandle* expectListenerCreate(
+      bool need_init,
+      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
     ListenerHandle* raw_listener = new ListenerHandle();
-    EXPECT_CALL(listener_factory_, createDrainManager_())
+    EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
         .WillOnce(Invoke(
@@ -250,6 +252,28 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.127.0.0.1_1234.foo").value());
 }
 
+TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
+  InSequence s;
+
+  // Add foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 10000 }
+    filter_chains:
+    - filters:
+    drain_type: MODIFY_ONLY
+  )EOF";
+
+  ListenerHandle* listener_foo =
+      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml)));
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   InSequence s;
 
@@ -258,7 +282,8 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1234",
-    "filters": []
+    "filters": [],
+    "drain_type": "default"
   }
   )EOF";
 
@@ -272,11 +297,13 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   {
     "name": "foo",
     "address": "tcp://127.0.0.1:1235",
-    "filters": []
+    "filters": [],
+    "drain_type": "modify_only"
   }
   )EOF";
 
-  ListenerHandle* listener_foo_different_address = expectListenerCreate(false);
+  ListenerHandle* listener_foo_different_address =
+      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_different_address_json)),

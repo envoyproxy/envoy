@@ -1171,7 +1171,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:respond(
-        {[":status"] = "403"},
+        {[":status"] = "503"},
         "nope")
 
       -- Should not run
@@ -1184,7 +1184,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   setup(SCRIPT);
 
   TestHeaderMapImpl request_headers{{":path", "/"}};
-  TestHeaderMapImpl expected_headers{{":status", "403"}, {"content-length", "4"}};
+  TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
@@ -1205,7 +1205,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseBadStatus) {
 
   TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
-                                  StrEq("[string \"...\"]:3: :status must be between 100-599")));
+                                  StrEq("[string \"...\"]:3: :status must be between 200-599")));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 

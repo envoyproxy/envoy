@@ -34,6 +34,7 @@ public:
 
   // Router::Config
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD0(redirectResponseCode, Http::Code());
 };
 
 class TestCorsPolicy : public CorsPolicy {

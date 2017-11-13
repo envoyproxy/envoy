@@ -46,6 +46,13 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     UNREFERENCED_PARAMETER(status);
   }
 
+  const std::string drain_type = json_listener.getString("drain_type", "default");
+  if (drain_type == "modify_only") {
+    listener.set_drain_type(envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  } else {
+    ASSERT(drain_type == "default");
+  }
+
   JSON_UTIL_SET_BOOL(json_listener, *filter_chain, use_proxy_proto);
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);

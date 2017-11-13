@@ -141,11 +141,13 @@ public:
                  const bool& is_reset, Code response_code, const std::string& body_text);
 
   /**
-   * Send a redirect response (301).
+   * Send a redirect response.
    * @param callbacks supplies the filter callbacks to use.
    * @param new_path supplies the redirect target.
+   * @param response_code supplies the response code to use.
    */
-  static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path);
+  static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
+                           Code response_code);
 
   /**
    * Retrieves the last address in x-forwarded-for header. If it isn't set, returns empty string.

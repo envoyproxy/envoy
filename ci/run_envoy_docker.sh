@@ -22,4 +22,5 @@ fi
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm -t -i -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
-  -v "$PWD":/source -e NUM_CPUS "${IMAGE_NAME}":"${IMAGE_ID}" /bin/bash -lc "cd source && $*"
+  -v "$PWD":/source -e NUM_CPUS --cap-add SYS_PTRACE "${IMAGE_NAME}":"${IMAGE_ID}" \
+  /bin/bash -lc "cd source && $*"
