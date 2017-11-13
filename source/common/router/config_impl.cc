@@ -33,7 +33,7 @@ namespace Router {
 namespace {
 
 Router::HeaderAddition
-make_header_to_add(const envoy::api::v2::HeaderValueOption& header_value_option) {
+makeHeaderToAdd(const envoy::api::v2::HeaderValueOption& header_value_option) {
   return Router::HeaderAddition{Http::LowerCaseString(header_value_option.header().key()),
                                 header_value_option.header().value(),
                                 PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true)};
@@ -300,7 +300,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   for (const auto& header_value_option : route.route().request_headers_to_add()) {
-    request_headers_to_add_.push_back(make_header_to_add(header_value_option));
+    request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
@@ -615,7 +615,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
   }
 
   for (const auto& header_value_option : virtual_host.request_headers_to_add()) {
-    request_headers_to_add_.push_back(make_header_to_add(header_value_option));
+    request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
   for (const auto& route : virtual_host.routes()) {
@@ -798,7 +798,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
   }
 
   for (const auto& header_value_option : config.response_headers_to_add()) {
-    response_headers_to_add_.push_back(make_header_to_add(header_value_option));
+    response_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
   for (const std::string& header : config.response_headers_to_remove()) {
@@ -806,7 +806,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
   }
 
   for (const auto& header_value_option : config.request_headers_to_add()) {
-    request_headers_to_add_.push_back(make_header_to_add(header_value_option));
+    request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
   request_headers_parser_ = RequestHeaderParser::parse(config.request_headers_to_add());
 }
