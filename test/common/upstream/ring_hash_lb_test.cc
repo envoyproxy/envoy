@@ -125,8 +125,8 @@ TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
   cluster_.healthy_hosts_ = cluster_.hosts_;
   cluster_.runCallbacks({}, {});
 
+  // use_std_hash defaults to true so don't set it here.
   config_.mutable_minimum_ring_size()->set_value(12);
-  config_.mutable_deprecated_v1()->mutable_use_std_hash()->set_value(true);
   RingHashLoadBalancer lb{cluster_, stats_, runtime_, random_, config_};
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
