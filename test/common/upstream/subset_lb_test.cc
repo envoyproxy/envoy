@@ -638,8 +638,8 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   cluster_.healthy_hosts_ = cluster_.hosts_;
   cluster_.healthy_hosts_per_locality_ = cluster_.hosts_per_locality_;
 
-  lb_.reset(
-      new SubsetLoadBalancer(lb_type_, cluster_, nullptr, stats_, runtime_, random_, subset_info_, ring_hash_lb_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, cluster_, nullptr, stats_, runtime_, random_,
+                                   subset_info_, ring_hash_lb_config_));
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 

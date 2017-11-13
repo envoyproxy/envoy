@@ -313,7 +313,7 @@ public:
   virtual LoadBalancerType lbType() const PURE;
 
   /**
-   * TODO(danielhochman)
+   * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
   virtual const envoy::api::v2::Cluster::RingHashLbConfig lbRingHashConfig() const PURE;
 

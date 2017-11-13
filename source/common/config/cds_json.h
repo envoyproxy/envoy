@@ -12,7 +12,9 @@ namespace Config {
 class CdsJson {
 public:
   /**
-   * TODO(danielhochman)
+   * Translate a v1 JSON ring hash config to envoy::api::v2::Cluster::RingHashLbConfig.
+   * @param json_ring_hash_lb_config source v1 JSON ring hash config object.
+   * @param ring_hash_lb_config destination v2 envoy::api::v2::Cluster::RingHashLbConfig.
    */
   static void
   translateRingHashLbConfig(const Json::Object& json_ring_hash_lb_config,

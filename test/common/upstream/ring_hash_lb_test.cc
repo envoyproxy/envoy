@@ -112,8 +112,9 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
 }
 
 #ifndef __APPLE__
-// Run similar tests with the default hash algorithm for GCC 5. After v1 is deprecated this test
-// can be deleted since std::hash will no longer be in use.
+// Run similar tests with the default hash algorithm for GCC 5.
+// TODO(danielhochman): After v1 is deprecated this test can be deleted since std::hash will no
+// longer be in use.
 TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
   cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
                      makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
@@ -198,7 +199,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   // :82  | 8241336090459785962
   // :82  | 12882406409176325258
   // :81  | 16064866803292627174
-  
+
   {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(cluster_.hosts_[0], lb.chooseHost(&context));
