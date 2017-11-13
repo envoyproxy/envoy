@@ -48,10 +48,17 @@ bool CidrRange::operator==(const CidrRange& other) const {
   if (length_ != other.length_ || length_ == -1) {
     return false;
   }
-  if (version() == IpVersion::v4) {
-    return other.version() == IpVersion::v4 && ipv4()->address() == other.ipv4()->address();
+
+  if (address_ == nullptr || other.address_ == nullptr) {
+    return false;
+  }
+
+  if (address_->ip()->version() == IpVersion::v4) {
+    return other.address_->ip()->version() == IpVersion::v4 &&
+           address_->ip()->ipv4()->address() == other.address_->ip()->ipv4()->address();
   } else {
-    return other.version() == IpVersion::v6 && ipv6()->address() == other.ipv6()->address();
+    return other.address_->ip()->version() == IpVersion::v6 &&
+           address_->ip()->ipv6()->address() == other.address_->ip()->ipv6()->address();
   }
 }
 
@@ -62,32 +69,11 @@ const Ip* CidrRange::ip() const {
   return nullptr;
 }
 
-const Ipv4* CidrRange::ipv4() const {
-  if (address_ != nullptr) {
-    return address_->ip()->ipv4();
-  }
-  return nullptr;
-}
-
-const Ipv6* CidrRange::ipv6() const {
-  if (address_ != nullptr) {
-    return address_->ip()->ipv6();
-  }
-  return nullptr;
-}
-
 int CidrRange::length() const { return length_; }
-
-IpVersion CidrRange::version() const {
-  if (address_ != nullptr) {
-    return address_->ip()->version();
-  }
-  return IpVersion::v4;
-}
 
 bool CidrRange::isInRange(const Instance& address) const {
   if (address_ == nullptr || !isValid() || address.type() != Type::Ip ||
-      version() != address.ip()->version()) {
+      address_->ip()->version() != address.ip()->version()) {
     return false;
   }
 
@@ -99,7 +85,7 @@ bool CidrRange::isInRange(const Instance& address) const {
   switch (address.ip()->version()) {
   case IpVersion::v4:
     if (ntohl(address.ip()->ipv4()->address()) >> (32 - length_) ==
-        ntohl(ipv4()->address()) >> (32 - length_)) {
+        ntohl(address_->ip()->ipv4()->address()) >> (32 - length_)) {
       return true;
     }
     break;
@@ -110,9 +96,9 @@ bool CidrRange::isInRange(const Instance& address) const {
       if (length < 8) {
         // Compare relevant bits.
         return (address.ip()->ipv6()->address()[i] >> (8 - length) ==
-                ipv6()->address()[i] >> (8 - length));
+                address_->ip()->ipv6()->address()[i] >> (8 - length));
       } else {
-        if (address.ip()->ipv6()->address()[i] == ipv6()->address()[i]) {
+        if (address.ip()->ipv6()->address()[i] == address_->ip()->ipv6()->address()[i]) {
           if (length == 8) {
             return true;
           } else {

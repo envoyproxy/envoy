@@ -48,27 +48,12 @@ public:
   const Ip* ip() const;
 
   /**
-   * @return Ipv4 address data IFF length >= 0 and version() == IpVersion::v4, otherwise nullptr.
-   */
-  const Ipv4* ipv4() const;
-
-  /**
-   * @return Ipv6 address data IFF length >= 0 and version() == IpVersion::v6, otherwise nullptr.
-   */
-  const Ipv6* ipv6() const;
-
-  /**
    * TODO(jamessynge) Consider making this Optional<int> length, or modifying the create() methods
    *                  below to return Optional<CidrRange> (the latter is probably better).
    * @return the number of bits of the address that are included in the mask. -1 if uninitialized
    *         or invalid, else in the range 0 to 32 for IPv4, and 0 to 128 for IPv6.
    */
   int length() const;
-
-  /**
-   * @return the version of IP address.
-   */
-  IpVersion version() const;
 
   /**
    * @return true if the address argument is in the range of this object, false if not, including
