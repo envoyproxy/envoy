@@ -68,9 +68,8 @@ jobs:
      working_directory: /source
      steps:
        - checkout
-       - run: ci/do_circle_ci.sh docs
        - add_ssh_keys
-       - run: docs/publish.sh
+       - run: ci/do_circle_ci.sh docs
    mac:
      macos:
        xcode: "8.3.3"
@@ -93,5 +92,8 @@ workflows:
       - coverage
       - format
       - build_image
-      - docs
+      - docs:
+          filters:
+            tags:
+              only: /^v.*/
       - mac
