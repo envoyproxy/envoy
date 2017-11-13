@@ -92,7 +92,7 @@ workflows:
       - coverage
       - format
       - build_image
-      - docs
+      - docs:
           filters:
             tags:
               only: /^v.*/
