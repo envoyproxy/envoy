@@ -53,15 +53,15 @@ public:
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
-    request_headers_.iterate(header_map_callback, static_cast<void*>(&f));
+    request_headers_.iterate(headerMapCallback, static_cast<void*>(&f));
     return {};
   }
 
 private:
   const Http::HeaderMap& request_headers_;
 
-  static Http::HeaderMap::Iterate header_map_callback(const Http::HeaderEntry& header,
-                                                      void* context) {
+  static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
+                                                    void* context) {
     OpenTracingCb* callback = static_cast<OpenTracingCb*>(context);
     opentracing::string_view key{header.key().c_str(), header.key().size()};
     opentracing::string_view value{header.value().c_str(), header.value().size()};
