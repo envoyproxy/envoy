@@ -6,7 +6,7 @@ To get started building Envoy locally, see the [Bazel quick start](https://githu
 
 Below is a list of additional documentation to aid the development process:
 
-- [General build and installation documentation](https://envoyproxy.github.io/envoy/install/install.html)
+- [General build and installation documentation](https://www.envoyproxy.io/docs/envoy/latest/install/install)
 
 - [Building and testing Envoy with Bazel](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md)
 
