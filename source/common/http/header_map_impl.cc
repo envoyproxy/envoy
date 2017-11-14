@@ -370,42 +370,12 @@ void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& 
   insertByKey(std::move(ref_key), std::move(ref_value));
 }
 
-void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, uint64_t value) {
-  HeaderString ref_key(key);
-  HeaderString new_value;
-  new_value.setInteger(value);
-  remove(key);
-  insertByKey(std::move(ref_key), std::move(new_value));
-}
-
 void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::string& value) {
   HeaderString ref_key(key);
   HeaderString new_value;
   new_value.setCopy(value.c_str(), value.size());
   remove(key);
   insertByKey(std::move(ref_key), std::move(new_value));
-  ASSERT(new_value.empty());
-}
-
-void HeaderMapImpl::setCopy(const LowerCaseString& key, uint64_t value) {
-  HeaderString new_key;
-  new_key.setCopy(key.get().c_str(), key.get().size());
-  HeaderString new_value;
-  new_value.setInteger(value);
-  remove(key);
-  insertByKey(std::move(new_key), std::move(new_value));
-  ASSERT(new_key.empty());
-  ASSERT(new_value.empty());
-}
-
-void HeaderMapImpl::setCopy(const LowerCaseString& key, const std::string& value) {
-  HeaderString new_key;
-  new_key.setCopy(key.get().c_str(), key.get().size());
-  HeaderString new_value;
-  new_value.setCopy(value.c_str(), value.size());
-  remove(key);
-  insertByKey(std::move(new_key), std::move(new_value));
-  ASSERT(new_key.empty());
   ASSERT(new_value.empty());
 }
 

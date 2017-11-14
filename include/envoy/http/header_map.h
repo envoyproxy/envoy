@@ -361,19 +361,6 @@ public:
   virtual void setReference(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
-   * Set a header with a reference key in the map. The key MUST point to data that will live beyond
-   * the lifetime of any request/response using the string (since a codec may optimize for zero
-   * copy). The value will be copied.
-   *
-   * Calling setReferenceKey multiple times for the same header will result in only the last header
-   * being present in the HeaderMap.
-   *
-   * @param key specifies the name of the header to set; it WILL NOT be copied.
-   * @param value specifies the value of the header to set; it WILL be copied.
-   */
-  virtual void setReferenceKey(const LowerCaseString& key, uint64_t value) PURE;
-
-  /**
    * Set a header with a reference key in the map. The key MUST point to point to data that will
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
@@ -385,28 +372,6 @@ public:
    * @param value specifies the value of the header to set; it WILL be copied.
    */
   virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
-
-  /**
-   * Set a header by copying both the header key and the value.
-   *
-   * Calling setCopy multiple times for the same header will result in only the last header being
-   * present in the HeaderMap.
-   *
-   * @param key specifies the name of the header to set; it WILL be copied.
-   * @param value specifies the value of the header to set; it WILL be copied.
-   */
-  virtual void setCopy(const LowerCaseString& key, uint64_t value) PURE;
-
-  /**
-   * Set a header by copying both the header key and the value.
-   *
-   * Calling setCopy multiple times for the same header will result in only the last header being
-   * present in the HeaderMap.
-   *
-   * @param key specifies the name of the header to set; it WILL be copied.
-   * @param value specifies the value of the header to set; it WILL be copied.
-   */
-  virtual void setCopy(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
    * @return uint64_t the approximate size of the header map in bytes.
