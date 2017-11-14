@@ -98,8 +98,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       (config.filter_chains().size() == 1 &&
        config.filter_chains()[0].filter_chain_match().sni_domains().empty());
 
-  size_t has_tls = 0;
-  size_t has_stk = 0;
+  uint32_t has_tls = 0;
+  uint32_t has_stk = 0;
   for (const auto& filter_chain : config.filter_chains()) {
     std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
                                          filter_chain.filter_chain_match().sni_domains().end());
