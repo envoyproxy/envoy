@@ -9,6 +9,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/config/well_known_names.h"
+
+#include "api/filter/http/health_check.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -17,7 +21,20 @@ class HealthCheckFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object& config, const std::string&,
                                           FactoryContext& context) override;
-  std::string name() override { return "envoy.health_check"; }
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                   const std::string& stats_prefix,
+                                                   FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::HealthCheck()};
+  }
+
+  std::string name() override { return Config::HttpFilterNames::get().HEALTH_CHECK; }
+
+private:
+  HttpFilterFactoryCb
+  createHealthCheckFilter(const envoy::api::v2::filter::http::HealthCheck& health_check,
+                          const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration
