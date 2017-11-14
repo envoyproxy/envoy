@@ -755,8 +755,8 @@ public:
                                                    dispatcher_, runtime_, random_));
   }
 
-    void setupDataDontReuseConnection() {
-      std::string json = R"EOF(
+  void setupDataDontReuseConnection() {
+    std::string json = R"EOF(
       {
         "type": "tcp",
         "timeout_ms": 1000,
@@ -773,8 +773,8 @@ public:
       }
       )EOF";
 
-      health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
-                                                     dispatcher_, runtime_, random_));
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                   dispatcher_, runtime_, random_));
   }
 
   void expectSessionCreate() {
