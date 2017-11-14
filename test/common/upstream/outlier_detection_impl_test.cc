@@ -314,13 +314,24 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   cluster_.runCallbacks({}, cluster_.hosts_);
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(3UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
-  EXPECT_EQ(2UL, cluster_.info_->stats_store_
-                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
-                     .value());
+  // Check preserves deprecated counter behaviour
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
-      1UL,
-      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
+      2UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_enforced_total").value());
+  EXPECT_EQ(2UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_detected_consecutive_gateway_failure")
+                     .value());
+  EXPECT_EQ(2UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_gateway_failure")
+                     .value());
+
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_detected_consecutive_5xx")
+                     .value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_5xx")
+                     .value());
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
@@ -394,12 +405,25 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   cluster_.runCallbacks({}, cluster_.hosts_);
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  // Deprecated counter, check we're preserving old behaviour
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      2UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_enforced_total").value());
   EXPECT_EQ(
       1UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
   EXPECT_EQ(1UL, cluster_.info_->stats_store_
-                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .counter("outlier_detection.ejections_detected_consecutive_5xx")
+                     .value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_5xx")
+                     .value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_detected_consecutive_gateway_failure")
+                     .value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_gateway_failure")
                      .value());
 }
 
@@ -584,12 +608,24 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      0UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_enforced_total").value());
   EXPECT_EQ(
       1UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
   EXPECT_EQ(1UL, cluster_.info_->stats_store_
-                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .counter("outlier_detection.ejections_detected_consecutive_5xx")
+                     .value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_5xx")
+                     .value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_detected_consecutive_gateway_failure")
+                     .value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_gateway_failure")
                      .value());
 }
 

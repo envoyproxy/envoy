@@ -147,8 +147,14 @@ private:
   GAUGE  (ejections_active)                                                                        \
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_consecutive_5xx)                                                               \
-  COUNTER(ejections_consecutive_gateway_failure)                                                   \
-  COUNTER(ejections_success_rate)
+  COUNTER(ejections_success_rate)                                                                  \
+  COUNTER(ejections_enforced_total)                                                                \
+  COUNTER(ejections_detected_consecutive_5xx)                                                      \
+  COUNTER(ejections_enforced_consecutive_5xx)                                                      \
+  COUNTER(ejections_detected_success_rate)                                                         \
+  COUNTER(ejections_enforced_success_rate)                                                         \
+  COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
+  COUNTER(ejections_enforced_consecutive_gateway_failure)
 // clang-format on
 
 /**
@@ -230,6 +236,7 @@ private:
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
   bool enforceEjection(EjectionType type);
+  void updateEnforcedEjectionStats(EjectionType type);
   void processSuccessRateEjections();
 
   DetectorConfig config_;

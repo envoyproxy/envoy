@@ -208,15 +208,34 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
   NOT_REACHED;
 }
 
+void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
+  stats_.ejections_enforced_total_.inc();
+  switch (type) {
+  case EjectionType::SuccessRate:
+    stats_.ejections_enforced_success_rate_.inc();
+    break;
+  case EjectionType::Consecutive5xx:
+    stats_.ejections_enforced_consecutive_5xx_.inc();
+    break;
+  case EjectionType::ConsecutiveGatewayFailure:
+    stats_.ejections_enforced_consecutive_gateway_failure_.inc();
+    break;
+  }
+}
+
 void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_monitors_.size();
   if (ejected_percent < max_ejection_percent) {
-    stats_.ejections_total_.inc();
+    if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRate) {
+      // Deprecated counter, preserving old behaviour until it's removed.
+      stats_.ejections_total_.inc();
+    }
     if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
+      updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.currentTime());
       runCallbacks(host);
 
@@ -281,12 +300,13 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
   // error responses even if the monitor is not charged with an interleaved non-error code.
   switch (type) {
   case EjectionType::Consecutive5xx:
-    stats_.ejections_consecutive_5xx_.inc();
+    stats_.ejections_consecutive_5xx_.inc(); // Deprecated
+    stats_.ejections_detected_consecutive_5xx_.inc();
     ejectHost(host, EjectionType::Consecutive5xx);
     host_monitors_[host]->resetConsecutive5xx();
     break;
   case EjectionType::ConsecutiveGatewayFailure:
-    stats_.ejections_consecutive_gateway_failure_.inc();
+    stats_.ejections_detected_consecutive_gateway_failure_.inc();
     ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
     host_monitors_[host]->resetConsecutiveGatewayFailure();
     break;
@@ -371,7 +391,8 @@ void DetectorImpl::processSuccessRateEjections() {
     success_rate_ejection_threshold_ = ejection_pair.ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold_) {
-        stats_.ejections_success_rate_.inc();
+        stats_.ejections_success_rate_.inc(); // Deprecated
+        stats_.ejections_detected_success_rate_.inc();
         ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
       }
     }
