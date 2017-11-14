@@ -238,7 +238,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
-    _com_github_opentracing_opentracing_cpp()
+    _io_opentracing_cpp()
     _com_github_lightstep_lightstep_tracer_cpp()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
@@ -313,36 +313,22 @@ def _com_github_gcovr_gcovr():
         actual = "@com_github_gcovr_gcovr//:gcovr",
     )
 
-def _com_github_opentracing_opentracing_cpp():
-    location = REPOSITORY_LOCATIONS[
-        "com_github_opentracing_opentracing_cpp"]
-    native.git_repository(
-        name = "io_opentracing_cpp",
-        remote = location["remote"],
-        commit = location["commit"],
-    )
+def _io_opentracing_cpp():
+    _repository_impl("io_opentracing_cpp")
     native.bind(
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
     )
 
 def _com_github_lightstep_lightstep_tracer_cpp():
-    location = REPOSITORY_LOCATIONS[
-        "com_github_lightstep_lightstep_tracer_cpp"]
-    native.git_repository(
-        name = "com_lightstep_tracer_cpp",
-        remote = location["remote"],
-        commit = location["commit"],
-    )
-    native.new_git_repository(
+    _repository_impl("com_github_lightstep_lightstep_tracer_cpp")
+    _repository_impl(
         name = "lightstep_vendored_googleapis",
-        remote = location["googleapis"]["remote"],
-        commit = location["googleapis"]["commit"],
-        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
+        build_file = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
     )
     native.bind(
         name = "lightstep",
-        actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
+        actual = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep_tracer",
     )
 
 def _com_github_tencent_rapidjson():

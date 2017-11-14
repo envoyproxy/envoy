@@ -4,6 +4,8 @@ cc_library(
     name = "all_external",
     srcs = [":empty.cc"],
     deps = [
+        "@io_opentracing_cpp//:opentracing",
+        "@com_github_lightstep_lightstep_tracer_cpp//:lightstep_tracer",
         "@com_google_googletest//:gtest",
     ],
 )
