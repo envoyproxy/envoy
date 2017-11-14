@@ -45,11 +45,11 @@ private:
   const std::string private_key_file_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::string verify_certificate_hash_;
-  unsigned min_protocol_version_;
-  unsigned max_protocol_version_;
+  const unsigned min_protocol_version_;
+  const unsigned max_protocol_version_;
 
-  unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
-                               unsigned default_version);
+  static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
+                                      unsigned default_version);
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
