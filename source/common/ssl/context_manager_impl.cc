@@ -36,7 +36,7 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
   } else {
     auto& listener_map_wildcard = map_wildcard_[listener_name];
     for (const auto& name : server_names) {
-      if (name.size() > 2 && name[0] == '*' && name[1] == '.') {
+      if (isWildcardServerName(name)) {
         auto ctx = listener_map_wildcard.find(name);
         if (ctx != listener_map_wildcard.end() && ctx->second == context) {
           listener_map_wildcard.erase(ctx);
@@ -64,6 +64,10 @@ ClientContextPtr ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
+bool ContextManagerImpl::isWildcardServerName(const std::string& name) {
+  return name.size() > 2 && name[0] == '*' && name[1] == '.';
+}
+
 ServerContextPtr ContextManagerImpl::createSslServerContext(
     const std::string& listener_name, const std::vector<std::string>& server_names,
     Stats::Scope& scope, ServerContextConfig& config, bool skip_context_update) {
@@ -77,7 +81,7 @@ ServerContextPtr ContextManagerImpl::createSslServerContext(
     map_exact_[listener_name][EMPTY_STRING] = context.get();
   } else {
     for (const auto& name : server_names) {
-      if (name.size() > 2 && name[0] == '*' && name[1] == '.') {
+      if (isWildcardServerName(name)) {
         map_wildcard_[listener_name][name] = context.get();
       } else {
         map_exact_[listener_name][name] = context.get();
