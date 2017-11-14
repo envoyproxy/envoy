@@ -834,7 +834,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
 
   Buffer::OwnedImpl response;
   add_uint8(response, 2);
