@@ -755,6 +755,28 @@ public:
                                                    dispatcher_, runtime_, random_));
   }
 
+    void setupDataDontReuseConnection() {
+      std::string json = R"EOF(
+      {
+        "type": "tcp",
+        "timeout_ms": 1000,
+        "interval_ms": 1000,
+        "unhealthy_threshold": 2,
+        "healthy_threshold": 2,
+        "reuse_connection": false,
+        "send": [
+          {"binary": "01"}
+        ],
+        "receive": [
+          {"binary": "02"}
+        ]
+      }
+      )EOF";
+
+      health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                     dispatcher_, runtime_, random_));
+  }
+
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     timeout_timer_ = new Event::MockTimer(&dispatcher_);
@@ -795,6 +817,30 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   Buffer::OwnedImpl response;
   add_uint8(response, 2);
   read_filter_->onData(response);
+}
+
+TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
+  InSequence s;
+
+  setupDataDontReuseConnection();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_)).Times(1);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+
+  Buffer::OwnedImpl response;
+  add_uint8(response, 2);
+  read_filter_->onData(response);
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
 }
 
 TEST_F(TcpHealthCheckerImplTest, Timeout) {
