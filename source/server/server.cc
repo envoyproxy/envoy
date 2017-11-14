@@ -300,19 +300,19 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
 
   // Setup signals.
   sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
-    ENVOY_LOG(info, "caught SIGTERM");
+    ENVOY_LOG(warn, "caught SIGTERM");
     shutdown_ = true;
     hot_restart.terminateParent();
     dispatcher.exit();
   });
 
   sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
-    ENVOY_LOG(info, "caught SIGUSR1");
+    ENVOY_LOG(warn, "caught SIGUSR1");
     access_log_manager.reopen();
   });
 
   sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
-    ENVOY_LOG(info, "caught and eating SIGHUP. See documentation for how to hot restart.");
+    ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
@@ -378,12 +378,12 @@ void InstanceImpl::shutdown() {
 }
 
 void InstanceImpl::shutdownAdmin() {
-  ENVOY_LOG(info, "shutting down admin due to child startup");
+  ENVOY_LOG(warn, "shutting down admin due to child startup");
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->mutable_socket().close();
 
-  ENVOY_LOG(info, "terminating parent process");
+  ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();
 }
 
