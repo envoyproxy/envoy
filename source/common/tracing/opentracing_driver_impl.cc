@@ -119,9 +119,7 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
 SpanPtr OpenTracingSpan::spawnChild(const Config&, const std::string& name, SystemTime start_time) {
   std::unique_ptr<opentracing::Span> ot_span = span_->tracer().StartSpan(
       name, {opentracing::ChildOf(&span_->context()), opentracing::StartTimestamp(start_time)});
-  if (ot_span == nullptr) {
-    return nullptr;
-  }
+  RELEASE_ASSERT(ot_span != nullptr);
   return SpanPtr{new OpenTracingSpan{use_single_header_propagation_, use_tracer_propagation_,
                                      std::move(ot_span)}};
 }
@@ -157,9 +155,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
   }
   active_span = tracer.StartSpan(operation_name, {opentracing::ChildOf(parent_span_ctx.get()),
                                                   opentracing::StartTimestamp(start_time)});
-  if (active_span == nullptr) {
-    return nullptr;
-  }
+  RELEASE_ASSERT(active_span != nullptr);
   return SpanPtr{new OpenTracingSpan{use_single_header_propagation, use_tracer_propagation,
                                      std::move(active_span)}};
 }
