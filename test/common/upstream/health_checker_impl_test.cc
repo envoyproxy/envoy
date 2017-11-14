@@ -894,6 +894,57 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   cluster_->runCallbacks({}, removed);
 }
 
+TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
+  InSequence s;
+
+  setupDataDontReuseConnection();
+  health_checker_->start();
+
+  expectSessionCreate();
+  expectClientCreate();
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(*connection_, write(_)).Times(1);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  cluster_->runCallbacks({cluster_->hosts_.back()}, {});
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  Buffer::OwnedImpl response;
+  add_uint8(response, 1);
+  read_filter_->onData(response);
+
+  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  timeout_timer_->callback_();
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  interval_timer_->callback_();
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->hosts_[0]->healthy());
+
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  interval_timer_->callback_();
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  std::vector<HostSharedPtr> removed{cluster_->hosts_.back()};
+  cluster_->hosts_.clear();
+  EXPECT_CALL(*connection_, close(_));
+  cluster_->runCallbacks({}, removed);
+}
+
 TEST_F(TcpHealthCheckerImplTest, NoData) {
   InSequence s;
 
