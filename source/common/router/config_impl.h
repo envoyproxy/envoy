@@ -115,6 +115,12 @@ public:
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
+    return response_headers_to_add_;
+  }
+  const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
+    return response_headers_to_remove_;
+  }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -149,6 +155,8 @@ private:
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
   std::list<Router::HeaderAddition> request_headers_to_add_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
+  std::list<Http::LowerCaseString> response_headers_to_remove_;
   RequestHeaderParserPtr request_headers_parser_;
 };
 

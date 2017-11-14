@@ -52,13 +52,6 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
   return route_config;
 }
 
-void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& header_value_options) {
-  for (auto& i : header_value_options) {
-    i.mutable_append()->set_value(false);
-  }
-}
-
 TEST(RouteMatcherTest, TestRoutes) {
   std::string json = R"EOF(
 {
@@ -627,65 +620,52 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels when append
 // is disabled.
-TEST(RouteMatcherTest, TestAddRemoveReqRespHeadersWithAppendFalse) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "www2",
-      "domains": ["lyft.com", "www.lyft.com", "w.lyft.com", "ww.lyft.com", "wwww.lyft.com"],
-      "request_headers_to_add": [
-          {"key": "x-global-header", "value": "vhost-www2"},
-          {"key": "x-vhost-header", "value": "vhost-www2"}
-      ],
-      "routes": [
-        {
-          "prefix": "/endpoint",
-          "cluster": "www2",
-          "request_headers_to_add": [
-             {"key": "x-global-header", "value": "route-endpoint"},
-             {"key": "x-vhost-header", "value": "route-endpoint"},
-             {"key": "x-route-header", "value": "route-endpoint"}
-          ]
-        },
-        {
-          "prefix": "/",
-          "cluster": "www2"
-        }
-      ]
-    }
-  ],
-
-  "internal_only_headers": [
-    "x-lyft-user-id"
-  ],
-
-  "response_headers_to_add": [
-    {"key": "x-envoy-upstream-canary", "value": "true"}
-  ],
-
-  "request_headers_to_add": [
-    {"key": "x-global-header", "value": "global"}
-  ]
-}
-  )EOF";
+TEST(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: x-global-header
+          value: vhost-www2
+        append: false
+      - header:
+          key: x-vhost-header
+          value: vhost-www2
+        append: false
+    routes:
+      - match: { prefix: "/endpoint" }
+        route:
+          cluster: www2
+          request_headers_to_add:
+            - header:
+                key: x-global-header
+                value: route-endpoint
+              append: false
+            - header:
+                key: x-vhost-header
+                value: route-endpoint
+              append: false
+            - header:
+                key: x-route-header
+                value: route-endpoint
+              append: false
+      - match: { prefix: "/" }
+        route: { cluster: www2 }
+request_headers_to_add:
+  - header:
+      key: x-global-header
+      value: global
+    append: false
+)EOF";
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
 
-  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromJson(json);
-  disableHeaderValueOptionAppend(*route_config.mutable_response_headers_to_add());
-  disableHeaderValueOptionAppend(*route_config.mutable_request_headers_to_add());
-  for (auto& vh : *route_config.mutable_virtual_hosts()) {
-    disableHeaderValueOptionAppend(*vh.mutable_request_headers_to_add());
-
-    for (auto& r : *vh.mutable_routes()) {
-      if (r.has_route()) {
-        disableHeaderValueOptionAppend(*(r.mutable_route()->mutable_request_headers_to_add()));
-      }
-    }
-  }
+  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
   ConfigImpl config(route_config, runtime, cm, true);
 
@@ -710,13 +690,6 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeadersWithAppendFalse) {
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
     }
   }
-
-  // Response header manipulation testing.
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
-              ContainerEq(config.internalOnlyHeaders()));
-  EXPECT_THAT((std::list<HeaderAddition>(
-                  {{Http::LowerCaseString("x-envoy-upstream-canary"), "true", false}})),
-              ContainerEq(config.responseHeadersToAdd()));
 }
 
 TEST(RouteMatcherTest, Priority) {
@@ -2697,6 +2670,40 @@ TEST(RoutePropertyTest, TestBadCorsConfig) {
   EXPECT_THROW(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
                EnvoyException);
 }
+
+TEST(RoutePropertyTest, TestVHostResponseHeadersConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: default
+    domains: ["*"]
+    response_headers_to_add:
+      - header:
+          key: X-VHost-To-Add
+          value: abc
+    response_headers_to_remove:
+      - X-VHost-To-Remove
+    routes:
+      - match: { prefix: "/api" }
+        route: { cluster: "ats" }
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  auto& vhost =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->virtualHost();
+
+  EXPECT_EQ(vhost.responseHeadersToAdd().size(), 1);
+  EXPECT_EQ(vhost.responseHeadersToAdd().front().header_, Http::LowerCaseString("x-vhost-to-add"));
+  EXPECT_EQ(vhost.responseHeadersToAdd().front().value_, "abc");
+  EXPECT_TRUE(vhost.responseHeadersToAdd().front().append_);
+  EXPECT_EQ(vhost.responseHeadersToRemove(),
+            std::list<Http::LowerCaseString>({Http::LowerCaseString("x-vhost-to-remove")}));
+}
+
+// TODO: add TestRouteResponseHeadersConfig
 
 TEST(RouterMatcherTest, Decorator) {
   std::string json = R"EOF(

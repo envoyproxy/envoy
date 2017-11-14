@@ -131,8 +131,15 @@ private:
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-
+    const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
+      return response_headers_to_add_;
+    }
+    const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
+      return response_headers_to_remove_;
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
+    static const std::list<Router::HeaderAddition> response_headers_to_add_;
+    static const std::list<Http::LowerCaseString> response_headers_to_remove_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {

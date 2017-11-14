@@ -158,10 +158,14 @@ public:
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
+  MOCK_CONST_METHOD0(responseHeadersToAdd, const std::list<Router::HeaderAddition>&());
+  MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
+  std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
 class MockHashPolicy : public HashPolicy {

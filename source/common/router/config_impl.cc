@@ -620,6 +620,14 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
     request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
+  for (const auto& header_value_option : virtual_host.response_headers_to_add()) {
+    response_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
+  }
+
+  for (const std::string& header : virtual_host.response_headers_to_remove()) {
+    response_headers_to_remove_.push_back(Http::LowerCaseString(header));
+  }
+
   for (const auto& route : virtual_host.routes()) {
     const bool has_prefix =
         route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPrefix;

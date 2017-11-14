@@ -381,6 +381,70 @@ TEST_F(RouterTest, AddMultipleCookies) {
   router_.onDestroy();
 }
 
+TEST_F(RouterTest, VirtualHostManipulateResponseHeaders) {
+  std::list<Router::HeaderAddition> to_add(
+      {{Http::LowerCaseString("x-vhost-to-add"), "abc", true},
+       {Http::LowerCaseString("x-vhost-to-set"), "abc", false}});
+
+  std::list<Http::LowerCaseString> to_remove({Http::LowerCaseString("x-vhost-to-remove")});
+
+  ON_CALL(callbacks_.route_->route_entry_.virtual_host_, responseHeadersToAdd())
+      .WillByDefault(ReturnRef(to_add));
+  ON_CALL(callbacks_.route_->route_entry_.virtual_host_, responseHeadersToRemove())
+      .WillByDefault(ReturnRef(to_remove));
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return &cancellable_;
+      }));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, Upstream::ResourcePriority,
+                           Upstream::LoadBalancerContext*) -> Http::ConnectionPool::Instance* {
+        return &cm_.conn_pool_;
+      }));
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
+        EXPECT_STREQ(headers.get(Http::LowerCaseString("x-vhost-to-set"))->value().c_str(), "abc");
+        EXPECT_EQ(headers.get(Http::LowerCaseString("x-vhost-to-remove")), nullptr);
+
+        std::list<std::string> values;
+        headers.iterate(
+            [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
+              if ("x-vhost-to-add" == std::string{header.key().c_str()}) {
+                std::list<std::string>* v = static_cast<std::list<std::string>*>(cb_v);
+                v->push_back(std::string{header.value().c_str()});
+              }
+              return Http::HeaderMap::Iterate::Continue;
+            },
+            &values);
+
+        EXPECT_EQ(values, std::list<std::string>({"existing", "abc"}));
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(
+      new Http::TestHeaderMapImpl{{":status", "200"},
+                                  {"x-vhost-to-add", "existing"},
+                                  {"x-vhost-to-set", "existing"},
+                                  {"x-vhost-to-remove", "existing"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  // When the router filter gets reset we should cancel the pool request.
+  router_.onDestroy();
+}
+
 TEST_F(RouterTest, MetadataMatchCriteria) {
   MockMetadataMatchCriteria matches;
 

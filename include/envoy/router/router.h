@@ -87,6 +87,34 @@ public:
 };
 
 /**
+ * Header to be added to a request or response at the global, VirtualHost or RouteEntry level.
+ */
+struct HeaderAddition {
+  /**
+   * The name of the header to add.
+   */
+  const Http::LowerCaseString header_;
+
+  /**
+   * The value of the header to add.
+   */
+  const std::string value_;
+
+  /**
+   * Indicates whether the value should be appended to existing values for the header (true) or
+   * replace them (false).
+   */
+  const bool append_;
+
+  /**
+   * Equality comparison.
+   */
+  bool operator==(const HeaderAddition& rhs) const {
+    return header_ == rhs.header_ && value_ == rhs.value_ && append_ == rhs.append_;
+  }
+};
+
+/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -215,6 +243,18 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+
+  /**
+   * @return const std::list<HeaderAddition>& a list of headers to add to the response sent
+   *         downstream.
+   */
+  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
+
+  /**
+   * @return const std::list<Http::LowerCaseString>& a list of headers to remove from the response
+   *         sent downstream.
+   */
+  virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
 };
 
 /**
@@ -423,34 +463,6 @@ public:
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;
-
-/**
- * Header to be added to a request or response.
- */
-struct HeaderAddition {
-  /**
-   * The name of the header to add.
-   */
-  const Http::LowerCaseString header_;
-
-  /**
-   * The value of the header to add.
-   */
-  const std::string value_;
-
-  /**
-   * Indicates whether the value should be appended to existing values for the header (true) or
-   * replace them (false).
-   */
-  const bool append_;
-
-  /**
-   * Equality comparison.
-   */
-  bool operator==(const HeaderAddition& rhs) const {
-    return header_ == rhs.header_ && value_ == rhs.value_ && append_ == rhs.append_;
-  }
-};
 
 /**
  * The router configuration.
