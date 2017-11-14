@@ -137,6 +137,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
        config_->stats().downstream_cx_rx_bytes_buffered_,
        config_->stats().downstream_cx_tx_bytes_total_,
        config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
+  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
 }
 
 void TcpProxy::readDisableUpstream(bool disable) {
@@ -238,7 +239,6 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  request_info_.onUpstreamHostSelected(conn_info.host_description_);
   onUpstreamHostReady();
   cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
   upstream_connection_->addReadFilter(upstream_callbacks_);
@@ -251,6 +251,8 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
        &read_callbacks_->upstreamHost()->cluster().stats().bind_errors_});
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
+  request_info_.onUpstreamHostSelected(conn_info.host_description_);
+  request_info_.upstream_local_address_ = upstream_connection_->localAddress().asString();
 
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
       [this]() -> void { onConnectTimeout(); });

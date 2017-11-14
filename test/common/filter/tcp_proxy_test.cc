@@ -23,6 +23,7 @@
 using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
@@ -395,13 +396,17 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(fmt::format(json, accessLogJson));
     config_.reset(new TcpProxyConfig(*config, factory_context_));
   }
+
   void setup(bool return_connection, const std::string& accessLogJson) {
     configure(accessLogJson);
     if (return_connection) {
       connect_timer_ = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
       EXPECT_CALL(*connect_timer_, enableTimer(_));
 
+      upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
       upstream_connection_ = new NiceMock<Network::MockClientConnection>();
+      ON_CALL(*upstream_connection_, localAddress())
+          .WillByDefault(ReturnPointee(upstream_local_address_));
       Upstream::MockHost::MockCreateConnectionData conn_info;
       conn_info.connection_ = upstream_connection_;
       conn_info.host_description_ = Upstream::makeTestHost(
@@ -437,6 +442,7 @@ public:
   NiceMock<Event::MockTimer>* connect_timer_{};
   std::unique_ptr<TcpProxy> filter_;
   std::string access_log_data_;
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
 };
 
 TEST_F(TcpProxyTest, UpstreamDisconnect) {
@@ -616,6 +622,32 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
     )EOF");
   filter_.reset();
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
+}
+
+TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
+  setup(true, R"EOF(
+      {
+        "path": "unused",
+        "format": "%UPSTREAM_LOCAL_ADDRESS%"
+      }
+    )EOF");
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
+}
+
+TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
+  Network::Address::InstanceConstSharedPtr downstream_address =
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+  ON_CALL(filter_callbacks_.connection_, remoteAddress())
+      .WillByDefault(ReturnPointee(downstream_address));
+  setup(true, R"EOF(
+      {
+        "path": "unused",
+        "format": "%DOWNSTREAM_ADDRESS%"
+      }
+    )EOF");
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "1.1.1.1:40000");
 }
 
 TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {

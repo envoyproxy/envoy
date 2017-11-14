@@ -309,7 +309,6 @@ TEST(AddressFromSockAddr, Pipe) {
   StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
 
   EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)), "ss_len");
 
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
   EXPECT_EQ("/some/path", addressFromSockAddr(ss, ss_len)->asString());
@@ -319,6 +318,9 @@ TEST(AddressFromSockAddr, Pipe) {
   EXPECT_THROW(
       addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path)),
       EnvoyException);
+
+  // Unnamed ( == ss_len equals sizeof sun.sun_family) is invalid.
+  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sun.sun_family)), EnvoyException);
 }
 
 } // namespace Address
