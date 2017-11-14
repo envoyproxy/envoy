@@ -308,7 +308,7 @@ TEST(AddressFromSockAddr, Pipe) {
 
   StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
 
-  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_THROW(addressFromSockAddr(ss, 0), EnvoyException);
 
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
   EXPECT_EQ("/some/path", addressFromSockAddr(ss, ss_len)->asString());
