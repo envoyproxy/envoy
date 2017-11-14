@@ -124,9 +124,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // accepted connection, before SNI update) for session related stuff, including Session Ticket
   // callback, which is going to be called iff it's set on the initial SSL_CTX, even if it's not
   // set on the current SSL_CTX that doesn't have any Session Ticket Keys configured.
-  ASSERT(has_stk == 0 || has_stk == has_tls);
-  UNREFERENCED_PARAMETER(has_tls);
-  UNREFERENCED_PARAMETER(has_stk);
+  if (has_stk != 0 && has_stk != has_tls) {
+    throw EnvoyException(fmt::format("error adding listener '{}': filter chains with mixed use of "
+                                     "Session Ticket Keys are currently not supported",
+                                     address_->asString()));
+  }
 }
 
 ListenerImpl::~ListenerImpl() {
