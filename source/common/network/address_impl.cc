@@ -38,12 +38,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   case AF_UNIX: {
     const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
     ASSERT(AF_UNIX == sun->sun_family);
-    if (ss_len == sizeof(sun->sun_family)) {
-      throw EnvoyException("Unnamed AF_UNIX sockets not supported.");
-    }
-    if (ss_len < offsetof(struct sockaddr_un, sun_path) + 1) {
-      throw EnvoyException("Could not retrieve socket name of AF_UNIX socket.");
-    }
+    RELEASE_ASSERT(ss_len == 0 || ss_len >= offsetof(struct sockaddr_un, sun_path) + 1);
     return std::make_shared<Address::PipeInstance>(sun);
   }
   default:
