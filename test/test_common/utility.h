@@ -69,7 +69,7 @@ public:
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
-   * @param seed seeds pseudo-random number genarator (dafault = 0).
+   * @param seed seeds pseudo-random number genarator (default = 0).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);

@@ -1,9 +1,4 @@
-#include <string>
-
-#include "envoy/common/exception.h"
-
 #include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
 #include "common/common/hex.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
@@ -39,11 +34,18 @@ protected:
   }
 };
 
+/**
+ * Exercises death by passing bad initialization params or by calling
+ * decompress before init.
+ */
 TEST_F(ZlibDecompressorImplDeathTest, DecompressorTestDeath) {
   EXPECT_DEATH(decompressorBadInitTestHelper(100), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedDecompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
 }
 
+/**
+ * Exercises decompressor's checksum by calling it before init or decompress.
+ */
 TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   Buffer::OwnedImpl compressor_input_buffer;
   Buffer::OwnedImpl compressor_output_buffer;
@@ -72,6 +74,10 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   EXPECT_EQ(compressor.checksum(), decompressor.checksum());
 }
 
+/**
+ * Exercises compression and decompression by compressing some data, decompressing it and then
+ * comparing compressor's input/checksum with decompressor's output/checksum.
+ */
 TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   Buffer::OwnedImpl compressor_input_buffer;
   Buffer::OwnedImpl compressor_output_buffer;
@@ -106,7 +112,10 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   EXPECT_EQ(original_text, decompressed_text);
 }
 
-TEST_F(ZlibDecompressorImplTest, DecompressWithReducedInternalMemory) {
+/**
+ * Exercises decompression with a very small output buffer.
+ */
+TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;
 
@@ -136,6 +145,9 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithReducedInternalMemory) {
   EXPECT_EQ(original_text, decompressed_text);
 }
 
+/**
+ * Exercises decompression with other supported zlib initialization params.
+ */
 TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;

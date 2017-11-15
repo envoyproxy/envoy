@@ -40,18 +40,16 @@ public:
    */
   uint64_t checksum();
 
-  /**
-   * Implements Envoy::Decompressor.
-   */
+  // Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
 private:
   bool inflateNext();
 
-  uint64_t chunk_;
+  uint64_t chunk_size_;
   bool initialized_;
 
-  std::unique_ptr<unsigned char[]> output_char_ptr_;
+  std::unique_ptr<unsigned char[]> chunk_char_ptr_;
   std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };
 

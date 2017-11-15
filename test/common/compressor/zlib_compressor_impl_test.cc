@@ -1,11 +1,4 @@
-#include <iostream>
-#include <random>
-#include <string>
-
-#include "envoy/common/exception.h"
-
 #include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
 #include "common/common/hex.h"
 #include "common/compressor/zlib_compressor_impl.h"
 
@@ -41,22 +34,29 @@ protected:
   }
 };
 
+/**
+ * Exercises death by passing bad initialization params or by calling
+ * compress before init.
+ */
 TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
 }
 
+/**
+ * Exercises compressor's checksum by calling it before init or compress.
+ */
 TEST_F(ZlibCompressorImplTest, CallingChecksum) {
   Buffer::OwnedImpl compressor_input_buffer;
   Buffer::OwnedImpl compressor_output_buffer;
 
   ZlibCompressorImpl compressor;
   EXPECT_EQ(0, compressor.checksum());
+
   compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
                   Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
                   gzip_window_bits, memory_level);
-
   EXPECT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4096);
@@ -66,6 +66,9 @@ TEST_F(ZlibCompressorImplTest, CallingChecksum) {
   EXPECT_TRUE(compressor.checksum() > 0);
 }
 
+/**
+ * Exercises compression with a very small output buffer.
+ */
 TEST_F(ZlibCompressorImplTest, CompressWithReducedInternalMemory) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;
@@ -102,6 +105,9 @@ TEST_F(ZlibCompressorImplTest, CompressWithReducedInternalMemory) {
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
+/**
+ * Exercises compression with a flush call on each received buffer.
+ */
 TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;
@@ -139,6 +145,9 @@ TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
   }
 }
 
+/**
+ * Exercises compression with very small input buffer.
+ */
 TEST_F(ZlibCompressorImplTest, CompressSmallInputMemory) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;
@@ -174,6 +183,10 @@ TEST_F(ZlibCompressorImplTest, CompressSmallInputMemory) {
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
+/**
+ * Exercises common flow of compressing some data, making it available to output buffer,
+ * then moving output buffer to another buffer and so on.
+ */
 TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl temp_buffer;
@@ -230,6 +243,9 @@ TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
+/**
+ * Exercises compression with other supported zlib initialization params.
+ */
 TEST_F(ZlibCompressorImplTest, CompressWithNotCommonParams) {
   Buffer::OwnedImpl input_buffer;
   Buffer::OwnedImpl output_buffer;

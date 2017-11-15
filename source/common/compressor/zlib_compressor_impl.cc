@@ -10,7 +10,7 @@ namespace Compressor {
 ZlibCompressorImpl::ZlibCompressorImpl() : ZlibCompressorImpl(4096){};
 
 ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
-    : chunk_{chunk_size}, initialized_{false}, output_char_ptr_(new unsigned char[chunk_size]),
+    : chunk_size_{chunk_size}, initialized_{false}, chunk_char_ptr_(new unsigned char[chunk_size]),
       zstream_ptr_(new z_stream(), [](z_stream* z) {
         deflateEnd(z);
         delete z;
@@ -18,8 +18,8 @@ ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
-  zstream_ptr_->avail_out = chunk_;
-  zstream_ptr_->next_out = output_char_ptr_.get();
+  zstream_ptr_->avail_out = chunk_size_;
+  zstream_ptr_->next_out = chunk_char_ptr_.get();
 }
 
 void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
@@ -73,10 +73,13 @@ void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_
 }
 
 void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
-  output_buffer.add(static_cast<void*>(output_char_ptr_.get()), chunk_ - zstream_ptr_->avail_out);
-  output_char_ptr_.reset(new unsigned char[chunk_]);
-  zstream_ptr_->avail_out = chunk_;
-  zstream_ptr_->next_out = output_char_ptr_.get();
+  const uint64_t n_output = chunk_size_ - zstream_ptr_->avail_out;
+  if (n_output > 0) {
+    output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()), n_output);
+  }
+  chunk_char_ptr_.reset(new unsigned char[chunk_size_]);
+  zstream_ptr_->avail_out = chunk_size_;
+  zstream_ptr_->next_out = chunk_char_ptr_.get();
 }
 
 } // namespace Compressor

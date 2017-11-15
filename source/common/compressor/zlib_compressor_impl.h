@@ -80,9 +80,7 @@ public:
    */
   uint64_t checksum();
 
-  /**
-   * Implements Envoy::Compressor.
-   */
+  // Compressor
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
 private:
@@ -90,10 +88,10 @@ private:
   void process(Buffer::Instance& output_buffer, int64_t flush_state);
   void updateOutput(Buffer::Instance& output_buffer);
 
-  const uint64_t chunk_;
+  const uint64_t chunk_size_;
   bool initialized_;
 
-  std::unique_ptr<unsigned char[]> output_char_ptr_;
+  std::unique_ptr<unsigned char[]> chunk_char_ptr_;
   std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
 };
 
