@@ -311,11 +311,70 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(0UL, headers.size());
 }
 
+TEST(HeaderMapImplTest, SetRemovesAllValues) {
+  HeaderMapImpl headers;
+
+  LowerCaseString key1("hello");
+  LowerCaseString key2("olleh");
+  std::string ref_value1("world");
+  std::string ref_value2("planet");
+  std::string ref_value3("globe");
+  std::string ref_value4("earth");
+  std::string ref_value5("blue marble");
+
+  headers.addReference(key1, ref_value1);
+  headers.addReference(key2, ref_value2);
+  headers.addReference(key1, ref_value3);
+  headers.addReference(key1, ref_value4);
+
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+
+  {
+    MockCb cb;
+
+    EXPECT_CALL(cb, Call("hello", "world"));
+    EXPECT_CALL(cb, Call("olleh", "planet"));
+    EXPECT_CALL(cb, Call("hello", "globe"));
+    EXPECT_CALL(cb, Call("hello", "earth"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+  }
+
+  headers.setReference(key1, ref_value5);
+
+  {
+    MockCb cb;
+
+    EXPECT_CALL(cb, Call("hello", "blue marble"));
+    EXPECT_CALL(cb, Call("olleh", "planet"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+  }
+}
+
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
   HeaderMapImpl headers;
   headers.addReferenceKey(Headers::get().ContentLength, 5);
   headers.addReferenceKey(Headers::get().ContentLength, 6);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
+  EXPECT_EQ(1UL, headers.size());
+}
+
+TEST(HeaderMapImplTest, DoubleInlineSet) {
+  HeaderMapImpl headers;
+  headers.setReferenceKey(Headers::get().ContentType, "blah");
+  headers.setReferenceKey(Headers::get().ContentType, "text/html");
+  EXPECT_STREQ("text/html", headers.ContentType()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
 }
 
@@ -325,6 +384,18 @@ TEST(HeaderMapImplTest, AddReferenceKey) {
   headers.addReferenceKey(foo, "world");
   EXPECT_NE("world", headers.get(foo)->value().c_str());
   EXPECT_STREQ("world", headers.get(foo)->value().c_str());
+}
+
+TEST(HeaderMapImplTest, SetReferenceKey) {
+  HeaderMapImpl headers;
+  LowerCaseString foo("hello");
+  headers.setReferenceKey(foo, "world");
+  EXPECT_NE("world", headers.get(foo)->value().c_str());
+  EXPECT_STREQ("world", headers.get(foo)->value().c_str());
+
+  headers.setReferenceKey(foo, "monde");
+  EXPECT_NE("monde", headers.get(foo)->value().c_str());
+  EXPECT_STREQ("monde", headers.get(foo)->value().c_str());
 }
 
 TEST(HeaderMapImplTest, AddCopy) {
@@ -405,15 +476,17 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
 TEST(HeaderMapImplTest, Iterate) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
-  headers.addCopy("foo", "bar");
+  headers.addCopy("foo", "xxx");
   headers.addCopy("world", "hello");
+  LowerCaseString foo_key("foo");
+  headers.setReferenceKey(foo_key, "bar"); // set moves key to end
 
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
 
   EXPECT_CALL(cb, Call("hello", "world"));
-  EXPECT_CALL(cb, Call("foo", "bar"));
   EXPECT_CALL(cb, Call("world", "hello"));
+  EXPECT_CALL(cb, Call("foo", "bar"));
   headers.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
@@ -426,7 +499,8 @@ TEST(HeaderMapImplTest, IterateReverse) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
   headers.addCopy("foo", "bar");
-  headers.addCopy("world", "hello");
+  LowerCaseString world_key("world");
+  headers.setReferenceKey(world_key, "hello");
 
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
