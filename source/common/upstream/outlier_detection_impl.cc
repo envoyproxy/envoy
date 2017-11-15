@@ -503,7 +503,7 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   case EjectionType::Consecutive5xx:
     return "5xx";
   case EjectionType::ConsecutiveGatewayFailure:
-    return "ConnectionFailure";
+    return "GatewayFailure";
   case EjectionType::SuccessRate:
     return "SuccessRate";
   }
