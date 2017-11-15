@@ -894,6 +894,8 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
+
+  // TODO(ggreenway): set upstream local address in the RequestInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 
