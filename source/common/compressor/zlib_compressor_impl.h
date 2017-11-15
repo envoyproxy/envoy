@@ -17,7 +17,7 @@ public:
   /**
    * Constructor that allows setting the size of compressor's output buffer. It
    * should be called whenever a buffer size different than the 4096 bytes, normally set by the
-   * default constructor, is desired. If memory is avaiable and it makes sense to output large
+   * default constructor, is desired. If memory is available and it makes sense to output large
    * chunks of compressed data, zlib documentation suggests buffers sizes on the order of 128K or
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the compressor output.
