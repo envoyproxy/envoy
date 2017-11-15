@@ -23,8 +23,6 @@ namespace Envoy {
 namespace Network {
 
 namespace {
-// TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
-// looks at this currently, but we may want to populate this later for logging purposes.
 Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& address) {
   if (address.type() == Address::Type::Ip && address.ip()->version() == Address::IpVersion::v6) {
     return Utility::getIpv6AnyAddress();
@@ -59,7 +57,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
-    : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
+    : filter_manager_(*this, *this), remote_address_(remote_address),
+      local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
+                                                : local_address),
+
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
@@ -539,6 +540,12 @@ void ConnectionImpl::doConnect() {
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
+
+  // The local address can only be retrieved for IP connections.  Other
+  // types, such as UDS, don't have a notion of a local address.
+  if (remote_address_->type() == Address::Type::Ip) {
+    local_address_ = Address::addressFromFd(fd_);
+  }
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
@@ -569,8 +576,8 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(
     Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
     const Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), source_address, false, false) {}
+    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address, nullptr,
+                     source_address, false, false) {}
 
 } // namespace Network
 } // namespace Envoy
