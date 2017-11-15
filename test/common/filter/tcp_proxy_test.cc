@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/config/filter_json.h"
 #include "common/filter/tcp_proxy.h"
 #include "common/network/address_impl.h"
 #include "common/stats/stats_impl.h"
@@ -30,6 +31,15 @@ using testing::_;
 namespace Envoy {
 namespace Filter {
 
+namespace {
+TcpProxyConfig constructTcpProxyConfigFromJson(const Json::Object& json,
+                                               Server::Configuration::FactoryContext& context) {
+  envoy::api::v2::filter::network::TcpProxy tcp_proxy;
+  Config::FilterJson::translateTcpProxy(json, tcp_proxy);
+  return TcpProxyConfig(tcp_proxy, context);
+}
+} // namespace
+
 TEST(TcpProxyConfigTest, NoRouteConfig) {
   std::string json = R"EOF(
     {
@@ -39,7 +49,7 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(TcpProxyConfig(*config, factory_context), EnvoyException);
+  EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
 }
 
 TEST(TcpProxyConfigTest, NoCluster) {
@@ -59,7 +69,7 @@ TEST(TcpProxyConfigTest, NoCluster) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(TcpProxyConfig(*config, factory_context), EnvoyException);
+  EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
 }
 
 TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
@@ -78,7 +88,7 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(TcpProxyConfig(*json_config, factory_context), Json::Exception);
+  EXPECT_THROW(constructTcpProxyConfigFromJson(*json_config, factory_context), Json::Exception);
 }
 
 TEST(TcpProxyConfigTest, Routes) {
@@ -143,7 +153,7 @@ TEST(TcpProxyConfigTest, Routes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 
-  TcpProxyConfig config_obj(*json_config, factory_context_);
+  TcpProxyConfig config_obj(constructTcpProxyConfigFromJson(*json_config, factory_context_));
 
   {
     // hit route with destination_ip (10.10.10.10/32)
@@ -335,36 +345,36 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 
-  TcpProxyConfig config_obj(*json_config, factory_context_);
+  TcpProxyConfig config_obj(constructTcpProxyConfigFromJson(*json_config, factory_context_));
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
 }
 
 TEST(TcpProxyConfigTest, AccessLogConfig) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-        ]
-      },
-      "access_log": [
-        {
-          "path": "some_path",
-          "format": "the format specifier"
-        },
-        {
-          "path": "another path"
-        }
-      ]
-    }
-    )EOF";
+  envoy::api::v2::filter::network::TcpProxy config;
+  envoy::api::v2::filter::AccessLog* log = config.mutable_access_log()->Add();
+  log->set_name(Config::AccessLogNames::get().FILE);
+  {
+    envoy::api::v2::filter::FileAccessLog file_access_log;
+    file_access_log.set_path("some_path");
+    file_access_log.set_format("the format specifier");
+    ProtobufWkt::Struct* custom_config = log->mutable_config();
+    MessageUtil::jsonConvert(file_access_log, *custom_config);
+  }
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+  log = config.mutable_access_log()->Add();
+  log->set_name(Config::AccessLogNames::get().FILE);
+  {
+    envoy::api::v2::filter::FileAccessLog file_access_log;
+    file_access_log.set_path("another path");
+    ProtobufWkt::Struct* custom_config = log->mutable_config();
+    MessageUtil::jsonConvert(file_access_log, *custom_config);
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  TcpProxyConfig config_obj(config, factory_context_);
 
-  TcpProxyConfig config_obj(*json_config, factory_context_);
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
 
@@ -393,7 +403,7 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(fmt::format(json, accessLogJson));
-    config_.reset(new TcpProxyConfig(*config, factory_context_));
+    config_.reset(new TcpProxyConfig(constructTcpProxyConfigFromJson(*config, factory_context_)));
   }
   void setup(bool return_connection, const std::string& accessLogJson) {
     configure(accessLogJson);
@@ -659,7 +669,7 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new TcpProxyConfig(*config, factory_context_));
+    config_.reset(new TcpProxyConfig(constructTcpProxyConfigFromJson(*config, factory_context_)));
   }
 
   void setup() {

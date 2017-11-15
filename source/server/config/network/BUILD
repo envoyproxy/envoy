@@ -117,9 +117,13 @@ envoy_cc_library(
     name = "tcp_proxy_lib",
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
+    external_deps = [
+        "envoy_filter_network_tcp_proxy",
+    ],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/filter:tcp_proxy_lib",
     ],
