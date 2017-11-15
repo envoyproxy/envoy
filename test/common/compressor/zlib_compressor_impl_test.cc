@@ -19,14 +19,14 @@ namespace {
 
 class ZlibCompressorImplTest : public testing::Test {
 protected:
-  static const int8_t gzip_window_bits{31};
-  static const int8_t memory_level{8};
+  static const int64_t gzip_window_bits{31};
+  static const int64_t memory_level{8};
   static const uint64_t default_input_size{796};
 };
 
 class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
 protected:
-  static void compressorBadInitTestHelper(int8_t window_bits, int8_t mem_level) {
+  static void compressorBadInitTestHelper(int64_t window_bits, int64_t mem_level) {
     ZlibCompressorImpl compressor;
     compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
                     ZlibCompressorImpl::CompressionStrategy::Standard, window_bits, mem_level);
@@ -45,6 +45,27 @@ TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
+}
+
+TEST_F(ZlibCompressorImplTest, CallingChecksum) {
+  const uint64_t expected_checksum{3587466910};
+
+  Buffer::OwnedImpl compressor_input_buffer;
+  Buffer::OwnedImpl compressor_output_buffer;
+
+  ZlibCompressorImpl compressor;
+  EXPECT_EQ(0, compressor.checksum());
+  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+                  gzip_window_bits, memory_level);
+
+  EXPECT_EQ(0, compressor.checksum());
+
+  TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4096);
+  compressor.compress(compressor_input_buffer, compressor_output_buffer);
+  compressor.flush(compressor_output_buffer);
+  compressor_input_buffer.drain(4096);
+  EXPECT_EQ(expected_checksum, compressor.checksum());
 }
 
 TEST_F(ZlibCompressorImplTest, CompressWithReducedInternalMemory) {

@@ -22,9 +22,9 @@ ZlibDecompressorImpl::ZlibDecompressorImpl(uint64_t chunk_size)
   zstream_ptr_->next_out = output_char_ptr_.get();
 }
 
-void ZlibDecompressorImpl::init(int8_t window_bits) {
+void ZlibDecompressorImpl::init(int64_t window_bits) {
   ASSERT(initialized_ == false);
-  const int result = inflateInit2(zstream_ptr_.get(), static_cast<int>(window_bits));
+  const int result = inflateInit2(zstream_ptr_.get(), window_bits);
   RELEASE_ASSERT(result >= 0);
   initialized_ = true;
 }
@@ -51,7 +51,10 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
     }
   }
 
-  output_buffer.add(static_cast<void*>(output_char_ptr_.get()), chunk_ - zstream_ptr_->avail_out);
+  const uint64_t n_output{chunk_ - zstream_ptr_->avail_out};
+  if (n_output > 0) {
+    output_buffer.add(static_cast<void*>(output_char_ptr_.get()), n_output);
+  }
 }
 
 bool ZlibDecompressorImpl::inflateNext() {

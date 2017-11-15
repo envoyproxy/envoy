@@ -18,14 +18,14 @@ namespace {
 
 class ZlibDecompressorImplTest : public testing::Test {
 protected:
-  static const int8_t gzip_window_bits{31};
-  static const int8_t memory_level{8};
+  static const int64_t gzip_window_bits{31};
+  static const int64_t memory_level{8};
   static const uint64_t default_input_size{796};
 };
 
 class ZlibDecompressorImplDeathTest : public ZlibDecompressorImplTest {
 protected:
-  static void decompressorBadInitTestHelper(int8_t window_bits) {
+  static void decompressorBadInitTestHelper(int64_t window_bits) {
     ZlibDecompressorImpl decompressor;
     decompressor.init(window_bits);
   }
@@ -42,6 +42,36 @@ protected:
 TEST_F(ZlibDecompressorImplDeathTest, DecompressorTestDeath) {
   EXPECT_DEATH(decompressorBadInitTestHelper(100), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedDecompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
+}
+
+TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
+  const uint64_t expected_checksum{3587466910};
+
+  Buffer::OwnedImpl compressor_input_buffer;
+  Buffer::OwnedImpl compressor_output_buffer;
+
+  Envoy::Compressor::ZlibCompressorImpl compressor;
+  ASSERT_EQ(0, compressor.checksum());
+
+  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+                  gzip_window_bits, memory_level);
+  ASSERT_EQ(0, compressor.checksum());
+
+  TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4096);
+  compressor.compress(compressor_input_buffer, compressor_output_buffer);
+  compressor.flush(compressor_output_buffer);
+  compressor_input_buffer.drain(4096);
+  ASSERT_EQ(expected_checksum, compressor.checksum());
+
+  ZlibDecompressorImpl decompressor;
+  decompressor.init(gzip_window_bits);
+  EXPECT_EQ(0, decompressor.checksum());
+
+  // compressor_output_buffer becomes decompressor input param.
+  // compressor_input_buffer is re-used as decompressor output since it is empty.
+  decompressor.decompress(compressor_output_buffer, compressor_input_buffer);
+  EXPECT_EQ(expected_checksum, decompressor.checksum());
 }
 
 TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {

@@ -15,10 +15,14 @@ public:
   ZlibCompressorImpl();
 
   /**
-   * Sets buffer size for feeding data to the compressor routines.
-   * @param chunk amount of memory reserved for the compressor output.
+   * Constructor that allows setting the size of compressor's output buffer. It
+   * should be called whenever a buffer size different than the 4096 bytes, normally set by the
+   * default constructor, is desired. If memory is avaiable and it makes sense to output large
+   * chunks of compressed data, zlib documentation suggests buffers sizes on the order of 128K or
+   * 256K bytes. @see http://zlib.net/zlib_how.html
+   * @param chunk_size amount of memory reserved for the compressor output.
    */
-  ZlibCompressorImpl(uint64_t chunk);
+  ZlibCompressorImpl(uint64_t chunk_size);
 
   /**
    * Enum values used to set compression level during initialization.
@@ -26,7 +30,7 @@ public:
    * speed: gives best.
    * standard: gives normal compression. (default)
    */
-  enum class CompressionLevel : int8_t {
+  enum class CompressionLevel : int64_t {
     Best = 9,
     Speed = 1,
     Standard = -1,
@@ -39,7 +43,7 @@ public:
    * rle: used to limit match distances to one. (Run-length encoding)
    * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY (zlib manual)
    */
-  enum class CompressionStrategy : uint8_t {
+  enum class CompressionStrategy : uint64_t {
     Filtered = 1,
     Huffman = 2,
     Rle = 3,
@@ -56,8 +60,8 @@ public:
    * @param memory_level sets how much memory should be allocated for the internal compression, min
    * 1 and max 9. @see memory_level (zlib manual)
    */
-  void init(CompressionLevel level, CompressionStrategy strategy, int8_t window_bits,
-            uint8_t memory_level);
+  void init(CompressionLevel level, CompressionStrategy strategy, int64_t window_bits,
+            uint64_t memory_level);
 
   /**
    * Flush should be called when no more data needs to be compressed. It will compress
@@ -69,6 +73,8 @@ public:
   void flush(Buffer::Instance& output_buffer);
 
   /**
+   * It returns the checksum of all output produced so far. Compressor's checksum at the end of the
+   * stream has to match decompressor's checksum produced at the end of the decompression.
    * @return uint64_t CRC-32 if a gzip stream is being written or Adler-32 for other compression
    * types.
    */
@@ -80,11 +86,11 @@ public:
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
 private:
-  bool deflateNext(int8_t flush_state);
-  void process(Buffer::Instance& output_buffer, int8_t flush_state);
+  bool deflateNext(int64_t flush_state);
+  void process(Buffer::Instance& output_buffer, int64_t flush_state);
   void updateOutput(Buffer::Instance& output_buffer);
 
-  uint64_t chunk_;
+  const uint64_t chunk_;
   bool initialized_;
 
   std::unique_ptr<unsigned char[]> output_char_ptr_;

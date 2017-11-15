@@ -23,11 +23,10 @@ ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
 }
 
 void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
-                              int8_t window_bits, uint8_t memory_level = 8) {
+                              int64_t window_bits, uint64_t memory_level = 8) {
   ASSERT(initialized_ == false);
-  const int result = deflateInit2(zstream_ptr_.get(), static_cast<int>(comp_level), Z_DEFLATED,
-                                  static_cast<int>(window_bits), static_cast<int>(memory_level),
-                                  static_cast<int>(comp_strategy));
+  const int result = deflateInit2(zstream_ptr_.get(), static_cast<int64_t>(comp_level), Z_DEFLATED,
+                                  window_bits, memory_level, static_cast<uint64_t>(comp_strategy));
   RELEASE_ASSERT(result >= 0);
   initialized_ = true;
 }
@@ -51,8 +50,8 @@ void ZlibCompressorImpl::compress(const Buffer::Instance& input_buffer,
   }
 }
 
-bool ZlibCompressorImpl::deflateNext(int8_t flush_state) {
-  const int result = deflate(zstream_ptr_.get(), static_cast<int>(flush_state));
+bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {
+  const int result = deflate(zstream_ptr_.get(), flush_state);
   if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
     return false; // This means that zlib needs more input, so stop here.
   }
@@ -61,7 +60,7 @@ bool ZlibCompressorImpl::deflateNext(int8_t flush_state) {
   return true;
 }
 
-void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int8_t flush_state) {
+void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_state) {
   while (deflateNext(flush_state)) {
     if (zstream_ptr_->avail_out == 0) {
       updateOutput(output_buffer);

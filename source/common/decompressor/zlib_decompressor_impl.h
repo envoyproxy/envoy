@@ -15,8 +15,12 @@ public:
   ZlibDecompressorImpl();
 
   /**
-   * Sets buffer size for feeding data to the decompressor routines.
-   * @param chunk amount of memory reserved for the compressor output.
+   * Constructor that allows setting the size of decompressor's output buffer. It
+   * should be called whenever a buffer size different than the 4096 bytes, normally set by the
+   * default constructor, is desired. If memory is avaiable and it makes sense to output large
+   * chunks of compressed data, zlib documentation suggests buffers sizes on the order of 128K or
+   * 256K bytes. @see http://zlib.net/zlib_how.html
+   * @param chunk_size amount of memory reserved for the decompressor output.
    */
   ZlibDecompressorImpl(uint64_t chunk_size);
 
@@ -26,10 +30,12 @@ public:
    * @param window_bits sets the size of the history buffer. It must be greater than or equal to
    * the window_bits value provided when data was compressed (zlib manual).
    */
-  void init(int8_t window_bits);
+  void init(int64_t window_bits);
 
   /**
-   * @return uint64_t CRC-32 if a gzip stream is being written or Adler-32 for other compression
+   * It returns the checksum of all output produced so far. Decompressor's checksum at the end of
+   * the stream has to match compressor's checksum produced at the end of the compression.
+   * @return uint64_t CRC-32 if a gzip stream is being read or Adler-32 for other compression
    * types.
    */
   uint64_t checksum();
