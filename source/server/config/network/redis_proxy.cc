@@ -17,15 +17,16 @@ namespace Configuration {
 NetworkFilterFactoryCb
 RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& config,
                                                    FactoryContext& context) {
-  Redis::ProxyFilterConfigSharedPtr filter_config(std::make_shared<Redis::ProxyFilterConfig>(
-      config, context.clusterManager(), context.scope()));
+  Redis::ProxyFilterConfigSharedPtr filter_config(
+      std::make_shared<Redis::ProxyFilterConfig>(config, context.clusterManager(), context.scope(),
+                                                 context.drainDecision(), context.runtime()));
   Redis::ConnPool::InstancePtr conn_pool(
-      new Redis::ConnPool::InstanceImpl(filter_config->clusterName(), context.clusterManager(),
+      new Redis::ConnPool::InstanceImpl(filter_config->cluster_name_, context.clusterManager(),
                                         Redis::ConnPool::ClientFactoryImpl::instance_,
                                         context.threadLocal(), *config.getObject("conn_pool")));
   std::shared_ptr<Redis::CommandSplitter::Instance> splitter(
       new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), context.scope(),
-                                               filter_config->statPrefix()));
+                                               filter_config->stat_prefix_));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<Redis::ProxyFilter>(

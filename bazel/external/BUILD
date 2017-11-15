@@ -5,6 +5,7 @@ cc_library(
     srcs = [":empty.cc"],
     deps = [
         "@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+        "@com_google_googletest//:gtest",
     ],
 )
 

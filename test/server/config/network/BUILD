@@ -12,9 +12,11 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
+        "//source/common/access_log:access_log_lib",
         "//source/common/config:well_known_names",
         "//source/common/dynamo:dynamo_filter_lib",
         "//source/server/config/network:client_ssl_auth_lib",
+        "//source/server/config/network:file_access_log_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",

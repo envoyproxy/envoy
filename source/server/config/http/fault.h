@@ -22,8 +22,12 @@ public:
                                           FactoryContext& context) override;
   HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                    const std::string& stats_prefix,
-
                                                    FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::HTTPFault()};
+  }
+
   std::string name() override { return Config::HttpFilterNames::get().FAULT; }
 
 private:

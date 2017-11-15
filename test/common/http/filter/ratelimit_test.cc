@@ -173,7 +173,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited))
+              setResponseFlag(AccessLog::ResponseFlag::RateLimited))
       .Times(0);
   request_callbacks_->complete(Envoy::RateLimit::LimitStatus::OK);
 
@@ -224,7 +224,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited))
+              setResponseFlag(AccessLog::ResponseFlag::RateLimited))
       .Times(0);
 
   EXPECT_EQ(
@@ -249,7 +249,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited));
+              setResponseFlag(AccessLog::ResponseFlag::RateLimited));
 
   request_callbacks_->complete(Envoy::RateLimit::LimitStatus::OverLimit);
 

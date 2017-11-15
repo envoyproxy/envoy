@@ -37,6 +37,14 @@ function bazel_debug_binary_build() {
 }
 
 if [[ "$1" == "bazel.release" ]]; then
+  # The release build step still runs during tag events. Avoid rebuilding for no reason.
+  # TODO(mattklein123): Consider moving this into its own "build".
+  if [[ -n "$CIRCLE_TAG" ]]
+  then
+    echo 'Ignoring build for git tag event'
+    exit 0
+  fi
+
   setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
@@ -102,7 +110,13 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
   echo "bazel coverage build with tests..."
-  export GCOVR="/thirdparty/gcovr/scripts/gcovr"
+
+  # gcovr is a pain to run with `bazel run`, so package it up into a
+  # relocatable and hermetic-ish .par file.
+  cd "${ENVOY_SRCDIR}"
+  bazel --batch build @com_github_gcovr_gcovr//:gcovr.par
+  export GCOVR="${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par"
+
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export WORKSPACE=ci
@@ -146,6 +160,9 @@ elif [[ "$1" == "check_format" ]]; then
   echo "check_format..."
   cd "${ENVOY_SRCDIR}"
   ./tools/check_format.py check
+  exit 0
+elif [[ "$1" == "docs" ]]; then
+  docs/publish.sh
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

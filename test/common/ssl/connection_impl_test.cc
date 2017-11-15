@@ -447,6 +447,59 @@ TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
            GetParam());
 }
 
+// Make sure that we do not flush code and do an immediate close if we have not completed the
+// handshake.
+TEST_P(SslConnectionImplTest, FlushCloseDuringHandshake) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ContextManagerImpl manager(runtime);
+  ServerContextPtr server_ctx(
+      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
+
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::MockListenerCallbacks callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener =
+      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
+                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr());
+  client_connection->connect();
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+        Buffer::OwnedImpl data("hello");
+        server_connection->write(data);
+        server_connection->close(Network::ConnectionCloseType::FlushWrite);
+      }));
+
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher.exit(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_P(SslConnectionImplTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;

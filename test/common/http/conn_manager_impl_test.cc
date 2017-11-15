@@ -4,15 +4,15 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/access_log.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/access_log/access_log_formatter.h"
+#include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
-#include "common/http/access_log/access_log_formatter.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
@@ -139,14 +139,16 @@ public:
     }
   }
 
-  void setUpEncoderAndDecoder() {
-    EXPECT_CALL(response_encoder_, getStream())
-        .Times(AnyNumber())
-        .WillRepeatedly(ReturnRef(stream_));
+  void setUpBufferLimits() {
+    ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
     EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
+  }
+
+  void setUpEncoderAndDecoder() {
+    setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
       HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
@@ -1857,6 +1859,45 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   decoder_filters_[0]->callbacks_->addDecodedData(data, false);
 }
 
+// Return 413 from an intermediate filter and make sure we don't continue the filter chain.
+TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) {
+  InSequence s;
+  initial_buffer_limit_ = 10;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl fake_data("hello");
+    decoder->decodeData(fake_data, false);
+
+    Buffer::OwnedImpl fake_data2("world world");
+    decoder->decodeData(fake_data2, true);
+  }));
+
+  setUpBufferLimits();
+  setupFilterChain(2, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "413"}, {"content-length", "17"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
@@ -1887,6 +1928,8 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
   EXPECT_EQ("Internal Server Error", response_body);
+
+  EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
@@ -1913,6 +1956,8 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(stream_, resetStream(_));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
+
+  EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {

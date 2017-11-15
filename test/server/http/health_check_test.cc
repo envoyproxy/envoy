@@ -97,7 +97,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(AccessLog::ResponseFlag::FailedLocalHealthCheck));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -147,7 +147,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(AccessLog::ResponseFlag::FailedLocalHealthCheck));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
@@ -184,7 +184,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
   // Verify that the next request uses the cached value.
   prepareFilter(true);
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(AccessLog::ResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::HeaderMap& headers, bool end_stream) {
@@ -208,7 +208,7 @@ TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
             filter_->decodeHeaders(request_headers_no_hc_, true));
 }
 
-TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
+TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSetJson) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(
       "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
@@ -218,12 +218,48 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
                EnvoyException);
 }
 
-TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
+TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSetJson) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectSharedPtr config =
       Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context);
+}
+
+TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSetProto) {
+  Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
+  envoy::api::v2::filter::http::HealthCheck config{};
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  config.mutable_pass_through_mode()->set_value(false);
+  config.set_endpoint("foo");
+  config.mutable_cache_time()->set_seconds(10);
+
+  EXPECT_THROW(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
+      EnvoyException);
+}
+
+TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSetProto) {
+  Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
+  envoy::api::v2::filter::http::HealthCheck config{};
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  config.mutable_pass_through_mode()->set_value(false);
+  config.set_endpoint("foo");
+  healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
+}
+
+TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
+  Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  envoy::api::v2::filter::http::HealthCheck config =
+      *dynamic_cast<envoy::api::v2::filter::http::HealthCheck*>(
+          healthCheckFilterConfig.createEmptyConfigProto().get());
+
+  config.mutable_pass_through_mode()->set_value(false);
+  config.set_endpoint("foo");
+  healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 } // namespace Envoy

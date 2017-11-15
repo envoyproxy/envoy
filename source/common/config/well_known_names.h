@@ -115,13 +115,15 @@ public:
   const std::string ROUTER = "envoy.router";
   // Health checking filter
   const std::string HEALTH_CHECK = "envoy.health_check";
+  // Lua filter
+  const std::string LUA = "envoy.lua";
 
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER}) {}
+                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

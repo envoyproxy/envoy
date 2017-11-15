@@ -32,6 +32,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "file_access_log_lib",
+    srcs = ["file_access_log.cc"],
+    hdrs = ["file_access_log.h"],
+    external_deps = ["envoy_filter_http_http_connection_manager"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:access_log_config_interface",
+        "//source/common/access_log:access_log_formatter_lib",
+        "//source/common/access_log:access_log_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "http_connection_manager_lib",
     srcs = ["http_connection_manager.cc"],
     hdrs = ["http_connection_manager.h"],
@@ -44,13 +59,13 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/access_log:access_log_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http/access_log:access_log_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/json:json_loader_lib",

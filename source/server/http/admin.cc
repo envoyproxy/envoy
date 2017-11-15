@@ -13,13 +13,13 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/access_log_formatter.h"
+#include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/http/access_log/access_log_formatter.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -427,8 +427,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     }
   }
 
-  access_logs_.emplace_back(new Http::AccessLog::FileAccessLog(
-      access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+  access_logs_.emplace_back(new AccessLog::FileAccessLog(
+      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));
 }
 

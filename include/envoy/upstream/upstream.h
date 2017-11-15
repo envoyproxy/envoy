@@ -374,6 +374,8 @@ public:
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
 
+class HealthChecker;
+
 /**
  * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
  * all forwarding threads/workers. Individual HostSets are used on the workers themselves.
@@ -383,21 +385,31 @@ public:
   enum class InitializePhase { Primary, Secondary };
 
   /**
+   * @return a pointer to the cluster's health checker. If a health checker has not been installed,
+   *         returns nullptr.
+   */
+  virtual HealthChecker* healthChecker() PURE;
+
+  /**
    * @return the information about this upstream cluster.
    */
   virtual ClusterInfoConstSharedPtr info() const PURE;
 
   /**
    * @return a pointer to the cluster's outlier detector. If an outlier detector has not been
-   *         installed, returns a nullptr.
+   *         installed, returns nullptr.
    */
+  virtual Outlier::Detector* outlierDetector() PURE;
   virtual const Outlier::Detector* outlierDetector() const PURE;
 
   /**
    * Initialize the cluster. This will be called either immediately at creation or after all primary
    * clusters have been initialized (determined via initializePhase()).
+   * @param callback supplies a callback that will be invoked after the cluster has undergone first
+   *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
+   *        called when initial DNS resolution is complete.
    */
-  virtual void initialize() PURE;
+  virtual void initialize(std::function<void()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
@@ -405,13 +417,6 @@ public:
    *         that depends on resolution of the SDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
-
-  /**
-   * Set a callback that will be invoked after the cluster has undergone first time initialization.
-   * E.g., for a dynamic DNS cluster the initialize callback will be called when initial DNS
-   * resolution is complete.
-   */
-  virtual void setInitializedCb(std::function<void()> callback) PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;

@@ -46,6 +46,12 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::st
   return route_config;
 }
 
+envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::RouteConfiguration route_config;
+  MessageUtil::loadFromYaml(yaml, route_config);
+  return route_config;
+}
+
 TEST(RouteMatcherTest, TestRoutes) {
   std::string json = R"EOF(
 {
@@ -215,7 +221,7 @@ TEST(RouteMatcherTest, TestRoutes) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Base routing testing.
@@ -555,7 +561,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Request header manipulation testing.
@@ -1127,7 +1133,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   EXPECT_EQ(
@@ -2675,7 +2681,7 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   )EOF";
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
   const std::string downstream_addr = "127.0.0.1";
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
@@ -2729,7 +2735,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   )EOF";
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
       "Incorrect header configuration. Expected variable format %<variable_name>%, actual format "
@@ -2924,6 +2930,48 @@ TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
     EXPECT_NE(matches, nullptr);
     EXPECT_EQ(matches->metadataMatchCriteria().size(), 1);
     EXPECT_EQ(matches->metadataMatchCriteria().at(0)->name(), "r4_key");
+  }
+}
+
+TEST(ConfigUtility, ParseResponseCode) {
+  const std::vector<std::pair<envoy::api::v2::RedirectAction::RedirectResponseCode, Http::Code>>
+      test_set = {std::make_pair(envoy::api::v2::RedirectAction::MOVED_PERMANENTLY,
+                                 Http::Code::MovedPermanently),
+                  std::make_pair(envoy::api::v2::RedirectAction::FOUND, Http::Code::Found),
+                  std::make_pair(envoy::api::v2::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
+                  std::make_pair(envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT,
+                                 Http::Code::TemporaryRedirect),
+                  std::make_pair(envoy::api::v2::RedirectAction::PERMANENT_REDIRECT,
+                                 Http::Code::PermanentRedirect)};
+  for (const auto& test_case : test_set) {
+    EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
+  }
+}
+
+TEST(RouteConfigurationV2, RedirectCode) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/"}
+        redirect: { host_redirect: new.lyft.com, response_code: TEMPORARY_REDIRECT }
+
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
+    EXPECT_EQ("http://new.lyft.com/foo",
+              config.route(headers, 0)->redirectEntry()->newPath(headers));
+    EXPECT_EQ(Http::Code::TemporaryRedirect,
+              config.route(headers, 0)->redirectEntry()->redirectResponseCode());
   }
 }
 

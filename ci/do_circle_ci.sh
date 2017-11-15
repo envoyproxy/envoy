@@ -2,12 +2,6 @@
 
 set -e
 
-if [ -n "$CIRCLE_TAG" ]
-then
-  echo 'Ignoring build for git tag event'
-  exit 0
-fi
-
 # bazel uses jgit internally and the default circle-ci .gitconfig says to
 # convert https://github.com to ssh://git@github.com, which jgit does not support.
 mv ~/.gitconfig ~/.gitconfig_save
