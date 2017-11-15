@@ -13,9 +13,6 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "fmt/format.h"
@@ -23,47 +20,45 @@
 namespace Envoy {
 namespace Filter {
 
-TcpProxyConfig::Route::Route(const Json::Object& config) {
-  cluster_name_ = config.getString("cluster");
+TcpProxyConfig::Route::Route(
+    const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config) {
+  cluster_name_ = config.cluster();
 
-  if (config.hasObject("source_ip_list")) {
-    source_ips_ = Network::Address::IpList(config.getStringArray("source_ip_list"));
+  source_ips_ = Network::Address::IpList(config.source_ip_list());
+  destination_ips_ = Network::Address::IpList(config.destination_ip_list());
+
+  if (!config.source_ports().empty()) {
+    Network::Utility::parsePortRangeList(config.source_ports(), source_port_ranges_);
   }
 
-  if (config.hasObject("source_ports")) {
-    const std::string source_ports = config.getString("source_ports");
-    Network::Utility::parsePortRangeList(source_ports, source_port_ranges_);
-  }
-
-  if (config.hasObject("destination_ip_list")) {
-    destination_ips_ = Network::Address::IpList(config.getStringArray("destination_ip_list"));
-  }
-
-  if (config.hasObject("destination_ports")) {
-    const std::string destination_ports = config.getString("destination_ports");
-    Network::Utility::parsePortRangeList(destination_ports, destination_port_ranges_);
+  if (!config.destination_ports().empty()) {
+    Network::Utility::parsePortRangeList(config.destination_ports(), destination_port_ranges_);
   }
 }
 
-TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
+TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
                                Server::Configuration::FactoryContext& context)
-    : stats_(generateStats(config.getString("stat_prefix"), context.scope())) {
-  config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
+    : stats_(generateStats(config.stat_prefix(), context.scope())) {
 
-  for (const Json::ObjectSharedPtr& route_desc :
-       config.getObject("route_config")->getObjectArray("routes")) {
-    routes_.emplace_back(Route(*route_desc));
-
-    if (!context.clusterManager().get(route_desc->getString("cluster"))) {
-      throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}' in TCP route",
-                                       route_desc->getString("cluster")));
+  if (config.has_deprecated_v1()) {
+    for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
+         config.deprecated_v1().routes()) {
+      if (!context.clusterManager().get(route_desc.cluster())) {
+        throw EnvoyException(
+            fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
+      }
+      routes_.emplace_back(Route(route_desc));
     }
   }
 
-  for (const Json::ObjectSharedPtr& json_access_log : config.getObjectArray("access_log", true)) {
-    envoy::api::v2::filter::AccessLog v2_access_log;
-    Config::FilterJson::translateAccessLog(*json_access_log, v2_access_log);
-    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(v2_access_log, context));
+  if (!config.cluster().empty()) {
+    envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute default_route;
+    default_route.set_cluster(config.cluster());
+    routes_.emplace_back(default_route);
+  }
+
+  for (const envoy::api::v2::filter::AccessLog& log_config : config.access_log()) {
+    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 }
 

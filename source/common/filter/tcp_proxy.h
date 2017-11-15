@@ -17,10 +17,11 @@
 
 #include "common/access_log/request_info_impl.h"
 #include "common/common/logger.h"
-#include "common/json/json_loader.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
+
+#include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {
 namespace Filter {
@@ -52,7 +53,8 @@ struct TcpProxyStats {
  */
 class TcpProxyConfig {
 public:
-  TcpProxyConfig(const Json::Object& config, Server::Configuration::FactoryContext& context);
+  TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                 Server::Configuration::FactoryContext& context);
 
   /**
    * Find out which cluster an upstream connection should be opened to based on the
@@ -69,7 +71,7 @@ public:
 
 private:
   struct Route {
-    Route(const Json::Object& config);
+    Route(const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config);
 
     Network::Address::IpList source_ips_;
     Network::PortRangeList source_port_ranges_;
