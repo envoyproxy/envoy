@@ -340,22 +340,15 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
 
 // Test that a minimal TcpProxy v2 config works.
 TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
-  auto factory = Registry::FactoryRegistry<NamedNetworkFilterConfigFactory>::getFactory(
-      Config::NetworkFilterNames::get().TCP_PROXY);
-  ASSERT_NE(nullptr, factory);
+  NiceMock<MockFactoryContext> context;
+  TcpProxyConfigFactory factory;
+  envoy::api::v2::filter::network::TcpProxy config =
+      *dynamic_cast<envoy::api::v2::filter::network::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
 
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  ASSERT_NE(nullptr, message);
-
-  envoy::api::v2::filter::network::TcpProxy tcp_proxy;
-  tcp_proxy.set_stat_prefix("prefix");
-  tcp_proxy.set_cluster("cluster");
-  MessageUtil::jsonConvert(tcp_proxy, *message);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-
-  NetworkFilterFactoryCb cb = factory->createFilterFactoryFromProto(*message, context);
-  EXPECT_NE(nullptr, cb);
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
