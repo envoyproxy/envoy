@@ -20,7 +20,7 @@ public:
 
   virtual const std::string format(const Envoy::AccessLog::RequestInfo& request_info) const PURE;
 
-  /*
+  /**
    * @return bool indicating whether the formatted header should be appended to the existing
    *              headers
    */

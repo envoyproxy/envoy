@@ -483,6 +483,8 @@ TEST(RouteMatcherTest, TestRoutes) {
   }
 }
 
+// Validates behavior of request_headers_to_add at router, vhost, and route levels. Validates
+// behavior of response_headers_to_add and response_headers_to_remove at router level.
 TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
   std::string json = R"EOF(
 {
