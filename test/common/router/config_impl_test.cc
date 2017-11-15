@@ -625,6 +625,8 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
               ContainerEq(config.responseHeadersToRemove()));
 }
 
+// Validates behavior of request_headers_to_add at router, vhost, and route levels when append
+// is disabled.
 TEST(RouteMatcherTest, TestAddRemoveReqRespHeadersWithAppendFalse) {
   std::string json = R"EOF(
 {
