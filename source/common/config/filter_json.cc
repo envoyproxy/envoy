@@ -2,13 +2,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/address_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/protocol_json.h"
 #include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
-#include "common/network/cidr_range.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -304,25 +304,10 @@ void FilterJson::translateTcpProxy(const Json::Object& json_tcp_proxy,
     JSON_UTIL_SET_STRING(*route_desc, *route, cluster);
     JSON_UTIL_SET_STRING(*route_desc, *route, destination_ports);
     JSON_UTIL_SET_STRING(*route_desc, *route, source_ports);
-
-    auto translate_ip_list =
-        [&route_desc](const std::string& json_name,
-                      Protobuf::RepeatedPtrField<envoy::api::v2::CidrRange>* dest) {
-          if (route_desc->hasObject(json_name)) {
-            for (const std::string& source_ip : route_desc->getStringArray(json_name)) {
-              Network::Address::CidrRange cidr(Network::Address::CidrRange::create(source_ip));
-              if (!cidr.isValid()) {
-                throw EnvoyException(fmt::format("Invalid {} entry: {}", json_name, source_ip));
-              }
-              envoy::api::v2::CidrRange* v2_cidr = dest->Add();
-              v2_cidr->set_address_prefix(cidr.ip()->addressAsString());
-              v2_cidr->mutable_prefix_len()->set_value(cidr.length());
-            }
-          }
-        };
-
-    translate_ip_list("source_ip_list", route->mutable_source_ip_list());
-    translate_ip_list("destination_ip_list", route->mutable_destination_ip_list());
+    AddressJson::translateCidrRangeList(route_desc->getStringArray("source_ip_list", true),
+                                        *route->mutable_source_ip_list());
+    AddressJson::translateCidrRangeList(route_desc->getStringArray("destination_ip_list", true),
+                                        *route->mutable_destination_ip_list());
   }
 }
 
