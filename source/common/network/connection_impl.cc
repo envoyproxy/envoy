@@ -544,7 +544,8 @@ void ConnectionImpl::doConnect() {
   try {
     local_address_ = Address::addressFromFd(fd_);
   } catch (const EnvoyException& e) {
-    // Eat the exception and leave local_address unchanged
+    // Eat the exception and leave local_address unchanged.  This will fail
+    // when connecting to a UDS.
   }
 }
 
