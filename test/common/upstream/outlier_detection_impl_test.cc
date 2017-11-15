@@ -167,7 +167,6 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
-
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
@@ -239,8 +238,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
                      .value());
 }
 
+/*
+ * Test that the consecutive gateway failure detector correctly fires, and also successfully retriggers after uneject.
+ * This will also ensure that the stats counters end up with the expected values.
+ */
 TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
-
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
@@ -334,8 +336,15 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
                      .value());
 }
 
+/*
+ * Test the interaction between the consecutive gateway failure and 5xx detectors.
+ * This will first trigger a consecutive gateway failure with 503s, and then trigger 5xx with a mix of 503s and 500s.
+ * We expect the consecutive gateway failure to fire after 5 consecutive 503s, and after an uneject the 5xx detector
+ * should require a further 5 consecutive 5xxs. The gateway failure detector should not fire a second time since fewer
+ * than another 5x 503s are triggered.
+ * This will also ensure that the stats counters end up with the expected values.
+ */
 TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
-
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
