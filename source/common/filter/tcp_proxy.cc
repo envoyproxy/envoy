@@ -124,7 +124,7 @@ TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Scop
 
 void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  ENVOY_CONN_LOG(info, "new tcp proxy session", read_callbacks_->connection());
+  ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
   config_->stats().downstream_cx_total_.inc();
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().setConnectionStats(
