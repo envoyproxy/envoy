@@ -391,7 +391,7 @@ void DetectorImpl::processSuccessRateEjections() {
     success_rate_ejection_threshold_ = ejection_pair.ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold_) {
-        stats_.ejections_success_rate_.inc(); // Deprecated
+        stats_.ejections_success_rate_.inc(); // Deprecated.
         stats_.ejections_detected_success_rate_.inc();
         ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
       }
