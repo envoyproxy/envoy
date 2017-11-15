@@ -20,7 +20,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  ENVOY_CONN_LOG(info, "connecting", *connection_);
+  ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
 
   // We just universally set no delay on connections. Theoretically we might at some point want

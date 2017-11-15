@@ -22,13 +22,13 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
   case envoy::api::v2::StatsdSink::kAddress: {
     Network::Address::InstanceConstSharedPtr address =
         Network::Address::resolveProtoAddress(statsd_sink.address());
-    ENVOY_LOG(info, "statsd UDP ip address: {}", address->asString());
+    ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
     return Stats::SinkPtr(
         new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address)));
     break;
   }
   case envoy::api::v2::StatsdSink::kTcpClusterName:
-    ENVOY_LOG(info, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
+    ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
     return Stats::SinkPtr(new Stats::Statsd::TcpStatsdSink(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
         server.clusterManager(), server.stats()));
