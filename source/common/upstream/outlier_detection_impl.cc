@@ -310,7 +310,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
     ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
     host_monitors_[host]->resetConsecutiveGatewayFailure();
     break;
-  default:
+  case EjectionType::SuccessRate:
     break;
   }
 }
