@@ -106,7 +106,7 @@ void RingHashLoadBalancer::Ring::create(const envoy::api::v2::Cluster::RingHashL
   ENVOY_LOG(info, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
   ring_.reserve(hosts.size() * hashes_per_host);
 
-  bool use_std_hash = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), use_std_hash, true);
+  const bool use_std_hash = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), use_std_hash, true);
   for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
       std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
