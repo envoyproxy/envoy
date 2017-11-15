@@ -20,6 +20,7 @@ public:
                                                       FactoryContext& context) override;
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                              FactoryContext& context) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() override { return Config::NetworkFilterNames::get().TCP_PROXY; }
 
 private:
