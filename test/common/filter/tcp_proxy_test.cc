@@ -613,6 +613,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   EXPECT_EQ(access_log_data_, "UO");
 }
 
+// Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   setup(true, R"EOF(
       {
@@ -624,6 +625,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
 }
 
+// Test that access log field %UPSTREAM_LOCAL_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(true, R"EOF(
       {
@@ -635,6 +637,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
+// Test that access log field %DOWNSTREAM_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   Network::Address::InstanceConstSharedPtr downstream_address =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
@@ -650,6 +653,8 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   EXPECT_EQ(access_log_data_, "1.1.1.1:40000");
 }
 
+// Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are
+// all correctly logged.
 TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   setup(true, R"EOF(
       {
