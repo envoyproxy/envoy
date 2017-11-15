@@ -42,7 +42,7 @@ public:
    *
    * @return decision if request is traceable or not and Reason why.
    **/
-  static Decision isTracing(const Http::AccessLog::RequestInfo& request_info,
+  static Decision isTracing(const AccessLog::RequestInfo& request_info,
                             const Http::HeaderMap& request_headers);
 
   /**
@@ -55,12 +55,26 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                           const Http::AccessLog::RequestInfo& request_info,
+                           const AccessLog::RequestInfo& request_info,
                            const Config& tracing_config);
 
   static const std::string INGRESS_OPERATION;
   static const std::string EGRESS_OPERATION;
 };
+
+class EgressConfigImpl : public Config {
+public:
+  // Tracing::Config
+  Tracing::OperationName operationName() const override { return Tracing::OperationName::Egress; }
+  const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
+    return request_headers_for_tags_;
+  }
+
+private:
+  const std::vector<Http::LowerCaseString> request_headers_for_tags_;
+};
+
+typedef ConstSingleton<EgressConfigImpl> EgressConfig;
 
 class NullSpan : public Span {
 public:
@@ -82,7 +96,7 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const AccessLog::RequestInfo&) override {
     return SpanPtr{new NullSpan()};
   }
 };
@@ -93,7 +107,7 @@ public:
 
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const Http::AccessLog::RequestInfo& request_info) override;
+                    const AccessLog::RequestInfo& request_info) override;
 
 private:
   DriverPtr driver_;

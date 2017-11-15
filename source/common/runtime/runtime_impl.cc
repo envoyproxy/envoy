@@ -85,7 +85,7 @@ std::string RandomGeneratorImpl::uuid() {
   static thread_local uint8_t buffered[2048];
   static thread_local size_t buffered_idx = sizeof(buffered);
 
-  if (buffered_idx >= sizeof(buffered)) {
+  if (buffered_idx + 16 > sizeof(buffered)) {
     int rc = RAND_bytes(buffered, sizeof(buffered));
     ASSERT(rc == 1);
     UNREFERENCED_PARAMETER(rc);
@@ -224,7 +224,17 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       // theoretically lead to issues.
       ENVOY_LOG(debug, "reading file: {}", full_path);
       Entry entry;
-      entry.string_value_ = Filesystem::fileReadToEnd(full_path);
+
+      // Read the file and remove any comments. A comment is a line starting with a '#' character.
+      // Comments are useful for placeholder files with no value.
+      const std::vector<std::string> lines =
+          StringUtil::split(Filesystem::fileReadToEnd(full_path), "\n");
+      for (const std::string& line : lines) {
+        if (!line.empty() && line.at(0) == '#') {
+          continue;
+        }
+        entry.string_value_ += line + "\n";
+      }
       StringUtil::rtrim(entry.string_value_);
 
       // As a perf optimization, attempt to convert the string into an integer. If we don't

@@ -7,6 +7,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/config/filter_json.h"
 #include "common/http/filter/fault_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -113,7 +114,10 @@ public:
 
   void SetUpTest(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new FaultFilterConfig(*config, runtime_, "prefix.", stats_));
+    envoy::api::v2::filter::http::HTTPFault fault;
+
+    Config::FilterJson::translateFaultFilter(*config, fault);
+    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -135,19 +139,9 @@ public:
 };
 
 void faultFilterBadConfigHelper(const std::string& json) {
-  Stats::IsolatedStoreImpl stats;
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
-}
-
-TEST(FaultFilterBadConfigTest, EmptyConfig) {
-  const std::string json = R"EOF(
-  {
-  }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
+  envoy::api::v2::filter::http::HTTPFault fault;
+  EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
 }
 
 TEST(FaultFilterBadConfigTest, BadAbortPercent) {
@@ -254,7 +248,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected))
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected))
       .Times(0);
 
   // Abort related calls
@@ -270,7 +264,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -323,7 +317,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
@@ -334,7 +328,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
@@ -364,7 +358,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
       .WillOnce(Return(500UL));
   expectDelayTimer(500UL);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -379,7 +373,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
@@ -413,7 +407,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   expectDelayTimer(500UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -434,7 +428,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
@@ -463,7 +457,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -480,7 +474,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
@@ -505,7 +499,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
 
   request_headers_.addCopy("x-envoy-downstream-service-node", "canary");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -522,7 +516,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true));
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
@@ -553,7 +547,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -569,7 +563,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(filter_callbacks_, encodeData(_, true));
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected));
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
@@ -620,7 +614,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL)));
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -635,7 +629,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -663,7 +657,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+              setResponseFlag(AccessLog::ResponseFlag::DelayInjected));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
@@ -674,7 +668,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+              setResponseFlag(AccessLog::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   timer_->callback_();

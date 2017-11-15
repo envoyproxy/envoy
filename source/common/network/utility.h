@@ -44,6 +44,20 @@ public:
   static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 
   /**
+   * Match a URL to the TCP scheme
+   * @param url supplies the URL to match.
+   * @return bool true if the URL matches the TCP scheme, false otherwise.
+   */
+  static bool urlIsTcpScheme(const std::string& url);
+
+  /**
+   * Match a URL to the Unix scheme
+   * @param url supplies the Unix to match.
+   * @return bool true if the URL matches the Unix scheme, false otherwise.
+   */
+  static bool urlIsUnixScheme(const std::string& url);
+
+  /**
    * Parses the host from a TCP URL
    * @param the URL to parse host from
    * @return std::string the parsed host

@@ -392,7 +392,7 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
-    Http::AccessLog::InstanceSharedPtr handler) {
+    AccessLog::InstanceSharedPtr handler) {
   access_log_handlers_.push_back(handler);
 }
 
@@ -560,32 +560,42 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
   active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
 
+  // TODO: Need to investigate the following code based on the cached route, as may
+  // be broken in the case a filter changes the route.
+
   // If a decorator has been defined, apply it to the active span.
   if (cached_route_.value() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
 
-    // For egress (outbound) requests, pass the decorator's operation name (if defined)
-    // as a request header to enable the receiving service to use it in its server span.
-    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
-            Tracing::OperationName::Egress &&
-        !cached_route_.value()->decorator()->getOperation().empty()) {
-      request_headers_->insertEnvoyDecoratorOperation().value(
-          cached_route_.value()->decorator()->getOperation());
+    // Cache decorated operation.
+    if (!cached_route_.value()->decorator()->getOperation().empty()) {
+      decorated_operation_ = &cached_route_.value()->decorator()->getOperation();
     }
   }
 
-  const HeaderEntry* decorator_operation = request_headers_->EnvoyDecoratorOperation();
-
-  // For ingress (inbound) requests, if a decorator operation name has been provided, it
-  // should be used to override the active span's operation.
   if (connection_manager_.config_.tracingConfig()->operation_name_ ==
-          Tracing::OperationName::Ingress &&
-      decorator_operation) {
-    if (!decorator_operation->value().empty()) {
-      active_span_->setOperation(decorator_operation->value().c_str());
+      Tracing::OperationName::Egress) {
+    // For egress (outbound) requests, pass the decorator's operation name (if defined)
+    // as a request header to enable the receiving service to use it in its server span.
+    if (decorated_operation_) {
+      request_headers_->insertEnvoyDecoratorOperation().value(*decorated_operation_);
     }
-    // Remove header so not propagated to service
-    request_headers_->removeEnvoyDecoratorOperation();
+  } else {
+    const HeaderEntry* req_operation_override = request_headers_->EnvoyDecoratorOperation();
+
+    // For ingress (inbound) requests, if a decorator operation name has been provided, it
+    // should be used to override the active span's operation.
+    if (req_operation_override) {
+      if (!req_operation_override->value().empty()) {
+        active_span_->setOperation(req_operation_override->value().c_str());
+
+        // Clear the decorated operation so won't be used in the response header, as
+        // it has been overridden by the inbound decorator operation request header.
+        decorated_operation_ = nullptr;
+      }
+      // Remove header so not propagated to service
+      request_headers_->removeEnvoyDecoratorOperation();
+    }
   }
 
   // Inject the active span's tracing context into the request headers.
@@ -819,6 +829,31 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
   }
 
+  if (connection_manager_.config_.tracingConfig()) {
+    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+        Tracing::OperationName::Ingress) {
+      // For ingress (inbound) responses, if the request headers do not include a
+      // decorator operation (override), then pass the decorator's operation name (if defined)
+      // as a response header to enable the client service to use it in its client span.
+      if (decorated_operation_) {
+        headers.insertEnvoyDecoratorOperation().value(*decorated_operation_);
+      }
+    } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+               Tracing::OperationName::Egress) {
+      const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
+
+      // For Egress (outbound) response, if a decorator operation name has been provided, it
+      // should be used to override the active span's operation.
+      if (resp_operation_override) {
+        if (!resp_operation_override->value().empty()) {
+          active_span_->setOperation(resp_operation_override->value().c_str());
+        }
+        // Remove header so not propagated to service.
+        headers.removeEnvoyDecoratorOperation();
+      }
+    }
+  }
+
   chargeStats(headers);
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):", *this,
@@ -985,6 +1020,12 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   // TODO(mattklein123): Raise an error if this is called during a callback.
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", parent_,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
   ASSERT(stopped_);
@@ -1156,6 +1197,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
+  ENVOY_STREAM_LOG(debug, "request data too large watermark exceeded", parent_);
   if (parent_.state_.decoder_filters_streaming_) {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
@@ -1226,13 +1268,14 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
+    parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
+
     // If headers have not been sent to the user, send a 500.
     if (!headers_continued_) {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
       stopped_ = false;
 
-      parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
       Http::Utility::sendLocalReply(
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
             parent_.response_headers_ = std::move(response_headers);

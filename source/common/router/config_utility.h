@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -57,6 +58,14 @@ public:
    */
   static bool matchHeaders(const Http::HeaderMap& headers,
                            const std::vector<HeaderData>& request_headers);
+
+  /**
+   * Returns the redirect HTTP Status Code enum parsed from proto.
+   * @param code supplies the RedirectResponseCode enum.
+   * @return Returns the Http::Code version of the RedirectResponseCode.
+   */
+  static Http::Code
+  parseRedirectResponseCode(const envoy::api::v2::RedirectAction::RedirectResponseCode& code);
 };
 
 } // namespace Router

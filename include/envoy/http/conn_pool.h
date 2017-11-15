@@ -70,6 +70,11 @@ public:
   virtual ~Instance() {}
 
   /**
+   * @return Http::Protocol Reports the protocol in use by this connection pool.
+   */
+  virtual Http::Protocol protocol() const PURE;
+
+  /**
    * Called when a connection pool has been drained of pending requests, busy connections, and
    * ready connections.
    */
@@ -80,6 +85,11 @@ public:
    * complete.
    */
   virtual void addDrainedCallback(DrainedCb cb) PURE;
+
+  /**
+   * Close all connections currently owned by the pool.
+   */
+  virtual void closeConnections() PURE;
 
   /**
    * Create a new stream on the pool.

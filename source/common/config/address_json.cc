@@ -24,6 +24,10 @@ void AddressJson::translateAddress(const std::string& json_address, bool url, bo
 
   // We don't have v1 JSON with unresolved addresses in non-URL form.
   ASSERT(url);
+  // Non-TCP scheme (e.g. Unix scheme) is not supported with unresolved address.
+  if (!Network::Utility::urlIsTcpScheme(json_address)) {
+    throw EnvoyException(fmt::format("unresolved URL must be TCP scheme, got: {}", json_address));
+  }
   address.mutable_socket_address()->set_address(Network::Utility::hostFromTcpUrl(json_address));
   address.mutable_socket_address()->set_port_value(Network::Utility::portFromTcpUrl(json_address));
 }

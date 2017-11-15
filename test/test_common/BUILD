@@ -57,6 +57,14 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
+    name = "registry_lib",
+    hdrs = ["registry.h"],
+    deps = [
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -72,5 +80,13 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "lua_wrappers_lib",
+    hdrs = ["lua_wrappers.h"],
+    deps = [
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )

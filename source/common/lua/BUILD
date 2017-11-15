@@ -21,3 +21,13 @@ envoy_cc_library(
         "//source/common/common:c_smart_ptr_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "wrappers_lib",
+    srcs = ["wrappers.cc"],
+    hdrs = ["wrappers.h"],
+    deps = [
+        ":lua_lib",
+        "//include/envoy/buffer:buffer_interface",
+    ],
+)

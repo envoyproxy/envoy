@@ -95,6 +95,34 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "router_upstream_log_test",
+    srcs = ["router_upstream_log_test.cc"],
+    external_deps = ["envoy_filter_http_router"],
+    deps = [
+        "//include/envoy/common:optional",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/router:router_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/server/config/network:file_access_log_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "shadow_writer_impl_test",
     srcs = ["shadow_writer_impl_test.cc"],
     deps = [

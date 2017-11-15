@@ -115,6 +115,26 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("foo", {}, "");
 }
 
+// Validate pause-resume behavior.
+TEST_F(GrpcMuxImplTest, PauseResume) {
+  InSequence s;
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
+  grpc_mux_->pause("foo");
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+  expectSendMessage("foo", {"x", "y"}, "");
+  grpc_mux_->resume("foo");
+  grpc_mux_->pause("bar");
+  expectSendMessage("foo", {"z", "x", "y"}, "");
+  auto foo_z_sub = grpc_mux_->subscribe("foo", {"z"}, callbacks_);
+  grpc_mux_->resume("bar");
+  grpc_mux_->pause("foo");
+  auto foo_zz_sub = grpc_mux_->subscribe("foo", {"zz"}, callbacks_);
+  expectSendMessage("foo", {"zz", "z", "x", "y"}, "");
+  grpc_mux_->resume("foo");
+  grpc_mux_->pause("foo");
+}
+
 // Validate behavior when type URL mismatches occur.
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   InSequence s;

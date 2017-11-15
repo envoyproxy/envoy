@@ -8,9 +8,10 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/common/optional.h"
-#include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
@@ -34,6 +35,12 @@ public:
    * @return std::string the redirect URL.
    */
   virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Returns the HTTP status code to use when redirecting a request.
+   * @return Http::Code the redirect response Code.
+   */
+  virtual Http::Code redirectResponseCode() const PURE;
 };
 
 /**
@@ -296,7 +303,7 @@ public:
    * @param request_info holds additional information about the request.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const Http::AccessLog::RequestInfo& request_info) const PURE;
+                                      const AccessLog::RequestInfo& request_info) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

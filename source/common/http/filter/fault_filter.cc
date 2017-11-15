@@ -16,7 +16,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 
 #include "fmt/format.h"
@@ -29,48 +29,35 @@ const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_perce
 const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
 
-FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
-                                     const std::string& stats_prefix, Stats::Scope& scope)
+FaultFilterConfig::FaultFilterConfig(const envoy::api::v2::filter::http::HTTPFault& fault,
+                                     Runtime::Loader& runtime, const std::string& stats_prefix,
+                                     Stats::Scope& scope)
     : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
       scope_(scope) {
 
-  json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
-
-  const Json::ObjectSharedPtr config_abort = json_config.getObject("abort", true);
-  const Json::ObjectSharedPtr config_delay = json_config.getObject("delay", true);
-
-  if (config_abort->empty() && config_delay->empty()) {
+  if (!fault.has_abort() && !fault.has_delay()) {
     throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
   }
 
-  if (!config_abort->empty()) {
-    abort_percent_ = static_cast<uint64_t>(config_abort->getInteger("abort_percent", 0));
-
-    // TODO(mattklein123): Throw error if invalid return code is provided
-    http_status_ = static_cast<uint64_t>(config_abort->getInteger("http_status"));
+  if (fault.has_abort()) {
+    abort_percent_ = fault.abort().percent();
+    http_status_ = fault.abort().http_status();
   }
 
-  if (!config_delay->empty()) {
-    const std::string type = config_delay->getString("type");
-    ASSERT(type == "fixed");
-    UNREFERENCED_PARAMETER(type);
-    fixed_delay_percent_ =
-        static_cast<uint64_t>(config_delay->getInteger("fixed_delay_percent", 0));
-    fixed_duration_ms_ = static_cast<uint64_t>(config_delay->getInteger("fixed_duration_ms", 0));
+  if (fault.has_delay()) {
+    fixed_delay_percent_ = fault.delay().percent();
+    const auto& delay = fault.delay();
+    fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
 
-  if (json_config.hasObject("headers")) {
-    std::vector<Json::ObjectSharedPtr> config_headers = json_config.getObjectArray("headers");
-    for (const Json::ObjectSharedPtr& header_map : config_headers) {
-      fault_filter_headers_.push_back(*header_map);
-    }
+  for (const Router::ConfigUtility::HeaderData& header_map : fault.headers()) {
+    fault_filter_headers_.push_back(header_map);
   }
 
-  upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
+  upstream_cluster_ = fault.upstream_cluster();
 
-  if (json_config.hasObject("downstream_nodes")) {
-    std::vector<std::string> nodes = json_config.getStringArray("downstream_nodes");
-    downstream_nodes_.insert(nodes.begin(), nodes.end());
+  for (const auto& node : fault.downstream_nodes()) {
+    downstream_nodes_.insert(node);
   }
 }
 
@@ -114,7 +101,7 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     delay_timer_ = callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
     recordDelaysInjectedStats();
-    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected);
+    callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::DelayInjected);
     return FilterHeadersStatus::StopIteration;
   }
 
@@ -247,7 +234,7 @@ void FaultFilter::postDelayInjection() {
 }
 
 void FaultFilter::abortWithHTTPStatus() {
-  callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
+  callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::FaultInjected);
   Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_,
                                 static_cast<Http::Code>(abortHttpStatus()), "fault filter abort");
   recordAbortsInjectedStats();

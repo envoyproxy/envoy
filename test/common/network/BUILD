@@ -87,6 +87,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -147,6 +148,7 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 

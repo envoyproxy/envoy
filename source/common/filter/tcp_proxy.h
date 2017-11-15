@@ -5,14 +5,17 @@
 #include <string>
 #include <vector>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/request_info_impl.h"
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
 #include "common/network/cidr_range.h"
@@ -49,8 +52,7 @@ struct TcpProxyStats {
  */
 class TcpProxyConfig {
 public:
-  TcpProxyConfig(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                 Stats::Scope& scope);
+  TcpProxyConfig(const Json::Object& config, Server::Configuration::FactoryContext& context);
 
   /**
    * Find out which cluster an upstream connection should be opened to based on the
@@ -63,6 +65,7 @@ public:
   const std::string& getRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return stats_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
 
 private:
   struct Route {
@@ -79,6 +82,7 @@ private:
 
   std::vector<Route> routes_;
   const TcpProxyStats stats_;
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -180,6 +184,7 @@ protected:
   Stats::TimespanPtr connected_timespan_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
+  AccessLog::RequestInfoImpl request_info_;
 };
 
 } // Filter

@@ -684,18 +684,13 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
 
   // Send the respone headers.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-  // Make sure the headers are received before the body is sent.
-  response_->waitForHeaders();
+
   // Now send an overly large response body.
   upstream_request_->encodeData(1024 * 65, false);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    response_->waitForReset();
-  } else {
-    response_->waitForEndStream();
-  }
-  EXPECT_FALSE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  response_->waitForEndStream();
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
 }
 
 void HttpIntegrationTest::testTwoRequests() {

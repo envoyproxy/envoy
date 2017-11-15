@@ -128,9 +128,44 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
-  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
+  cluster.initialize([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.hosts().size());
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
+}
+
+// Resolve zero hosts, while using health checking.
+TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<MockClusterManager> cm;
+  ReadyWatcher initialized;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+  )EOF";
+
+  ResolverData resolver(*dns_resolver, dispatcher);
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  cluster.setHealthChecker(health_checker);
+  cluster.initialize([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(*resolver.timer_, enableTimer(_));
+  resolver.dns_callback_({});
+  EXPECT_EQ(0UL, cluster.hosts().size());
+  EXPECT_EQ(0UL, cluster.healthyHosts().size());
 }
 
 TEST(StrictDnsClusterImplTest, Basic) {
@@ -177,14 +212,23 @@ TEST(StrictDnsClusterImplTest, Basic) {
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.name.default.max_pending_requests", 57));
   EXPECT_EQ(57U,
             cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
   EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
   EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
   EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
   EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
@@ -200,6 +244,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
       [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
         membership_updated.ready();
       });
+
+  cluster.initialize([] {});
 
   resolver1.expectResolve(*dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
@@ -281,7 +327,7 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(100U, host->weight());
 }
 
-TEST(HostImplTest, HostameCanaryAndLocality) {
+TEST(HostImplTest, HostnameCanaryAndLocality) {
   MockCluster cluster;
   envoy::api::v2::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -318,6 +364,8 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
+  cluster.initialize([] {});
+
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
   EXPECT_EQ("", cluster.hosts()[0]->hostname());
   EXPECT_FALSE(cluster.info()->addedViaApi());
@@ -340,6 +388,8 @@ TEST(StaticClusterImplTest, RingHash) {
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             true);
+  cluster.initialize([] {});
+
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::RingHash, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
@@ -367,6 +417,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{detector});
+  cluster.initialize([] {});
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
@@ -412,8 +463,18 @@ TEST(StaticClusterImplTest, HealthyStat) {
   std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
   cluster.setHealthChecker(health_checker);
 
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
+  ReadyWatcher initialized;
+  cluster.initialize([&initialized] { initialized.ready(); });
+
+  EXPECT_EQ(2UL, cluster.hosts().size());
+  EXPECT_EQ(0UL, cluster.healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
+
+  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.hosts()[0], true);
+  cluster.hosts()[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_CALL(initialized, ready());
+  health_checker->runCallbacks(cluster.hosts()[1], true);
 
   cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.hosts()[0]);
@@ -464,6 +525,8 @@ TEST(StaticClusterImplTest, UrlConfig) {
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
+  cluster.initialize([] {});
+
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
             cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());

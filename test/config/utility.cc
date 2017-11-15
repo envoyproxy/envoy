@@ -26,8 +26,6 @@ static_resources:
         config:
           http_filters:
             name: envoy.router
-            config:
-              deprecated_v1: true
           codec_type: HTTP1
           route_config:
             virtual_hosts:

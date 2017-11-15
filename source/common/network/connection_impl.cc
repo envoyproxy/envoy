@@ -124,7 +124,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush || !canFlushClose()) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.

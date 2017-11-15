@@ -3,11 +3,11 @@
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://envoyproxy.github.io/envoy/install/requirements.html) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements) are typically
 independently sourced, the following steps should be followed:
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Configure, build and/or install the [Envoy dependencies](https://envoyproxy.github.io/envoy/install/requirements.html).
+2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements).
 3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
    to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
    [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
@@ -72,9 +72,9 @@ unprefixed, e.g. `as` instead of `x86_64-linux-gnu-as`.
 
 ## Supported compiler versions
 
-Though Envoy has been run in production compiled with GCC 4.9 extensively, we now strongly
-recommend GCC >= 5 due to known issues with std::string thread safety. Clang >= 4.0 is also known
-to work.
+Though Envoy has been run in production compiled with GCC 4.9 extensively, we now require
+GCC >= 5 due to known issues with std::string thread safety and C++14 support. Clang >= 4.0 is also
+known to work.
 
 ## Clang STL debug symbols
 

@@ -56,12 +56,12 @@ public:
   MockRetryState* retry_state_{};
 };
 
-class RouterTest : public testing::Test {
+class RouterTestBase : public testing::Test {
 public:
-  RouterTest()
+  RouterTestBase(bool start_child_span)
       : shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
-                ShadowWriterPtr{shadow_writer_}, true),
+                ShadowWriterPtr{shadow_writer_}, true, start_child_span),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -120,9 +120,13 @@ public:
       Network::Utility::parseInternetAddressAndPort("1.2.3.4:80")};
 };
 
+class RouterTest : public RouterTestBase {
+public:
+  RouterTest() : RouterTestBase(false) { EXPECT_CALL(callbacks_, activeSpan()).Times(0); }
+};
+
 TEST_F(RouterTest, RouteNotFound) {
-  EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound));
+  EXPECT_CALL(callbacks_.request_info_, setResponseFlag(AccessLog::ResponseFlag::NoRouteFound));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -134,8 +138,7 @@ TEST_F(RouterTest, RouteNotFound) {
 }
 
 TEST_F(RouterTest, ClusterNotFound) {
-  EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound));
+  EXPECT_CALL(callbacks_.request_info_, setResponseFlag(AccessLog::ResponseFlag::NoRouteFound));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -164,7 +167,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
         EXPECT_EQ(host_address_, host->address());
@@ -446,7 +449,7 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream));
+              setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -466,8 +469,7 @@ TEST_F(RouterTest, MaintenanceMode) {
                                            {"x-envoy-overloaded", "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow));
+  EXPECT_CALL(callbacks_.request_info_, setResponseFlag(AccessLog::ResponseFlag::UpstreamOverflow));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -517,8 +519,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   router_.retry_state_->callback_();
 
   // RetryOverflow kicks in.
-  EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow));
+  EXPECT_CALL(callbacks_.request_info_, setResponseFlag(AccessLog::ResponseFlag::UpstreamOverflow));
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _))
       .WillOnce(Return(RetryStatus::NoOverflow));
   EXPECT_CALL(cm_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
@@ -577,7 +578,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   router_.decodeData(data, true);
 
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
@@ -797,7 +798,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   router_.decodeData(data, true);
 
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -838,7 +839,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   router_.decodeData(data, true);
 
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
@@ -878,7 +879,7 @@ TEST_F(RouterTest, PerTryTimeoutWithNoUpstreamHost) {
 
   EXPECT_CALL(cancellable_, cancel());
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout));
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
@@ -903,7 +904,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
         return nullptr;
       }));
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
         EXPECT_EQ(host_address_, host->address());
@@ -950,7 +951,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream));
+              setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream));
   router_.retry_state_->callback_();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1137,7 +1138,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
 
   // Fire timeout.
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout));
 
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_)).Times(0);
   Http::TestHeaderMapImpl response_headers{
@@ -1183,7 +1184,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   // Fire timeout.
   EXPECT_CALL(cancellable, cancel());
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout));
 
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_)).Times(0);
   Http::TestHeaderMapImpl response_headers{
@@ -1404,9 +1405,24 @@ TEST_F(RouterTest, AltStatName) {
 TEST_F(RouterTest, Redirect) {
   MockRedirectEntry redirect;
   EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(redirect, redirectResponseCode()).WillOnce(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, RedirectFound) {
+  MockRedirectEntry redirect;
+  EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(redirect, redirectResponseCode()).WillOnce(Return(Http::Code::Found));
+  EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1811,7 +1827,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
             return nullptr;
           }));
   EXPECT_CALL(callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
+              setResponseFlag(AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillRepeatedly(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
         EXPECT_EQ(host_address_, host->address());
@@ -1829,6 +1845,71 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   // This should not trigger a retry as the retry state has been deleted.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+}
+
+class RouterTestChildSpan : public RouterTestBase {
+public:
+  RouterTestChildSpan() : RouterTestBase(true) {}
+};
+
+// Make sure child spans start/inject/finish with a normal flow.
+TEST_F(RouterTestChildSpan, BasicFlow) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*child_span, injectContext(_));
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span));
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span, finishSpan());
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Make sure child spans start/inject/finish with a reset flow.
+TEST_F(RouterTestChildSpan, ResetFlow) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*child_span, injectContext(_));
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span));
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  EXPECT_CALL(*child_span, finishSpan());
+  encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 
 } // namespace Router

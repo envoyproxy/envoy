@@ -38,7 +38,7 @@ public:
         [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
           membership_updated_.ready();
         });
-    cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
+    cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
   void expectResolve(Network::DnsLookupFamily dns_lookup_family) {
@@ -118,6 +118,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   }
   )EOF";
 
+  EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
