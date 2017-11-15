@@ -13,15 +13,21 @@
 #include "server/drain_manager_impl.h"
 
 #include "fmt/format.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Server {
 
-std::vector<Configuration::NetworkFilterFactoryCb>
+std::pair<std::string, std::vector<Configuration::NetworkFilterFactoryCb>>
 ProdListenerComponentFactory::createFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
+  EVP_MD_CTX md;
+
+  int rc = EVP_DigestInit(&md, EVP_sha256());
+  RELEASE_ASSERT(rc == 1);
+
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const ProtobufTypes::String string_type = proto_config.deprecated_v1().type();
@@ -32,19 +38,35 @@ ProdListenerComponentFactory::createFilterFactoryList_(
         MessageUtil::getJsonObjectFromMessage(proto_config.config());
 
     // Now see if there is a factory that will accept the config.
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
-            string_name);
-    Configuration::NetworkFilterFactoryCb callback;
-    if (filter_config->getBoolean("deprecated_v1", false)) {
-      callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
-    } else {
-      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
-      callback = factory.createFilterFactoryFromProto(*message, context);
+    try {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
+              string_name);
+      Configuration::NetworkFilterFactoryCb callback;
+      if (filter_config->getBoolean("deprecated_v1", false)) {
+        callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
+      } else {
+        auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+        callback = factory.createFilterFactoryFromProto(*message, context);
+
+        std::string buf;
+        message.get()->SerializeToString(&buf);
+        rc = EVP_DigestUpdate(&md, buf.data(), buf.size());
+        RELEASE_ASSERT(rc == 1);
+      }
+      ret.push_back(callback);
+    } catch (EnvoyException& e) {
+      EVP_MD_CTX_cleanup(&md);
+      throw;
     }
-    ret.push_back(callback);
   }
-  return ret;
+
+  uint8_t digest_data[EVP_MAX_MD_SIZE];
+  unsigned digest_len;
+  rc = EVP_DigestFinal(&md, digest_data, &digest_len);
+  RELEASE_ASSERT(rc == 1);
+
+  return std::make_pair(std::string(reinterpret_cast<const char*>(digest_data), digest_len), ret);
 }
 
 Network::ListenSocketSharedPtr
@@ -98,15 +120,20 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       (config.filter_chains().size() == 1 &&
        config.filter_chains()[0].filter_chain_match().sni_domains().empty());
 
+  std::string digest;
   uint32_t has_tls = 0;
   uint32_t has_stk = 0;
   for (const auto& filter_chain : config.filter_chains()) {
     std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
                                          filter_chain.filter_chain_match().sni_domains().end());
-    if (filter_factories_.empty() || !filter_chain.filters().empty()) {
-      // Only one filter chain can have filters until multiple filter chains are properly supported.
-      RELEASE_ASSERT(filter_factories_.empty());
-      filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+    auto ret = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+    if (filter_factories_.empty()) {
+      digest = ret.first;
+      filter_factories_ = ret.second;
+    } else if (digest.compare(ret.first) != 0) {
+      throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
+                                       "is currently not supported",
+                                       address_->asString()));
     }
     if (filter_chain.has_tls_context()) {
       Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());

@@ -187,7 +187,10 @@ envoy_cc_library(
     name = "listener_manager_lib",
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
-    external_deps = ["envoy_lds"],
+    external_deps = [
+        "envoy_lds",
+        "ssl",
+    ],
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",

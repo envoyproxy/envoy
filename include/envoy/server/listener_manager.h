@@ -36,7 +36,7 @@ public:
    * @param context supplies the factory creation context.
    * @return std::vector<Configuration::NetworkFilterFactoryCb> the list of filter factories.
    */
-  virtual std::vector<Configuration::NetworkFilterFactoryCb>
+  virtual std::pair<std::string, std::vector<Configuration::NetworkFilterFactoryCb>>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) PURE;
 

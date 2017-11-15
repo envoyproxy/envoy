@@ -89,7 +89,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   // Server::ListenerComponentFactory
-  std::vector<Configuration::NetworkFilterFactoryCb>
+  std::pair<std::string, std::vector<Configuration::NetworkFilterFactoryCb>>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);

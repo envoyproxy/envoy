@@ -142,7 +142,7 @@ public:
   DrainManagerPtr createDrainManager() override { return DrainManagerPtr{createDrainManager_()}; }
 
   MOCK_METHOD2(createFilterFactoryList,
-               std::vector<Configuration::NetworkFilterFactoryCb>(
+               std::pair<std::string, std::vector<Configuration::NetworkFilterFactoryCb>>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                    Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
