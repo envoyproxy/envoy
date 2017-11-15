@@ -37,6 +37,11 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Ob
   return createFactory(tcp_proxy_config, context);
 }
 
+ProtobufTypes::MessagePtr TcpProxyConfigFactory::createEmptyConfigProto() {
+  return std::unique_ptr<envoy::api::v2::filter::network::TcpProxy>(
+      new envoy::api::v2::filter::network::TcpProxy());
+}
+
 /**
  * Static registration for the tcp_proxy filter. @see RegisterFactory.
  */
