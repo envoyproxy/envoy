@@ -541,11 +541,10 @@ void ConnectionImpl::doConnect() {
     }
   }
 
-  try {
+  // The local address can only be retrieved for IP connections.  Other
+  // types, such as UDS, don't have a notion of a local address.
+  if (remote_address_->type() == Address::Type::Ip) {
     local_address_ = Address::addressFromFd(fd_);
-  } catch (const EnvoyException& e) {
-    // Eat the exception and leave local_address unchanged.  This will fail
-    // when connecting to a UDS.
   }
 }
 
