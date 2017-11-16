@@ -304,6 +304,9 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  Http::Code clusterNotFoundResponseCode() const override {
+    return cluster_not_found_response_code_;
+  }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const AccessLog::RequestInfo& request_info) const override;
@@ -360,6 +363,9 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    Http::Code clusterNotFoundResponseCode() const override {
+      return parent_->clusterNotFoundResponseCode();
+    }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers,
                                 const AccessLog::RequestInfo& request_info) const override {
@@ -456,6 +462,7 @@ private:
   const bool use_websocket_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
+  const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   const Optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;

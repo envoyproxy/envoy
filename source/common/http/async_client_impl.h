@@ -142,6 +142,9 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    Http::Code clusterNotFoundResponseCode() const override {
+      return Http::Code::InternalServerError;
+    }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     void finalizeRequestHeaders(Http::HeaderMap&, const AccessLog::RequestInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }

@@ -115,7 +115,8 @@ protected:
   void testRouterRedirect();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
-  void testRouterUnknownCluster();
+  void testRouterClusterNotFound404();
+  void testRouterClusterNotFound503();
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);

@@ -66,6 +66,14 @@ public:
    */
   static Http::Code
   parseRedirectResponseCode(const envoy::api::v2::RedirectAction::RedirectResponseCode& code);
+
+  /**
+   * Returns the HTTP Status Code enum parsed from proto.
+   * @param code supplies the ClusterNotFoundResponseCode enum.
+   * @return Returns the Http::Code version of the ClusterNotFoundResponseCode enum.
+   */
+  static Http::Code parseClusterNotFoundResponseCode(
+      const envoy::api::v2::RouteAction::ClusterNotFoundResponseCode& code);
 };
 
 } // namespace Router
