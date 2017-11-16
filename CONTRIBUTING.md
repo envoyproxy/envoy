@@ -3,7 +3,7 @@ maximize the chances of your PR being merged.
 
 # Communication
 
-* Before starting work on a major feature, please reach out to us via GitHub, Gitter,
+* Before starting work on a major feature, please reach out to us via GitHub, Slack,
   email, etc. We will make sure no one else is already working on it and ask you to open a
   GitHub issue.
 * A "major feature" is defined as any change that is > 100 LOC altered (not including tests), or
@@ -98,7 +98,7 @@ maximize the chances of your PR being merged.
   organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code.
-* If there is a question on who should review a PR please discuss in Gitter.
+* If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a committer or not.
 * Please **clean up the commit message** before merging. By default, GitHub fills the squash merge
   commit message with every individual commit from the PR. Generally, we want a commit message
