@@ -379,6 +379,27 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
 
+class TcpProxyNoConfigTest : public testing::Test {
+public:
+  TcpProxyNoConfigTest() {}
+
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<TcpProxy> filter_;
+};
+
+TEST_F(TcpProxyNoConfigTest, Initialization) {
+  filter_.reset(new TcpProxy(nullptr, factory_context_.cluster_manager_));
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+}
+
+TEST_F(TcpProxyNoConfigTest, ReadDisableDownstream) {
+  filter_.reset(new TcpProxy(nullptr, factory_context_.cluster_manager_));
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
+  filter_->readDisableDownstream(true);
+}
+
 class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
