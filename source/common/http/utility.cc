@@ -185,9 +185,7 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
 
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
   return (headers.Connection() && headers.Upgrade() &&
-          (0 == StringUtil::caseInsensitiveCompare(
-                    headers.Connection()->value().c_str(),
-                    Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
+          (NULL != strcasestr(headers.Connection()->value().c_str(), Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
           (0 == StringUtil::caseInsensitiveCompare(
                     headers.Upgrade()->value().c_str(),
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
