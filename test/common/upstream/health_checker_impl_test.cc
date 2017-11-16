@@ -135,6 +135,27 @@ public:
     });
   }
 
+  void setupNoServiceValidationNoReuseConnectionHC() {
+    std::string json = R"EOF(
+    {
+      "type": "http",
+      "timeout_ms": 1000,
+      "interval_ms": 1000,
+      "interval_jitter_ms": 1000,
+      "unhealthy_threshold": 2,
+      "healthy_threshold": 2,
+      "reuse_connection": false,
+      "path": "/healthcheck"
+    }
+    )EOF";
+
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
   void setupServiceValidationHC() {
     std::string json = R"EOF(
     {
@@ -614,6 +635,36 @@ TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 }
 
+// Test that we close connections on a healthy check when reuse_connection is false
+TEST_F(HttpHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
+  setupNoServiceValidationNoReuseConnectionHC();
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+
+  // A new client is created because we close the connection ourselves
+  // See HttpHealthCheckerImplTest.RemoteCloseBetweenChecks for how this works when the remote end
+  // closes the connection
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  test_sessions_[0]->interval_timer_->callback_();
+
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+}
+
 TEST_F(HttpHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, false));
@@ -819,6 +870,7 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   read_filter_->onData(response);
 }
 
+// Tests that a successful healthcheck will disconnect the client when reuse_connection is false
 TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   InSequence s;
 
@@ -832,6 +884,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
+  // Expected execution flow when a healthcheck is successful and reuse_connection is false
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
@@ -840,7 +893,9 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   add_uint8(response, 2);
   read_filter_->onData(response);
 
+  // Expected metric results after testing
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
 
 TEST_F(TcpHealthCheckerImplTest, Timeout) {
@@ -894,31 +949,33 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   cluster_->runCallbacks({}, removed);
 }
 
+// Tests that when reuse_connection is false timeouts execute normally
 TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
   InSequence s;
 
   setupDataDontReuseConnection();
-  health_checker_->start();
-
+  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  cluster_->hosts_ = {makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   EXPECT_CALL(*connection_, write(_)).Times(1);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
-  cluster_->runCallbacks({cluster_->hosts_.back()}, {});
+  health_checker_->start();
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  Buffer::OwnedImpl response;
-  add_uint8(response, 1);
-  read_filter_->onData(response);
-
-  EXPECT_CALL(*connection_, close(_));
+  // Expected flow when a healthchech is successful and reuse_connection is false
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
-  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
 
+  Buffer::OwnedImpl response;
+  add_uint8(response, 2);
+  read_filter_->onData(response);
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+
+  // Check again
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
@@ -926,23 +983,36 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
+  // Expected flow when a healthchech times out
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  // Not yet at the unhealthy threshold
+  EXPECT_FALSE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_TRUE(cluster_->hosts_[0]->healthy());
+
+  // Healthcheck results after first timeout block
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+
+  // healthcheck should be failing after doing this again
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  interval_timer_->callback_();
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Expected flow when a healthchech times out
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->hosts_[0]->healthy());
 
-  expectClientCreate();
-  EXPECT_CALL(*connection_, write(_));
-  EXPECT_CALL(*timeout_timer_, enableTimer(_));
-  interval_timer_->callback_();
-
-  connection_->raiseEvent(Network::ConnectionEvent::Connected);
-
-  std::vector<HostSharedPtr> removed{cluster_->hosts_.back()};
-  cluster_->hosts_.clear();
-  EXPECT_CALL(*connection_, close(_));
-  cluster_->runCallbacks({}, removed);
+  // Healthcheck results after first timeout block
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
 
 TEST_F(TcpHealthCheckerImplTest, NoData) {
