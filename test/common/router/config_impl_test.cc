@@ -2681,6 +2681,10 @@ virtual_hosts:
       - header:
           key: X-VHost-To-Add
           value: abc
+      - header:
+          key: X-VHost-To-Set
+          value: def
+        append: false
     response_headers_to_remove:
       - X-VHost-To-Remove
     routes:
@@ -2694,16 +2698,74 @@ virtual_hosts:
 
   auto& vhost =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->virtualHost();
-
-  EXPECT_EQ(vhost.responseHeadersToAdd().size(), 1);
-  EXPECT_EQ(vhost.responseHeadersToAdd().front().header_, Http::LowerCaseString("x-vhost-to-add"));
-  EXPECT_EQ(vhost.responseHeadersToAdd().front().value_, "abc");
-  EXPECT_TRUE(vhost.responseHeadersToAdd().front().append_);
+  EXPECT_EQ(vhost.responseHeadersToAdd(),
+            std::list<Router::HeaderAddition>({
+                {Http::LowerCaseString("x-vhost-to-add"), "abc", true},
+                {Http::LowerCaseString("x-vhost-to-set"), "def", false},
+            }));
   EXPECT_EQ(vhost.responseHeadersToRemove(),
             std::list<Http::LowerCaseString>({Http::LowerCaseString("x-vhost-to-remove")}));
 }
 
-// TODO: add TestRouteResponseHeadersConfig
+TEST(RoutePropertyTest, TestRouteResponseHeadersConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/api" }
+        route:
+          cluster: "ats"
+          response_headers_to_add:
+            - header:
+                key: X-Route-To-Add
+                value: abc
+            - header:
+                key: X-Route-To-Set
+                value: def
+              append: false
+          response_headers_to_remove:
+            - X-Route-To-Remove
+      - match: { prefix: "/weighted" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: "c1"
+                weight: 50
+              - name: "c2"
+                weight: 50
+          response_headers_to_add:
+            - header:
+                key: X-WeightedCluster-To-Add
+                value: abc
+          response_headers_to_remove:
+            - X-WeightedCluster-To-Remove
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  auto* route_entry = config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry();
+  EXPECT_EQ(route_entry->responseHeadersToAdd(),
+            std::list<Router::HeaderAddition>({
+                {Http::LowerCaseString("x-route-to-add"), "abc", true},
+                {Http::LowerCaseString("x-route-to-set"), "def", false},
+            }));
+  EXPECT_EQ(route_entry->responseHeadersToRemove(),
+            std::list<Http::LowerCaseString>({Http::LowerCaseString("x-route-to-remove")}));
+
+  auto* wc_route_entry =
+      config.route(genHeaders("api.lyft.com", "/weighted", "GET"), 0)->routeEntry();
+  EXPECT_EQ(wc_route_entry->responseHeadersToAdd(),
+            std::list<Router::HeaderAddition>({
+                {Http::LowerCaseString("x-weightedcluster-to-add"), "abc", true},
+            }));
+  EXPECT_EQ(
+      wc_route_entry->responseHeadersToRemove(),
+      std::list<Http::LowerCaseString>({Http::LowerCaseString("x-weightedcluster-to-remove")}));
+}
 
 TEST(RouterMatcherTest, Decorator) {
   std::string json = R"EOF(
@@ -2932,7 +2994,7 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
   EXPECT_EQ((*it)->value().value().string_value(), "override3");
 }
 
-TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
+TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
   auto route_config = envoy::api::v2::RouteConfiguration();
   auto* vhost = route_config.add_virtual_hosts();
   vhost->set_name("vhost");

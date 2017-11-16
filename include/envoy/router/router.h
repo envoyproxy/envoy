@@ -415,6 +415,18 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  /**
+   * @return const std::list<HeaderAddition>& a list of headers to add to the response sent
+   *         downstream.
+   */
+  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
+
+  /**
+   * @return const std::list<Http::LowerCaseString>& a list of headers to remove from the response
+   *         sent downstream.
+   */
+  virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
 };
 
 /**

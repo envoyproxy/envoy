@@ -381,17 +381,33 @@ TEST_F(RouterTest, AddMultipleCookies) {
   router_.onDestroy();
 }
 
-TEST_F(RouterTest, VirtualHostManipulateResponseHeaders) {
-  std::list<Router::HeaderAddition> to_add(
+// Validates behavior of response_headers_to_/remove from the vhost and route.
+TEST_F(RouterTest, FilterManipulateResponseHeaders) {
+  std::list<Router::HeaderAddition> vhost_to_add(
       {{Http::LowerCaseString("x-vhost-to-add"), "abc", true},
-       {Http::LowerCaseString("x-vhost-to-set"), "abc", false}});
+       {Http::LowerCaseString("x-vhost-to-set"), "def", false},
+       {Http::LowerCaseString("x-override"), "vhost-value", false}});
 
-  std::list<Http::LowerCaseString> to_remove({Http::LowerCaseString("x-vhost-to-remove")});
+  std::list<Http::LowerCaseString> vhost_to_remove(
+      {Http::LowerCaseString("x-vhost-to-remove"), Http::LowerCaseString("x-remove-me")});
 
   ON_CALL(callbacks_.route_->route_entry_.virtual_host_, responseHeadersToAdd())
-      .WillByDefault(ReturnRef(to_add));
+      .WillByDefault(ReturnRef(vhost_to_add));
   ON_CALL(callbacks_.route_->route_entry_.virtual_host_, responseHeadersToRemove())
-      .WillByDefault(ReturnRef(to_remove));
+      .WillByDefault(ReturnRef(vhost_to_remove));
+
+  std::list<Router::HeaderAddition> route_to_add(
+      {{Http::LowerCaseString("x-route-to-set"), "ghi", false},
+       {Http::LowerCaseString("x-route-to-add"), "jkl", true},
+       {Http::LowerCaseString("x-override"), "route-value", false},
+       {Http::LowerCaseString("x-remove-me"), "route-value", true}});
+
+  std::list<Http::LowerCaseString> route_to_remove({{Http::LowerCaseString("x-route-to-remove")}});
+
+  ON_CALL(callbacks_.route_->route_entry_, responseHeadersToAdd())
+      .WillByDefault(ReturnRef(route_to_add));
+  ON_CALL(callbacks_.route_->route_entry_, responseHeadersToRemove())
+      .WillByDefault(ReturnRef(route_to_remove));
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -412,21 +428,34 @@ TEST_F(RouterTest, VirtualHostManipulateResponseHeaders) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_STREQ(headers.get(Http::LowerCaseString("x-vhost-to-set"))->value().c_str(), "abc");
+        EXPECT_STREQ(headers.get(Http::LowerCaseString("x-vhost-to-set"))->value().c_str(), "def");
+        EXPECT_STREQ(headers.get(Http::LowerCaseString("x-route-to-set"))->value().c_str(), "ghi");
         EXPECT_EQ(headers.get(Http::LowerCaseString("x-vhost-to-remove")), nullptr);
+        EXPECT_EQ(headers.get(Http::LowerCaseString("x-route-to-remove")), nullptr);
 
-        std::list<std::string> values;
+        // vhost headers applied after route headers
+        EXPECT_STREQ(headers.get(Http::LowerCaseString("x-override"))->value().c_str(),
+                     "vhost-value");
+
+        // vhost headers removals applied after route header additions
+        EXPECT_EQ(headers.get(Http::LowerCaseString("x-remove-me")), nullptr);
+
+        std::pair<std::list<std::string>, std::list<std::string>> values;
         headers.iterate(
             [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
+              auto* v =
+                  static_cast<std::pair<std::list<std::string>, std::list<std::string>>*>(cb_v);
               if ("x-vhost-to-add" == std::string{header.key().c_str()}) {
-                std::list<std::string>* v = static_cast<std::list<std::string>*>(cb_v);
-                v->push_back(std::string{header.value().c_str()});
+                v->first.push_back(std::string{header.value().c_str()});
+              } else if ("x-route-to-add" == std::string{header.key().c_str()}) {
+                v->second.push_back(std::string{header.value().c_str()});
               }
               return Http::HeaderMap::Iterate::Continue;
             },
             &values);
 
-        EXPECT_EQ(values, std::list<std::string>({"existing", "abc"}));
+        EXPECT_EQ(values.first, std::list<std::string>({"existing-vhost", "abc"}));
+        EXPECT_EQ(values.second, std::list<std::string>({"existing-route", "jkl"}));
       }));
   expectResponseTimerCreate();
 
@@ -437,9 +466,12 @@ TEST_F(RouterTest, VirtualHostManipulateResponseHeaders) {
 
   Http::HeaderMapPtr response_headers(
       new Http::TestHeaderMapImpl{{":status", "200"},
-                                  {"x-vhost-to-add", "existing"},
-                                  {"x-vhost-to-set", "existing"},
-                                  {"x-vhost-to-remove", "existing"}});
+                                  {"x-vhost-to-add", "existing-vhost"},
+                                  {"x-vhost-to-set", "existing-vhost"},
+                                  {"x-vhost-to-remove", "existing-vhost"},
+                                  {"x-route-to-add", "existing-route"},
+                                  {"x-route-to-set", "existing-route"},
+                                  {"x-route-to-remove", "existing-route"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
   // When the router filter gets reset we should cancel the pool request.
   router_.onDestroy();

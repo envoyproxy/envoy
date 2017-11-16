@@ -305,6 +305,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
+  for (const auto& header_value_option : route.route().response_headers_to_add()) {
+    response_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
+  }
+
+  for (const std::string& header : route.route().response_headers_to_remove()) {
+    response_headers_to_remove_.push_back(Http::LowerCaseString(header));
+  }
+
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
   // or the route set `include_vh_rate_limits` to true.
   include_vh_rate_limits_ =

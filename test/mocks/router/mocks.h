@@ -213,6 +213,8 @@ public:
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
+  MOCK_CONST_METHOD0(responseHeadersToAdd, const std::list<Router::HeaderAddition>&());
+  MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -224,6 +226,8 @@ public:
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
+  std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
 class MockDecorator : public Decorator {

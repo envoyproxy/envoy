@@ -336,6 +336,12 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
+  const std::list<HeaderAddition>& responseHeadersToAdd() const override {
+    return response_headers_to_add_;
+  }
+  const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
+    return response_headers_to_remove_;
+  }
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -399,6 +405,13 @@ private:
     bool useWebSocket() const override { return parent_->useWebSocket(); }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
+    }
+
+    const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
+      return parent_->responseHeadersToAdd();
+    }
+    const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
+      return parent_->responseHeadersToRemove();
     }
 
     // Router::Route
@@ -479,6 +492,8 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   std::list<Router::HeaderAddition> request_headers_to_add_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
+  std::list<Http::LowerCaseString> response_headers_to_remove_;
   RequestHeaderParserPtr request_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.

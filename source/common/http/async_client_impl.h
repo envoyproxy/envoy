@@ -23,6 +23,7 @@
 #include "common/access_log/request_info_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
+#include "common/common/macros.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -176,7 +177,12 @@ private:
     bool autoHostRewrite() const override { return false; }
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-
+    const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
+      CONSTRUCT_ON_FIRST_USE(std::list<Router::HeaderAddition>);
+    }
+    const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
+      CONSTRUCT_ON_FIRST_USE(std::list<Http::LowerCaseString>);
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
