@@ -238,7 +238,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
                      .value());
 }
 
-/*
+/**
  * Test that the consecutive gateway failure detector correctly fires, and also successfully
  * retriggers after uneject. This will also ensure that the stats counters end up with the expected
  * values.
@@ -337,7 +337,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
                      .value());
 }
 
-/*
+/**
  * Test the interaction between the consecutive gateway failure and 5xx detectors.
  * This will first trigger a consecutive gateway failure with 503s, and then trigger 5xx with a mix
  * of 503s and 500s. We expect the consecutive gateway failure to fire after 5 consecutive 503s, and
