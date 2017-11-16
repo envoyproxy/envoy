@@ -125,14 +125,19 @@ TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Scop
 void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
-  config_->stats().downstream_cx_total_.inc();
+
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
+    
+  if (!config_) {
+    return;
+  }
+  config_->stats().downstream_cx_total_.inc();
   read_callbacks_->connection().setConnectionStats(
       {config_->stats().downstream_cx_rx_bytes_total_,
        config_->stats().downstream_cx_rx_bytes_buffered_,
        config_->stats().downstream_cx_tx_bytes_total_,
        config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
-  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
 }
 
 void TcpProxy::readDisableUpstream(bool disable) {
