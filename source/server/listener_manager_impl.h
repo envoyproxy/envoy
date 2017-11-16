@@ -27,12 +27,12 @@ public:
   /**
    * Static worker for createFilterFactoryList() that can be used directly in tests.
    */
-  static std::pair<std::string, std::vector<Configuration::NetworkFilterFactoryCb>>
+  static std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                            Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
-  std::pair<std::string, std::vector<Configuration::NetworkFilterFactoryCb>>
+  std::vector<Configuration::NetworkFilterFactoryCb>
   createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, context);
