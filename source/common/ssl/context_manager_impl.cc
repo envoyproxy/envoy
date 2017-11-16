@@ -103,6 +103,7 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   // TODO(PiotrSikora): make this lockless.
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
 
+  // TODO(PiotrSikora): refactor and combine code with RouteMatcher::findVirtualHost().
   auto listener_map_exact = map_exact_.find(listener_name);
   if (listener_map_exact != map_exact_.end()) {
     auto ctx = listener_map_exact->second.find(server_name);
