@@ -244,7 +244,7 @@ public:
   uint64_t features() const override { return features_; }
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
-  const envoy::api::v2::Cluster::RingHashLbConfig lbRingHashConfig() const override {
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
   bool maintenanceMode() const override;
@@ -291,7 +291,7 @@ private:
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
-  envoy::api::v2::Cluster::RingHashLbConfig lb_ring_hash_config_;
+  Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
 };

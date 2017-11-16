@@ -24,7 +24,7 @@ class RingHashLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::u
 public:
   RingHashLoadBalancer(HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
-                       const envoy::api::v2::Cluster::RingHashLbConfig& config);
+                       const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -37,7 +37,7 @@ private:
 
   struct Ring {
     HostConstSharedPtr chooseHost(LoadBalancerContext* context, Runtime::RandomGenerator& random);
-    void create(const envoy::api::v2::Cluster::RingHashLbConfig& config,
+    void create(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
                 const std::vector<HostSharedPtr>& hosts);
 
     std::vector<RingEntry> ring_;
@@ -49,7 +49,7 @@ private:
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
-  const envoy::api::v2::Cluster::RingHashLbConfig config_;
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
   Ring all_hosts_ring_;
   Ring healthy_hosts_ring_;
 };
