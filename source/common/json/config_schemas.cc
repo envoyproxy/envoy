@@ -1522,6 +1522,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
+          "consecutive_gateway_failure" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "success_rate_minimum_hosts" : {
             "type" : "integer",
             "minimum" : 0,
@@ -1553,6 +1558,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "maximum" : 100
           },
           "enforcing_consecutive_5xx" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "enforcing_consecutive_gateway_failure" : {
             "type" : "integer",
             "minimum" : 0,
             "maximum" : 100
