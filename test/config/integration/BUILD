@@ -13,6 +13,7 @@ exports_files([
     "server_ads.yaml",
     "server_cors_filter.json",
     "server_grpc_json_transcoder.json",
+    "server_header.json",
     "server_http2.json",
     "server_http2_upstream.json",
     "server_proxy_proto.json",

@@ -221,6 +221,10 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
 }
 
+void BaseIntegrationTest::registerParam(const std::string& key, const std::string& value) {
+  param_map_[key] = value;
+}
+
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_);
@@ -250,7 +254,8 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
+      TestEnvironment::temporaryFileSubstitute(json_path, param_map_, port_map_, version_),
+      version_);
   registerTestServerPorts(port_names);
 }
 

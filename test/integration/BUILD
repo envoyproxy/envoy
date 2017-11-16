@@ -106,6 +106,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_integration_test",
+    srcs = [
+        "header_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration:server_header.json",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_integration_test",
     srcs = [
         "http2_integration_test.cc",
