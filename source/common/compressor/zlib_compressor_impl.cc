@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Compressor {
 
-ZlibCompressorImpl::ZlibCompressorImpl() : ZlibCompressorImpl(4096){};
+ZlibCompressorImpl::ZlibCompressorImpl() : ZlibCompressorImpl(4096) {}
 
 ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
     : chunk_size_{chunk_size}, initialized_{false}, chunk_char_ptr_(new unsigned char[chunk_size]),
