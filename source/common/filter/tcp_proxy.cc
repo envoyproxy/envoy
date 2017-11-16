@@ -128,7 +128,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
-    
+
   if (!config_) {
     return;
   }
