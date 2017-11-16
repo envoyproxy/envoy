@@ -126,6 +126,7 @@ bool ListenerImpl::drainClose() const {
 }
 
 void ListenerImpl::debugLog(const std::string& message) {
+  UNREFERENCED_PARAMETER(message);
   ENVOY_LOG(debug, "{}: name={}, hash={}, address={}", message, name_, hash_, address_->asString());
 }
 
