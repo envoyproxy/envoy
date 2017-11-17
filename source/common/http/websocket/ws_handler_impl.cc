@@ -24,7 +24,7 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const AccessLog::Reques
 }
 
 void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
-  Code http_code;
+  Code http_code = Code::InternalServerError;
   switch (failure_reason) {
   case UpstreamFailureReason::CONNECT_FAILED:
     http_code = Code::GatewayTimeout;
