@@ -152,12 +152,19 @@ protected:
     bool on_high_watermark_called_{false};
   };
 
+  enum class UpstreamFailureReason {
+    CONNECT_FAILED,
+    NO_HEALTHY_UPSTREAM,
+    RESOURCE_LIMIT_EXCEEDED,
+    NO_ROUTE,
+  };
+
   // Callbacks for different error and success states during connection establishment
   virtual const std::string& getUpstreamCluster() {
     return config_->getRouteFromEntries(read_callbacks_->connection());
   }
 
-  virtual void onInitFailure(Http::Code) {
+  virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 

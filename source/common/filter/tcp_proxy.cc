@@ -234,7 +234,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
       config_->stats().downstream_cx_no_route_.inc();
     }
     request_info_.setResponseFlag(AccessLog::ResponseFlag::NoRouteFound);
-    onInitFailure(Http::Code::ServiceUnavailable);
+    onInitFailure(UpstreamFailureReason::NO_ROUTE);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -242,18 +242,14 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
-    onInitFailure(Http::Code::ServiceUnavailable);
+    onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
     return Network::FilterStatus::StopIteration;
   }
 
   const uint32_t max_connect_attempts = (config_ != nullptr) ? config_->maxConnectAttempts() : 1;
   if (connect_attempts_ >= max_connect_attempts) {
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
-
-    // This isn't logically the correct error code, but this maintains existing websocket
-    // error code functionality.
-    onInitFailure(Http::Code::GatewayTimeout);
-
+    onInitFailure(UpstreamFailureReason::CONNECT_FAILED);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -265,7 +261,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   if (!upstream_connection_) {
     // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy.
     request_info_.setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream);
-    onInitFailure(Http::Code::ServiceUnavailable);
+    onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
     return Network::FilterStatus::StopIteration;
   }
 

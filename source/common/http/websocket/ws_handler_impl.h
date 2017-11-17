@@ -33,8 +33,7 @@ public:
 protected:
   // Filter::TcpProxy
   const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }
-
-  void onInitFailure(Http::Code failure_reason) override;
+  void onInitFailure(UpstreamFailureReason failure_reason) override;
   void onConnectionSuccess() override;
 
 private:

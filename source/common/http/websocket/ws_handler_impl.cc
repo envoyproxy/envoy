@@ -23,8 +23,20 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const AccessLog::Reques
   initializeReadFilterCallbacks(*read_callbacks);
 }
 
-void WsHandlerImpl::onInitFailure(Code failure_reason) {
-  HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(failure_reason))}};
+void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
+  Code http_code;
+  switch (failure_reason) {
+  case UpstreamFailureReason::CONNECT_FAILED:
+    http_code = Code::GatewayTimeout;
+    break;
+  case UpstreamFailureReason::NO_HEALTHY_UPSTREAM:
+  case UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED:
+  case UpstreamFailureReason::NO_ROUTE:
+    http_code = Code::ServiceUnavailable;
+    break;
+  }
+
+  HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(http_code))}};
   ws_callbacks_.sendHeadersOnlyResponse(headers);
 }
 
