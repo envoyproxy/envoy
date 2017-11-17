@@ -104,7 +104,6 @@ protected:
   static SslStats generateStats(Stats::Scope& scope);
   int32_t getDaysUntilExpiration(const X509* cert);
   bssl::UniquePtr<X509> loadCert(const std::string& cert_file);
-  bssl::UniquePtr<X509_CRL> loadCRL(const std::string& crl_file);
   static std::string getSerialNumber(X509* cert);
   std::string getCaFileName() { return ca_file_path_; };
   std::string getCertChainFileName() { return cert_chain_file_path_; };
