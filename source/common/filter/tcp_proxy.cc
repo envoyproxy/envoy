@@ -39,8 +39,7 @@ TcpProxyConfig::Route::Route(
 TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
                                Server::Configuration::FactoryContext& context)
     : stats_(generateStats(config.stat_prefix(), context.scope())),
-      max_connect_attempts_(
-          config.has_max_connect_attempts() ? config.max_connect_attempts().value() : 1) {
+      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)) {
 
   if (config.has_deprecated_v1()) {
     for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
@@ -94,6 +93,7 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
   return EMPTY_STRING;
 }
 
+// TODO(ggreenway): refactor this and websocket code so that config_ is always non-null.
 TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
@@ -139,8 +139,12 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  read_callbacks_->connection().readDisable(true);
   request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
+
+  // Need to disable reads so that we don't write to an upstream that might fail
+  // in onData().  This will get re-enabled when the upstream connection is
+  // established.
+  read_callbacks_->connection().readDisable(true);
 
   if (!config_) {
     return;
@@ -245,7 +249,11 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   const uint32_t max_connect_attempts = (config_ != nullptr) ? config_->maxConnectAttempts() : 1;
   if (connect_attempts_ >= max_connect_attempts) {
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
+
+    // This isn't logically the correct error code, but this maintains existing websocket
+    // error code functionality.
     onInitFailure(Http::Code::GatewayTimeout);
+
     return Network::FilterStatus::StopIteration;
   }
 
@@ -255,7 +263,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
-    // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy
+    // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy.
     request_info_.setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream);
     onInitFailure(Http::Code::ServiceUnavailable);
     return Network::FilterStatus::StopIteration;
@@ -276,6 +284,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   request_info_.onUpstreamHostSelected(conn_info.host_description_);
   request_info_.upstream_local_address_ = upstream_connection_->localAddress().asString();
 
+  ASSERT(connect_timeout_timer_ == nullptr);
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
       [this]() -> void { onConnectTimeout(); });
   connect_timeout_timer_->enableTimer(cluster->connectTimeout());
@@ -354,7 +363,11 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
   } else if (event == Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
+
+    // Re-enable downstream reads now that the upstream connection is established
+    // so we have a place to send downstream data to.
     read_callbacks_->connection().readDisable(false);
+
     onConnectionSuccess();
   }
 }
