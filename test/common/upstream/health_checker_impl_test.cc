@@ -635,7 +635,7 @@ TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 }
 
-// Test that we close connections on a healthy check when reuse_connection is false
+// Test that we close connections on a healthy check when reuse_connection is false.
 TEST_F(HttpHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
   setupNoServiceValidationNoReuseConnectionHC();
   EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
@@ -651,9 +651,9 @@ TEST_F(HttpHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
   respond(0, "200", false);
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 
-  // A new client is created because we close the connection ourselves
+  // A new client is created because we close the connection ourselves.
   // See HttpHealthCheckerImplTest.RemoteCloseBetweenChecks for how this works when the remote end
-  // closes the connection
+  // closes the connection.
   expectClientCreate(0);
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
@@ -870,7 +870,7 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   read_filter_->onData(response);
 }
 
-// Tests that a successful healthcheck will disconnect the client when reuse_connection is false
+// Tests that a successful healthcheck will disconnect the client when reuse_connection is false.
 TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   InSequence s;
 
@@ -884,7 +884,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // Expected execution flow when a healthcheck is successful and reuse_connection is false
+  // Expected execution flow when a healthcheck is successful and reuse_connection is false.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
@@ -893,7 +893,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   add_uint8(response, 2);
   read_filter_->onData(response);
 
-  // Expected metric results after testing
+  // These are the expected metric results after testing.
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
@@ -949,8 +949,8 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   cluster_->runCallbacks({}, removed);
 }
 
-// Tests that when reuse_connection is false timeouts execute normally
-TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
+// Tests that when reuse_connection is false timeouts execute normally.
+TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
   InSequence s;
 
   setupDataDontReuseConnection();
@@ -963,7 +963,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // Expected flow when a healthchech is successful and reuse_connection is false
+  // Expected flow when a healthcheck is successful and reuse_connection is false.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
@@ -975,7 +975,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 
-  // Check again
+  // The healthcheck will run again.
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
@@ -983,19 +983,19 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // Expected flow when a healthchech times out
+  // Expected flow when a healthcheck times out.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-  // Not yet at the unhealthy threshold
+  // The healthcheck is not yet at the unhealthy threshold.
   EXPECT_FALSE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 
-  // Healthcheck results after first timeout block
+  // The healthcheck metric results after first timeout block.
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 
-  // healthcheck should be failing after doing this again
+  // The healthcheck will run again, it should be failing after this attempt.
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
@@ -1003,14 +1003,14 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithReuseConnection) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // Expected flow when a healthchech times out
+  // Expected flow when a healthcheck times out.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_TRUE(cluster_->hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->hosts_[0]->healthy());
 
-  // Healthcheck results after first timeout block
+  // The healthcheck metric results after the second timeout block.
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
@@ -1256,7 +1256,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
-// Tests that redis client will behave appropriately when reuse_connection is false
+// Tests that redis client will behave appropriately when reuse_connection is false.
 TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   InSequence s;
   setupDontReuseConnection();
@@ -1268,7 +1268,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   expectRequestCreate();
   health_checker_->start();
 
-  // Success will close connection
+  // The connection will close on success.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
@@ -1281,7 +1281,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   expectRequestCreate();
   interval_timer_->callback_();
 
-  // Failure will close connection
+  // The connection will close on failure.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
@@ -1292,7 +1292,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   expectRequestCreate();
   interval_timer_->callback_();
 
-  // Redis failure via disconnect, connection closed by the other end
+  // Redis failure via disconnect, the connection was closed by the other end.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   pool_callbacks_->onFailure();
@@ -1302,7 +1302,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   expectRequestCreate();
   interval_timer_->callback_();
 
-  // Timeout, connection will be closed
+  // Timeout, the connection will be closed.
   EXPECT_CALL(pool_request_, cancel());
   EXPECT_CALL(*client_, close());
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -1317,6 +1317,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   EXPECT_CALL(pool_request_, cancel());
   EXPECT_CALL(*client_, close());
 
+  // The metrics expected after all tests have run.
   EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
