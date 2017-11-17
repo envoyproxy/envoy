@@ -1,6 +1,8 @@
-#include "test/integration/http_integration.h"
-#include "test/mocks/http/mocks.h"
+#include "common/protobuf/protobuf.h"
 
+#include "test/integration/http_integration.h"
+
+#include "api/filter/http/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -13,62 +15,73 @@ public:
   enum HeaderMode {
     Append = 1,
     Replace = 2,
-    AppendWithRouteConfigHeaders = 3,
-    ReplaceWithRouteConfigHeaders = 4
   };
 
-  void init(HeaderMode mode) {
-    BaseIntegrationTest::initialize();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
+  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>* field,
+                 const std::string& key, const std::string& value, bool append) {
+    envoy::api::v2::HeaderValueOption* header_value_option = field->Add();
+    auto* mutable_header = header_value_option->mutable_header();
+    mutable_header->set_key(key);
+    mutable_header->set_value(value);
+    header_value_option->mutable_append()->set_value(append);
+  }
 
-    std::string route_config_header_fmt = R"EOF(
-      {{
-        "header": {{ "key": "x-routeconfig-{}", "value": "routeconfig" }},
-        "append": {}
-      }})EOF";
+  void initializeFilter(HeaderMode mode, bool includeRouteConfigHeaders) {
+    config_helper_.addConfigModifier([&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+      using namespace envoy::api::v2::filter::http;
 
-    std::string route_config_response_headers_to_add, route_config_response_headers_to_remove,
-        route_config_request_headers_to_add;
-    bool append = false;
+      const bool append = mode == HeaderMode::Append;
 
-    switch (mode) {
-    case HeaderMode::ReplaceWithRouteConfigHeaders:
-      route_config_response_headers_to_add =
-          fmt::format(route_config_header_fmt, "response", "false");
-      route_config_response_headers_to_remove = R"EOF("x-routeconfig-response-remove")EOF";
-      route_config_request_headers_to_add =
-          fmt::format(route_config_header_fmt, "request", "false");
-      append = false;
-      break;
+      auto* route_config = hcm.mutable_route_config();
+      if (includeRouteConfigHeaders) {
+        addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-response",
+                  "routeconfig", append);
+        route_config->add_response_headers_to_remove("x-routeconfig-response-remove");
+        addHeader(route_config->mutable_request_headers_to_add(), "x-routeconfig-request",
+                  "routeconfig", append);
+      }
 
-    case HeaderMode::Replace:
-      append = false;
-      break;
+      route_config->clear_virtual_hosts();
 
-    case HeaderMode::AppendWithRouteConfigHeaders:
-      route_config_response_headers_to_add =
-          fmt::format(route_config_header_fmt, "response", "true");
-      route_config_response_headers_to_remove = R"EOF("x-routeconfig-response-remove")EOF";
-      route_config_request_headers_to_add = fmt::format(route_config_header_fmt, "request", "true");
-      append = true;
-      break;
+      auto* vhost = route_config->add_virtual_hosts();
+      vhost->set_name("no-headers");
+      vhost->add_domains("no-headers.com");
+      auto* route = vhost->add_routes();
+      route->mutable_match()->set_prefix("/");
+      route->mutable_route()->set_cluster("cluster_0");
 
-    case HeaderMode::Append:
-      append = true;
-      break;
+      vhost = route_config->add_virtual_hosts();
+      vhost->set_name("vhost-headers");
+      vhost->add_domains("vhost-headers.com");
+      addHeader(vhost->mutable_request_headers_to_add(), "x-vhost-request", "vhost", append);
+      addHeader(vhost->mutable_response_headers_to_add(), "x-vhost-response", "vhost", append);
+      vhost->add_response_headers_to_remove("x-vhost-response-remove");
+      route = vhost->add_routes();
+      route->mutable_match()->set_prefix("/vhost-only");
+      route->mutable_route()->set_cluster("cluster_0");
+      route = vhost->add_routes();
+      route->mutable_match()->set_prefix("/vhost-and-route");
+      auto* route_action = route->mutable_route();
+      route_action->set_cluster("cluster_0");
+      addHeader(route_action->mutable_request_headers_to_add(), "x-route-request", "route", append);
+      addHeader(route_action->mutable_response_headers_to_add(), "x-route-response", "route",
+                append);
+      route_action->add_response_headers_to_remove("x-route-response-remove");
 
-    default:
-      ASSERT(false);
-    }
+      vhost = route_config->add_virtual_hosts();
+      vhost->set_name("route-headers");
+      vhost->add_domains("route-headers.com");
+      route = vhost->add_routes();
+      route->mutable_match()->set_prefix("/route-only");
+      route_action = route->mutable_route();
+      route_action->set_cluster("cluster_0");
+      addHeader(route_action->mutable_request_headers_to_add(), "x-route-request", "route", append);
+      addHeader(route_action->mutable_response_headers_to_add(), "x-route-response", "route",
+                append);
+      route_action->add_response_headers_to_remove("x-route-response-remove");
+    });
 
-    registerParam("append", append ? "true" : "false");
-    registerParam("route_config_response_headers_to_add", route_config_response_headers_to_add);
-    registerParam("route_config_response_headers_to_remove",
-                  route_config_response_headers_to_remove);
-    registerParam("route_config_request_headers_to_add", route_config_request_headers_to_add);
-
-    createTestServer("test/config/integration/server_header.json", {"http"});
+    initialize();
   }
 
 protected:
@@ -76,10 +89,12 @@ protected:
                       Http::TestHeaderMapImpl&& expected_request_headers,
                       Http::TestHeaderMapImpl&& response_headers,
                       Http::TestHeaderMapImpl&& expected_response_headers) {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+    waitForNextUpstreamRequest();
 
-    EXPECT_TRUE(response_->complete());
+    upstream_request_->encodeHeaders(response_headers, true);
+    response_->waitForEndStream();
 
     compareHeaders(upstream_request_->headers(), expected_request_headers);
     compareHeaders(response_->headers(), expected_response_headers);
@@ -94,26 +109,6 @@ protected:
     headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-proto"});
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
 
-    if (!(expected_headers == headers)) {
-      std::cout << "got: " << std::endl;
-      headers.iterate(
-          [](const Http::HeaderEntry& header, void*) -> Http::HeaderMap::Iterate {
-            std::cout << "  " << header.key().c_str() << ": " << header.value().c_str()
-                      << std::endl;
-            return Http::HeaderMap::Iterate::Continue;
-          },
-          nullptr);
-
-      std::cout << "expected: " << std::endl;
-      expected_headers.iterate(
-          [](const Http::HeaderEntry& header, void*) -> Http::HeaderMap::Iterate {
-            std::cout << "  " << header.key().c_str() << ": " << header.value().c_str()
-                      << std::endl;
-            return Http::HeaderMap::Iterate::Continue;
-          },
-          nullptr);
-    }
-
     EXPECT_EQ(expected_headers, headers);
   }
 };
@@ -124,7 +119,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, HeaderIntegrationTest,
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
 TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
-  init(HeaderMode::Append);
+  initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -155,7 +150,7 @@ TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
 // Validates the virtual host appends upstream request headers and appends/removes upstream
 // response headers.
 TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
-  init(HeaderMode::Append);
+  initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -188,7 +183,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
 
 // Validates the virtual host replaces request headers and replaces upstream response headers.
 TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
-  init(HeaderMode::Replace);
+  initializeFilter(HeaderMode::Replace, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -222,7 +217,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
 
 // Validates the route appends request headers and appends/removes upstream response headers.
 TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
-  init(HeaderMode::Append);
+  initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -255,7 +250,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
 
 // Validates the route replaces request headers and replaces/removes upstream response headers.
 TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
-  init(HeaderMode::Replace);
+  initializeFilter(HeaderMode::Replace, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -290,7 +285,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
 
 // Validates the relationship between virtual host and route header manipulations when appending.
 TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
-  init(HeaderMode::Append);
+  initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -330,7 +325,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
 
 // Validates the relationship between virtual host and route header manipulations when replacing.
 TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) {
-  init(HeaderMode::Replace);
+  initializeFilter(HeaderMode::Replace, false);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -369,7 +364,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) 
 // Validates the relationship between route configuration, virtual host and route header
 // manipulations when appending.
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderManipulation) {
-  init(HeaderMode::AppendWithRouteConfigHeaders);
+  initializeFilter(HeaderMode::Append, true);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -417,7 +412,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
 // Validates the relationship between route configuration, virtual host and route header
 // manipulations when replacing.
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderManipulation) {
-  init(HeaderMode::ReplaceWithRouteConfigHeaders);
+  initializeFilter(HeaderMode::Replace, true);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},

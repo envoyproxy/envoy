@@ -110,16 +110,10 @@ envoy_cc_test(
     srcs = [
         "header_integration_test.cc",
     ],
-    data = [
-        "//test/config/integration:server_header.json",
-    ],
+    external_deps = ["envoy_filter_http_http_connection_manager"],
     deps = [
         ":http_integration_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
+        "//source/common/protobuf",
     ],
 )
 

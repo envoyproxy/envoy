@@ -124,9 +124,6 @@ public:
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
-  // Config parameters
-  void registerParam(const std::string& key, const std::string& value);
-
   Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
@@ -150,7 +147,6 @@ protected:
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
-  TestEnvironment::ParamMap param_map_;
   TestEnvironment::PortMap port_map_;
   bool initialized_{}; // True if initialized() has been called.
 };
