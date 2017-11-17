@@ -131,6 +131,7 @@ private:
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
+
     static const NullRateLimitPolicy rate_limit_policy_;
   };
 
@@ -169,6 +170,7 @@ private:
     bool autoHostRewrite() const override { return false; }
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
+
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
