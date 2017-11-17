@@ -792,8 +792,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   headers.insertServer().value().setReference(connection_manager_.config_.serverName());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
-                                                  *snapped_route_config_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.

@@ -602,29 +602,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
 
-  for (const auto& header_value : route_entry_->responseHeadersToAdd()) {
-    if (header_value.append_) {
-      headers->addReferenceKey(header_value.header_, header_value.value_);
-    } else {
-      headers->setReferenceKey(header_value.header_, header_value.value_);
-    }
-  }
-
-  for (const auto& header : route_entry_->responseHeadersToRemove()) {
-    headers->remove(header);
-  }
-
-  for (const auto& header_value : route_entry_->virtualHost().responseHeadersToAdd()) {
-    if (header_value.append_) {
-      headers->addReferenceKey(header_value.header_, header_value.value_);
-    } else {
-      headers->setReferenceKey(header_value.header_, header_value.value_);
-    }
-  }
-
-  for (const auto& header : route_entry_->virtualHost().responseHeadersToRemove()) {
-    headers->remove(header);
-  }
+  route_entry_->finalizeResponseHeaders(*headers);
 
   downstream_response_started_ = true;
   if (end_stream) {

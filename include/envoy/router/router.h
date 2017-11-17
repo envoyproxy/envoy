@@ -87,34 +87,6 @@ public:
 };
 
 /**
- * Header to be added to a request or response at the global, VirtualHost or RouteEntry level.
- */
-struct HeaderAddition {
-  /**
-   * The name of the header to add.
-   */
-  const Http::LowerCaseString header_;
-
-  /**
-   * The value of the header to add.
-   */
-  const std::string value_;
-
-  /**
-   * Indicates whether the value should be appended to existing values for the header (true) or
-   * replace them (false).
-   */
-  const bool append_;
-
-  /**
-   * Equality comparison.
-   */
-  bool operator==(const HeaderAddition& rhs) const {
-    return header_ == rhs.header_ && value_ == rhs.value_ && append_ == rhs.append_;
-  }
-};
-
-/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -243,18 +215,6 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
-
-  /**
-   * @return const std::list<HeaderAddition>& a list of headers to add to the response sent
-   *         downstream.
-   */
-  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
-
-  /**
-   * @return const std::list<Http::LowerCaseString>& a list of headers to remove from the response
-   *         sent downstream.
-   */
-  virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
 };
 
 /**
@@ -346,6 +306,14 @@ public:
                                       const AccessLog::RequestInfo& request_info) const PURE;
 
   /**
+   * Do potentially destructive header transforms on response headers prior to forwarding. For
+   * adding or removing headers. This should only be called ONCE immediately after receiving an
+   * upstream's headers.
+   * @param headers supplies the response headers, which may be modified during this call.
+   */
+  virtual void finalizeResponseHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
    * @return const HashPolicy* the optional hash policy for the route.
    */
   virtual const HashPolicy* hashPolicy() const PURE;
@@ -415,18 +383,6 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
-
-  /**
-   * @return const std::list<HeaderAddition>& a list of headers to add to the response sent
-   *         downstream.
-   */
-  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
-
-  /**
-   * @return const std::list<Http::LowerCaseString>& a list of headers to remove from the response
-   *         sent downstream.
-   */
-  virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
 };
 
 /**
@@ -499,18 +455,6 @@ public:
    * (RFC1918) source.
    */
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
-
-  /**
-   * Return a list of header key/value pairs will be appended to or override every response that
-   * transits the router.
-   */
-  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
-
-  /**
-   * Return a list of upstream headers that will be stripped from every response that transits the
-   * router.
-   */
-  virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

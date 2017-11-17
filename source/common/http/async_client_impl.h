@@ -23,7 +23,6 @@
 #include "common/access_log/request_info_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
-#include "common/common/macros.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -132,15 +131,7 @@ private:
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
-      return response_headers_to_add_;
-    }
-    const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
-      return response_headers_to_remove_;
-    }
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const std::list<Router::HeaderAddition> response_headers_to_add_;
-    static const std::list<Http::LowerCaseString> response_headers_to_remove_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
@@ -152,6 +143,7 @@ private:
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     void finalizeRequestHeaders(Http::HeaderMap&, const AccessLog::RequestInfo&) const override {}
+    void finalizeResponseHeaders(Http::HeaderMap&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -177,12 +169,6 @@ private:
     bool autoHostRewrite() const override { return false; }
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-    const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
-      CONSTRUCT_ON_FIRST_USE(std::list<Router::HeaderAddition>);
-    }
-    const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
-      CONSTRUCT_ON_FIRST_USE(std::list<Http::LowerCaseString>);
-    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
