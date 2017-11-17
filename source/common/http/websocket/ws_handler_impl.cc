@@ -20,44 +20,34 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const AccessLog::Reques
     : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
       request_info_(request_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
 
-  read_callbacks_ = read_callbacks;
-  read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+  initializeReadFilterCallbacks(*read_callbacks);
 }
 
-void WsHandlerImpl::onInitFailure() {
-  HeaderMapImpl headers{
-      {Headers::get().Status, std::to_string(enumToInt(Code::ServiceUnavailable))}};
+void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
+  Code http_code = Code::InternalServerError;
+  switch (failure_reason) {
+  case UpstreamFailureReason::CONNECT_FAILED:
+    http_code = Code::GatewayTimeout;
+    break;
+  case UpstreamFailureReason::NO_HEALTHY_UPSTREAM:
+  case UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED:
+  case UpstreamFailureReason::NO_ROUTE:
+    http_code = Code::ServiceUnavailable;
+    break;
+  }
+
+  HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(http_code))}};
   ws_callbacks_.sendHeadersOnlyResponse(headers);
 }
 
-void WsHandlerImpl::onUpstreamHostReady() {
+void WsHandlerImpl::onConnectionSuccess() {
   // path and host rewrites
   route_entry_.finalizeRequestHeaders(request_headers_, request_info_);
   // for auto host rewrite
   if (route_entry_.autoHostRewrite() && !read_callbacks_->upstreamHost()->hostname().empty()) {
     request_headers_.Host()->value(read_callbacks_->upstreamHost()->hostname());
   }
-}
 
-void WsHandlerImpl::onConnectTimeoutError() {
-  HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::GatewayTimeout))}};
-  ws_callbacks_.sendHeadersOnlyResponse(headers);
-}
-
-void WsHandlerImpl::onConnectionFailure() {
-  // We send a 503 response if the upstream refuses to accept connections
-  // (i.e. non-null connect_timeout_timer). If the upstream closes connection
-  // after the starting data transfer, we close and flush the connection as
-  // in TCP proxy.
-  if (connect_timeout_timer_) {
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::GatewayTimeout))}};
-    ws_callbacks_.sendHeadersOnlyResponse(headers);
-  } else {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-  }
-}
-
-void WsHandlerImpl::onConnectionSuccess() {
   // Wrap upstream connection in HTTP Connection, so that we can
   // re-use the HTTP1 codec to send upgrade headers to upstream
   // host.

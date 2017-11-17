@@ -68,6 +68,7 @@ public:
 
   const TcpProxyStats& stats() { return stats_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
+  uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
 
 private:
   struct Route {
@@ -85,6 +86,7 @@ private:
   std::vector<Route> routes_;
   const TcpProxyStats stats_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  const uint32_t max_connect_attempts_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -150,31 +152,31 @@ protected:
     bool on_high_watermark_called_{false};
   };
 
+  enum class UpstreamFailureReason {
+    CONNECT_FAILED,
+    NO_HEALTHY_UPSTREAM,
+    RESOURCE_LIMIT_EXCEEDED,
+    NO_ROUTE,
+  };
+
   // Callbacks for different error and success states during connection establishment
   virtual const std::string& getUpstreamCluster() {
     return config_->getRouteFromEntries(read_callbacks_->connection());
   }
 
-  virtual void onInitFailure() {
+  virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
-
-  virtual void onConnectTimeoutError() {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
-
-  virtual void onConnectionFailure() {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
   virtual void onConnectionSuccess() {}
-  virtual void onUpstreamHostReady() {}
 
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data);
   void onUpstreamEvent(Network::ConnectionEvent event);
+  void finalizeUpstreamConnectionStats();
+  void closeUpstreamConnection();
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -187,6 +189,7 @@ protected:
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   AccessLog::RequestInfoImpl request_info_;
+  uint32_t connect_attempts_{};
 };
 
 } // Filter
