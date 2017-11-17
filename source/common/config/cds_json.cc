@@ -20,6 +20,7 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
   JSON_UTIL_SET_DURATION(json_health_check, health_check, interval_jitter);
   JSON_UTIL_SET_INTEGER(json_health_check, health_check, unhealthy_threshold);
   JSON_UTIL_SET_INTEGER(json_health_check, health_check, healthy_threshold);
+  JSON_UTIL_SET_BOOL(json_health_check, health_check, reuse_connection);
 
   const std::string hc_type = json_health_check.getString("type");
   if (hc_type == "http") {

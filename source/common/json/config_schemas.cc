@@ -1370,6 +1370,7 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "reuse_connection" : {"type" : "boolean"},
       "service_name" : {"type" : "string"}
     },
     "required" : ["type", "timeout_ms", "interval_ms", "unhealthy_threshold", "healthy_threshold"],
