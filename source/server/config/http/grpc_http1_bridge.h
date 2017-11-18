@@ -17,6 +17,10 @@ class GrpcHttp1BridgeFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                           FactoryContext& context) override;
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                   const std::string&,
+                                                   FactoryContext&) override;
+
   std::string name() override { return Config::HttpFilterNames::get().GRPC_HTTP1_BRIDGE; }
 };
 

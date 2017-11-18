@@ -12,6 +12,10 @@ class GrpcWebFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                           FactoryContext&) override;
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                   const std::string&,
+                                                   FactoryContext&) override;
+
   std::string name() override { return Config::HttpFilterNames::get().GRPC_WEB; }
 };
 

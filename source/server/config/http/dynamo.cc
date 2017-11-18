@@ -19,6 +19,15 @@ HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(const Json::Object&,
   };
 }
 
+HttpFilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProto(const Protobuf::Message&,
+                                                                     const std::string& stats_prefix,
+                                                                     FactoryContext& context) {
+  return [&context, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
+        new Dynamo::DynamoFilter(context.runtime(), stat_prefix, context.scope())});
+  };
+}
+
 /**
  * Static registration for the http dynamodb filter. @see RegisterFactory.
  */

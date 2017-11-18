@@ -48,9 +48,8 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
         "//source/common/network:filter_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -58,6 +57,7 @@ envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
+    external_deps = ["envoy_filter_network_redis_proxy"],
     deps = [
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
@@ -67,9 +67,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
-        "//source/common/json:json_validator_lib",
     ],
 )
 

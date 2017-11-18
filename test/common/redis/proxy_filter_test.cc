@@ -27,6 +27,14 @@ using testing::_;
 namespace Envoy {
 namespace Redis {
 
+envoy::api::v2::filter::network::RedisProxy parseProtoFromJson(const std::string& json_string) {
+  envoy::api::v2::filter::network::RedisProxy config;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
+
+  return config;
+}
+
 class RedisProxyFilterConfigTest : public testing::Test {
 public:
   NiceMock<Upstream::MockClusterManager> cm_;

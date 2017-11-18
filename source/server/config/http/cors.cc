@@ -16,6 +16,14 @@ HttpFilterFactoryCb CorsFilterConfig::createFilterFactory(const Json::Object&, c
   };
 }
 
+HttpFilterFactoryCb CorsFilterConfig::createFilterFactoryFromProto(const Protobuf::Message&,
+                                                                   const std::string&,
+                                                                   FactoryContext&) {
+  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Http::CorsFilter()});
+  };
+}
+
 /**
  * Static registration for the cors filter. @see RegisterFactory.
  */

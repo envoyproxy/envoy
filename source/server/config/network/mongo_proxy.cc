@@ -8,8 +8,6 @@
 #include "common/config/filter_json.h"
 #include "common/mongo/proxy.h"
 
-#include "api/filter/network/mongo_proxy.pb.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {

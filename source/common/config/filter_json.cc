@@ -222,6 +222,20 @@ void FilterJson::translateHttpConnectionManager(
   }
 }
 
+void FilterJson::translateRedisProxy(const Json::Object& json_redis_proxy,
+                                     envoy::api::v2::filter::network::RedisProxy& redis_proxy) {
+  json_redis_proxy.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
+
+  const auto json_conn_pool = json_redis_proxy.getObject("conn_pool");
+  conn_pool.validateSchema(Json::Schema::REDIS_CONN_POOL_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, stat_prefix);
+  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, cluster);
+
+  auto* conn_pool = redis_proxy.mutable_settings();
+  JSON_UTIL_SET_DURATION_FROM_FIELD(*json_conn_pool, *conn_pool, op_timeout);
+}
+
 void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
                                      envoy::api::v2::filter::network::MongoProxy& mongo_proxy) {
   json_mongo_proxy.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
