@@ -41,6 +41,9 @@ envoy_cc_library(
     name = "tcp_proxy_lib",
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
+    external_deps = [
+        "envoy_filter_network_tcp_proxy",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -60,9 +63,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:logger_lib",
-        "//source/common/config:filter_json_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",

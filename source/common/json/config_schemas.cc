@@ -1370,6 +1370,7 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "reuse_connection" : {"type" : "boolean"},
       "service_name" : {"type" : "string"}
     },
     "required" : ["type", "timeout_ms", "interval_ms", "unhealthy_threshold", "healthy_threshold"],
@@ -1522,6 +1523,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
+          "consecutive_gateway_failure" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "success_rate_minimum_hosts" : {
             "type" : "integer",
             "minimum" : 0,
@@ -1553,6 +1559,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "maximum" : 100
           },
           "enforcing_consecutive_5xx" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "enforcing_consecutive_gateway_failure" : {
             "type" : "integer",
             "minimum" : 0,
             "maximum" : 100

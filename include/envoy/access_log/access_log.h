@@ -151,6 +151,11 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
+   * Get the upstream local address, eg the source ip:port of the connection.
+   */
+  virtual const Optional<std::string>& upstreamLocalAddress() const PURE;
+
+  /**
    * @return whether the request is a health check request or not.
    */
   virtual bool healthCheck() const PURE;

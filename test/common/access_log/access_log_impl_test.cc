@@ -85,6 +85,9 @@ public:
     upstream_host_ = host;
   }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
+  const Optional<std::string>& upstreamLocalAddress() const override {
+    return upstream_local_address_;
+  }
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
   const std::string& getDownstreamAddress() const override { return downstream_address_; }
@@ -97,6 +100,7 @@ public:
   uint64_t response_flags_{};
   uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Optional<std::string> upstream_local_address_{};
   bool hc_request_{};
   std::string downstream_address_;
 };
