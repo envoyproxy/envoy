@@ -71,6 +71,8 @@ TEST(NetworkFilterConfigTest, RedisProxyCorrectProto) {
 }
 
 TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
+  NiceMock<MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
   envoy::api::v2::filter::network::RedisProxy config =
     *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
           factory.createEmptyConfigProto().get());
@@ -78,8 +80,6 @@ TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
   config.set_stat_prefix("foo");
   config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
 
-  NiceMock<MockFactoryContext> context;
-  RedisProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));

@@ -8,6 +8,7 @@
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
+#include "api/filter/network/redis_proxy.pb.h"
 #include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {

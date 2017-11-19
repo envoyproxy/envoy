@@ -21,7 +21,7 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(const Json:
 
 HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProto(const Protobuf::Message&,
                                                                               const std::string&,
-                                                                              FactoryContext&) {
+                                                                              FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         Http::StreamFilterSharedPtr{new Grpc::Http1BridgeFilter(context.clusterManager())});

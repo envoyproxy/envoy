@@ -20,7 +20,7 @@ HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(const Json::Object&,
 }
 
 HttpFilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProto(const Protobuf::Message&,
-                                                                     const std::string& stats_prefix,
+                                                                     const std::string& stat_prefix,
                                                                      FactoryContext& context) {
   return [&context, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{

@@ -19,7 +19,7 @@ HttpFilterFactoryCb GrpcWebFilterConfig::createFilterFactory(const Json::Object&
 
 HttpFilterFactoryCb GrpcWebFilterConfig::createFilterFactoryFromProto(const Protobuf::Message&,
                                                                       const std::string&,
-                                                                      FactoryContext&) {
+                                                                      FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter(context.clusterManager())});

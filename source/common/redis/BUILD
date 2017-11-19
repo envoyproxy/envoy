@@ -38,6 +38,7 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool_impl.cc"],
     hdrs = ["conn_pool_impl.h"],
+    external_deps = ["envoy_filter_network_redis_proxy"],
     deps = [
         ":codec_lib",
         "//include/envoy/redis:conn_pool_interface",

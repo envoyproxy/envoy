@@ -28,6 +28,11 @@ public:
   }
 
   std::string name() override { return Config::NetworkFilterNames::get().REDIS_PROXY; }
+
+private:
+  NetworkFilterFactoryCb
+  createRedisProxyFactory(const envoy::api::v2::filter::network::RedisProxy& config,
+                          FactoryContext& context);
 };
 
 } // namespace Configuration

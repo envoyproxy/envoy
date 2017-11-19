@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 
+#include "common/config/filter_json.h"
 #include "common/redis/proxy_filter.h"
 
 #include "test/mocks/common.h"
@@ -30,7 +31,7 @@ namespace Redis {
 envoy::api::v2::filter::network::RedisProxy parseProtoFromJson(const std::string& json_string) {
   envoy::api::v2::filter::network::RedisProxy config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
+  Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
 
   return config;
 }
@@ -48,13 +49,12 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   {
     "cluster_name": "fake_cluster",
     "stat_prefix": "foo",
-    "conn_pool": {}
+    "conn_pool": { "op_timeout_ms" : 10 }
   }
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RedisProxy config = parseProtoFromJson(*json_config);
-  ProxyFilterConfig config(config, cm_, store_, drain_decision_, runtime_);
+  envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
+  ProxyFilterConfig config(proto_config, cm_, store_, drain_decision_, runtime_);
   EXPECT_EQ("fake_cluster", config.cluster_name_);
 }
 
@@ -63,15 +63,14 @@ TEST_F(RedisProxyFilterConfigTest, InvalidCluster) {
   {
     "cluster_name": "fake_cluster",
     "stat_prefix": "foo",
-    "conn_pool": {}
+    "conn_pool": { "op_timeout_ms" : 10 }
   }
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RedisProxy config = parseProtoFromJson(*json_config);
+  envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
 
   EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(config, cm_, store_, drain_decision_, runtime_),
+  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
                             EnvoyException, "redis: unknown cluster 'fake_cluster'");
 }
 
@@ -80,15 +79,14 @@ TEST_F(RedisProxyFilterConfigTest, InvalidAddedByApi) {
   {
     "cluster_name": "fake_cluster",
     "stat_prefix": "foo",
-    "conn_pool": {}
+    "conn_pool": { "op_timeout_ms" : 10 }
   }
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RedisProxy config = parseProtoFromJson(*json_config);
+  envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
 
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(config, cm_, store_, drain_decision_, runtime_),
+  EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
                             EnvoyException,
                             "redis: invalid cluster 'fake_cluster': currently only "
                             "static (non-CDS) clusters are supported");
@@ -102,9 +100,8 @@ TEST_F(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RedisProxy config = parseProtoFromJson(*json_config);
-  EXPECT_THROW(ProxyFilterConfig(config, cm_, store_, drain_decision_, runtime_),
+  envoy::api::v2::filter::network::RedisProxy proto_config = parseProtoFromJson(json_string);
+  EXPECT_THROW(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
                Json::Exception);
 }
 
@@ -115,14 +112,13 @@ public:
     {
       "cluster_name": "fake_cluster",
       "stat_prefix": "foo",
-      "conn_pool": {}
+      "conn_pool": { "op_timeout_ms" : 10 }
     }
     )EOF";
 
-    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-    envoy::api::v2::filter::network::RedisProxy config = parseProtoFromJson(*json_config);
+    envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
     NiceMock<Upstream::MockClusterManager> cm;
-    config_.reset(new ProxyFilterConfig(config, cm, store_, drain_decision_, runtime_));
+    config_.reset(new ProxyFilterConfig(proto_config, cm, store_, drain_decision_, runtime_));
     filter_.reset(new ProxyFilter(*this, EncoderPtr{encoder_}, splitter_, config_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
