@@ -258,6 +258,19 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(11U, string.size());
     EXPECT_EQ(HeaderString::Type::Reference, string.type());
   }
+
+  // caseInsensitiveContains
+  {
+    std::string static_string("keep-alive, Upgrade");
+    HeaderString string(static_string);
+    EXPECT_TRUE(string.caseInsensitiveContains("keep-alive"));
+    EXPECT_TRUE(string.caseInsensitiveContains("Keep-alive"));
+    EXPECT_TRUE(string.caseInsensitiveContains("Upgrade"));
+    EXPECT_TRUE(string.caseInsensitiveContains("upgrade"));
+    EXPECT_FALSE(string.caseInsensitiveContains("keep"));
+    EXPECT_FALSE(string.caseInsensitiveContains("alive"));
+    EXPECT_FALSE(string.caseInsensitiveContains("grade"));
+  }
 }
 
 TEST(HeaderMapImplTest, InlineInsert) {

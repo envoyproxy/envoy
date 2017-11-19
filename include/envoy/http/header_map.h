@@ -103,6 +103,28 @@ public:
   bool find(const char* str) const { return strstr(c_str(), str); }
 
   /**
+   * HeaderString is in token list form, each token separated by commas or whitespace,
+   * see https://www.w3.org/Protocols/rfc2616/rfc2616-sec2.html#sec2.1 for more information,
+   * header field value's case sensitivity depends on each header.
+   * @return whether contains token in case insensitive manner.
+   */
+  bool caseInsensitiveContains(const char* token) const {
+    const int n = strlen(token);
+    if (n == 0) {
+      return true;
+    }
+    const char* tokens = c_str();
+    const char* separators = " ,";
+    for (const char* p = tokens; (p = strcasestr(p, token)); p += n) {
+      if ((p == tokens || strchr(separators, *(p - 1)) != NULL) &&
+          (*(p + n) == '\0' || strchr(separators, *(p + n)) != NULL)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
    */
   void setCopy(const char* data, uint32_t size);
