@@ -59,6 +59,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
+      reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
   cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
@@ -366,10 +367,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleFailure(FailureType::Active);
   }
 
-  if (response_headers_->Connection() &&
-      0 ==
-          StringUtil::caseInsensitiveCompare(response_headers_->Connection()->value().c_str(),
-                                             Http::Headers::get().ConnectionValues.Close.c_str())) {
+  if ((response_headers_->Connection() &&
+       0 == StringUtil::caseInsensitiveCompare(
+                response_headers_->Connection()->value().c_str(),
+                Http::Headers::get().ConnectionValues.Close.c_str())) ||
+      !parent_.reuse_connection_) {
     client_->close();
   }
 
@@ -439,8 +441,12 @@ TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession(
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
+    ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     data.drain(data.length());
     handleSuccess();
+    if (!parent_.reuse_connection_) {
+      client_->close(Network::ConnectionCloseType::NoFlush);
+    }
   }
 }
 
@@ -550,6 +556,9 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     handleSuccess();
   } else {
     handleFailure(FailureType::Active);
+  }
+  if (!parent_.reuse_connection_) {
+    client_->close();
   }
 }
 

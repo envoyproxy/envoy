@@ -363,6 +363,22 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   ASSERT(new_value.empty());
 }
 
+void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString ref_value(value);
+  remove(key);
+  insertByKey(std::move(ref_key), std::move(ref_value));
+}
+
+void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString new_value;
+  new_value.setCopy(value.c_str(), value.size());
+  remove(key);
+  insertByKey(std::move(ref_key), std::move(new_value));
+  ASSERT(new_value.empty());
+}
+
 uint64_t HeaderMapImpl::byteSize() const {
   uint64_t byte_size = 0;
   for (const HeaderEntryImpl& header : headers_) {

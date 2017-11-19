@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/address_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/protocol_json.h"
 #include "common/config/rds_json.h"
@@ -60,6 +61,15 @@ void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::OrFil
 
 void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
+}
+
+void translateRepeatedAccessLog(
+    const std::vector<Json::ObjectSharedPtr>& json,
+    Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLog>& access_logs) {
+  for (const auto& json_access_log : json) {
+    auto* access_log = access_logs.Add();
+    FilterJson::translateAccessLog(*json_access_log, *access_log);
+  }
 }
 
 } // namespace
@@ -185,11 +195,8 @@ void FilterJson::translateHttpConnectionManager(
                                  idle_timeout);
   JSON_UTIL_SET_DURATION(json_http_connection_manager, http_connection_manager, drain_timeout);
 
-  for (const auto& json_access_log :
-       json_http_connection_manager.getObjectArray("access_log", true)) {
-    auto* access_log = http_connection_manager.mutable_access_log()->Add();
-    translateAccessLog(*json_access_log, *access_log);
-  }
+  translateRepeatedAccessLog(json_http_connection_manager.getObjectArray("access_log", true),
+                             *http_connection_manager.mutable_access_log());
 
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, use_remote_address);
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, generate_request_id);
@@ -266,6 +273,16 @@ void FilterJson::translateFaultFilter(const Json::Object& json_fault,
   }
 }
 
+void FilterJson::translateHealthCheckFilter(
+    const Json::Object& json_health_check,
+    envoy::api::v2::filter::http::HealthCheck& health_check) {
+  json_health_check.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_BOOL(json_health_check, health_check, pass_through_mode);
+  JSON_UTIL_SET_DURATION(json_health_check, health_check, cache_time);
+  JSON_UTIL_SET_STRING(json_health_check, health_check, endpoint);
+}
+
 void FilterJson::translateRouter(const Json::Object& json_router,
                                  envoy::api::v2::filter::http::Router& router) {
   json_router.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
@@ -280,6 +297,28 @@ void FilterJson::translateBufferFilter(const Json::Object& json_buffer,
 
   JSON_UTIL_SET_INTEGER(json_buffer, buffer, max_request_bytes);
   JSON_UTIL_SET_DURATION_SECONDS(json_buffer, buffer, max_request_time);
+}
+
+void FilterJson::translateTcpProxy(const Json::Object& json_tcp_proxy,
+                                   envoy::api::v2::filter::network::TcpProxy& tcp_proxy) {
+  json_tcp_proxy.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_tcp_proxy, tcp_proxy, stat_prefix);
+  translateRepeatedAccessLog(json_tcp_proxy.getObjectArray("access_log", true),
+                             *tcp_proxy.mutable_access_log());
+
+  for (const Json::ObjectSharedPtr& route_desc :
+       json_tcp_proxy.getObject("route_config")->getObjectArray("routes")) {
+    envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute* route =
+        tcp_proxy.mutable_deprecated_v1()->mutable_routes()->Add();
+    JSON_UTIL_SET_STRING(*route_desc, *route, cluster);
+    JSON_UTIL_SET_STRING(*route_desc, *route, destination_ports);
+    JSON_UTIL_SET_STRING(*route_desc, *route, source_ports);
+    AddressJson::translateCidrRangeList(route_desc->getStringArray("source_ip_list", true),
+                                        *route->mutable_source_ip_list());
+    AddressJson::translateCidrRangeList(route_desc->getStringArray("destination_ip_list", true),
+                                        *route->mutable_destination_ip_list());
+  }
 }
 
 } // namespace Config

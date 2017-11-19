@@ -197,9 +197,12 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
     response_headers.remove(to_remove);
   }
 
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       route_config.responseHeadersToAdd()) {
-    response_headers.addReference(to_add.first, to_add.second);
+  for (const Router::HeaderAddition& to_add : route_config.responseHeadersToAdd()) {
+    if (to_add.append_) {
+      response_headers.addReference(to_add.header_, to_add.value_);
+    } else {
+      response_headers.setReference(to_add.header_, to_add.value_);
+    }
   }
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {

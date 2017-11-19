@@ -185,7 +185,7 @@ public:
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
   uint64_t hash() const { return hash_; }
-  void infoLog(const std::string& message);
+  void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);

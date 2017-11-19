@@ -53,6 +53,15 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       // It's possible for the cluster/detector to go away while we still have a host in use.
       return;
     }
+    if (Http::CodeUtility::isGatewayError(response_code)) {
+      if (++consecutive_gateway_failure_ == detector->runtime().snapshot().getInteger(
+                                                "outlier_detection.consecutive_gateway_failure",
+                                                detector->config().consecutiveGatewayFailure())) {
+        detector->onConsecutiveGatewayFailure(host_.lock());
+      }
+    } else {
+      consecutive_gateway_failure_ = 0;
+    }
 
     if (++consecutive_5xx_ ==
         detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
@@ -62,6 +71,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   } else {
     success_rate_accumulator_bucket_.load()->success_request_counter_++;
     consecutive_5xx_ = 0;
+    consecutive_gateway_failure_ = 0;
   }
 }
 
@@ -71,6 +81,8 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& 
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, base_ejection_time, 30000))),
       consecutive_5xx_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_5xx, 5))),
+      consecutive_gateway_failure_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_gateway_failure, 5))),
       max_ejection_percent_(
           static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_ejection_percent, 10))),
       success_rate_minimum_hosts_(static_cast<uint64_t>(
@@ -81,6 +93,8 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& 
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, success_rate_stdev_factor, 1900))),
       enforcing_consecutive_5xx_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_5xx, 100))),
+      enforcing_consecutive_gateway_failure_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_gateway_failure, 0))),
       enforcing_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))) {}
 
@@ -164,6 +178,10 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+    // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
+    // to the non-triggering counter being close to its trigger value.
+    host_monitors_[host]->resetConsecutive5xx();
+    host_monitors_[host]->resetConsecutiveGatewayFailure();
     monitor->uneject(now);
     runCallbacks(host);
 
@@ -178,6 +196,10 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
   case EjectionType::Consecutive5xx:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
                                               config_.enforcingConsecutive5xx());
+  case EjectionType::ConsecutiveGatewayFailure:
+    return runtime_.snapshot().featureEnabled(
+        "outlier_detection.enforcing_consecutive_gateway_failure",
+        config_.enforcingConsecutiveGatewayFailure());
   case EjectionType::SuccessRate:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
                                               config_.enforcingSuccessRate());
@@ -186,15 +208,34 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
   NOT_REACHED;
 }
 
+void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
+  stats_.ejections_enforced_total_.inc();
+  switch (type) {
+  case EjectionType::SuccessRate:
+    stats_.ejections_enforced_success_rate_.inc();
+    break;
+  case EjectionType::Consecutive5xx:
+    stats_.ejections_enforced_consecutive_5xx_.inc();
+    break;
+  case EjectionType::ConsecutiveGatewayFailure:
+    stats_.ejections_enforced_consecutive_gateway_failure_.inc();
+    break;
+  }
+}
+
 void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_monitors_.size();
   if (ejected_percent < max_ejection_percent) {
-    stats_.ejections_total_.inc();
+    if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRate) {
+      // Deprecated counter, preserving old behaviour until it's removed.
+      stats_.ejections_total_.inc();
+    }
     if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
+      updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.currentTime());
       runCallbacks(host);
 
@@ -217,10 +258,10 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
                                       POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
+void DetectorImpl::notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
-  // NOTE: Unfortunately consecutive 5xx is complicated from a threading perspective because
-  //       we catch consecutive 5xx on worker threads and then post back to the main thread.
+  // NOTE: Unfortunately consecutive errors are complicated from a threading perspective because
+  //       we catch consecutive errors on worker threads and then post back to the main thread.
   //       Clusters can get removed, and this means there is a race condition with this
   //       reverse post. The way we handle this is as follows:
   //       1) The only strong pointer to the detector is owned by the cluster.
@@ -229,33 +270,49 @@ void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
   //          pointer, the detector/cluster must still exist so we can safely fire callbacks.
   //          Otherwise we do nothing since the detector/cluster is already gone.
   std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host]() -> void {
+  dispatcher_.post([weak_this, host, type]() -> void {
     std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
     if (shared_this) {
-      shared_this->onConsecutive5xxWorker(host);
+      shared_this->onConsecutiveErrorWorker(host, type);
     }
   });
 }
 
-void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
-  // This comes in cross thread. There is a chance that the host has already been removed from
+void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
+  notifyMainThreadConsecutiveError(host, EjectionType::Consecutive5xx);
+}
+
+void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
+  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
+}
+
+void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type) {
+  // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_monitors_.count(host) == 0) {
     return;
   }
-
   if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
     return;
   }
 
-  stats_.ejections_consecutive_5xx_.inc();
-  ejectHost(host, EjectionType::Consecutive5xx);
-
-  // Reset the DetectorHostMonitor's consecutive_5xx_ counter. The reset is performed here
-  // on the onConsecutive5xxWorker call to prevent thread thrashing. The consecutive_5xx_
-  // counter needs to be reset in order to allow the monitor to detect a bout of consecutive
-  // 5xx responses even if the monitor is not charged with an interleaved non-5xx code.
-  host_monitors_[host]->resetConsecutive5xx();
+  // We also reset the appropriate counter here to allow the monitor to detect a bout of consecutive
+  // error responses even if the monitor is not charged with an interleaved non-error code.
+  switch (type) {
+  case EjectionType::Consecutive5xx:
+    stats_.ejections_consecutive_5xx_.inc(); // Deprecated
+    stats_.ejections_detected_consecutive_5xx_.inc();
+    ejectHost(host, EjectionType::Consecutive5xx);
+    host_monitors_[host]->resetConsecutive5xx();
+    break;
+  case EjectionType::ConsecutiveGatewayFailure:
+    stats_.ejections_detected_consecutive_gateway_failure_.inc();
+    ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
+    host_monitors_[host]->resetConsecutiveGatewayFailure();
+    break;
+  case EjectionType::SuccessRate:
+    NOT_REACHED;
+  }
 }
 
 Utility::EjectionPair Utility::successRateEjectionThreshold(
@@ -334,7 +391,8 @@ void DetectorImpl::processSuccessRateEjections() {
     success_rate_ejection_threshold_ = ejection_pair.ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold_) {
-        stats_.ejections_success_rate_.inc();
+        stats_.ejections_success_rate_.inc(); // Deprecated.
+        stats_.ejections_detected_success_rate_.inc();
         ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
       }
     }
@@ -401,6 +459,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
 
   switch (type) {
   case EjectionType::Consecutive5xx:
+  case EjectionType::ConsecutiveGatewayFailure:
     file_->write(fmt::format(
         json_5xx, AccessLogDateTimeFormatter::fromTime(now),
         secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
@@ -443,6 +502,8 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   switch (type) {
   case EjectionType::Consecutive5xx:
     return "5xx";
+  case EjectionType::ConsecutiveGatewayFailure:
+    return "GatewayFailure";
   case EjectionType::SuccessRate:
     return "SuccessRate";
   }

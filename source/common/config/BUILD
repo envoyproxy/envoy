@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
     ],
 )
@@ -91,10 +92,13 @@ envoy_cc_library(
         "envoy_filter_http_http_connection_manager",
         "envoy_filter_http_buffer",
         "envoy_filter_http_fault",
+        "envoy_filter_http_health_check",
         "envoy_filter_http_router",
         "envoy_filter_network_mongo_proxy",
+        "envoy_filter_network_tcp_proxy",
     ],
     deps = [
+        ":address_json_lib",
         ":json_utility_lib",
         ":protocol_json_lib",
         ":rds_json_lib",
