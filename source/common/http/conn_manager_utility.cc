@@ -22,17 +22,30 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
   // Clean proxy headers.
+
+  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // as we forward them verbatim to the upstream hosts.
+  if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
+    // Current WebSocket implementation re-use the HTTP1 codec to send upgrade headers to
+    // upstream host, which add "transfer-encoding: chunked" request header if stream not end
+    // and content-length not exists.
+    // In HTTP1.1, if transfer-encoding and content-length both not exists means no request body,
+    // after transfer-encoding striped here, the upstream request become invalid:
+    //   chunked encoding with no request body.
+    // We can fix it by explicitly add a "content-length: 0" request header here.
+    bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
+    if (no_body) {
+      request_headers.insertContentLength().value(uint64_t(0));
+    }
+  } else {
+    request_headers.removeConnection();
+    request_headers.removeUpgrade();
+  }
+
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
-
-  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
-  // as we forward them verbatim to the upstream hosts.
-  if (protocol != Protocol::Http11 || !Utility::isWebSocketUpgradeRequest(request_headers)) {
-    request_headers.removeConnection();
-    request_headers.removeUpgrade();
-  }
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
