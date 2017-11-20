@@ -188,22 +188,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap& request_headers,
-                                                     const Router::Config& route_config) {
+                                                     const Http::HeaderMap& request_headers) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
-
-  for (const Http::LowerCaseString& to_remove : route_config.responseHeadersToRemove()) {
-    response_headers.remove(to_remove);
-  }
-
-  for (const Router::HeaderAddition& to_add : route_config.responseHeadersToAdd()) {
-    if (to_add.append_) {
-      response_headers.addReference(to_add.header_, to_add.value_);
-    } else {
-      response_headers.setReference(to_add.header_, to_add.value_);
-    }
-  }
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());

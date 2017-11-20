@@ -64,8 +64,8 @@ public:
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
-  std::chrono::microseconds request_received_duration_;
-  std::chrono::microseconds response_received_duration_;
+  Optional<std::chrono::microseconds> request_received_duration_;
+  Optional<std::chrono::microseconds> response_received_duration_;
 };
 
 } // namespace AccessLog

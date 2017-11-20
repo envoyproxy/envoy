@@ -6,6 +6,8 @@
 
 #include "common/config/well_known_names.h"
 
+#include "server/config/http/empty_http_filter_config.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -13,11 +15,10 @@ namespace Configuration {
 /**
  * Config registration for the cors filter. @see NamedHttpFilterConfigFactory.
  */
-class CorsFilterConfig : public NamedHttpFilterConfigFactory {
+class CorsFilterConfig : public EmptyHttpFilterConfig {
 public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config,
-                                          const std::string& stats_prefix,
-                                          FactoryContext& context) override;
+  HttpFilterFactoryCb createFilter(const std::string&, FactoryContext&) override;
+
   std::string name() override { return Config::HttpFilterNames::get().CORS; }
 };
 

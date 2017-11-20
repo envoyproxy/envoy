@@ -166,8 +166,8 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
-        "//source/common/common:singleton",
         "//source/common/common:utility_lib",
+        "//source/common/singleton:const_singleton",
     ],
 )
 
@@ -176,7 +176,7 @@ envoy_cc_library(
     hdrs = ["headers.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
-        "//source/common/common:singleton",
+        "//source/common/singleton:const_singleton",
     ],
 )
 
