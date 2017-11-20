@@ -45,13 +45,13 @@ public:
   void iterateContexts(std::function<void(const Context&)> callback) override;
 
 private:
+  static bool isWildcardServerName(const std::string& name);
+
   Runtime::Loader& runtime_;
   std::list<Context*> contexts_;
   mutable std::shared_timed_mutex contexts_lock_;
   std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_exact_;
   std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_wildcard_;
-
-  static bool isWildcardServerName(const std::string& name);
 };
 
 } // namespace Ssl
