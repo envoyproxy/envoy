@@ -11,10 +11,19 @@
 namespace Envoy {
 namespace Tracing {
 
+#define OPENTRACING_TRACER_STATS(COUNTER)                                                          \
+  COUNTER(span_context_extraction_error)                                                           \
+  COUNTER(span_context_injection_error)
+
+struct OpenTracingTracerStats {
+  OPENTRACING_TRACER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class OpenTracingDriver;
+
 class OpenTracingSpan : public Span, Logger::Loggable<Logger::Id::tracing> {
 public:
-  OpenTracingSpan(bool use_single_header_propagation, bool use_tracer_propagation,
-                  std::unique_ptr<opentracing::Span>&& span);
+  OpenTracingSpan(OpenTracingDriver& driver, std::unique_ptr<opentracing::Span>&& span);
 
   // Tracing::Span
   void finishSpan() override;
@@ -24,13 +33,14 @@ public:
   SpanPtr spawnChild(const Config& config, const std::string& name, SystemTime start_time) override;
 
 private:
-  const bool use_single_header_propagation_;
-  const bool use_tracer_propagation_;
+  OpenTracingDriver& driver_;
   std::unique_ptr<opentracing::Span> span_;
 };
 
 class OpenTracingDriver : public Driver, protected Logger::Loggable<Logger::Id::tracing> {
 public:
+  explicit OpenTracingDriver(Stats::Store& stats);
+
   // Tracer::TracingDriver
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time) override;
@@ -39,6 +49,10 @@ public:
 
   virtual bool useSingleHeaderPropagation() const { return true; }
   virtual bool useTracerPropagation() const { return true; }
+  OpenTracingTracerStats& tracerStats() { return tracer_stats_; }
+
+private:
+  OpenTracingTracerStats tracer_stats_;
 };
 
 } // namespace Tracing

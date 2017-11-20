@@ -323,6 +323,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   const std::string invalid_context = "notvalidcontext";
   request_headers_.insertOtSpanContext().value(invalid_context);
   driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  EXPECT_EQ(1U, stats_.counter("tracing.opentracing.span_context_extraction_error").value());
 
   std::string injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());

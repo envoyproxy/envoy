@@ -74,10 +74,9 @@ private:
 };
 } // namespace
 
-OpenTracingSpan::OpenTracingSpan(bool use_single_header_propagation, bool use_tracer_propagation,
+OpenTracingSpan::OpenTracingSpan(OpenTracingDriver& driver,
                                  std::unique_ptr<opentracing::Span>&& span)
-    : use_single_header_propagation_(use_single_header_propagation),
-      use_tracer_propagation_(use_tracer_propagation), span_(std::move(span)) {}
+    : driver_{driver}, span_(std::move(span)) {}
 
 void OpenTracingSpan::finishSpan() { span_->Finish(); }
 
@@ -90,13 +89,14 @@ void OpenTracingSpan::setTag(const std::string& name, const std::string& value) 
 }
 
 void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
-  if (use_single_header_propagation_) {
+  if (driver_.useSingleHeaderPropagation()) {
     // Inject the span context using Envoy's single-header format.
     std::ostringstream oss;
     const opentracing::expected<void> was_successful =
         span_->tracer().Inject(span_->context(), oss);
     if (!was_successful) {
       ENVOY_LOG(debug, "Failed to inject span context: {}", was_successful.error().message());
+      driver_.tracerStats().span_context_injection_error_.inc();
       return;
     }
     const std::string current_span_context = oss.str();
@@ -104,13 +104,14 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   }
 
-  if (use_tracer_propagation_) {
+  if (driver_.useTracerPropagation()) {
     // Inject the context using the tracer's standard HTTP header format.
     const OpenTracingHTTPHeadersWriter writer{request_headers};
     const opentracing::expected<void> was_successful =
         span_->tracer().Inject(span_->context(), writer);
     if (!was_successful) {
       ENVOY_LOG(debug, "Failed to inject span context: {}", was_successful.error().message());
+      driver_.tracerStats().span_context_injection_error_.inc();
       return;
     }
   }
@@ -120,9 +121,11 @@ SpanPtr OpenTracingSpan::spawnChild(const Config&, const std::string& name, Syst
   std::unique_ptr<opentracing::Span> ot_span = span_->tracer().StartSpan(
       name, {opentracing::ChildOf(&span_->context()), opentracing::StartTimestamp(start_time)});
   RELEASE_ASSERT(ot_span != nullptr);
-  return SpanPtr{new OpenTracingSpan{use_single_header_propagation_, use_tracer_propagation_,
-                                     std::move(ot_span)}};
+  return SpanPtr{new OpenTracingSpan{driver_, std::move(ot_span)}};
 }
+
+OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
+    : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.opentracing."))} {}
 
 SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_headers,
                                      const std::string& operation_name, SystemTime start_time) {
@@ -141,6 +144,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
     } else {
       ENVOY_LOG(debug, "Failed to extract span context: {}",
                 parent_span_ctx_maybe.error().message());
+      tracerStats().span_context_extraction_error_.inc();
     }
   } else if (use_tracer_propagation) {
     const OpenTracingHTTPHeadersReader reader{request_headers};
@@ -151,13 +155,13 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
     } else {
       ENVOY_LOG(debug, "Failed to extract span context: {}",
                 parent_span_ctx_maybe.error().message());
+      tracerStats().span_context_extraction_error_.inc();
     }
   }
   active_span = tracer.StartSpan(operation_name, {opentracing::ChildOf(parent_span_ctx.get()),
                                                   opentracing::StartTimestamp(start_time)});
   RELEASE_ASSERT(active_span != nullptr);
-  return SpanPtr{new OpenTracingSpan{use_single_header_propagation, use_tracer_propagation,
-                                     std::move(active_span)}};
+  return SpanPtr{new OpenTracingSpan{*this, std::move(active_span)}};
 }
 
 } // namespace Tracing

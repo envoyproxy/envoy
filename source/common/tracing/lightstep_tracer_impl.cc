@@ -116,7 +116,8 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options)
-    : cm_(cluster_manager), tracer_stats_{LIGHTSTEP_TRACER_STATS(
+    : OpenTracingDriver{stats},
+      cm_(cluster_manager), tracer_stats_{LIGHTSTEP_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_(tls.allocateSlot()), runtime_(runtime), options_(std::move(options)) {
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
