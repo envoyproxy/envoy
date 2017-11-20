@@ -225,12 +225,11 @@ void FilterJson::translateHttpConnectionManager(
 void FilterJson::translateRedisProxy(const Json::Object& json_redis_proxy,
                                      envoy::api::v2::filter::network::RedisProxy& redis_proxy) {
   json_redis_proxy.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
+  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, stat_prefix);
+  redis_proxy.set_cluster(json_redis_proxy.getString("cluster_name"));
 
   const auto json_conn_pool = json_redis_proxy.getObject("conn_pool");
   json_conn_pool->validateSchema(Json::Schema::REDIS_CONN_POOL_SCHEMA);
-
-  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, stat_prefix);
-  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, cluster);
 
   auto* conn_pool = redis_proxy.mutable_settings();
   JSON_UTIL_SET_DURATION(*json_conn_pool, *conn_pool, op_timeout);

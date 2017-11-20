@@ -100,9 +100,7 @@ TEST_F(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config = parseProtoFromJson(json_string);
-  EXPECT_THROW(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
-               Json::Exception);
+  EXPECT_THROW(parseProtoFromJson(json_string), Json::Exception);
 }
 
 class RedisProxyFilterTest : public testing::Test, public DecoderFactory {
