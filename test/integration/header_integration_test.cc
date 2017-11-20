@@ -6,6 +6,69 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+void disableHeaderValueOptionAppend(
+    Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& header_value_options) {
+  for (auto& i : header_value_options) {
+    i.mutable_append()->set_value(false);
+  }
+}
+
+const std::string http_connection_mgr_config = R"EOF(
+http_filters:
+  - name: envoy.router
+codec_type: HTTP1
+route_config:
+  virtual_hosts:
+    - name: no-headers
+      domains: ["no-headers.com"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: "cluster_0" }
+    - name: vhost-headers
+      domains: ["vhost-headers.com"]
+      request_headers_to_add:
+        - header:
+            key: "x-vhost-request"
+            value: "vhost"
+      response_headers_to_add:
+        - header:
+            key: "x-vhost-response"
+            value: "vhost"
+      response_headers_to_remove: ["x-vhost-response-remove"]
+      routes:
+        - match: { prefix: "/vhost-only" }
+          route: { cluster: "cluster_0" }
+        - match: { prefix: "/vhost-and-route" }
+          route:
+            cluster: cluster_0
+            request_headers_to_add:
+              - header:
+                  key: "x-route-request"
+                  value: "route"
+            response_headers_to_add:
+              - header:
+                  key: "x-route-response"
+                  value: "route"
+            response_headers_to_remove: ["x-route-response-remove"]
+    - name: route-headers
+      domains: ["route-headers.com"]
+      routes:
+        - match: { prefix: "/route-only" }
+          route:
+            cluster: cluster_0
+            request_headers_to_add:
+              - header:
+                  key: "x-route-request"
+                  value: "route"
+            response_headers_to_add:
+              - header:
+                  key: "x-route-response"
+                  value: "route"
+            response_headers_to_remove: ["x-route-response-remove"]
+)EOF";
+
+} // namespace
 
 class HeaderIntegrationTest : public HttpIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
@@ -26,14 +89,16 @@ public:
     header_value_option->mutable_append()->set_value(append);
   }
 
-  void initializeFilter(HeaderMode mode, bool includeRouteConfigHeaders) {
+  void initializeFilter(HeaderMode mode, bool include_route_config_headers) {
     config_helper_.addConfigModifier([&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
-      using namespace envoy::api::v2::filter::http;
+      // Overwrite default config with our own.
+      MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
 
       const bool append = mode == HeaderMode::Append;
 
       auto* route_config = hcm.mutable_route_config();
-      if (includeRouteConfigHeaders) {
+      if (include_route_config_headers) {
+        // Configure route config level headers.
         addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-response",
                   "routeconfig", append);
         route_config->add_response_headers_to_remove("x-routeconfig-response-remove");
@@ -41,44 +106,23 @@ public:
                   "routeconfig", append);
       }
 
-      route_config->clear_virtual_hosts();
+      if (append) {
+        // The config specifies append by default: no modifications needed.
+        return;
+      }
 
-      auto* vhost = route_config->add_virtual_hosts();
-      vhost->set_name("no-headers");
-      vhost->add_domains("no-headers.com");
-      auto* route = vhost->add_routes();
-      route->mutable_match()->set_prefix("/");
-      route->mutable_route()->set_cluster("cluster_0");
+      // Iterate over VirtualHosts and nested Routes, disabling header append.
+      for (auto& vhost : *route_config->mutable_virtual_hosts()) {
+        disableHeaderValueOptionAppend(*vhost.mutable_request_headers_to_add());
+        disableHeaderValueOptionAppend(*vhost.mutable_response_headers_to_add());
 
-      vhost = route_config->add_virtual_hosts();
-      vhost->set_name("vhost-headers");
-      vhost->add_domains("vhost-headers.com");
-      addHeader(vhost->mutable_request_headers_to_add(), "x-vhost-request", "vhost", append);
-      addHeader(vhost->mutable_response_headers_to_add(), "x-vhost-response", "vhost", append);
-      vhost->add_response_headers_to_remove("x-vhost-response-remove");
-      route = vhost->add_routes();
-      route->mutable_match()->set_prefix("/vhost-only");
-      route->mutable_route()->set_cluster("cluster_0");
-      route = vhost->add_routes();
-      route->mutable_match()->set_prefix("/vhost-and-route");
-      auto* route_action = route->mutable_route();
-      route_action->set_cluster("cluster_0");
-      addHeader(route_action->mutable_request_headers_to_add(), "x-route-request", "route", append);
-      addHeader(route_action->mutable_response_headers_to_add(), "x-route-response", "route",
-                append);
-      route_action->add_response_headers_to_remove("x-route-response-remove");
-
-      vhost = route_config->add_virtual_hosts();
-      vhost->set_name("route-headers");
-      vhost->add_domains("route-headers.com");
-      route = vhost->add_routes();
-      route->mutable_match()->set_prefix("/route-only");
-      route_action = route->mutable_route();
-      route_action->set_cluster("cluster_0");
-      addHeader(route_action->mutable_request_headers_to_add(), "x-route-request", "route", append);
-      addHeader(route_action->mutable_response_headers_to_add(), "x-route-response", "route",
-                append);
-      route_action->add_response_headers_to_remove("x-route-response-remove");
+        for (auto& rte : *vhost.mutable_routes()) {
+          if (rte.has_route()) {
+            disableHeaderValueOptionAppend(*rte.mutable_route()->mutable_request_headers_to_add());
+            disableHeaderValueOptionAppend(*rte.mutable_route()->mutable_response_headers_to_add());
+          }
+        }
+      }
     });
 
     initialize();
@@ -451,4 +495,5 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
           {":status", "200"},
       });
 }
+
 } // namespace Envoy
