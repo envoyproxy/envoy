@@ -44,7 +44,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
-        "//source/common/protobuf:protobuf_lib",
+        "//source/common/protobuf:protobuf",
     ],
 )
 
