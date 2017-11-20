@@ -114,7 +114,7 @@ TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLim
 // Test hitting the bridge filter with too many response bytes to buffer.  Given
 // the headers are not proxied, the connection manager will send a 500.
 TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
-  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: {} }");
+  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: { deprecated_v1: true } }");
   config_helper_.setBufferLimits(1024, 1024);
 
   initialize();

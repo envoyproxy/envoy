@@ -628,7 +628,7 @@ void HttpIntegrationTest::testRetryHittingBufferLimit() {
 // Test hitting the dynamo filter with too many request bytes to buffer.  Ensure the connection
 // manager sends a 413.
 void HttpIntegrationTest::testHittingDecoderFilterLimit() {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: { deprecated_v1: true } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -653,7 +653,7 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
 // Test hitting the dynamo filter with too many response bytes to buffer.  Given the request headers
 // are sent on early, the stream/connection will be reset.
 void HttpIntegrationTest::testHittingEncoderFilterLimit() {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: { deprecated_v1: true } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 

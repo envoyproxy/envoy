@@ -1,7 +1,5 @@
 #pragma once
 
-#include "server/config/http/empty_http_filter_config.h"
-
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -10,11 +8,10 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class GrpcWebFilterConfig : public EmptyHttpFilterConfig {
+class GrpcWebFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb createFilter(const std::string&,
-                                   FactoryContext& context) override;
-
+  HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
+                                          FactoryContext&) override;
   std::string name() override { return Config::HttpFilterNames::get().GRPC_WEB; }
 };
 

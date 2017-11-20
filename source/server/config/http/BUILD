@@ -38,21 +38,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "empty_http_filter_config_lib",
-    hdrs = ["empty_http_filter_config.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-    ],
-)
-
-envoy_cc_library(
     name = "cors_lib",
     srcs = ["cors.cc"],
     hdrs = ["cors.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
@@ -65,7 +54,6 @@ envoy_cc_library(
     srcs = ["dynamo.cc"],
     hdrs = ["dynamo.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
@@ -91,7 +79,6 @@ envoy_cc_library(
     srcs = ["grpc_http1_bridge.cc"],
     hdrs = ["grpc_http1_bridge.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
@@ -116,7 +103,6 @@ envoy_cc_library(
     srcs = ["grpc_web.cc"],
     hdrs = ["grpc_web.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
