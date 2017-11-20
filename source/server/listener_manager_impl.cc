@@ -99,16 +99,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       (config.filter_chains().size() == 1 &&
        config.filter_chains()[0].filter_chain_match().sni_domains().empty());
 
-  size_t filters_hash = 0;
+  Optional<uint64_t> filters_hash;
   uint32_t has_tls = 0;
   uint32_t has_stk = 0;
   for (const auto& filter_chain : config.filter_chains()) {
     std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
                                          filter_chain.filter_chain_match().sni_domains().end());
-    if (filters_hash == 0) {
-      filters_hash = RepeatedPtrUtil::hash(filter_chain.filters());
+    if (!filters_hash.valid()) {
+      filters_hash.value(RepeatedPtrUtil::hash(filter_chain.filters()));
       filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
-    } else if (filters_hash != RepeatedPtrUtil::hash(filter_chain.filters())) {
+    } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
       throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
                                        "is currently not supported",
                                        address_->asString()));
