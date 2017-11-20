@@ -68,7 +68,7 @@ public:
   void addConfigModifier(ConfigModifierFunction function);
 
   // Allows callers to easily modify the HttpConnectionManager configuration.
-  // Mofidiers will be applied just before ports are modified in finalize
+  // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
 
   // Return the bootstrap configuration for hand-off to Envoy.

@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":config_utility_lib",
         ":req_header_formatter_lib",
+        ":resp_header_parser_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         "//include/envoy/common:optional",
@@ -127,6 +128,7 @@ envoy_cc_library(
     external_deps = ["envoy_filter_http_router"],
     deps = [
         ":config_lib",
+        ":resp_header_parser_lib",
         ":retry_state_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -188,6 +190,17 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "resp_header_parser_lib",
+    srcs = ["resp_header_parser.cc"],
+    hdrs = ["resp_header_parser.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//source/common/config:base_json_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

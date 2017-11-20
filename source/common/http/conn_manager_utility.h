@@ -23,8 +23,7 @@ public:
                                    const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                    const Http::HeaderMap& request_headers,
-                                    const Router::Config& route_config);
+                                    const Http::HeaderMap& request_headers);
 
 private:
   static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,

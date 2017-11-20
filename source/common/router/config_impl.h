@@ -17,6 +17,7 @@
 
 #include "common/router/config_utility.h"
 #include "common/router/req_header_formatter.h"
+#include "common/router/resp_header_parser.h"
 #include "common/router/router_ratelimit.h"
 
 #include "api/rds.pb.h"
@@ -105,11 +106,9 @@ public:
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
-  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
-    return request_headers_to_add_;
-  }
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
   const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+  const ResponseHeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -148,8 +147,8 @@ private:
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
-  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
+  ResponseHeaderParserPtr response_headers_parser_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -299,15 +298,12 @@ public:
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
 
-  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
-    return request_headers_to_add_;
-  }
-
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const AccessLog::RequestInfo& request_info) const override;
+  void finalizeResponseHeaders(Http::HeaderMap& headers) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -347,6 +343,7 @@ protected:
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
   const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+  const ResponseHeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
 
 private:
   struct RuntimeData {
@@ -365,6 +362,9 @@ private:
     void finalizeRequestHeaders(Http::HeaderMap& headers,
                                 const AccessLog::RequestInfo& request_info) const override {
       return parent_->finalizeRequestHeaders(headers, request_info);
+    }
+    void finalizeResponseHeaders(Http::HeaderMap& headers) const override {
+      return parent_->finalizeResponseHeaders(headers);
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
@@ -470,8 +470,8 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
-  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
+  ResponseHeaderParserPtr response_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -576,11 +576,8 @@ public:
   ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
              Upstream::ClusterManager& cm, bool validate_clusters_default);
 
-  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
-    return request_headers_to_add_;
-  }
-
   const RequestHeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
+  const ResponseHeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
 
   // Router::Config
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
@@ -591,21 +588,11 @@ public:
     return internal_only_headers_;
   }
 
-  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
-    return response_headers_to_add_;
-  }
-
-  const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
-    return response_headers_to_remove_;
-  }
-
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<Router::HeaderAddition> response_headers_to_add_;
-  std::list<Http::LowerCaseString> response_headers_to_remove_;
-  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
+  ResponseHeaderParserPtr response_headers_parser_;
 };
 
 /**
@@ -620,18 +607,8 @@ public:
     return internal_only_headers_;
   }
 
-  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
-    return response_headers_to_add_;
-  }
-
-  const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
-    return response_headers_to_remove_;
-  }
-
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<Router::HeaderAddition> response_headers_to_add_;
-  std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
 } // namespace Router
