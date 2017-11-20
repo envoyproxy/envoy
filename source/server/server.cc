@@ -88,7 +88,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clust
 Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
 
 void InstanceImpl::drainListeners() {
-  ENVOY_LOG(warn, "closing and draining listeners");
+  ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners();
   drain_manager_->startDrainSequence(nullptr);
 }
@@ -153,7 +153,7 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 
 void InstanceImpl::initialize(Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
-  ENVOY_LOG(warn, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
+  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
@@ -192,7 +192,7 @@ void InstanceImpl::initialize(Options& options,
                                    options.serviceClusterName(), options.serviceNodeName()));
 
   Configuration::InitialImpl initial_config(bootstrap);
-  ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
+  ENVOY_LOG(debug, "admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
@@ -287,7 +287,7 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
 
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
   if (api_->fileExists(flags_path.value() + "/drain")) {
-    ENVOY_LOG(warn, "starting server in drain mode");
+    ENVOY_LOG(info, "starting server in drain mode");
     failHealthcheck(true);
   }
 }
@@ -325,7 +325,7 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
       return;
     }
 
-    ENVOY_LOG(warn, "all clusters initialized. initializing init manager");
+    ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize([this, workers_start_cb]() {
       if (shutdown_) {
         return;
@@ -341,11 +341,11 @@ void InstanceImpl::run() {
                    [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
-  ENVOY_LOG(warn, "starting main dispatch loop");
+  ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  ENVOY_LOG(warn, "main dispatch loop exited");
+  ENVOY_LOG(info, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
@@ -366,14 +366,14 @@ void InstanceImpl::run() {
   config_->clusterManager().shutdown();
   handler_.reset();
   thread_local_.shutdownThread();
-  ENVOY_LOG(warn, "exiting");
+  ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
 void InstanceImpl::shutdown() {
-  ENVOY_LOG(warn, "shutdown invoked. sending SIGTERM to self");
+  ENVOY_LOG(info, "shutdown invoked. sending SIGTERM to self");
   kill(getpid(), SIGTERM);
 }
 

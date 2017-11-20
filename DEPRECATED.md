@@ -5,6 +5,16 @@ As of release 1.3.0, Envoy will follow a
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 
+## Version 1.5.0
+
+* The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
+  the individual `ejections_detected_*` counters for the detectors of interest, or
+  `ejections_enforced_total` for the total number of ejections that actually occurred.
+* The outlier detection `ejections_consecutive_5xx` stats counter has been deprecated in favour of
+  `ejections_detected_consecutive_5xx` and `ejections_enforced_consecutive_5xx`.
+* The outlier detection `ejections_success_rate` stats counter has been deprecated in favour of
+  `ejections_detected_success_rate` and `ejections_enforced_success_rate`.
+
 ## Version 1.4.0
 
 * Config option `statsd_local_udp_port` has been deprecated and has been replaced with

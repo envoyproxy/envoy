@@ -39,6 +39,7 @@ public:
   std::list<Network::ConnectionCallbacks*> callbacks_;
   uint64_t id_{next_id_++};
   Address::InstanceConstSharedPtr remote_address_;
+  Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
   Connection::State state_{Connection::State::Open};
 };

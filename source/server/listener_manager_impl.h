@@ -39,7 +39,7 @@ public:
   }
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
-  DrainManagerPtr createDrainManager() override;
+  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
@@ -185,7 +185,7 @@ public:
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
   uint64_t hash() const { return hash_; }
-  void infoLog(const std::string& message);
+  void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);

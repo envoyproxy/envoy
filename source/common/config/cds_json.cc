@@ -20,6 +20,7 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
   JSON_UTIL_SET_DURATION(json_health_check, health_check, interval_jitter);
   JSON_UTIL_SET_INTEGER(json_health_check, health_check, unhealthy_threshold);
   JSON_UTIL_SET_INTEGER(json_health_check, health_check, healthy_threshold);
+  JSON_UTIL_SET_BOOL(json_health_check, health_check, reuse_connection);
 
   const std::string hc_type = json_health_check.getString("type");
   if (hc_type == "http") {
@@ -72,8 +73,11 @@ void CdsJson::translateOutlierDetection(
   JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, interval);
   JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, base_ejection_time);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, consecutive_5xx);
+  JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, consecutive_gateway_failure);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, max_ejection_percent);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, enforcing_consecutive_5xx);
+  JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection,
+                        enforcing_consecutive_gateway_failure);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, enforcing_success_rate);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, success_rate_minimum_hosts);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, success_rate_request_volume);

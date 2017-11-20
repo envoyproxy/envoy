@@ -14,16 +14,17 @@
 namespace Envoy {
 namespace Server {
 
-DrainManagerImpl::DrainManagerImpl(Instance& server) : server_(server) {}
+DrainManagerImpl::DrainManagerImpl(Instance& server, envoy::api::v2::Listener::DrainType drain_type)
+    : server_(server), drain_type_(drain_type) {}
 
 bool DrainManagerImpl::drainClose() const {
-  // If we are actively HC failed, always drain close.
+  // If we are actively HC failed and the drain type is default, always drain close.
   //
   // TODO(mattklein123): In relation to x-envoy-immediate-health-check-fail, it would be better
   // if even in the case of server health check failure we had some period of drain ramp up. This
   // would allow the other side to fail health check for the host which will require some thread
   // jumps versus immediately start GOAWAY/connection thrashing.
-  if (server_.healthCheckFailed()) {
+  if (drain_type_ == envoy::api::v2::Listener_DrainType_DEFAULT && server_.healthCheckFailed()) {
     return true;
   }
 
@@ -59,7 +60,7 @@ void DrainManagerImpl::startParentShutdownSequence() {
   ASSERT(!parent_shutdown_timer_);
   parent_shutdown_timer_ = server_.dispatcher().createTimer([this]() -> void {
     // Shut down the parent now. It should have already been draining.
-    ENVOY_LOG(warn, "shutting down parent after drain");
+    ENVOY_LOG(info, "shutting down parent after drain");
     server_.hotRestart().terminateParent();
   });
 

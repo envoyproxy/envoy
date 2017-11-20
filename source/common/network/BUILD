@@ -23,6 +23,9 @@ envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
+    external_deps = [
+        "envoy_address",
+    ],
     deps = [
         ":address_lib",
         ":utility_lib",

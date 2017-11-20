@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
@@ -34,6 +35,12 @@ public:
    * @return std::string the redirect URL.
    */
   virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Returns the HTTP status code to use when redirecting a request.
+   * @return Http::Code the redirect response Code.
+   */
+  virtual Http::Code redirectResponseCode() const PURE;
 };
 
 /**
@@ -418,6 +425,34 @@ public:
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;
 
 /**
+ * Header to be added to a request or response.
+ */
+struct HeaderAddition {
+  /**
+   * The name of the header to add.
+   */
+  const Http::LowerCaseString header_;
+
+  /**
+   * The value of the header to add.
+   */
+  const std::string value_;
+
+  /**
+   * Indicates whether the value should be appended to existing values for the header (true) or
+   * replace them (false).
+   */
+  const bool append_;
+
+  /**
+   * Equality comparison.
+   */
+  bool operator==(const HeaderAddition& rhs) const {
+    return header_ == rhs.header_ && value_ == rhs.value_ && append_ == rhs.append_;
+  }
+};
+
+/**
  * The router configuration.
  */
 class Config {
@@ -442,11 +477,10 @@ public:
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
 
   /**
-   * Return a list of header key/value pairs that will be added to every response that transits the
-   * router.
+   * Return a list of header key/value pairs will be appended to or override every response that
+   * transits the router.
    */
-  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  responseHeadersToAdd() const PURE;
+  virtual const std::list<HeaderAddition>& responseHeadersToAdd() const PURE;
 
   /**
    * Return a list of upstream headers that will be stripped from every response that transits the
