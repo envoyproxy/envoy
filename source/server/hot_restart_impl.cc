@@ -425,7 +425,7 @@ void HotRestartImpl::onSocketEvent() {
     }
 
     case RpcMessageType::TerminateRequest: {
-      ENVOY_LOG(warn, "shutting down due to child request");
+      ENVOY_LOG(info, "shutting down due to child request");
       kill(getpid(), SIGTERM);
       break;
     }

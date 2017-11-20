@@ -338,6 +338,22 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
   EXPECT_NE(nullptr, dynamic_cast<AccessLog::FileAccessLog*>(instance.get()));
 }
 
+// Test that a minimal TcpProxy v2 config works.
+TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
+  NiceMock<MockFactoryContext> context;
+  TcpProxyConfigFactory factory;
+  envoy::api::v2::filter::network::TcpProxy config =
+      *dynamic_cast<envoy::api::v2::filter::network::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

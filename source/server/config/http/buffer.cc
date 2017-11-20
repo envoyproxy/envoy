@@ -6,26 +6,42 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/config/filter_json.h"
 #include "common/http/filter/buffer_filter.h"
-#include "common/json/config_schemas.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                                            const std::string& stats_prefix,
-                                                            FactoryContext& context) {
-  json_config.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
+HttpFilterFactoryCb
+BufferFilterConfig::createBufferFilter(const envoy::api::v2::filter::http::Buffer& buffer,
+                                       const std::string& stats_prefix, FactoryContext& context) {
+  ASSERT(buffer.has_max_request_bytes());
+  ASSERT(buffer.has_max_request_time());
 
   Http::BufferFilterConfigConstSharedPtr config(new Http::BufferFilterConfig{
       Http::BufferFilter::generateStats(stats_prefix, context.scope()),
-      static_cast<uint64_t>(json_config.getInteger("max_request_bytes")),
-      std::chrono::seconds(json_config.getInteger("max_request_time_s"))});
+      static_cast<uint64_t>(buffer.max_request_bytes().value()),
+      std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(buffer, max_request_time))});
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new Http::BufferFilter(config)});
   };
+}
+
+HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& json_config,
+                                                            const std::string& stats_prefix,
+                                                            FactoryContext& context) {
+  envoy::api::v2::filter::http::Buffer buffer;
+  Config::FilterJson::translateBufferFilter(json_config, buffer);
+  return createBufferFilter(buffer, stats_prefix, context);
+}
+
+HttpFilterFactoryCb BufferFilterConfig::createFilterFactoryFromProto(
+    const Protobuf::Message& config, const std::string& stats_prefix, FactoryContext& context) {
+  return createBufferFilter(dynamic_cast<const envoy::api::v2::filter::http::Buffer&>(config),
+                            stats_prefix, context);
 }
 
 /**

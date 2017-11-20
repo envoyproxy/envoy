@@ -30,6 +30,16 @@
 
 namespace Envoy {
 namespace Router {
+namespace {
+
+Router::HeaderAddition
+makeHeaderToAdd(const envoy::api::v2::HeaderValueOption& header_value_option) {
+  return Router::HeaderAddition{Http::LowerCaseString(header_value_option.header().key()),
+                                header_value_option.header().value(),
+                                PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true)};
+}
+
+} // namespace
 
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
@@ -232,7 +242,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       request_headers_parser_(RequestHeaderParser::parse(route.route().request_headers_to_add())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)) {
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      redirect_response_code_(
+          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -290,8 +302,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   for (const auto& header_value_option : route.route().request_headers_to_add()) {
-    request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                       header_value_option.header().value()});
+    request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
@@ -606,8 +617,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
   }
 
   for (const auto& header_value_option : virtual_host.request_headers_to_add()) {
-    request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                       header_value_option.header().value()});
+    request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
   for (const auto& route : virtual_host.routes()) {
@@ -686,7 +696,7 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
     for (const std::string& domain : virtual_host_config.domains()) {
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
       } else if (domain.size() > 0 && '*' == domain[0]) {
@@ -790,8 +800,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
   }
 
   for (const auto& header_value_option : config.response_headers_to_add()) {
-    response_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                        header_value_option.header().value()});
+    response_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
 
   for (const std::string& header : config.response_headers_to_remove()) {
@@ -799,8 +808,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
   }
 
   for (const auto& header_value_option : config.request_headers_to_add()) {
-    request_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                       header_value_option.header().value()});
+    request_headers_to_add_.push_back(makeHeaderToAdd(header_value_option));
   }
   request_headers_parser_ = RequestHeaderParser::parse(config.request_headers_to_add());
 }

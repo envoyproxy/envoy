@@ -52,6 +52,7 @@ class SslRedirector : public RedirectEntry {
 public:
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  Http::Code redirectResponseCode() const override { return Http::Code::MovedPermanently; }
 };
 
 class SslRedirectRoute : public Route {
@@ -104,7 +105,7 @@ public:
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
-  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
@@ -147,7 +148,7 @@ private:
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
-  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 };
 
@@ -297,7 +298,8 @@ public:
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
-  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+
+  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
 
@@ -329,6 +331,7 @@ public:
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  Http::Code redirectResponseCode() const override { return redirect_response_code_; }
 
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
@@ -467,13 +470,14 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
-  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
+  const Http::Code redirect_response_code_;
 };
 
 /**
@@ -572,7 +576,7 @@ public:
   ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
              Upstream::ClusterManager& cm, bool validate_clusters_default);
 
-  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+  const std::list<Router::HeaderAddition>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
 
@@ -587,8 +591,7 @@ public:
     return internal_only_headers_;
   }
 
-  const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  responseHeadersToAdd() const override {
+  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
     return response_headers_to_add_;
   }
 
@@ -599,9 +602,9 @@ public:
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
-  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+  std::list<Router::HeaderAddition> request_headers_to_add_;
   RequestHeaderParserPtr request_headers_parser_;
 };
 
@@ -617,8 +620,7 @@ public:
     return internal_only_headers_;
   }
 
-  const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  responseHeadersToAdd() const override {
+  const std::list<Router::HeaderAddition>& responseHeadersToAdd() const override {
     return response_headers_to_add_;
   }
 
@@ -628,7 +630,7 @@ public:
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
+  std::list<Router::HeaderAddition> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 

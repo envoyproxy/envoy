@@ -9,14 +9,16 @@ namespace Envoy {
 namespace AccessLog {
 
 struct RequestInfoImpl : public RequestInfo {
-  RequestInfoImpl(Http::Protocol protocol)
-      : protocol_(protocol), start_time_(std::chrono::system_clock::now()),
+  RequestInfoImpl()
+      : start_time_(std::chrono::system_clock::now()),
         start_time_monotonic_(std::chrono::steady_clock::now()) {}
+
+  RequestInfoImpl(Http::Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
 
   // AccessLog::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
-  std::chrono::microseconds requestReceivedDuration() const override {
+  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override {
@@ -24,7 +26,7 @@ struct RequestInfoImpl : public RequestInfo {
         std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
   }
 
-  std::chrono::microseconds responseReceivedDuration() const override {
+  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
     return response_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override {
@@ -34,7 +36,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  Http::Protocol protocol() const override { return protocol_; }
+  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
@@ -58,22 +60,27 @@ struct RequestInfoImpl : public RequestInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
+  const Optional<std::string>& upstreamLocalAddress() const override {
+    return upstream_local_address_;
+  }
+
   bool healthCheck() const override { return hc_request_; }
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   const std::string& getDownstreamAddress() const override { return downstream_address_; };
 
-  Http::Protocol protocol_;
+  Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
-  std::chrono::microseconds request_received_duration_{};
-  std::chrono::microseconds response_received_duration_{};
+  Optional<std::chrono::microseconds> request_received_duration_{};
+  Optional<std::chrono::microseconds> response_received_duration_{};
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Optional<std::string> upstream_local_address_{};
   bool hc_request_{};
   std::string downstream_address_;
 };

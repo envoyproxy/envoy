@@ -44,7 +44,7 @@ public:
   const std::string& logPath() override { return log_path_; }
   uint64_t restartEpoch() override { return 0; }
   std::chrono::milliseconds fileFlushIntervalMsec() override {
-    return std::chrono::milliseconds(10000);
+    return std::chrono::milliseconds(50);
   }
   Mode mode() const override { return Mode::Serve; }
   const std::string& serviceClusterName() override { return service_cluster_name_; }

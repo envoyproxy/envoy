@@ -80,6 +80,18 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   return output;
 }
 
+void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
+                                                 uint64_t seed) {
+  const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
+  std::mt19937 generate(seed);
+  std::uniform_int_distribution<> distribute(1, sample.length() - 1);
+  std::string str{};
+  for (uint64_t n = 0; n < n_char; ++n) {
+    str += sample.at(distribute(generate));
+  }
+  buffer.add(str);
+}
+
 Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
   for (auto counter : store.counters()) {
     if (counter->name() == name) {

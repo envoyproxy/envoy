@@ -115,6 +115,7 @@ public:
   SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; }
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
+  void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
 
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
@@ -128,6 +129,7 @@ private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
+  std::atomic<uint32_t> consecutive_gateway_failure_{0};
   Optional<MonotonicTime> last_ejection_time_;
   Optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
@@ -145,7 +147,14 @@ private:
   GAUGE  (ejections_active)                                                                        \
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_consecutive_5xx)                                                               \
-  COUNTER(ejections_success_rate)
+  COUNTER(ejections_success_rate)                                                                  \
+  COUNTER(ejections_enforced_total)                                                                \
+  COUNTER(ejections_detected_consecutive_5xx)                                                      \
+  COUNTER(ejections_enforced_consecutive_5xx)                                                      \
+  COUNTER(ejections_detected_success_rate)                                                         \
+  COUNTER(ejections_enforced_success_rate)                                                         \
+  COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
+  COUNTER(ejections_enforced_consecutive_gateway_failure)
 // clang-format on
 
 /**
@@ -165,22 +174,26 @@ public:
   uint64_t intervalMs() { return interval_ms_; }
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
   uint64_t consecutive5xx() { return consecutive_5xx_; }
+  uint64_t consecutiveGatewayFailure() { return consecutive_gateway_failure_; }
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
   uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() { return success_rate_stdev_factor_; }
   uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
+  uint64_t enforcingConsecutiveGatewayFailure() { return enforcing_consecutive_gateway_failure_; }
   uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
 
 private:
   const uint64_t interval_ms_;
   const uint64_t base_ejection_time_ms_;
   const uint64_t consecutive_5xx_;
+  const uint64_t consecutive_gateway_failure_;
   const uint64_t max_ejection_percent_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;
   const uint64_t enforcing_consecutive_5xx_;
+  const uint64_t enforcing_consecutive_gateway_failure_;
   const uint64_t enforcing_success_rate_;
 };
 
@@ -198,6 +211,7 @@ public:
   ~DetectorImpl();
 
   void onConsecutive5xx(HostSharedPtr host);
+  void onConsecutiveGatewayFailure(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
 
@@ -217,10 +231,12 @@ private:
   void ejectHost(HostSharedPtr host, EjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
-  void onConsecutive5xxWorker(HostSharedPtr host);
+  void onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host, EjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
   bool enforceEjection(EjectionType type);
+  void updateEnforcedEjectionStats(EjectionType type);
   void processSuccessRateEjections();
 
   DetectorConfig config_;

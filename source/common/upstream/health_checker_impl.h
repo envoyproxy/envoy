@@ -125,6 +125,7 @@ protected:
   HealthCheckerStats stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  const bool reuse_connection_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
