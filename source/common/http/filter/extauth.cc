@@ -95,12 +95,18 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
     reqmsg->headers().insertPath().value(path);
   }
 
-  // Next up, reset the Host: header to match the cluster name we're about
-  // to send the auth request to...
+  // https://github.com/datawire/ambassador/issues/154
+  // We used to reset the Host: header to match the cluster name we're about
+  // to send the auth request to. That, however, causes trouble for anyone
+  // who wants to make auth decisions based on the host to which the client
+  // started out trying to talk to.
+  //
+  // We may need to make this configurable later, so I'm leaving this line
+  // in for reference.
+  // reqmsg->headers().insertHost().value(config_->cluster_);
 
-  reqmsg->headers().insertHost().value(config_->cluster_);
-
-  // ...and make sure the body is correctly marked as empty.
+  // After setting up whatever headers we need to, make sure the body is
+  // correctly marked as empty.
 
   reqmsg->headers().insertContentLength().value(uint64_t(0));
 
