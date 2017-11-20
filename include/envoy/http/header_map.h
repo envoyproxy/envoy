@@ -112,7 +112,7 @@ public:
     // Avoid dead loop if token argument is empty.
     const int n = strlen(token);
     if (n == 0) {
-      return true;
+      return false;
     }
 
     // Find token substring, skip if it's partial of other token.

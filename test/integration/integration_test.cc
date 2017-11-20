@@ -204,10 +204,11 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   tcp_client->write(upgrade_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   const std::string data = fake_upstream_connection->waitForData(228);
-  // The chunked transfer-encoding for no body upstream request must valid
-  if (std::string::npos != data.find("transfer-encoding: chunked")) {
-    EXPECT_NE(std::string::npos, data.find("\r\n\r\n0\r\n"));
-  }
+  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
+  // content-length header is present. No body websocket upgrade request send to upstream has
+  // content-length header and has no transfer-encoding header.
+  EXPECT_NE(data.find("content-length:"), std::string::npos);
+  EXPECT_EQ(data.find("transfer-encoding:"), std::string::npos);
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   tcp_client->waitForData(upgrade_resp_str);
@@ -244,10 +245,11 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
   const std::string data = fake_upstream_connection->waitForData(228);
-  // The chunked transfer-encoding for no body upstream request must valid
-  if (std::string::npos != data.find("transfer-encoding: chunked")) {
-    EXPECT_NE(std::string::npos, data.find("\r\n\r\n0\r\n"));
-  }
+  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
+  // content-length header is present. No body websocket upgrade request send to upstream has
+  // content-length header and has no transfer-encoding header.
+  EXPECT_NE(data.find("content-length:"), std::string::npos);
+  EXPECT_EQ(data.find("transfer-encoding:"), std::string::npos);
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   tcp_client->waitForData(upgrade_resp_str);
