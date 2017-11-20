@@ -16,7 +16,8 @@ ProxyFilterConfig::ProxyFilterConfig(const envoy::api::v2::filter::network::Redi
                                      const Network::DrainDecision& drain_decision,
                                      Runtime::Loader& runtime)
     : drain_decision_(drain_decision), runtime_(runtime), cluster_name_(config.cluster()),
-      stat_prefix_(config.stat_prefix()), stats_(generateStats(stat_prefix_, scope)) {
+      stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
+      stats_(generateStats(stat_prefix_, scope)) {
   Config::Utility::checkCluster("redis", cluster_name_, cm);
 }
 

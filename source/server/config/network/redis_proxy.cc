@@ -22,7 +22,6 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createRedisProxyFactory(
   ASSERT(!config.cluster().empty());
   ASSERT(config.has_settings());
 
-  const std::string stat_prefix = fmt::format("redis.{}.", config.stat_prefix());
   Redis::ProxyFilterConfigSharedPtr filter_config(
       std::make_shared<Redis::ProxyFilterConfig>(config, context.clusterManager(), context.scope(),
                                                  context.drainDecision(), context.runtime()));

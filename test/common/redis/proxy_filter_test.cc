@@ -284,7 +284,7 @@ TEST_F(RedisProxyFilterTest, ProtocolError) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data));
 
-  EXPECT_EQ(1UL, config_->stats_.downstream_cx_protocol_error_.value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.downstream_cx_protocol_error").value());
 }
 
 } // namespace Redis
