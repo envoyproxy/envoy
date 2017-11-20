@@ -5,6 +5,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,20 +22,19 @@ public:
   virtual HttpFilterFactoryCb createFilter(const std::string& stat_prefix,
                                            FactoryContext& context) PURE;
 
-  HttpFilterFactoryCb createFilterFactory(const Json::Object&,
-                                          const std::string& stat_prefix,
+  HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string& stat_prefix,
                                           FactoryContext& context) override {
-      return createFilter(stat_prefix, context);
+    return createFilter(stat_prefix, context);
   }
 
   HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                    const std::string& stat_prefix,
                                                    FactoryContext& context) override {
-      return createFilter(stat_prefix, context);
+    return createFilter(stat_prefix, context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-     return ProtobufTypes::MessagePtr{new google::protobuf::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Empty()};
   }
 };
 

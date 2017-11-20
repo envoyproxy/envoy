@@ -1,12 +1,12 @@
 #pragma once
 
-#include "server/config/http/empty_http_filter_config.h"
-
 #include <string>
 
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
+
+#include "server/config/http/empty_http_filter_config.h"
 
 namespace Envoy {
 namespace Server {

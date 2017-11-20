@@ -8,8 +8,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
-                                                      FactoryContext& context) {
+HttpFilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&, FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter(context.clusterManager())});
