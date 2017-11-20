@@ -29,7 +29,7 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
   // Remove mappings.
   auto& listener_map_exact = map_exact_[listener_name];
   if (server_names.empty()) {
-    auto ctx = listener_map_exact.find(EMPTY_STRING);
+    const auto ctx = listener_map_exact.find(EMPTY_STRING);
     if (ctx != listener_map_exact.end() && ctx->second == context) {
       listener_map_exact.erase(ctx);
     }
@@ -37,12 +37,12 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
     auto& listener_map_wildcard = map_wildcard_[listener_name];
     for (const auto& name : server_names) {
       if (isWildcardServerName(name)) {
-        auto ctx = listener_map_wildcard.find(name);
+        const auto ctx = listener_map_wildcard.find(name);
         if (ctx != listener_map_wildcard.end() && ctx->second == context) {
           listener_map_wildcard.erase(ctx);
         }
       } else {
-        auto ctx = listener_map_exact.find(name);
+        const auto ctx = listener_map_exact.find(name);
         if (ctx != listener_map_exact.end() && ctx->second == context) {
           listener_map_exact.erase(ctx);
         }
@@ -104,21 +104,21 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
 
   // TODO(PiotrSikora): refactor and combine code with RouteMatcher::findVirtualHost().
-  auto listener_map_exact = map_exact_.find(listener_name);
+  const auto listener_map_exact = map_exact_.find(listener_name);
   if (listener_map_exact != map_exact_.end()) {
-    auto ctx = listener_map_exact->second.find(server_name);
+    const auto ctx = listener_map_exact->second.find(server_name);
     if (ctx != listener_map_exact->second.end()) {
       return ctx->second;
     }
   }
 
   // Try to construct and match wildcard domain.
-  size_t pos = server_name.find('.');
+  const size_t pos = server_name.find('.');
   if (pos > 0 && pos < server_name.size() - 1) {
-    std::string wildcard = '*' + server_name.substr(pos);
-    auto listener_map_wildcard = map_wildcard_.find(listener_name);
+    const std::string wildcard = '*' + server_name.substr(pos);
+    const auto listener_map_wildcard = map_wildcard_.find(listener_name);
     if (listener_map_wildcard != map_wildcard_.end()) {
-      auto ctx = listener_map_wildcard->second.find(wildcard);
+      const auto ctx = listener_map_wildcard->second.find(wildcard);
       if (ctx != listener_map_wildcard->second.end()) {
         return ctx->second;
       }
@@ -126,7 +126,7 @@ ServerContext* ContextManagerImpl::findSslServerContext(const std::string& liste
   }
 
   if (listener_map_exact != map_exact_.end()) {
-    auto ctx = listener_map_exact->second.find(EMPTY_STRING);
+    const auto ctx = listener_map_exact->second.find(EMPTY_STRING);
     if (ctx != listener_map_exact->second.end()) {
       return ctx->second;
     }
