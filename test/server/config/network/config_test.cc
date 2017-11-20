@@ -74,7 +74,7 @@ TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   envoy::api::v2::filter::network::RedisProxy config =
-    *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
+      *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_cluster("fake_cluster");
   config.set_stat_prefix("foo");

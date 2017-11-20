@@ -53,7 +53,8 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
+  envoy::api::v2::filter::network::RedisProxy proto_config =
+      Envoy::Redis::parseProtoFromJson(json_string);
   ProxyFilterConfig config(proto_config, cm_, store_, drain_decision_, runtime_);
   EXPECT_EQ("fake_cluster", config.cluster_name_);
 }
@@ -67,7 +68,8 @@ TEST_F(RedisProxyFilterConfigTest, InvalidCluster) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
+  envoy::api::v2::filter::network::RedisProxy proto_config =
+      Envoy::Redis::parseProtoFromJson(json_string);
 
   EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
@@ -83,7 +85,8 @@ TEST_F(RedisProxyFilterConfigTest, InvalidAddedByApi) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
+  envoy::api::v2::filter::network::RedisProxy proto_config =
+      Envoy::Redis::parseProtoFromJson(json_string);
 
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
   EXPECT_THROW_WITH_MESSAGE(ProxyFilterConfig(proto_config, cm_, store_, drain_decision_, runtime_),
@@ -114,7 +117,8 @@ public:
     }
     )EOF";
 
-    envoy::api::v2::filter::network::RedisProxy proto_config = Envoy::Redis::parseProtoFromJson(json_string);
+    envoy::api::v2::filter::network::RedisProxy proto_config =
+        Envoy::Redis::parseProtoFromJson(json_string);
     NiceMock<Upstream::MockClusterManager> cm;
     config_.reset(new ProxyFilterConfig(proto_config, cm, store_, drain_decision_, runtime_));
     filter_.reset(new ProxyFilter(*this, EncoderPtr{encoder_}, splitter_, config_));

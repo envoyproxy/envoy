@@ -178,9 +178,10 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                             config);
 }
 
-InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                           ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-                           const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config)
+InstanceImpl::InstanceImpl(
+    const std::string& cluster_name, Upstream::ClusterManager& cm, ClientFactory& client_factory,
+    ThreadLocal::SlotAllocator& tls,
+    const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {

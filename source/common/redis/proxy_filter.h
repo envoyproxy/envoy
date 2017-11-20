@@ -47,7 +47,8 @@ struct ProxyStats {
  */
 class ProxyFilterConfig {
 public:
-    ProxyFilterConfig(const envoy::api::v2::filter::network::RedisProxy& config, Upstream::ClusterManager& cm, Stats::Scope& scope,
+  ProxyFilterConfig(const envoy::api::v2::filter::network::RedisProxy& config,
+                    Upstream::ClusterManager& cm, Stats::Scope& scope,
                     const Network::DrainDecision& drain_decision, Runtime::Loader& runtime);
 
   const Network::DrainDecision& drain_decision_;

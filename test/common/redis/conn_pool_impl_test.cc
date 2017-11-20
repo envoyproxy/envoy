@@ -28,9 +28,9 @@ namespace Redis {
 namespace ConnPool {
 
 envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings createConnPoolSettings() {
-    envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings setting{};
-    setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
-    return setting;
+  envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings setting{};
+  setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
+  return setting;
 }
 
 class RedisClientImplTest : public testing::Test, public DecoderFactory {
