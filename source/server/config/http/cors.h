@@ -1,5 +1,7 @@
 #pragma once
 
+#include "server/config/http/empty_http_filter_config.h"
+
 #include <string>
 
 #include "envoy/server/filter_config.h"
@@ -13,14 +15,10 @@ namespace Configuration {
 /**
  * Config registration for the cors filter. @see NamedHttpFilterConfigFactory.
  */
-class CorsFilterConfig : public NamedHttpFilterConfigFactory {
+class CorsFilterConfig : public EmptyHttpFilterConfig {
 public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object&,
-                                          const std::string&,
-                                          FactoryContext&) override;
-  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                   const std::string&,
-                                                   FactoryContext&) override;
+  HttpFilterFactoryCb createFilter(const std::string&,
+                                   FactoryContext&) override;
 
   std::string name() override { return Config::HttpFilterNames::get().CORS; }
 };

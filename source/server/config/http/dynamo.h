@@ -1,5 +1,7 @@
 #pragma once
 
+#include "server/config/http/empty_http_filter_config.h"
+
 #include <string>
 
 #include "envoy/server/filter_config.h"
@@ -13,13 +15,10 @@ namespace Configuration {
 /**
  * Config registration for http dynamodb filter.
  */
-class DynamoFilterConfig : public NamedHttpFilterConfigFactory {
+class DynamoFilterConfig : public EmptyHttpFilterConfig {
 public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string& stat_prefix,
-                                          FactoryContext& context) override;
-  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                   const std::string& stats_prefix,
-                                                   FactoryContext& context) override;
+  HttpFilterFactoryCb createFilter(const std::string& stat_prefix,
+                                   FactoryContext& context) override;
 
   std::string name() override { return Config::HttpFilterNames::get().DYNAMO; }
 };

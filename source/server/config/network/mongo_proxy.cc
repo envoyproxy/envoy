@@ -8,6 +8,8 @@
 #include "common/config/filter_json.h"
 #include "common/mongo/proxy.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -16,7 +18,7 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
     const envoy::api::v2::filter::network::MongoProxy& config, FactoryContext& context) {
 
   ASSERT(!config.stat_prefix().empty());
-  std::string stat_prefix = "mongo." + config.stat_prefix() + ".";
+  std::string stat_prefix = fmt::format("mongo.{}.", config.stat_prefix());
 
   Mongo::AccessLogSharedPtr access_log;
   if (!config.access_log().empty()) {
