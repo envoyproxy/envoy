@@ -24,6 +24,8 @@ ResponseHeaderParserPtr ResponseHeaderParser::parse(
   return response_header_parser;
 }
 
+// TODO(zuercher): If modifying this function to perform header substitutions, consider refactoring
+// this class and RequestHeaderParser to share overlapping code.
 void ResponseHeaderParser::evaluateResponseHeaders(Http::HeaderMap& headers) const {
   for (const auto& header_value : headers_to_add_) {
     if (header_value.append_) {
