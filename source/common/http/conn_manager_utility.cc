@@ -21,8 +21,6 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     ConnectionManagerConfig& config, const Router::Config& route_config,
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
-  // Clean proxy headers.
-
   // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
@@ -41,6 +39,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     request_headers.removeUpgrade();
   }
 
+  // Clean proxy headers.
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
