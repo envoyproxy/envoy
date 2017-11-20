@@ -18,8 +18,8 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
     const envoy::api::v2::filter::network::MongoProxy& config, FactoryContext& context) {
 
   ASSERT(!config.stat_prefix().empty());
-  std::string stat_prefix = fmt::format("mongo.{}.", config.stat_prefix());
 
+  const std::string stat_prefix = fmt::format("mongo.{}.", config.stat_prefix());
   Mongo::AccessLogSharedPtr access_log;
   if (!config.access_log().empty()) {
     access_log.reset(new Mongo::AccessLog(config.access_log(), context.accessLogManager()));
