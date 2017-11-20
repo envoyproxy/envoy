@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-TEST(NetworkFilterConfigTest, RedisProxy) {
+TEST(NetworkFilterConfigTest, RedisProxyCorrectJson) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
@@ -41,6 +41,46 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, RedisProxyCorrectProto) {
+  std::string json_string = R"EOF(
+  {
+    "cluster_name": "fake_cluster",
+    "stat_prefix": "foo",
+    "conn_pool": {
+      "op_timeout_ms": 20
+    }
+  }
+  )EOF";
+
+  envoy::api::v2::filter::network::RedisProxy config{};
+  config.set_cluster("fake_cluster");
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
+
+  NiceMock<MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
+  NiceMock<MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  envoy::api::v2::filter::network::RedisProxy config =
+      *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_cluster("fake_cluster");
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
+
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
