@@ -27,12 +27,6 @@ namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
-envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings createConnPoolSettings() {
-    envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings setting{};
-    setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
-    return setting;
-}
-
 class RedisClientImplTest : public testing::Test, public DecoderFactory {
 public:
   // Redis::DecoderFactory
@@ -54,7 +48,15 @@ public:
   }
 
   void setup() {
-    config_.reset(new ConfigImpl(createConnPoolSettings()));
+    std::string json_string = R"EOF(
+    {
+      "op_timeout_ms": 20
+    }
+    )EOF";
+
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+    config_.reset(new ConfigImpl(*json_config));
+
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = upstream_connection_;
@@ -322,13 +324,21 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 }
 
 TEST(RedisClientFactoryImplTest, Basic) {
+  std::string json_string = R"EOF(
+  {
+    "op_timeout_ms": 20
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
   std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
   EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
-  ConfigImpl config(createConnPoolSettings());
+  ConfigImpl config(*json_config);
   ClientPtr client = factory.create(host, dispatcher, config);
   client->close();
 }
@@ -336,7 +346,14 @@ TEST(RedisClientFactoryImplTest, Basic) {
 class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
 public:
   RedisConnPoolImplTest() {
-    conn_pool_.reset(new InstanceImpl(cluster_name_, cm_, *this, tls_, createConnPoolSettings()));
+    std::string json_string = R"EOF(
+    {
+      "op_timeout_ms": 20
+    }
+    )EOF";
+
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+    conn_pool_.reset(new InstanceImpl(cluster_name_, cm_, *this, tls_, *json_config));
   }
 
   // Redis::ConnPool::ClientFactory

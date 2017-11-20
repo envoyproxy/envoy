@@ -8,7 +8,6 @@
 #include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
-#include "api/filter/network/redis_proxy.pb.h"
 #include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {
@@ -43,15 +42,6 @@ public:
   static void translateHttpConnectionManager(
       const Json::Object& json_http_connection_manager,
       envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager);
-
-  /**
-   * Translate a v1 JSON Redis proxy object to v2 envoy::api::v2::filter::network::RedisProxy.
-   * @param json_redis_proxy source v1 JSON HTTP connection manager object.
-   * @param redis_proxy destination v2
-   * envoy::api::v2::filter::network::RedisProxy.
-   */
-  static void translateRedisProxy(const Json::Object& json_redis_proxy,
-                                  envoy::api::v2::filter::network::RedisProxy& redis_proxy);
 
   /**
    * Translate a v1 JSON Mongo proxy object to v2 envoy::api::v2::filter::network::MongoProxy.

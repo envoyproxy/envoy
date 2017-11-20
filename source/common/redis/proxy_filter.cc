@@ -5,19 +5,21 @@
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"
+#include "common/json/config_schemas.h"
 
 #include "fmt/format.h"
 
 namespace Envoy {
 namespace Redis {
 
-ProxyFilterConfig::ProxyFilterConfig(const envoy::api::v2::filter::network::RedisProxy& config, Upstream::ClusterManager& cm,
+ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm,
                                      Stats::Scope& scope,
                                      const Network::DrainDecision& drain_decision,
                                      Runtime::Loader& runtime)
-    : drain_decision_(drain_decision), runtime_(runtime),
-      cluster_name_(config.cluster()),
-      stat_prefix_(config.stat_prefix()),
+    : Json::Validator(config, Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA),
+      drain_decision_(drain_decision), runtime_(runtime),
+      cluster_name_(config.getString("cluster_name")),
+      stat_prefix_(fmt::format("redis.{}.", config.getString("stat_prefix"))),
       stats_(generateStats(stat_prefix_, scope)) {
   Config::Utility::checkCluster("redis", cluster_name_, cm);
 }

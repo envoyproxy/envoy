@@ -8,13 +8,15 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
+#include "common/json/config_schemas.h"
 
 namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
-ConfigImpl::ConfigImpl(const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config)
-    : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)) {}
+ConfigImpl::ConfigImpl(const Json::Object& config)
+    : Validator(config, Json::Schema::REDIS_CONN_POOL_SCHEMA),
+      op_timeout_(config.getInteger("op_timeout_ms")) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -180,7 +182,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
 
 InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
                            ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-                           const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config)
+                           const Json::Object& config)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {

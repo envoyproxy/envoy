@@ -81,7 +81,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/mongo:proxy_lib",
     ],
@@ -106,7 +105,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/redis:codec_lib",
         "//source/common/redis:command_splitter_lib",

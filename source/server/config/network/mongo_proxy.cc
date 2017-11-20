@@ -8,28 +8,28 @@
 #include "common/config/filter_json.h"
 #include "common/mongo/proxy.h"
 
-#include "fmt/format.h"
+#include "api/filter/network/mongo_proxy.pb.h"
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
-    const envoy::api::v2::filter::network::MongoProxy& config, FactoryContext& context) {
+    const envoy::api::v2::filter::network::MongoProxy& mongo_proxy, FactoryContext& context) {
 
-  ASSERT(!config.stat_prefix().empty());
-  std::string stat_prefix = fmt::format("mongo.{}.", config.stat_prefix());
+  ASSERT(!mongo_proxy.stat_prefix().empty());
+  std::string stat_prefix = "mongo." + mongo_proxy.stat_prefix() + ".";
 
   Mongo::AccessLogSharedPtr access_log;
-  if (!config.access_log().empty()) {
-    access_log.reset(new Mongo::AccessLog(config.access_log(), context.accessLogManager()));
+  if (!mongo_proxy.access_log().empty()) {
+    access_log.reset(new Mongo::AccessLog(mongo_proxy.access_log(), context.accessLogManager()));
   }
 
   Mongo::FaultConfigSharedPtr fault_config;
-  if (config.has_delay()) {
-    auto delay = config.delay();
+  if (mongo_proxy.has_delay()) {
+    auto delay = mongo_proxy.delay();
     ASSERT(delay.has_fixed_delay());
-    fault_config = std::make_shared<Mongo::FaultConfig>(config.delay());
+    fault_config = std::make_shared<Mongo::FaultConfig>(mongo_proxy.delay());
   }
 
   return [stat_prefix, &context, access_log,
