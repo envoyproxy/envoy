@@ -6,7 +6,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/singleton.h"
+#include "common/singleton/const_singleton.h"
 
 #include "fmt/format.h"
 

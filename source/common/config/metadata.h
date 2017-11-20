@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
+#include "common/singleton/const_singleton.h"
 
 #include "api/base.pb.h"
 
