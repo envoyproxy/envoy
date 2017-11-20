@@ -7,6 +7,8 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 
+#include "common/api/os_sys_calls_impl.h"
+
 #include "test/mocks/filesystem/mocks.h"
 
 #include "gmock/gmock.h"
@@ -34,7 +36,7 @@ public:
   std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
 };
 
-class MockOsSysCalls : public OsSysCalls {
+class MockOsSysCalls : public OsSysCallsImpl {
 public:
   MockOsSysCalls();
   ~MockOsSysCalls();

@@ -2,6 +2,8 @@
 
 #include "envoy/api/os_sys_calls.h"
 
+#include "common/singleton/threadsafe_singleton.h"
+
 namespace Envoy {
 namespace Api {
 
@@ -18,6 +20,8 @@ public:
   void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) override;
   int stat(const char* pathname, struct stat* buf) override;
 };
+
+typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;
 
 } // namespace Api
 } // namespace Envoy

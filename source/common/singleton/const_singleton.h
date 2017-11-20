@@ -3,7 +3,10 @@
 namespace Envoy {
 
 /**
- * Immutable singleton pattern. See singleton/manager.h for mutable/destroyable singletons.
+ * ConstSingleton allows easy global cross-thread access to a const object.
+ *
+ * This singleton should be used for data which is initialized once at
+ * start-up and then be treated as immutable const data thereafter.
  */
 template <class T> class ConstSingleton {
 public:

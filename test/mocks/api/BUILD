@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/api:os_sys_calls_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//test/mocks/filesystem:filesystem_mocks",
     ],
 )

@@ -1,9 +1,11 @@
+#include "common/api/os_sys_calls_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "server/hot_restart_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
@@ -33,7 +35,7 @@ public:
     Stats::RawStatData::configureForTestsOnly(options_);
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_.reset(new HotRestartImpl(options_, os_sys_calls_));
+    hot_restart_.reset(new HotRestartImpl(options_));
     hot_restart_->drainParentListeners();
   }
 
@@ -45,6 +47,7 @@ public:
   }
 
   Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;
@@ -75,7 +78,7 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
   EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer_.data()));
   EXPECT_CALL(os_sys_calls_, bind(_, _, _));
-  HotRestartImpl hot_restart2(options_, os_sys_calls_);
+  HotRestartImpl hot_restart2(options_);
   Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");
   Stats::RawStatData* stat3_prime = hot_restart2.alloc("stat3");
   Stats::RawStatData* stat5_prime = hot_restart2.alloc("stat5");

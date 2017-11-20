@@ -396,74 +396,15 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
-  route_config_.response_headers_to_remove_.push_back(LowerCaseString("custom_header"));
-  route_config_.response_headers_to_add_.push_back(
-      Router::HeaderAddition{LowerCaseString("to_add"), "foo", true});
+  TestHeaderMapImpl response_headers{
+      {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
+  TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  {
-    TestHeaderMapImpl response_headers{
-        {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
-    TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers);
 
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers,
-                                                    route_config_);
-
-    EXPECT_EQ(1UL, response_headers.size());
-    EXPECT_EQ("foo", response_headers.get_("to_add"));
-    EXPECT_FALSE(response_headers.has("x-request-id"));
-  }
-
-  // Values are appended
-  {
-    TestHeaderMapImpl response_headers{
-        {"connection", "foo"}, {"transfer-encoding", "foo"}, {"to_add", "existing"}};
-    TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
-
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers,
-                                                    route_config_);
-
-    EXPECT_EQ(2UL, response_headers.size());
-
-    std::list<std::string> values;
-    response_headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
-          if ("to_add" == std::string{header.key().c_str()}) {
-            std::list<std::string>* v = static_cast<std::list<std::string>*>(cb_v);
-            v->push_back(std::string{header.value().c_str()});
-          }
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        &values);
-
-    EXPECT_EQ(std::list<std::string>({"existing", "foo"}), values);
-    EXPECT_FALSE(response_headers.has("x-request-id"));
-  }
-
-  // Values are overridden
-  route_config_.response_headers_to_add_.push_back(
-      Router::HeaderAddition{LowerCaseString("to_override"), "foo", false});
-  {
-    TestHeaderMapImpl response_headers{
-        {"connection", "foo"}, {"transfer-encoding", "foo"}, {"to_override", "existing"}};
-    TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
-
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers,
-                                                    route_config_);
-
-    std::list<std::string> values;
-    response_headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
-          if ("to_override" == std::string{header.key().c_str()}) {
-            std::list<std::string>* v = static_cast<std::list<std::string>*>(cb_v);
-            v->push_back(std::string{header.value().c_str()});
-          }
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        &values);
-
-    EXPECT_EQ(std::list<std::string>({"foo"}), values);
-    EXPECT_FALSE(response_headers.has("x-request-id"));
-  }
+  EXPECT_EQ(1UL, response_headers.size());
+  EXPECT_EQ("foo", response_headers.get_("custom_header"));
+  EXPECT_FALSE(response_headers.has("x-request-id"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
@@ -471,7 +412,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                     {"x-envoy-force-trace", "true"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, route_config_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers);
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 

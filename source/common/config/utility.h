@@ -11,10 +11,10 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
-#include "common/common/singleton.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 
 #include "api/base.pb.h"
 #include "api/cds.pb.h"
