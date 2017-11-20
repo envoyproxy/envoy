@@ -15,7 +15,6 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
-#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/bootstrap.pb.h"

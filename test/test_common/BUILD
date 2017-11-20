@@ -90,3 +90,11 @@ envoy_cc_test_library(
         "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
+
+envoy_cc_library(
+    name = "threadsafe_singleton_injector_lib",
+    hdrs = ["threadsafe_singleton_injector.h"],
+    deps = [
+        "//source/common/singleton:threadsafe_singleton",
+    ],
+)
