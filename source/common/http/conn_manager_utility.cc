@@ -26,14 +26,13 @@ void ConnectionManagerUtility::mutateRequestHeaders(
   // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
-    // Current WebSocket implementation re-use the HTTP1 codec to send upgrade headers to
-    // upstream host, which add "transfer-encoding: chunked" request header if stream not end
-    // and content-length not exists.
-    // In HTTP1.1, if transfer-encoding and content-length both not exists means no request body,
-    // after transfer-encoding striped here, the upstream request become invalid:
-    //   chunked encoding with no request body.
-    // We can fix it by explicitly add a "content-length: 0" request header here.
-    bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
+    // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
+    // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
+    // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
+    // content-length both do not exist this means there is no request body. After transfer-encoding
+    // is stripped here, the upstream request becomes invalid. We can fix it by explicitly adding a
+    // "content-length: 0" request header here.
+    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
     if (no_body) {
       request_headers.insertContentLength().value(uint64_t(0));
     }

@@ -109,18 +109,21 @@ public:
    * @return whether contains token in case insensitive manner.
    */
   bool caseInsensitiveContains(const char* token) const {
+    // Avoid dead loop if token argument is empty.
     const int n = strlen(token);
     if (n == 0) {
       return true;
     }
+
+    // Find token substring, skip if it's partial of other token.
     const char* tokens = c_str();
-    const char* separators = " ,";
     for (const char* p = tokens; (p = strcasestr(p, token)); p += n) {
-      if ((p == tokens || strchr(separators, *(p - 1)) != NULL) &&
-          (*(p + n) == '\0' || strchr(separators, *(p + n)) != NULL)) {
+      if ((p == tokens || *(p - 1) == ' ' || *(p - 1) == ',') &&
+          (*(p + n) == '\0' || *(p + n) == ' ' || *(p + n) == ',')) {
         return true;
       }
     }
+
     return false;
   }
 

@@ -203,7 +203,11 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(228);
+  const std::string data = fake_upstream_connection->waitForData(228);
+  // The chunked transfer-encoding for no body upstream request must valid
+  if (std::string::npos != data.find("transfer-encoding: chunked")) {
+    EXPECT_NE(std::string::npos, data.find("\r\n\r\n0\r\n"));
+  }
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   tcp_client->waitForData(upgrade_resp_str);
@@ -239,7 +243,11 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
-  fake_upstream_connection->waitForData(228);
+  const std::string data = fake_upstream_connection->waitForData(228);
+  // The chunked transfer-encoding for no body upstream request must valid
+  if (std::string::npos != data.find("transfer-encoding: chunked")) {
+    EXPECT_NE(std::string::npos, data.find("\r\n\r\n0\r\n"));
+  }
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   tcp_client->waitForData(upgrade_resp_str);
