@@ -264,11 +264,13 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
 }
 
 void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
-  if (cluster.hosts().empty()) {
-    return;
+  for (size_t i = 0; i < cluster.prioritySet().hostSetsPerPriority().size(); ++i) {
+    auto& host_set = cluster.prioritySet().getHostSet(i);
+    if (host_set.hosts().empty()) {
+      continue;
+    }
+    postThreadLocalClusterUpdate(cluster, i, host_set.hosts(), std::vector<HostSharedPtr>{});
   }
-
-  postThreadLocalClusterUpdate(cluster, cluster.hosts(), std::vector<HostSharedPtr>{});
 }
 
 bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) {
@@ -343,12 +345,14 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   }
 
   const Cluster& primary_cluster_reference = *new_cluster;
-  new_cluster->addMemberUpdateCb(
-      [&primary_cluster_reference, this](const std::vector<HostSharedPtr>& hosts_added,
+  new_cluster->prioritySet().addMemberUpdateCb(
+      [&primary_cluster_reference, this](uint32_t priority,
+                                         const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
         // This fires when a cluster is about to have an updated member set. We need to send this
         // out to all of the thread local configurations.
-        postThreadLocalClusterUpdate(primary_cluster_reference, hosts_added, hosts_removed);
+        postThreadLocalClusterUpdate(primary_cluster_reference, priority, hosts_added,
+                                     hosts_removed);
       });
 
   if (new_cluster->healthChecker() != nullptr) {
@@ -408,7 +412,8 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(
-    const Cluster& primary_cluster, const std::vector<HostSharedPtr>& hosts_added,
+    const Cluster& primary_cluster, uint32_t priority,
+    const std::vector<HostSharedPtr>& hosts_added,
     const std::vector<HostSharedPtr>& hosts_removed) {
   if (init_helper_.state() == ClusterManagerInitHelper::State::Loading) {
     // A cluster may try to post updates before we are ready for multi-threading. Block this case
@@ -416,23 +421,25 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(
     return;
   }
 
-  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(primary_cluster.hosts()));
+  const auto& host_set = primary_cluster.prioritySet().hostSetsPerPriority()[priority];
+
+  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(
-      new std::vector<HostSharedPtr>(primary_cluster.healthyHosts()));
+      new std::vector<HostSharedPtr>(host_set->healthyHosts()));
   HostListsConstSharedPtr hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.hostsPerLocality()));
+      new std::vector<std::vector<HostSharedPtr>>(host_set->hostsPerLocality()));
   HostListsConstSharedPtr healthy_hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(primary_cluster.healthyHostsPerLocality()));
+      new std::vector<std::vector<HostSharedPtr>>(host_set->healthyHostsPerLocality()));
 
   tls_->runOnAllThreads([
-    this, name = primary_cluster.info()->name(), hosts_copy, healthy_hosts_copy,
+    this, name = primary_cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
     hosts_per_locality_copy, healthy_hosts_per_locality_copy, hosts_added, hosts_removed
   ]()
                             ->void {
                               ThreadLocalClusterManagerImpl::updateClusterMembership(
-                                  name, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-                                  healthy_hosts_per_locality_copy, hosts_added, hosts_removed,
-                                  *tls_);
+                                  name, priority, hosts_copy, healthy_hosts_copy,
+                                  hosts_per_locality_copy, healthy_hosts_per_locality_copy,
+                                  hosts_added, hosts_removed, *tls_);
                             });
 }
 
@@ -481,9 +488,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
         new ClusterEntry(*this, local_cluster->info()));
   }
 
-  local_host_set_ = local_cluster_name.valid()
-                        ? &thread_local_clusters_[local_cluster_name.value()]->host_set_
-                        : nullptr;
+  local_priority_set_ = local_cluster_name.valid()
+                            ? &thread_local_clusters_[local_cluster_name.value()]->priority_set_
+                            : nullptr;
 
   for (auto& cluster : parent.primary_clusters_) {
     // If local cluster name is set then we already initialized this cluster.
@@ -508,7 +515,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   ENVOY_LOG(debug, "shutting down thread local cluster manager");
   host_http_conn_pool_map_.clear();
   for (auto& cluster : thread_local_clusters_) {
-    if (&cluster.second->host_set_ != local_host_set_) {
+    if (&cluster.second->priority_set_ != local_priority_set_) {
       cluster.second.reset();
     }
   }
@@ -560,15 +567,16 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
-    const std::string& name, HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-    HostListsConstSharedPtr hosts_per_locality, HostListsConstSharedPtr healthy_hosts_per_locality,
+    const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
+    HostVectorConstSharedPtr healthy_hosts, HostListsConstSharedPtr hosts_per_locality,
+    HostListsConstSharedPtr healthy_hosts_per_locality,
     const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
     ThreadLocal::Slot& tls) {
 
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
-  config.thread_local_clusters_[name]->host_set_.updateHosts(
+  config.thread_local_clusters_[name]->priority_set_.getHostSet(priority).updateHosts(
       std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
       std::move(healthy_hosts_per_locality), hosts_added, hosts_removed);
 }
@@ -602,42 +610,50 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
+
+  // TODO(alyssawilk) make lb priority-set aware in a follow-up patch
+  HostSet& host_set = priority_set_.getHostSet(0);
+  HostSet* local_host_set = nullptr;
+  if (parent.local_priority_set_) {
+    local_host_set = parent.local_priority_set_->hostSetsPerPriority()[0].get();
+  }
+
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), host_set_, parent.local_host_set_,
-                                     cluster->stats(), parent.parent_.runtime_,
-                                     parent.parent_.random_, cluster->lbSubsetInfo()));
+    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), host_set, local_host_set, cluster->stats(),
+                                     parent.parent_.runtime_, parent.parent_.random_,
+                                     cluster->lbSubsetInfo()));
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
-      lb_.reset(new LeastRequestLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
+      lb_.reset(new LeastRequestLoadBalancer(host_set, local_host_set, cluster->stats(),
                                              parent.parent_.runtime_, parent.parent_.random_));
       break;
     }
     case LoadBalancerType::Random: {
-      lb_.reset(new RandomLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
+      lb_.reset(new RandomLoadBalancer(host_set, local_host_set, cluster->stats(),
                                        parent.parent_.runtime_, parent.parent_.random_));
       break;
     }
     case LoadBalancerType::RoundRobin: {
-      lb_.reset(new RoundRobinLoadBalancer(host_set_, parent.local_host_set_, cluster->stats(),
+      lb_.reset(new RoundRobinLoadBalancer(host_set, local_host_set, cluster->stats(),
                                            parent.parent_.runtime_, parent.parent_.random_));
       break;
     }
     case LoadBalancerType::RingHash: {
-      lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
+      lb_.reset(new RingHashLoadBalancer(host_set, cluster->stats(), parent.parent_.runtime_,
                                          parent.parent_.random_));
       break;
     }
     case LoadBalancerType::OriginalDst: {
       lb_.reset(new OriginalDstCluster::LoadBalancer(
-          host_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
+          host_set, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
       break;
     }
     }
   }
 
-  host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
-                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
+  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                         const std::vector<HostSharedPtr>& hosts_removed) -> void {
     // We need to go through and purge any connection pools for hosts that got deleted.
     // Even if two hosts actually point to the same address this will be safe, since if a
     // host is readded it will be a different physical HostSharedPtr.
@@ -652,7 +668,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
   // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
   // going with a more targeted approach for now.
-  parent_.drainConnPools(host_set_.hosts());
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    parent_.drainConnPools(host_set->hosts());
+  }
 }
 
 Http::ConnectionPool::Instance*

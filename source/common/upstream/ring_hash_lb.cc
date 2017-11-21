@@ -14,7 +14,7 @@ RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stat
                                            Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random)
     : host_set_(host_set), stats_(stats), runtime_(runtime), random_(random) {
-  host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
+  host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
                                      const std::vector<HostSharedPtr>&) -> void { refresh(); });
 
   refresh();

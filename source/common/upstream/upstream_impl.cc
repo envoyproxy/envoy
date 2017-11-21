@@ -67,6 +67,23 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(100U, new_weight)); }
 
+PrioritySetImpl::PrioritySetImpl() { getHostSet(0); }
+
+HostSet& PrioritySetImpl::getHostSet(uint32_t priority) {
+  if (host_sets_.size() < priority + 1) {
+    for (size_t i = host_sets_.size(); i <= priority; ++i) {
+      // TODO(alyssar) test for off-by-1 bugs.
+      host_sets_.push_back(HostSetPtr{new HostSetImpl(i)});
+      host_sets_[i]->addMemberUpdateCb([this](uint32_t priority,
+                                              const std::vector<HostSharedPtr>& hosts_added,
+                                              const std::vector<HostSharedPtr>& hosts_removed) {
+        runUpdateCallbacks(priority, hosts_added, hosts_removed);
+      });
+    }
+  }
+  return *host_sets_[priority];
+}
+
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
@@ -214,7 +231,24 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
-                                                   ssl_context_manager, added_via_api)) {}
+                                                   ssl_context_manager, added_via_api)) {
+  priority_set_.addMemberUpdateCb([this](uint32_t priority,
+                                         const std::vector<HostSharedPtr>& hosts_added,
+                                         const std::vector<HostSharedPtr>& hosts_removed) {
+    // FIXME(alyssawilk) talk to Matt about how to change stats in prod.
+    // Add per-priority stats and deprecate the old ones next release?
+    if (priority != 0)
+      return;
+
+    if (!hosts_added.empty() || !hosts_removed.empty()) {
+      info_->stats().membership_change_.inc();
+    }
+
+    info_->stats().membership_healthy_.set(
+        prioritySet().getHostSet(priority).healthyHosts().size());
+    info_->stats().membership_total_.set(prioritySet().getHostSet(priority).hosts().size());
+  });
+}
 
 HostVectorConstSharedPtr
 ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) {
@@ -277,7 +311,9 @@ void ClusterImplBase::onPreInitComplete() {
   initialization_started_ = true;
 
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
-    pending_initialize_health_checks_ = hosts().size();
+    for (auto& host_set : prioritySet().hostSetsPerPriority()) {
+      pending_initialize_health_checks_ += host_set->hosts().size();
+    }
 
     // TODO(mattklein123): Remove this callback when done.
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool) -> void {
@@ -308,17 +344,6 @@ void ClusterImplBase::finishInitialization() {
   if (snapped_callback != nullptr) {
     snapped_callback();
   }
-}
-
-void ClusterImplBase::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                                         const std::vector<HostSharedPtr>& hosts_removed) {
-  if (!hosts_added.empty() || !hosts_removed.empty()) {
-    info_->stats().membership_change_.inc();
-  }
-
-  info_->stats().membership_healthy_.set(healthyHosts().size());
-  info_->stats().membership_total_.set(hosts().size());
-  HostSetImpl::runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
@@ -353,11 +378,14 @@ void ClusterImplBase::reloadHealthyHosts() {
     return;
   }
 
-  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(hosts()));
-  HostListsConstSharedPtr hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(hostsPerLocality()));
-  updateHosts(hosts_copy, createHealthyHostList(hosts()), hosts_per_locality_copy,
-              createHealthyHostLists(hostsPerLocality()), {}, {});
+  for (auto& host_set : prioritySet().hostSetsPerPriority()) {
+    HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(host_set->hosts()));
+    HostListsConstSharedPtr hosts_per_locality_copy(
+        new std::vector<std::vector<HostSharedPtr>>(host_set->hostsPerLocality()));
+    host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
+                          hosts_per_locality_copy,
+                          createHealthyHostLists(host_set->hostsPerLocality()), {}, {});
+  }
 }
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
@@ -435,8 +463,11 @@ void StaticClusterImpl::startPreInit() {
     }
   }
 
-  updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_), empty_host_lists_,
-              empty_host_lists_, *initial_hosts_, {});
+  // Given the current config, only EDS clusters support multiple priorities.
+  ASSERT(prioritySet().hostSetsPerPriority().size() == 1);
+  auto& first_host_set = prioritySet().getHostSet(0);
+  first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
+                             empty_host_lists_, empty_host_lists_, *initial_hosts_, {});
   initial_hosts_ = nullptr;
 
   onPreInitComplete();
@@ -574,8 +605,11 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostSharedPtr>& host
     }
   }
 
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
-              hosts_added, hosts_removed);
+  // Given the current config, only EDS clusters support multiple priorities.
+  ASSERT(prioritySet().hostSetsPerPriority().size() == 1);
+  auto& first_host_set = prioritySet().getHostSet(0);
+  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
+                             empty_host_lists_, hosts_added, hosts_removed);
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,

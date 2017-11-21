@@ -16,7 +16,7 @@ public:
   /**
    * @return const HostSet& the backing host set.
    */
-  virtual const HostSet& hostSet() PURE;
+  virtual const PrioritySet& prioritySet() PURE;
 
   /**
    * @return ClusterInfoConstSharedPtr the info for this cluster. The info is safe to store beyond

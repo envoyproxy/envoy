@@ -119,19 +119,22 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 /**
- * Base host set interface. This is used both for clusters, as well as per thread/worker host sets
- * used during routing/forwarding.
+ * Base host set interface.  This contains all of the endpoints for a given LocalityLbEndpoints
+ * priority level.
  */
 class HostSet {
 public:
   virtual ~HostSet() {}
 
+  // TODO(alyssawilk) remove this once LBs use PrioritySet.
+  // It is generally incorrect to subscribe to updates to individual HostSet
+  // as one misses the addition of new HostSet to a PrioritySet.
   /**
    * Called when cluster host membership is about to change.
    * @param hosts_added supplies the newly added hosts, if any.
    * @param hosts_removed supplies the removed hosts, if any.
    */
-  typedef std::function<void(const std::vector<HostSharedPtr>& hosts_added,
+  typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
                              const std::vector<HostSharedPtr>& hosts_removed)>
       MemberUpdateCb;
 
@@ -168,6 +171,44 @@ public:
    * @return same as hostsPerLocality but only contains healthy hosts.
    */
   virtual const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const PURE;
+
+  // FIXME comment
+  virtual void updateHosts(
+      std::shared_ptr<const std::vector<HostSharedPtr>> hosts,
+      std::shared_ptr<const std::vector<HostSharedPtr>> healthy_hosts,
+      std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> hosts_per_locality,
+      std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> healthy_hosts_per_locality,
+      const std::vector<HostSharedPtr>& hosts_added,
+      const std::vector<HostSharedPtr>& hosts_removed) PURE;
+
+  // FIXME comment
+  virtual uint32_t priority() const PURE;
+};
+
+typedef std::unique_ptr<HostSet> HostSetPtr;
+
+/**
+ * This class contains all of the HostSets for a given cluster grouped by priority, for
+ * ease of load balancing.
+ */
+// FIXME comment all
+class PrioritySet {
+public:
+  typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
+                             const std::vector<HostSharedPtr>& hosts_removed)>
+      MemberUpdateCb;
+
+  virtual ~PrioritySet() {}
+
+  /**
+   * Install a callback that will be invoked when the membership of any of the HostSets changes.
+   * @param callback supplies the callback to invoke.
+   */
+  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+
+  virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
+  virtual std::vector<HostSetPtr>& hostSetsPerPriority() PURE;
+  virtual HostSet& getHostSet(uint32_t priority) PURE;
 };
 
 /**
@@ -381,8 +422,10 @@ class HealthChecker;
  * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
  * all forwarding threads/workers. Individual HostSets are used on the workers themselves.
  */
-class Cluster : public virtual HostSet {
+class Cluster {
 public:
+  virtual ~Cluster() {}
+
   enum class InitializePhase { Primary, Secondary };
 
   /**
@@ -418,6 +461,16 @@ public:
    *         that depends on resolution of the SDS server itself).
    */
   virtual InitializePhase initializePhase() const PURE;
+
+  /**
+   * @return the PrioritySet for the cluster.
+   */
+  virtual PrioritySet& prioritySet() PURE;
+
+  /**
+   * @return the const PrioritySet for the cluster.
+   */
+  virtual const PrioritySet& prioritySet() const PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterSharedPtr;

@@ -129,26 +129,28 @@ DetectorImpl::create(const Cluster& cluster,
 }
 
 void DetectorImpl::initialize(const Cluster& cluster) {
-  for (const HostSharedPtr& host : cluster.hosts()) {
-    addHostMonitor(host);
-  }
-
-  cluster.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
-                                   const std::vector<HostSharedPtr>& hosts_removed) -> void {
-    for (const HostSharedPtr& host : hosts_added) {
+  for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
       addHostMonitor(host);
     }
+  }
+  cluster.prioritySet().addMemberUpdateCb(
+      [this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
+             const std::vector<HostSharedPtr>& hosts_removed) -> void {
+        for (const HostSharedPtr& host : hosts_added) {
+          addHostMonitor(host);
+        }
 
-    for (const HostSharedPtr& host : hosts_removed) {
-      ASSERT(host_monitors_.count(host) == 1);
-      if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-        ASSERT(stats_.ejections_active_.value() > 0);
-        stats_.ejections_active_.dec();
-      }
+        for (const HostSharedPtr& host : hosts_removed) {
+          ASSERT(host_monitors_.count(host) == 1);
+          if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+            ASSERT(stats_.ejections_active_.value() > 0);
+            stats_.ejections_active_.dec();
+          }
 
-      host_monitors_.erase(host);
-    }
-  });
+          host_monitors_.erase(host);
+        }
+      });
 
   armIntervalTimer();
 }

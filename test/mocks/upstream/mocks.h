@@ -27,14 +27,13 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Upstream {
 
-class MockCluster : public Cluster {
+class MockHostSet : public HostSet {
 public:
-  MockCluster();
-  ~MockCluster();
+  MockHostSet();
 
   void runCallbacks(const std::vector<HostSharedPtr> added,
                     const std::vector<HostSharedPtr> removed) {
-    member_update_cb_helper_.runCallbacks(added, removed);
+    member_update_cb_helper_.runCallbacks(0, added, removed);
   }
 
   // Upstream::HostSet
@@ -43,6 +42,50 @@ public:
   MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(hostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());
+  MOCK_METHOD6(
+      updateHosts,
+      void(
+          std::shared_ptr<const std::vector<HostSharedPtr>> hosts,
+          std::shared_ptr<const std::vector<HostSharedPtr>> healthy_hosts,
+          std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> hosts_per_locality,
+          std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> healthy_hosts_per_locality,
+          const std::vector<HostSharedPtr>& hosts_added,
+          const std::vector<HostSharedPtr>& hosts_removed));
+  MOCK_CONST_METHOD0(priority, uint32_t());
+
+  std::vector<HostSharedPtr> hosts_;
+  std::vector<HostSharedPtr> healthy_hosts_;
+  std::vector<std::vector<HostSharedPtr>> hosts_per_locality_;
+  std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_locality_;
+  Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
+                          const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
+};
+
+class MockPrioritySet : public PrioritySet {
+public:
+  MockPrioritySet();
+  ~MockPrioritySet() {}
+
+  HostSet& getHostSetInternal(uint32_t priority);
+  void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
+                          const std::vector<HostSharedPtr>& hosts_removed);
+
+  MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
+  MOCK_CONST_METHOD0(hostSetsPerPriority, const std::vector<HostSetPtr>&());
+  MOCK_METHOD0(hostSetsPerPriority, std::vector<HostSetPtr>&());
+  MOCK_METHOD1(getHostSet, HostSet&(uint32_t priority));
+
+  std::vector<HostSetPtr> host_sets_;
+  Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
+                          const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
+};
+
+class MockCluster : public Cluster {
+public:
+  MockCluster();
+  ~MockCluster();
 
   // Upstream::Cluster
   MOCK_METHOD0(healthChecker, HealthChecker*());
@@ -52,16 +95,13 @@ public:
   MOCK_METHOD1(initialize, void(std::function<void()> callback));
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD0(prioritySet, PrioritySet&());
+  MOCK_CONST_METHOD0(prioritySet, const PrioritySet&());
 
-  std::vector<HostSharedPtr> hosts_;
-  std::vector<HostSharedPtr> healthy_hosts_;
-  std::vector<std::vector<HostSharedPtr>> hosts_per_locality_;
-  std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_locality_;
-  Common::CallbackManager<const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&>
-      member_update_cb_helper_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  NiceMock<MockPrioritySet> priority_set_;
 };
 
 class MockLoadBalancer : public LoadBalancer {
@@ -81,7 +121,7 @@ public:
   ~MockThreadLocalCluster();
 
   // Upstream::ThreadLocalCluster
-  MOCK_METHOD0(hostSet, const HostSet&());
+  MOCK_METHOD0(prioritySet, const PrioritySet&());
   MOCK_METHOD0(info, ClusterInfoConstSharedPtr());
   MOCK_METHOD0(loadBalancer, LoadBalancer&());
 
