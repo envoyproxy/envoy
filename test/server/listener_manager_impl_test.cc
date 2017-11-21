@@ -12,12 +12,12 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -739,6 +739,14 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, EarlyShutdown) {
+  // If stopWorkers is called before the workers are started, it should be a no-op: they should be
+  // neither started nor stopped.
+  EXPECT_CALL(*worker_, start(_)).Times(0);
+  EXPECT_CALL(*worker_, stop()).Times(0);
+  manager_->stopWorkers();
 }
 
 } // namespace Server
