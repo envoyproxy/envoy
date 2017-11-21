@@ -60,7 +60,7 @@ public:
 };
 
 /**
- * Exercises gzip filter by applying compresion on data dispatched from the upstream.
+ * Exercises gzip filter by applying compression on data dispatched from the upstream.
  */
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   setUpTest(minimum_conf_json);
@@ -80,7 +80,7 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
 }
 
 /**
- * Exercises gzip filter by compression on chuncked data dispatched from the upstream.
+ * Exercises gzip filter by compression on chunked data dispatched from the upstream.
  */
 TEST_F(GzipFilterTest, AcceptanceGzipEncodingDataStatus) {
   setUpTest(minimum_conf_json);
@@ -142,7 +142,7 @@ TEST_F(GzipFilterTest, NoAcceptEncodingHeader) {
 }
 
 /**
- * Exercises gzip filter when `content-type` white-list is empty.
+ * Exercises gzip filter when `content-type` whitelist is empty.
  */
 TEST_F(GzipFilterTest, EmptyContentTypeConfig) {
   setUpTest(minimum_conf_json);
@@ -162,7 +162,7 @@ TEST_F(GzipFilterTest, EmptyContentTypeConfig) {
 }
 
 /**
- * Exercises gzip filter when upstream responds with a not white-listed `content-type`.
+ * Exercises gzip filter when upstream responds with a not whitelisted `content-type`.
  */
 TEST_F(GzipFilterTest, NotSupportedContentType) {
   setUpTest(full_conf_json);

@@ -25,12 +25,12 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Verifies that upstream has not been encoded already
+  // Verifies that upstream has not been encoded already.
   if (headers.ContentEncoding() != nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Verifies that content-type is white-listed and initializes compressor.
+  // Verifies that content-type is whitelisted and initializes compressor.
   if (isContentTypeAllowed(headers)) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
@@ -70,7 +70,6 @@ bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) {
   if (config_->getContentTypes().size() == 0 || headers.ContentType() == nullptr) {
     return true;
   }
-
   for (const auto& content_type : config_->getContentTypes()) {
     if (headers.ContentType()->value().find(content_type.c_str())) {
       return true;
