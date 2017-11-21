@@ -55,6 +55,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "gzip_filter_test",
+    srcs = ["gzip_filter_test.cc"],
+    deps = [
+        "//source/common/decompressor:decompressor_lib",
+        "//source/common/http/filter:gzip_filter_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "ip_tagging_filter_test",
     srcs = ["ip_tagging_filter_test.cc"],
     deps = [

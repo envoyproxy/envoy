@@ -39,6 +39,7 @@ public:
   static const std::string BUFFER_HTTP_FILTER_SCHEMA;
   static const std::string FAULT_HTTP_FILTER_SCHEMA;
   static const std::string GRPC_JSON_TRANSCODER_FILTER_SCHEMA;
+  static const std::string GZIP_HTTP_FILTER_SCHEMA;
   static const std::string HEALTH_CHECK_HTTP_FILTER_SCHEMA;
   static const std::string IP_TAGGING_HTTP_FILTER_SCHEMA;
   static const std::string RATE_LIMIT_HTTP_FILTER_SCHEMA;

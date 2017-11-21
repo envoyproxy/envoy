@@ -1075,6 +1075,31 @@ const std::string Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "compression_level" : {
+        "type" : "string",
+        "enum" : ["best", "speed", "default"]
+      },
+      "content_types" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : { "type" : "string" }
+      },
+      "memory_level" : {
+        "type" : "integer",
+        "minimum" : 1,
+        "maximum" : 9
+      }
+    },
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",

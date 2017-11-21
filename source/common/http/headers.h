@@ -15,6 +15,7 @@ namespace Http {
 class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
+  const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
@@ -27,6 +28,7 @@ public:
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
+  const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ContentLength{"content-length"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
@@ -183,6 +185,15 @@ public:
     const std::string Http11String{"HTTP/1.1"};
     const std::string Http2String{"HTTP/2"};
   } ProtocolStrings;
+
+  struct {
+    const std::string Wildcard{"*"};
+    const std::string Gzip{"gzip"};
+  } AcceptEncodingValues;
+
+  struct {
+    const std::string Gzip{"gzip"};
+  } ContentEncodingValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;
