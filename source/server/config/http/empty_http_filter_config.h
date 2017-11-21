@@ -34,7 +34,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 };
 
