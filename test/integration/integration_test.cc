@@ -193,31 +193,36 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
   const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
   const std::string upgrade_resp_str =
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
 
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
   // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 225 bytes.
+  // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(225);
+  const std::string data = fake_upstream_connection->waitForData(228);
+  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
+  // content-length header is present. No body websocket upgrade request send to upstream has
+  // content-length header and has no transfer-encoding header.
+  EXPECT_NE(data.find("content-length:"), std::string::npos);
+  EXPECT_EQ(data.find("transfer-encoding:"), std::string::npos);
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   tcp_client->waitForData(upgrade_resp_str);
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 225 + strlen(hello)
-  fake_upstream_connection->waitForData(230);
+  // datalen = 228 + strlen(hello)
+  fake_upstream_connection->waitForData(233);
   fake_upstream_connection->write("world");
   tcp_client->waitForData(upgrade_resp_str + "world");
   tcp_client->write("bye!");
   // downstream disconnect
   tcp_client->close();
-  // datalen = 225 + strlen(hello) + strlen(bye!)
-  fake_upstream_connection->waitForData(234);
+  // datalen = 228 + strlen(hello) + strlen(bye!)
+  fake_upstream_connection->waitForData(237);
   fake_upstream_connection->waitForDisconnect();
 }
 
@@ -230,7 +235,7 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
   const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
   const std::string upgrade_resp_str =
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
   tcp_client = makeTcpConnection(lookupPort("http"));
@@ -238,15 +243,20 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   tcp_client->write(upgrade_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 225 bytes.
-  fake_upstream_connection->waitForData(225);
+  // The size of headers received by the destination is 228 bytes.
+  const std::string data = fake_upstream_connection->waitForData(228);
+  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
+  // content-length header is present. No body websocket upgrade request send to upstream has
+  // content-length header and has no transfer-encoding header.
+  EXPECT_NE(data.find("content-length:"), std::string::npos);
+  EXPECT_EQ(data.find("transfer-encoding:"), std::string::npos);
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   tcp_client->waitForData(upgrade_resp_str);
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 225 + strlen(hello)
-  fake_upstream_connection->waitForData(230);
+  // datalen = 228 + strlen(hello)
+  fake_upstream_connection->waitForData(233);
   fake_upstream_connection->write("world");
   // upstream disconnect
   fake_upstream_connection->close();

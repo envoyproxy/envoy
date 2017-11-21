@@ -21,18 +21,29 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     ConnectionManagerConfig& config, const Router::Config& route_config,
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
+  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // as we forward them verbatim to the upstream hosts.
+  if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
+    // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
+    // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
+    // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
+    // content-length both do not exist this means there is no request body. After transfer-encoding
+    // is stripped here, the upstream request becomes invalid. We can fix it by explicitly adding a
+    // "content-length: 0" request header here.
+    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
+    if (no_body) {
+      request_headers.insertContentLength().value(uint64_t(0));
+    }
+  } else {
+    request_headers.removeConnection();
+    request_headers.removeUpgrade();
+  }
+
   // Clean proxy headers.
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
-
-  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
-  // as we forward them verbatim to the upstream hosts.
-  if (protocol != Protocol::Http11 || !Utility::isWebSocketUpgradeRequest(request_headers)) {
-    request_headers.removeConnection();
-    request_headers.removeUpgrade();
-  }
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
