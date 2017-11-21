@@ -42,7 +42,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
-  std::vector<std::vector<HostSharedPtr>> new_hosts(1);
+  std::vector<std::vector<HostSharedPtr>> new_hosts(4);  // Large enough to avoid most resizes.
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -59,8 +59,11 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                      cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    uint32_t priority = locality_lb_endpoint.priority().value();
+    if (new_hosts.size() <= priority) {
+      new_hosts.resize(2 * (priority + 1));
+    }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      uint32_t priority = 0; // FIXME locality_lb_endpoint.priority() resize vector.
       new_hosts[priority].emplace_back(new HostImpl(
           info_, "", Network::Address::resolveProtoAddress(lb_endpoint.endpoint().address()),
           lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
