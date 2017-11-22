@@ -609,6 +609,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:logTrace(request_handle:headers():get(":path"))
+      request_handle:headers():add("foo", "bar")
 
       for chunk in request_handle:bodyChunks() do
         request_handle:logTrace(chunk:length())
@@ -619,6 +620,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
 
     function envoy_on_response(response_handle)
       response_handle:logTrace(response_handle:headers():get(":status"))
+      response_handle:headers():add("foo", "bar")
 
       for chunk in response_handle:bodyChunks() do
         response_handle:logTrace(chunk:length())
@@ -633,6 +635,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
 
   TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");

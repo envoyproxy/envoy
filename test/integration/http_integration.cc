@@ -240,10 +240,11 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-void HttpIntegrationTest::waitForNextUpstreamRequest() {
+void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    fake_upstream_connection_ =
+        fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_);
   }
   // Wait for the next stream on the upstream connection.
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
