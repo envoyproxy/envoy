@@ -403,6 +403,9 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
                                         const HeaderEntry** entry) const {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
+    // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
+    // even though we don't make any modifications, we need to cast_cast in order to use the
+    // accessor.
     StaticLookupResponse ref_lookup_response = cb(const_cast<HeaderMapImpl&>(*this));
     *entry = *ref_lookup_response.entry_;
     if (*entry) {
