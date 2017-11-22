@@ -37,6 +37,12 @@ private:
   std::unique_ptr<opentracing::Span> span_;
 };
 
+/**
+ * This driver can be used by tracing libraries implementing the OpenTracing API (see
+ * https://github.com/opentracing/opentracing-cpp) to hook into Envoy's tracing functionality with a
+ * minimal amount of effort. Libraries need only provide an opentracing::Tracer implementation; the
+ * rest of span creation is taken care of by this class.
+ */
 class OpenTracingDriver : public Driver, protected Logger::Loggable<Logger::Id::tracing> {
 public:
   explicit OpenTracingDriver(Stats::Store& stats);
