@@ -1131,6 +1131,10 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true
+          },
+          "api_type" : {
+            "type" : "string",
+            "enum" : ["REST_LEGACY", "REST", "GRPC"]
           }
         },
         "required" : ["cluster"],
