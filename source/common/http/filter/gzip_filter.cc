@@ -3,14 +3,13 @@
 namespace Envoy {
 namespace Http {
 
-GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config) : config_(config) {}
+GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
+    : skipCompression_{true}, compressed_data_(), compressor_(), config_(config) {}
 
 void GzipFilter::onDestroy() {}
 
 FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
-  if (headers.AcceptEncoding() != nullptr) {
-    request_headers_ = &headers;
-  }
+  accept_encoding_ = headers.get(Http::Headers::get().AcceptEncoding);
   return FilterHeadersStatus::Continue;
 }
 
@@ -18,35 +17,34 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
   // TODO(gsagula): In order to fully implement RFC2616-14.3, more work is required here. The
   // current implementation only checks if `gzip` is found in `accept-encoding` header, but
   // it disregards the presence of qvalue or the order/priority of other encoding types.
-  if (request_headers_ == nullptr || !(request_headers_->AcceptEncoding()->value().find(
-                                           Headers::get().AcceptEncodingValues.Gzip.c_str()) ||
-                                       request_headers_->AcceptEncoding()->value().find(
-                                           Headers::get().AcceptEncodingValues.Wildcard.c_str()))) {
+  if (accept_encoding_ == nullptr ||
+      !(accept_encoding_->value().find(Headers::get().AcceptEncodingValues.Gzip.c_str()) ||
+        accept_encoding_->value().find(Headers::get().AcceptEncodingValues.Wildcard.c_str()))) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Verifies that upstream has not been encoded already.
+  // Skip compression if upstream data is already encoded.
   if (headers.ContentEncoding() != nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Verifies that content-type is whitelisted and initializes compressor.
-  if (isContentTypeAllowed(headers)) {
-    headers.removeContentLength();
-    headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
-    response_headers_ = &headers;
-    compressor_.init(config_->getCompressionLevel(),
-                     Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 31,
-                     config_->getMemoryLevel());
+  // Skip compression if content-type is not whitelisted.
+  if (!isContentTypeAllowed(headers)) {
+    return Http::FilterHeadersStatus::Continue;
   }
 
+  // Removing content-length will set transfer-encoding to chunked.
+  headers.removeContentLength();
+  headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
+  compressor_.init(config_->getCompressionLevel(), config_->getCompressionStrategy(),
+                   config_->getWindowBits(), config_->getMemoryLevel());
+
+  skipCompression_ = false;
   return Http::FilterHeadersStatus::Continue;
 }
 
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (response_headers_ == nullptr || response_headers_->ContentEncoding() == nullptr ||
-      !response_headers_->ContentEncoding()->value().find(
-          Headers::get().ContentEncodingValues.Gzip.c_str())) {
+  if (skipCompression_) {
     return Http::FilterDataStatus::Continue;
   }
 

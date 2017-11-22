@@ -152,6 +152,30 @@ TEST_P(GzipIntegrationTest, GzipEncodingCompressionLevelAcceptanceTest) {
 }
 
 /**
+ * Exercises client request and upstream response with gzip encoded data, but with
+ * compression-strategy constraint.
+ */
+TEST_P(GzipIntegrationTest, GzipEncodingCompressionStrategyAcceptanceTest) {
+  initializeFilter(R"EOF(
+      name: envoy.gzip
+      config:
+        deprecated_v1: true
+        content-types:
+          - text/html
+        memory_level: 1
+        compression_strategy: rle
+    )EOF");
+
+  doRequestAndCompression(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"},
+                              {"accept-encoding", "deflate, gzip"}},
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+}
+
+/**
  * Exercises client request and upstream response with no gzip encoded data, due to
  * not supported accept-encoding.
  */

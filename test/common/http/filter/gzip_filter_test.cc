@@ -22,7 +22,8 @@ public:
         "text/html",
         "text/plain"
       ],
-      "compression_level": "best"
+      "compression_level": "best",
+      "compression_strategy": "huffman"
     }
   )EOF";
 
