@@ -42,6 +42,7 @@ LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& dri
 void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& request,
                                                  Protobuf::Message& response,
                                                  lightstep::AsyncTransporter::Callback& callback) {
+  // TODO(rnburn): Update to use Grpc::AsyncClient when it supports abstract message classes.
   active_callback_ = &callback;
   active_response_ = &response;
 
