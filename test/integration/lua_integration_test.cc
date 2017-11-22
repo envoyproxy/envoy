@@ -37,7 +37,7 @@ public:
           ->mutable_match()
           ->set_prefix("/test/long/url");
 
-      auto new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+      auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
       new_route->mutable_match()->set_prefix("/alt/route");
       new_route->mutable_route()->set_cluster("alt_cluster");
     });
