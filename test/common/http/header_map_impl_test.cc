@@ -451,21 +451,21 @@ TEST(HeaderMapImplTest, Lookup) {
   headers.addCopy("hello", "world");
   headers.insertContentLength().value(5);
 
-  // Lookup is not supported for non O(1) header.
+  // Lookup is not supported for non predefined inline headers.
   {
     const HeaderEntry* entry;
     EXPECT_EQ(HeaderMap::Lookup::NotSupported, headers.lookup(LowerCaseString{"hello"}, &entry));
     EXPECT_EQ(nullptr, entry);
   }
 
-  // Lookup returns the entry of a O(1) header if it exists.
+  // Lookup returns the entry of a predefined inline header if it exists.
   {
     const HeaderEntry* entry;
     EXPECT_EQ(HeaderMap::Lookup::Found, headers.lookup(Headers::get().ContentLength, &entry));
     EXPECT_STREQ("5", entry->value().c_str());
   }
 
-  // Lookup returns HeaderMap::Lookup::NotFound if a O(1) header does not exist.
+  // Lookup returns HeaderMap::Lookup::NotFound if a predefined inline header does not exist.
   {
     const HeaderEntry* entry;
     EXPECT_EQ(HeaderMap::Lookup::NotFound, headers.lookup(Headers::get().Host, &entry));
