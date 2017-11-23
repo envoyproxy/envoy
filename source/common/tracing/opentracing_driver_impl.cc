@@ -89,7 +89,7 @@ void OpenTracingSpan::setTag(const std::string& name, const std::string& value) 
 }
 
 void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
-  if (driver_.useSingleHeaderPropagation()) {
+  if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.
     std::ostringstream oss;
     const opentracing::expected<void> was_successful =
@@ -102,9 +102,7 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
     const std::string current_span_context = oss.str();
     request_headers.insertOtSpanContext().value(
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
-  }
-
-  if (driver_.useTracerPropagation()) {
+  } else {
     // Inject the context using the tracer's standard HTTP header format.
     const OpenTracingHTTPHeadersWriter writer{request_headers};
     const opentracing::expected<void> was_successful =
@@ -129,16 +127,22 @@ OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
 
 SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_headers,
                                      const std::string& operation_name, SystemTime start_time) {
-  const bool use_single_header_propagation = this->useSingleHeaderPropagation();
-  const bool use_tracer_propagation = this->useTracerPropagation();
+  const PropagationMode propagation_mode = this->propagationMode();
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
-  if (use_single_header_propagation && request_headers.OtSpanContext()) {
+  if (propagation_mode == PropagationMode::SingleHeader && request_headers.OtSpanContext()) {
+    opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
     std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
-    std::istringstream iss(parent_context);
-    opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe =
-        tracer.Extract(iss);
+
+    if (!parent_context.empty()) {
+      std::istringstream iss{parent_context, std::ios::binary};
+      parent_span_ctx_maybe = tracer.Extract(iss);
+    } else {
+      parent_span_ctx_maybe =
+          opentracing::make_unexpected(opentracing::span_context_corrupted_error);
+    }
+
     if (parent_span_ctx_maybe) {
       parent_span_ctx = std::move(*parent_span_ctx_maybe);
     } else {
@@ -146,7 +150,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
                 parent_span_ctx_maybe.error().message());
       tracerStats().span_context_extraction_error_.inc();
     }
-  } else if (use_tracer_propagation) {
+  } else if (propagation_mode == PropagationMode::TracerNative) {
     const OpenTracingHTTPHeadersReader reader{request_headers};
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe =
         tracer.Extract(reader);

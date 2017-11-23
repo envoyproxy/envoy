@@ -45,13 +45,15 @@ public:
 
   // Tracer::OpenTracingDriver
   const opentracing::Tracer& tracer() const override;
-  bool useTracerPropagation() const override { return true; }
-  bool useSingleHeaderPropagation() const override { return false; }
+  PropagationMode propagationMode() const override { return propagation_mode_; }
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
+  void setPropagationMode(PropagationMode propagation_mode) {
+    propagation_mode_ = propagation_mode;
+  }
 
 private:
   class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
@@ -103,6 +105,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
+  PropagationMode propagation_mode_ = PropagationMode::TracerNative;
 };
 
 } // Tracing

@@ -53,8 +53,15 @@ public:
 
   virtual const opentracing::Tracer& tracer() const PURE;
 
-  virtual bool useSingleHeaderPropagation() const { return true; }
-  virtual bool useTracerPropagation() const { return true; }
+  enum class PropagationMode { SingleHeader, TracerNative };
+
+  /**
+   * Controls how span context is propagated in HTTP hedaers. PropagationMode::SingleHeader will
+   * propagate span context as a single header within the inline header HeaderMap::OtSpanContext;
+   * otherwise, span context will be propagated using the native format of the tracing library.
+   */
+  virtual PropagationMode propagationMode() const { return PropagationMode::SingleHeader; }
+
   OpenTracingTracerStats& tracerStats() { return tracer_stats_; }
 
 private:
