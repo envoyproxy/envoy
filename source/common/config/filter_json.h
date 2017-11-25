@@ -5,7 +5,7 @@
 #include "api/filter/http/buffer.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/health_check.pb.h"
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
 #include "api/filter/network/redis_proxy.pb.h"
@@ -35,14 +35,14 @@ public:
 
   /**
    * Translate a v1 JSON HTTP connection manager object to v2
-   * envoy::api::v2::filter::http::HttpConnectionManager.
+   * envoy::api::v2::filter::network::HttpConnectionManager.
    * @param json_http_connection_manager source v1 JSON HTTP connection manager object.
    * @param http_connection_manager destination v2
-   * envoy::api::v2::filter::http::HttpConnectionManager.
+   * envoy::api::v2::filter::network::HttpConnectionManager.
    */
   static void translateHttpConnectionManager(
       const Json::Object& json_http_connection_manager,
-      envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager);
+      envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager);
 
   /**
    * Translate a v1 JSON Redis proxy object to v2 envoy::api::v2::filter::network::RedisProxy.

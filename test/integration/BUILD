@@ -110,7 +110,7 @@ envoy_cc_test(
     srcs = [
         "header_integration_test.cc",
     ],
-    external_deps = ["envoy_filter_http_http_connection_manager"],
+    external_deps = ["envoy_filter_network_http_connection_manager"],
     deps = [
         ":http_integration_lib",
         "//source/common/protobuf",

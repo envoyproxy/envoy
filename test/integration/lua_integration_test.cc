@@ -30,7 +30,7 @@ public:
       alt_cluster->set_name("alt_cluster");
     });
 
-    config_helper_.addConfigModifier([](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+    config_helper_.addConfigModifier([](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
       hcm.mutable_route_config()
           ->mutable_virtual_hosts(0)
           ->mutable_routes(0)

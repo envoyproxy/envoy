@@ -2,7 +2,7 @@
 
 #include "test/integration/http_integration.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -90,7 +90,7 @@ public:
   }
 
   void initializeFilter(HeaderMode mode, bool include_route_config_headers) {
-    config_helper_.addConfigModifier([&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+    config_helper_.addConfigModifier([&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
       // Overwrite default config with our own.
       MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
 
