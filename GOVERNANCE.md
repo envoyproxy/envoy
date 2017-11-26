@@ -35,7 +35,7 @@
 * Monitor email aliases.
 * Monitor Slack (delayed response is perfectly acceptable).
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
-* In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
+* In general continue to be willing to spend at least 25% of one's time working on Envoy (~1.25
   business days per week).
 * Note that currently the above is performed by all maintainers in a best-effort/haphazard way. In
   the future we may decide to move to an "on-call" rotation.
