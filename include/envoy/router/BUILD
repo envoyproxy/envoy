@@ -17,7 +17,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "route_config_provider_manager_interface",
     hdrs = ["route_config_provider_manager.h"],
-    external_deps = ["envoy_filter_http_http_connection_manager"],
+    external_deps = ["envoy_filter_network_http_connection_manager"],
     deps = [
         ":rds_interface",
         "//include/envoy/event:dispatcher_interface",

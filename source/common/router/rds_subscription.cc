@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Router {
 
 RdsSubscription::RdsSubscription(Envoy::Config::SubscriptionStats stats,
-                                 const envoy::api::v2::filter::http::Rds& rds,
+                                 const envoy::api::v2::filter::network::Rds& rds,
                                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)
