@@ -12,7 +12,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -39,9 +39,9 @@ public:
    * @param init_manager supplies the init manager.
    */
   virtual RouteConfigProviderSharedPtr
-  getRouteConfigProvider(const envoy::api::v2::filter::http::Rds& rds, Upstream::ClusterManager& cm,
-                         Stats::Scope& scope, const std::string& stat_prefix,
-                         Init::Manager& init_manager) PURE;
+  getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds,
+                         Upstream::ClusterManager& cm, Stats::Scope& scope,
+                         const std::string& stat_prefix, Init::Manager& init_manager) PURE;
 };
 
 /**

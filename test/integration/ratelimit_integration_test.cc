@@ -38,14 +38,15 @@ public:
       ratelimit_cluster->set_name("ratelimit");
       ratelimit_cluster->mutable_http2_protocol_options();
     });
-    config_helper_.addConfigModifier([](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
-      auto* rate_limit = hcm.mutable_route_config()
-                             ->mutable_virtual_hosts(0)
-                             ->mutable_routes(0)
-                             ->mutable_route()
-                             ->add_rate_limits();
-      rate_limit->add_actions()->mutable_destination_cluster();
-    });
+    config_helper_.addConfigModifier(
+        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+          auto* rate_limit = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->add_rate_limits();
+          rate_limit->add_actions()->mutable_destination_cluster();
+        });
     named_ports_ = {"http"};
     HttpIntegrationTest::initialize();
   }

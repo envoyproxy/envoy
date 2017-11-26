@@ -14,7 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
