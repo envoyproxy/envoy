@@ -63,7 +63,7 @@ public:
   MOCK_METHOD0(maxObjNameLength, uint64_t());
 
   std::string config_path_;
-  bool v2_config_only_;
+  bool v2_config_only_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
