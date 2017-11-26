@@ -30,17 +30,18 @@ public:
       alt_cluster->set_name("alt_cluster");
     });
 
-    config_helper_.addConfigModifier([](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
-      hcm.mutable_route_config()
-          ->mutable_virtual_hosts(0)
-          ->mutable_routes(0)
-          ->mutable_match()
-          ->set_prefix("/test/long/url");
+    config_helper_.addConfigModifier(
+        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_match()
+              ->set_prefix("/test/long/url");
 
-      auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
-      new_route->mutable_match()->set_prefix("/alt/route");
-      new_route->mutable_route()->set_cluster("alt_cluster");
-    });
+          auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+          new_route->mutable_match()->set_prefix("/alt/route");
+          new_route->mutable_route()->set_cluster("alt_cluster");
+        });
 
     initialize();
   }

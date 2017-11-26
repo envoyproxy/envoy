@@ -39,9 +39,9 @@ public:
    * @param init_manager supplies the init manager.
    */
   virtual RouteConfigProviderSharedPtr
-  getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm,
-                         Stats::Scope& scope, const std::string& stat_prefix,
-                         Init::Manager& init_manager) PURE;
+  getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds,
+                         Upstream::ClusterManager& cm, Stats::Scope& scope,
+                         const std::string& stat_prefix, Init::Manager& init_manager) PURE;
 };
 
 /**

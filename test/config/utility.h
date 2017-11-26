@@ -79,7 +79,8 @@ private:
   void loadHttpConnectionManager(envoy::api::v2::filter::network::HttpConnectionManager& hcm);
   // Stick the contents of the procided HCM proto and stuff them into the first HCM
   // struct of the first listener.
-  void storeHttpConnectionManager(const envoy::api::v2::filter::network::HttpConnectionManager& hcm);
+  void
+  storeHttpConnectionManager(const envoy::api::v2::filter::network::HttpConnectionManager& hcm);
 
   // The bootstrap proto Envoy will start up with.
   envoy::api::v2::Bootstrap bootstrap_;

@@ -170,8 +170,8 @@ RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
 };
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteConfigProvider(
-    const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm, Stats::Scope& scope,
-    const std::string& stat_prefix, Init::Manager& init_manager) {
+    const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm,
+    Stats::Scope& scope, const std::string& stat_prefix, Init::Manager& init_manager) {
 
   // RdsRouteConfigProviders are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a

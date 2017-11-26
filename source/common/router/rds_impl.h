@@ -156,11 +156,10 @@ public:
   // ServerRouteConfigProviderManager
   std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds,
-                                                      Upstream::ClusterManager& cm,
-                                                      Stats::Scope& scope,
-                                                      const std::string& stat_prefix,
-                                                      Init::Manager& init_manager) override;
+  RouteConfigProviderSharedPtr
+  getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds,
+                         Upstream::ClusterManager& cm, Stats::Scope& scope,
+                         const std::string& stat_prefix, Init::Manager& init_manager) override;
 
 private:
   /**
