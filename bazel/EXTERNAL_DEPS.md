@@ -3,7 +3,7 @@
 This is the preferred style of adding dependencies that use Bazel for their
 build process.
 
-1. Specify name and version in [external documentation](../docs/install/requirements.rst).
+1. Specify name and version in [external documentation](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/install/requirements.rst).
 2. Define a new Bazel repository in [`bazel/repositories.bzl`](repositories.bzl),
    in the `envoy_dependencies()` function.
 5. Reference your new external dependency in some `envoy_cc_library` via the
@@ -20,7 +20,7 @@ The shell script is executed by Bash, with a few Bazel-specific extensions.
 See the [Bazel docs for "genrule"](https://docs.bazel.build/versions/master/be/general.html#genrule)
 for details on Bazel's shell extensions.
 
-1. Specify name and version in [external documentation](../docs/install/requirements.rst).
+1. Specify name and version in [external documentation](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/install/requirements.rst).
 2. Add a BUILD file in [`bazel/external/`](external/), using a `genrule` target
    to build the dependency. Please do not add BUILD logic that replaces the
    dependency's upstream build tooling.
@@ -43,7 +43,7 @@ an example.
 This is the older style of adding dependencies. It uses shell scripts to build
 and install dependencies into a shared directory prefix.
 
-1. Specify name and version in [external documentation](../docs/install/requirements.rst).
+1. Specify name and version in [external documentation](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/install/requirements.rst).
 2. Add a build recipe X in [`ci/build_container/build_recipes`](../ci/build_container/build_recipes)
    for developer-local and CI external dependency build flows.
 3. Add a build target Y in [`ci/prebuilt/BUILD`](../ci/prebuilt/BUILD) to consume the headers and
@@ -55,6 +55,6 @@ and install dependencies into a shared directory prefix.
 
 # Updating an external dependency version
 
-1. Specify the new version in [external documentation](../docs/install/requirements.rst).
+1. Specify the new version in [external documentation](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/install/requirements.rst).
 2. Update the build recipe in [`ci/build_container/build_recipes`](../ci/build_container/build_recipes).
 3. `bazel test //test/...`
