@@ -2,7 +2,7 @@
 
 #include "test/integration/http_integration.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -90,40 +90,43 @@ public:
   }
 
   void initializeFilter(HeaderMode mode, bool include_route_config_headers) {
-    config_helper_.addConfigModifier([&](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
-      // Overwrite default config with our own.
-      MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
+    config_helper_.addConfigModifier(
+        [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+          // Overwrite default config with our own.
+          MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
 
-      const bool append = mode == HeaderMode::Append;
+          const bool append = mode == HeaderMode::Append;
 
-      auto* route_config = hcm.mutable_route_config();
-      if (include_route_config_headers) {
-        // Configure route config level headers.
-        addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-response",
-                  "routeconfig", append);
-        route_config->add_response_headers_to_remove("x-routeconfig-response-remove");
-        addHeader(route_config->mutable_request_headers_to_add(), "x-routeconfig-request",
-                  "routeconfig", append);
-      }
-
-      if (append) {
-        // The config specifies append by default: no modifications needed.
-        return;
-      }
-
-      // Iterate over VirtualHosts and nested Routes, disabling header append.
-      for (auto& vhost : *route_config->mutable_virtual_hosts()) {
-        disableHeaderValueOptionAppend(*vhost.mutable_request_headers_to_add());
-        disableHeaderValueOptionAppend(*vhost.mutable_response_headers_to_add());
-
-        for (auto& rte : *vhost.mutable_routes()) {
-          if (rte.has_route()) {
-            disableHeaderValueOptionAppend(*rte.mutable_route()->mutable_request_headers_to_add());
-            disableHeaderValueOptionAppend(*rte.mutable_route()->mutable_response_headers_to_add());
+          auto* route_config = hcm.mutable_route_config();
+          if (include_route_config_headers) {
+            // Configure route config level headers.
+            addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-response",
+                      "routeconfig", append);
+            route_config->add_response_headers_to_remove("x-routeconfig-response-remove");
+            addHeader(route_config->mutable_request_headers_to_add(), "x-routeconfig-request",
+                      "routeconfig", append);
           }
-        }
-      }
-    });
+
+          if (append) {
+            // The config specifies append by default: no modifications needed.
+            return;
+          }
+
+          // Iterate over VirtualHosts and nested Routes, disabling header append.
+          for (auto& vhost : *route_config->mutable_virtual_hosts()) {
+            disableHeaderValueOptionAppend(*vhost.mutable_request_headers_to_add());
+            disableHeaderValueOptionAppend(*vhost.mutable_response_headers_to_add());
+
+            for (auto& rte : *vhost.mutable_routes()) {
+              if (rte.has_route()) {
+                disableHeaderValueOptionAppend(
+                    *rte.mutable_route()->mutable_request_headers_to_add());
+                disableHeaderValueOptionAppend(
+                    *rte.mutable_route()->mutable_response_headers_to_add());
+              }
+            }
+          }
+        });
 
     initialize();
   }

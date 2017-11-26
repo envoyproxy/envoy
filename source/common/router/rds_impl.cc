@@ -18,14 +18,14 @@ namespace Envoy {
 namespace Router {
 
 RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
-    const envoy::api::v2::filter::http::HttpConnectionManager& config, Runtime::Loader& runtime,
+    const envoy::api::v2::filter::network::HttpConnectionManager& config, Runtime::Loader& runtime,
     Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
     Init::Manager& init_manager, RouteConfigProviderManager& route_config_provider_manager) {
   switch (config.route_specifier_case()) {
-  case envoy::api::v2::filter::http::HttpConnectionManager::kRouteConfig:
+  case envoy::api::v2::filter::network::HttpConnectionManager::kRouteConfig:
     return RouteConfigProviderSharedPtr{
         new StaticRouteConfigProviderImpl(config.route_config(), runtime, cm)};
-  case envoy::api::v2::filter::http::HttpConnectionManager::kRds:
+  case envoy::api::v2::filter::network::HttpConnectionManager::kRds:
     return route_config_provider_manager.getRouteConfigProvider(config.rds(), cm, scope,
                                                                 stat_prefix, init_manager);
   default:
@@ -41,7 +41,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 // initialization needs to be fixed.
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
-    const envoy::api::v2::filter::http::Rds& rds, const std::string& manager_identifier,
+    const envoy::api::v2::filter::network::Rds& rds, const std::string& manager_identifier,
     Runtime::Loader& runtime, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
     const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
@@ -170,8 +170,8 @@ RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
 };
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteConfigProvider(
-    const envoy::api::v2::filter::http::Rds& rds, Upstream::ClusterManager& cm, Stats::Scope& scope,
-    const std::string& stat_prefix, Init::Manager& init_manager) {
+    const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm,
+    Stats::Scope& scope, const std::string& stat_prefix, Init::Manager& init_manager) {
 
   // RdsRouteConfigProviders are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a

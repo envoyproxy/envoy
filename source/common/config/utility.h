@@ -19,7 +19,7 @@
 #include "api/base.pb.h"
 #include "api/cds.pb.h"
 #include "api/eds.pb.h"
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "api/lds.pb.h"
 #include "api/rds.pb.h"
 
@@ -134,12 +134,12 @@ public:
                                  envoy::api::v2::ConfigSource& cds_config);
 
   /**
-   * Convert a v1 RDS JSON config to v2 RDS envoy::api::v2::filter::http::Rds.
+   * Convert a v1 RDS JSON config to v2 RDS envoy::api::v2::filter::network::Rds.
    * @param json_rds source v1 RDS JSON config.
-   * @param rds destination v2 RDS envoy::api::v2::filter::http::Rds.
+   * @param rds destination v2 RDS envoy::api::v2::filter::network::Rds.
    */
   static void translateRdsConfig(const Json::Object& json_rds,
-                                 envoy::api::v2::filter::http::Rds& rds);
+                                 envoy::api::v2::filter::network::Rds& rds);
 
   /**
    * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::ConfigSource.
