@@ -27,7 +27,8 @@
 * Start doing PRs and code reviews under the guidance of your senior maintainer.
 * After a period of 1-2 months the existing senior maintainers will discuss granting "standard"
   maintainer access.
-* "Standard" maintainer access can be upgraded to "senior" maintainer access aft
+* "Standard" maintainer access can be upgraded to "senior" maintainer access after another 1-2
+  months of work and another conference of the existing senior committers.
 
 ## Maintainer responsibilities
 

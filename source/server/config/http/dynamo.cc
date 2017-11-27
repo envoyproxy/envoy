@@ -10,9 +10,8 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(const Json::Object&,
-                                                            const std::string& stat_prefix,
-                                                            FactoryContext& context) {
+HttpFilterFactoryCb DynamoFilterConfig::createFilter(const std::string& stat_prefix,
+                                                     FactoryContext& context) {
   return [&context, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
         new Dynamo::DynamoFilter(context.runtime(), stat_prefix, context.scope())});

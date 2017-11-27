@@ -364,12 +364,13 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
   return connection;
 }
 
-void FakeRawConnection::waitForData(uint64_t num_bytes) {
+std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   std::unique_lock<std::mutex> lock(lock_);
   while (data_.size() != num_bytes) {
     ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
     connection_event_.wait(lock);
   }
+  return data_;
 }
 
 void FakeRawConnection::write(const std::string& data) {

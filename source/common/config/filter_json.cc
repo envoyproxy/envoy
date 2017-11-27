@@ -120,11 +120,11 @@ void FilterJson::translateAccessLog(const Json::Object& json_access_log,
 
 void FilterJson::translateHttpConnectionManager(
     const Json::Object& json_http_connection_manager,
-    envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager) {
+    envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager) {
   json_http_connection_manager.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
-  envoy::api::v2::filter::http::HttpConnectionManager::CodecType codec_type{};
-  envoy::api::v2::filter::http::HttpConnectionManager::CodecType_Parse(
+  envoy::api::v2::filter::network::HttpConnectionManager::CodecType codec_type{};
+  envoy::api::v2::filter::network::HttpConnectionManager::CodecType_Parse(
       StringUtil::toUpper(json_http_connection_manager.getString("codec_type")), &codec_type);
   http_connection_manager.set_codec_type(codec_type);
 
@@ -167,8 +167,8 @@ void FilterJson::translateHttpConnectionManager(
     const auto json_tracing = json_http_connection_manager.getObject("tracing");
     auto* tracing = http_connection_manager.mutable_tracing();
 
-    envoy::api::v2::filter::http::HttpConnectionManager::Tracing::OperationName operation_name{};
-    envoy::api::v2::filter::http::HttpConnectionManager::Tracing::OperationName_Parse(
+    envoy::api::v2::filter::network::HttpConnectionManager::Tracing::OperationName operation_name{};
+    envoy::api::v2::filter::network::HttpConnectionManager::Tracing::OperationName_Parse(
         StringUtil::toUpper(json_tracing->getString("operation_name")), &operation_name);
     tracing->set_operation_name(operation_name);
 
@@ -201,8 +201,8 @@ void FilterJson::translateHttpConnectionManager(
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, use_remote_address);
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, generate_request_id);
 
-  envoy::api::v2::filter::http::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
-  envoy::api::v2::filter::http::HttpConnectionManager::ForwardClientCertDetails_Parse(
+  envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
+  envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails_Parse(
       StringUtil::toUpper(
           json_http_connection_manager.getString("forward_client_cert", "sanitize")),
       &fcc_details);
@@ -220,6 +220,19 @@ void FilterJson::translateHttpConnectionManager(
           true);
     }
   }
+}
+
+void FilterJson::translateRedisProxy(const Json::Object& json_redis_proxy,
+                                     envoy::api::v2::filter::network::RedisProxy& redis_proxy) {
+  json_redis_proxy.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
+  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, stat_prefix);
+  redis_proxy.set_cluster(json_redis_proxy.getString("cluster_name"));
+
+  const auto json_conn_pool = json_redis_proxy.getObject("conn_pool");
+  json_conn_pool->validateSchema(Json::Schema::REDIS_CONN_POOL_SCHEMA);
+
+  auto* conn_pool = redis_proxy.mutable_settings();
+  JSON_UTIL_SET_DURATION(*json_conn_pool, *conn_pool, op_timeout);
 }
 
 void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,

@@ -8,7 +8,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 
@@ -136,7 +136,7 @@ void ConfigHelper::setSourceAddress(const std::string& address_string) {
 
 void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std::string& prefix) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
   auto* virtual_host = hcm_config.mutable_route_config()->mutable_virtual_hosts(0);
@@ -159,9 +159,9 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     cluster->mutable_per_connection_buffer_limit_bytes()->set_value(upstream_buffer_limit);
   }
 
-  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
-  if (hcm_config.codec_type() == envoy::api::v2::filter::http::HttpConnectionManager::HTTP2) {
+  if (hcm_config.codec_type() == envoy::api::v2::filter::network::HttpConnectionManager::HTTP2) {
     const uint32_t size =
         std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
     auto* options = hcm_config.mutable_http2_protocol_options();
@@ -189,7 +189,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
                             const std::string& cluster,
                             envoy::api::v2::VirtualHost::TlsRequirementType type) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
   auto* virtual_host = hcm_config.mutable_route_config()->add_virtual_hosts();
@@ -203,7 +203,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
 
 void ConfigHelper::addFilter(const std::string& config) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
   auto* filter_list_back = hcm_config.add_http_filters();
@@ -218,9 +218,9 @@ void ConfigHelper::addFilter(const std::string& config) {
 }
 
 void ConfigHelper::setClientCodec(
-    envoy::api::v2::filter::http::HttpConnectionManager::CodecType type) {
+    envoy::api::v2::filter::network::HttpConnectionManager::CodecType type) {
   RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
+  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
   hcm_config.set_codec_type(type);
   storeHttpConnectionManager(hcm_config);
@@ -252,7 +252,7 @@ void ConfigHelper::addSslConfig() {
 }
 
 void ConfigHelper::loadHttpConnectionManager(
-    envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+    envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_chain = listener->mutable_filter_chains(0);
@@ -261,7 +261,7 @@ void ConfigHelper::loadHttpConnectionManager(
 }
 
 void ConfigHelper::storeHttpConnectionManager(
-    const envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+    const envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_chain = listener->mutable_filter_chains(0);
@@ -277,7 +277,7 @@ void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   addConfigModifier([function, this](envoy::api::v2::Bootstrap&) -> void {
-    envoy::api::v2::filter::http::HttpConnectionManager hcm_config;
+    envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);

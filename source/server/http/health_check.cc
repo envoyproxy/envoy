@@ -29,9 +29,9 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createHealthCheckFilter(
   ASSERT(health_check.has_pass_through_mode());
   ASSERT(!health_check.endpoint().empty());
 
-  bool pass_through_mode = health_check.pass_through_mode().value();
-  int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(health_check, cache_time, 0);
-  std::string hc_endpoint = health_check.endpoint();
+  const bool pass_through_mode = health_check.pass_through_mode().value();
+  const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(health_check, cache_time, 0);
+  const std::string hc_endpoint = health_check.endpoint();
 
   if (!pass_through_mode && cache_time_ms) {
     throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");

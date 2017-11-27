@@ -106,6 +106,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_integration_test",
+    srcs = [
+        "header_integration_test.cc",
+    ],
+    external_deps = ["envoy_filter_network_http_connection_manager"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_integration_test",
     srcs = [
         "http2_integration_test.cc",

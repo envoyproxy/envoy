@@ -15,7 +15,6 @@
 #include "server/test_hooks.h"
 
 #ifdef ENVOY_HOT_RESTART
-#include "common/api/os_sys_calls_impl.h"
 #include "server/hot_restart_impl.h"
 #endif
 
@@ -47,10 +46,9 @@ int main_common(OptionsImpl& options) {
   Stats::RawStatData::configure(options);
 
 #ifdef ENVOY_HOT_RESTART
-  Api::OsSysCallsImpl os_sys_calls_impl;
   std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
-    restarter.reset(new Server::HotRestartImpl(options, os_sys_calls_impl));
+    restarter.reset(new Server::HotRestartImpl(options));
   } catch (Envoy::EnvoyException& e) {
     std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
     return 1;
