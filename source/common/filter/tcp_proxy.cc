@@ -58,7 +58,7 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
     routes_.emplace_back(default_route);
   }
 
-  for (const envoy::api::v2::filter::AccessLog& log_config : config.access_log()) {
+  for (const envoy::api::v2::filter::accesslog::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 }

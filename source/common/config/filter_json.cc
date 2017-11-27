@@ -18,13 +18,13 @@ namespace Config {
 namespace {
 
 void translateComparisonFilter(const Json::Object& config,
-                               envoy::api::v2::filter::ComparisonFilter& filter) {
+                               envoy::api::v2::filter::accesslog::ComparisonFilter& filter) {
   const std::string op = config.getString("op");
   if (op == ">=") {
-    filter.set_op(envoy::api::v2::filter::ComparisonFilter::GE);
+    filter.set_op(envoy::api::v2::filter::accesslog::ComparisonFilter::GE);
   } else {
     ASSERT(op == "=");
-    filter.set_op(envoy::api::v2::filter::ComparisonFilter::EQ);
+    filter.set_op(envoy::api::v2::filter::accesslog::ComparisonFilter::EQ);
   }
 
   auto* runtime = filter.mutable_value();
@@ -33,39 +33,41 @@ void translateComparisonFilter(const Json::Object& config,
 }
 
 void translateStatusCodeFilter(const Json::Object& config,
-                               envoy::api::v2::filter::StatusCodeFilter& filter) {
+                               envoy::api::v2::filter::accesslog::StatusCodeFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateDurationFilter(const Json::Object& config,
-                             envoy::api::v2::filter::DurationFilter& filter) {
+                             envoy::api::v2::filter::accesslog::DurationFilter& filter) {
   translateComparisonFilter(config, *filter.mutable_comparison());
 }
 
 void translateRuntimeFilter(const Json::Object& config,
-                            envoy::api::v2::filter::RuntimeFilter& filter) {
+                            envoy::api::v2::filter::accesslog::RuntimeFilter& filter) {
   filter.set_runtime_key(config.getString("key"));
 }
 
 void translateRepeatedFilter(
     const Json::Object& config,
-    Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLogFilter>& filters) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::filter::accesslog::AccessLogFilter>& filters) {
   for (const auto& json_filter : config.getObjectArray("filters")) {
     FilterJson::translateAccessLogFilter(*json_filter, *filters.Add());
   }
 }
 
-void translateOrFilter(const Json::Object& config, envoy::api::v2::filter::OrFilter& filter) {
+void translateOrFilter(const Json::Object& config,
+                       envoy::api::v2::filter::accesslog::OrFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
-void translateAndFilter(const Json::Object& config, envoy::api::v2::filter::AndFilter& filter) {
+void translateAndFilter(const Json::Object& config,
+                        envoy::api::v2::filter::accesslog::AndFilter& filter) {
   translateRepeatedFilter(config, *filter.mutable_filters());
 }
 
 void translateRepeatedAccessLog(
     const std::vector<Json::ObjectSharedPtr>& json,
-    Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLog>& access_logs) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::filter::accesslog::AccessLog>& access_logs) {
   for (const auto& json_access_log : json) {
     auto* access_log = access_logs.Add();
     FilterJson::translateAccessLog(*json_access_log, *access_log);
@@ -76,7 +78,7 @@ void translateRepeatedAccessLog(
 
 void FilterJson::translateAccessLogFilter(
     const Json::Object& json_access_log_filter,
-    envoy::api::v2::filter::AccessLogFilter& access_log_filter) {
+    envoy::api::v2::filter::accesslog::AccessLogFilter& access_log_filter) {
   const std::string type = json_access_log_filter.getString("type");
   if (type == "status_code") {
     translateStatusCodeFilter(json_access_log_filter,
@@ -98,10 +100,10 @@ void FilterJson::translateAccessLogFilter(
 }
 
 void FilterJson::translateAccessLog(const Json::Object& json_access_log,
-                                    envoy::api::v2::filter::AccessLog& access_log) {
+                                    envoy::api::v2::filter::accesslog::AccessLog& access_log) {
   json_access_log.validateSchema(Json::Schema::ACCESS_LOG_SCHEMA);
 
-  envoy::api::v2::filter::FileAccessLog file_access_log;
+  envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
   JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);

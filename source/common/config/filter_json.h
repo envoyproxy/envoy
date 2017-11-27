@@ -18,20 +18,21 @@ class FilterJson {
 public:
   /**
    * Translate a v1 JSON access log filter object to v2
-   * envoy::api::v2::filter::AccessLogFilter.
+   * envoy::api::v2::filter::accesslog::AccessLogFilter.
    * @param json_access_log_filter source v1 JSON access log object.
-   * @param access_log_filter destination v2 envoy::api::v2::filter::AccessLog.
+   * @param access_log_filter destination v2 envoy::api::v2::filter::accesslog::AccessLog.
    */
-  static void translateAccessLogFilter(const Json::Object& json_access_log_filter,
-                                       envoy::api::v2::filter::AccessLogFilter& access_log_filter);
+  static void
+  translateAccessLogFilter(const Json::Object& json_access_log_filter,
+                           envoy::api::v2::filter::accesslog::AccessLogFilter& access_log_filter);
 
   /**
-   * Translate a v1 JSON access log object to v2 envoy::api::v2::filter::AccessLog.
+   * Translate a v1 JSON access log object to v2 envoy::api::v2::filter::accesslog::AccessLog.
    * @param json_access_log source v1 JSON access log object.
-   * @param access_log destination v2 envoy::api::v2::filter::AccessLog.
+   * @param access_log destination v2 envoy::api::v2::filter::accesslog::AccessLog.
    */
   static void translateAccessLog(const Json::Object& json_access_log,
-                                 envoy::api::v2::filter::AccessLog& access_log);
+                                 envoy::api::v2::filter::accesslog::AccessLog& access_log);
 
   /**
    * Translate a v1 JSON HTTP connection manager object to v2
