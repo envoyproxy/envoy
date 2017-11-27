@@ -65,6 +65,12 @@ public:
   virtual const std::string& configPath() PURE;
 
   /**
+   * @return bool whether the config should only be parsed as v2. If false, when a v2 parse fails,
+   *              a second attempt to parse the config as v1 will be made.
+   */
+  virtual bool v2ConfigOnly() PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() PURE;
