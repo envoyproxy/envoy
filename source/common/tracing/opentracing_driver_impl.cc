@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -136,8 +137,8 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
     std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
 
     if (!parent_context.empty()) {
-      std::istringstream iss{parent_context, std::ios::binary};
-      parent_span_ctx_maybe = tracer.Extract(iss);
+      IMemoryStream istream{parent_context.data(), parent_context.size()};
+      parent_span_ctx_maybe = tracer.Extract(istream);
     } else {
       parent_span_ctx_maybe =
           opentracing::make_unexpected(opentracing::span_context_corrupted_error);

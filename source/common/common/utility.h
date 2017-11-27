@@ -65,6 +65,26 @@ public:
 };
 
 /**
+ * Class used for creating non-copying std::istream's. See IMemoryStream below.
+ */
+class MemoryStreamBuffer : public std::streambuf {
+public:
+  MemoryStreamBuffer(const char* data, size_t size);
+};
+
+/**
+ * std::istream class similar to std::istringstream, except that it provides a view into a region of
+ * constant memory. It can be more efficient than std::istringstream because it doesn't copy the
+ * provided string.
+ *
+ * See https://stackoverflow.com/a/13059195/4447365.
+ */
+class IMemoryStream : public virtual MemoryStreamBuffer, public std::istream {
+public:
+  IMemoryStream(const char* data, size_t size);
+};
+
+/**
  * Utility class for date/time helpers.
  */
 class DateUtil {
