@@ -46,7 +46,8 @@ public:
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
-  MOCK_CONST_METHOD0(lbRingHashConfig, const Optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
+  MOCK_CONST_METHOD0(lbRingHashConfig,
+                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());

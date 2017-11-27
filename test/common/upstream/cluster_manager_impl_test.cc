@@ -531,7 +531,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   )EOF",
       defaultStaticClusterJson("cds_cluster"),
       clustersJson({defaultStaticClusterJson("cluster_0"), defaultStaticClusterJson("cluster_1")}));
-  
+
   // EXPECT_CALL(*cluster, foo()).WillOnce(Return(Optional<>{}));
 
   MockCdsApi* cds = new MockCdsApi();
