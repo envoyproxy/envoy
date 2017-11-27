@@ -399,7 +399,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 }
 
-ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
+IoResult ConnectionImpl::doReadFromSocket() {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   do {
@@ -452,7 +452,7 @@ void ConnectionImpl::onReadReady() {
   }
 }
 
-ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
+IoResult ConnectionImpl::doWriteToSocket() {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {

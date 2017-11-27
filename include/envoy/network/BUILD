@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":filter_interface",
+        ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/ssl:connection_interface",
@@ -59,6 +60,11 @@ envoy_cc_library(
     name = "listen_socket_interface",
     hdrs = ["listen_socket.h"],
     deps = ["//include/envoy/network:address_interface"],
+)
+
+envoy_cc_library(
+    name = "transport_socket_interface",
+    hdrs = ["transport_socket.h"],
 )
 
 envoy_cc_library(

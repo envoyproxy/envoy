@@ -12,6 +12,8 @@
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
 
+using Envoy::Network::PostIoAction;
+
 namespace Envoy {
 namespace Ssl {
 
@@ -43,7 +45,7 @@ ConnectionImpl::~ConnectionImpl() {
   filter_manager_.destroyFilters();
 }
 
-Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
+Network::IoResult ConnectionImpl::doReadFromSocket() {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
@@ -97,7 +99,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
   return {action, bytes_read};
 }
 
-Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
+PostIoAction ConnectionImpl::doHandshake() {
   ASSERT(!handshake_complete_);
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
@@ -145,7 +147,7 @@ void ConnectionImpl::drainErrorQueue() {
   }
 }
 
-Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
+Network::IoResult ConnectionImpl::doWriteToSocket() {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {

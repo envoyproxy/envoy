@@ -8,6 +8,7 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
@@ -85,13 +86,6 @@ public:
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
 protected:
-  enum class PostIoAction { Close, KeepOpen };
-
-  struct IoResult {
-    PostIoAction action_;
-    uint64_t bytes_processed_;
-  };
-
   virtual bool canFlushClose() { return true; }
   virtual void closeSocket(ConnectionEvent close_type);
   void doConnect();

@@ -37,15 +37,15 @@ public:
   SSL* rawSslForTest() { return ssl_.get(); }
 
 private:
-  PostIoAction doHandshake();
+  Network::PostIoAction doHandshake();
   void drainErrorQueue();
   std::string getUriSanFromCertificate(X509* cert);
 
   // Network::ConnectionImpl
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
-  IoResult doReadFromSocket() override;
-  IoResult doWriteToSocket() override;
+  Network::IoResult doReadFromSocket() override;
+  Network::IoResult doWriteToSocket() override;
   void onConnected() override;
 
   ContextImpl& ctx_;

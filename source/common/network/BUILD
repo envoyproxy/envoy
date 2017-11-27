@@ -43,6 +43,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":filter_manager_lib",
+        ":raw_buffer_socket_lib",
         ":utility_lib",
         "//include/envoy/common:optional",
         "//include/envoy/event:timer_interface",
@@ -132,6 +133,16 @@ envoy_cc_library(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:libevent_lib",
         "//source/common/ssl:connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "raw_buffer_socket_lib",
+    srcs = ["raw_buffer_socket.cc"],
+    hdrs = ["raw_buffer_socket.h"],
+    external_deps = ["envoy_base"],
+    deps = [
+        ":utility_lib",
     ],
 )
 
