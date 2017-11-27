@@ -41,10 +41,11 @@ TEST(OptionsImplTest, All) {
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar");
+      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
+  EXPECT_TRUE(options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());

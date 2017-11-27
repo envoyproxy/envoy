@@ -48,6 +48,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
                                            "", "string", cmd);
+  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "parse config as v2 only", cmd, false);
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
   TCLAP::ValueArg<std::string> local_address_ip_version("", "local-address-ip-version",
@@ -142,6 +143,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   base_id_ = base_id.getValue() * 10;
   concurrency_ = concurrency.getValue();
   config_path_ = config_path.getValue();
+  v2_config_only_ = v2_config_only.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
