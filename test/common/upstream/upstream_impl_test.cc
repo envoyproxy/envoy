@@ -316,7 +316,7 @@ TEST(HostImplTest, Weight) {
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
   EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 128)->weight());
-  EXPECT_EQ(129U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 129)->weight());
+  EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 129)->weight());
 
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 50);
   EXPECT_EQ(50U, host->weight());
