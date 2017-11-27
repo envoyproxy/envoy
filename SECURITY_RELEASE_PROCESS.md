@@ -42,9 +42,13 @@ necessary and is unlikely to make a public disclosure less damaging.
 
 For each vulnerability a member of the PST will volunteer to lead coordination with the "Fix Team"
 and is responsible for sending disclosure emails to the rest of the community. This lead will be
-referred to as the "Fix Lead.""
+referred to as the "Fix Lead."
 
 The role of Fix Lead should rotate round-robin across the PST.
+
+Note that given the current size of the Envoy community it is likely that the PST is the same as
+the "Fix team." (I.e., all maintainers). The PST may decide to bring in additional contributors
+for added expertise depending on the area of the code that contains the vulnerability.
 
 All of the timelines below are suggestions and assume a private disclosure. The Fix Lead drives the
 schedule using their best judgment based on severity and development time. If the Fix Lead is
@@ -183,7 +187,11 @@ could be in the form of the following:
 To be eligible for the envoy-distributors-announce mailing list, your
 distribution should:
 
-1. Be an actively maintained distribution of Envoy components.
+1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
+   available service in which the product clearly states that it is built on top of Envoy. E.g.,
+   "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages OR
+   "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". A cloud service that uses Envoy for a
+   product but does not publicly say they are using Envoy does not qualify.
 2. Have a user base not limited to your own organization.
 3. Have a publicly verifiable track record up to present day of fixing security
    issues.
@@ -209,7 +217,8 @@ Subject: Seven-Corp Membership to envoy-distributors-announce
 
 Below are each criterion and why I think we, Seven-Corp, qualify.
 
-> 1. Be an actively maintained distribution of Envoy components.
+> 1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
+     available service in which the product clearly states that it is built on top of Envoy.
 
 We distribute the "Seven" distribution of Envoy [link]. We have been doing
 this since 1999 before proxies were even cool.
@@ -220,7 +229,7 @@ Our user base spans of the extensive "Seven" community. We have a slack and
 GitHub repos and mailing lists where the community hangs out. [links]
 
 > 3. Have a publicly verifiable track record up to present day of fixing security
-   issues.
+     issues.
 
 We announce on our blog all upstream patches we apply to "Seven." [link to blog
 posts]
