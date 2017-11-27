@@ -21,6 +21,17 @@ typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 namespace Outlier {
 
 /**
+ * Non-HTTP result of requests/operations.
+ */
+enum class Result {
+  SUCCESS,        // Successfully established a connection or completed a request.
+  TIMEOUT,        // Timed out while connecting or executing a request.
+  CONNECT_FAILED, // Remote host rejected the connection.
+  REQUEST_FAILED, // Request was not completed successfully.
+  SERVER_FAILURE, // The server indicated it cannot process a request.
+};
+
+/**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
  */
 class DetectorHostMonitor {
@@ -36,6 +47,11 @@ public:
    * Add an HTTP response code for a host.
    */
   virtual void putHttpResponseCode(uint64_t code) PURE;
+
+  /**
+   * Add a non-HTTP result for a host.
+   */
+  virtual void putResult(Result result) PURE;
 
   /**
    * Add a response time for a host (in this case response time is generic and might be used for
