@@ -532,8 +532,6 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       defaultStaticClusterJson("cds_cluster"),
       clustersJson({defaultStaticClusterJson("cluster_0"), defaultStaticClusterJson("cluster_1")}));
 
-  // EXPECT_CALL(*cluster, foo()).WillOnce(Return(Optional<>{}));
-
   MockCdsApi* cds = new MockCdsApi();
   std::shared_ptr<MockCluster> cds_cluster(new NiceMock<MockCluster>());
   cds_cluster->info_->name_ = "cds_cluster";
