@@ -20,7 +20,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LoadBalancerSubsetInfo& subsets,
-    const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config)
+    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), stats_(stats),
       runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_(subsets.defaultSubset()), subset_keys_(subsets.subsetKeys()),

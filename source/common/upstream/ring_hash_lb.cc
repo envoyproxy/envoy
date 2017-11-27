@@ -115,8 +115,8 @@ void RingHashLoadBalancer::Ring::create(
           : true;
   for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
-      std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
-      uint64_t hash =
+      const std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
+      const uint64_t hash =
           use_std_hash ? std::hash<std::string>()(hash_key) : HashUtil::xxHash64(hash_key);
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
       ring_.push_back({hash, host});

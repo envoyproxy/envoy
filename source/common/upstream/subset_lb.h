@@ -22,7 +22,7 @@ public:
   SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
-                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config);
+                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
