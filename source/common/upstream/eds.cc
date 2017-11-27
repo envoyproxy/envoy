@@ -42,7 +42,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
-  std::vector<std::vector<HostSharedPtr>> new_hosts(4);  // Large enough to avoid most resizes.
+  typedef std::unique_ptr<std::vector<HostSharedPtr>> HostListPtr;
+  std::vector<HostListPtr> new_hosts;
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -63,8 +64,11 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     if (new_hosts.size() <= priority) {
       new_hosts.resize(2 * (priority + 1));
     }
+    if (new_hosts[priority] == nullptr) {
+      new_hosts[priority] = HostListPtr{new std::vector<HostSharedPtr>};
+    }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      new_hosts[priority].emplace_back(new HostImpl(
+      new_hosts[priority]->emplace_back(new HostImpl(
           info_, "", Network::Address::resolveProtoAddress(lb_endpoint.endpoint().address()),
           lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
           locality_lb_endpoint.locality()));
@@ -72,7 +76,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   }
 
   for (size_t i = 0; i < new_hosts.size(); ++i) {
-    UpdateHostsPerLocality(prioritySet().getHostSet(i), new_hosts[i]);
+    if (new_hosts[i] != nullptr) {
+      UpdateHostsPerLocality(prioritySet().getHostSet(i), *new_hosts[i]);
+    }
   }
 
   // If we didn't setup to initialize when our first round of health checking is complete, just

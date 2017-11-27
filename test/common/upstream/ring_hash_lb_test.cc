@@ -37,28 +37,27 @@ class RingHashLoadBalancerTest : public testing::Test {
 public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
-  NiceMock<MockCluster> cluster_;
+  NiceMock<MockHostSet> host_set_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  RingHashLoadBalancer lb_{cluster_, stats_, runtime_, random_};
+  RingHashLoadBalancer lb_{host_set_, stats_, runtime_, random_};
 };
 
 TEST_F(RingHashLoadBalancerTest, NoHost) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); };
 
 TEST_F(RingHashLoadBalancerTest, Basic) {
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:84"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:85")};
-  cluster_.healthy_hosts_ = cluster_.hosts_;
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
 
   ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
       .WillByDefault(Return(12));
-  cluster_.runCallbacks({}, {});
+  host_set_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
@@ -77,41 +76,41 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
   // ring hash: host=127.0.0.1:80 hash=17613279263364193813
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[5], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(cluster_.hosts_[5], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602068);
-    EXPECT_EQ(cluster_.hosts_[5], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602069);
-    EXPECT_EQ(cluster_.hosts_[3], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb_.chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
-    EXPECT_EQ(cluster_.hosts_[2], lb_.chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[2], lb_.chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
-  cluster_.healthy_hosts_.clear();
-  cluster_.runCallbacks({}, {});
+  host_set_.healthy_hosts_.clear();
+  host_set_.runCallbacks({}, {});
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[5], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_.chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
 
 TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
       .WillByDefault(Return(3));
-  cluster_.runCallbacks({}, {});
+  host_set_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
@@ -122,12 +121,12 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   // ring hash: host=127.0.0.1:80 hash=17613279263364193813
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[1], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[1], lb_.chooseHost(&context));
   }
 
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
-  cluster_.runCallbacks({}, {});
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
+                      makeTestHost(info_, "tcp://127.0.0.1:82")};
+  host_set_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
@@ -138,7 +137,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   // ring hash: host=127.0.0.1:82 hash=10150910876324007731
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb_.chooseHost(&context));
   }
 }
 
@@ -176,13 +175,13 @@ TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   // TODO(danielhochman): add support for more hosts if necessary with another loop for subnet
   ASSERT_LT(num_hosts, 256);
   for (uint64_t i = 0; i < num_hosts; i++) {
-    cluster_.hosts_.push_back(makeTestHost(cluster_.info_, fmt::format("tcp://10.0.0.{}:6379", i)));
+    host_set_.hosts_.push_back(makeTestHost(info_, fmt::format("tcp://10.0.0.{}:6379", i)));
   }
-  cluster_.healthy_hosts_ = cluster_.hosts_;
+  host_set_.healthy_hosts_ = host_set_.hosts_;
 
   ON_CALL(runtime_.snapshot_, getInteger("upstream.ring_hash.min_ring_size", _))
       .WillByDefault(Return(min_ring_size));
-  cluster_.runCallbacks({}, {});
+  host_set_.runCallbacks({}, {});
 
   for (uint64_t i = 0; i < keys_to_simulate; i++) {
     TestLoadBalancerContext context(std::hash<std::string>()(fmt::format("{}", i)));

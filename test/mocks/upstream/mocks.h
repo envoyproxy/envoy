@@ -76,6 +76,10 @@ public:
   MOCK_METHOD0(hostSetsPerPriority, std::vector<HostSetPtr>&());
   MOCK_METHOD1(getHostSet, HostSet&(uint32_t priority));
 
+  MockHostSet* getMockHostSet(uint32_t priority) {
+    return reinterpret_cast<MockHostSet*>(host_sets_[priority].get());
+  }
+
   std::vector<HostSetPtr> host_sets_;
   Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
                           const std::vector<HostSharedPtr>&>
@@ -95,7 +99,7 @@ public:
   MOCK_METHOD1(initialize, void(std::function<void()> callback));
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
-  MOCK_METHOD0(prioritySet, PrioritySet&());
+  MOCK_METHOD0(prioritySet, MockPrioritySet&());
   MOCK_CONST_METHOD0(prioritySet, const PrioritySet&());
 
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};

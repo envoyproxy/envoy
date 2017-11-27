@@ -30,10 +30,19 @@ MockHostSet::MockHostSet() {
 }
 
 MockPrioritySet::MockPrioritySet() {
-  // FIXME host_sets_.push_back(std::reference_wrapper<MockHostSet>);
+  host_sets_.push_back(HostSetPtr{new NiceMock<MockHostSet>});
+  host_sets_[0]->addMemberUpdateCb([this](uint32_t priority,
+                                          const std::vector<HostSharedPtr>& hosts_added,
+                                          const std::vector<HostSharedPtr>& hosts_removed) {
+    runUpdateCallbacks(priority, hosts_added, hosts_removed);
+  });
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(testing::Const(*this), hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(*this, getHostSet(_)).WillByDefault(Invoke(this, &MockPrioritySet::getHostSetInternal));
+  ON_CALL(*this, addMemberUpdateCb(_))
+      .WillByDefault(Invoke([this](HostSet::MemberUpdateCb cb) -> Common::CallbackHandle* {
+        return member_update_cb_helper_.add(cb);
+      }));
 }
 
 HostSet& MockPrioritySet::getHostSetInternal(uint32_t priority) {
