@@ -94,7 +94,7 @@ void RingHashLoadBalancer::Ring::create(
   //       standpoint and duplicates the regeneration computation. In the future we might want
   //       to generate the rings centrally and then just RCU them out to each thread. This is
   //       sufficient for getting started.
-  uint64_t min_ring_size =
+  const uint64_t min_ring_size =
       config.valid() ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, 1024)
                      : 1024;
 

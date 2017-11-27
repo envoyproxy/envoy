@@ -49,7 +49,7 @@ private:
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
-  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
   Ring all_hosts_ring_;
   Ring healthy_hosts_ring_;
 };
