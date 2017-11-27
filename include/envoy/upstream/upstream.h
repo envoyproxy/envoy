@@ -172,7 +172,16 @@ public:
    */
   virtual const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const PURE;
 
-  // FIXME comment
+  /**
+   * Updates the hosts in a given host set.
+   *
+   * @param hosts supplies the (usually new) list of hosts in the host set.
+   * @param healthy hosts supplies the subset of hosts which are healthy.
+   * @param hosts_per_locality supplies the hosts subdivided by locality.
+   * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
+   * @param hosts_added supplies the hosts added since the last update.
+   * @param hosts_removed supplies the hosts removed since the last update.
+   */
   virtual void updateHosts(
       std::shared_ptr<const std::vector<HostSharedPtr>> hosts,
       std::shared_ptr<const std::vector<HostSharedPtr>> healthy_hosts,
@@ -181,7 +190,9 @@ public:
       const std::vector<HostSharedPtr>& hosts_added,
       const std::vector<HostSharedPtr>& hosts_removed) PURE;
 
-  // FIXME comment
+  /**
+   * @return the priority of this host set.
+   */
   virtual uint32_t priority() const PURE;
 };
 
@@ -191,7 +202,6 @@ typedef std::unique_ptr<HostSet> HostSetPtr;
  * This class contains all of the HostSets for a given cluster grouped by priority, for
  * ease of load balancing.
  */
-// FIXME comment all
 class PrioritySet {
 public:
   typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
@@ -201,13 +211,29 @@ public:
   virtual ~PrioritySet() {}
 
   /**
-   * Install a callback that will be invoked when the membership of any of the HostSets changes.
+   * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
+   * This includes when a new HostSet is created.
+   *
    * @param callback supplies the callback to invoke.
    */
   virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
-  virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
+  /**
+   * Returns the host sets for this priority set, ordered by priority.
+   * The first element in the vector is the host set for priority 0, and so on.
+   *
+   * @return the host sets for this priority set.
+   */
   virtual std::vector<HostSetPtr>& hostSetsPerPriority() PURE;
+
+  /**
+   * @return the const host sets for this priority set, ordered by priority.
+   */
+  virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
+
+  /**
+   * @return the host sets for this priority.  If no such host set exists, it will be created.
+   */
   virtual HostSet& getHostSet(uint32_t priority) PURE;
 };
 

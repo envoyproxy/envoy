@@ -235,8 +235,6 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
   priority_set_.addMemberUpdateCb([this](uint32_t priority,
                                          const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
-    // FIXME(alyssawilk) talk to Matt about how to change stats in prod.
-    // Add per-priority stats and deprecate the old ones next release?
     if (priority != 0)
       return;
 
@@ -244,9 +242,14 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
       info_->stats().membership_change_.inc();
     }
 
-    info_->stats().membership_healthy_.set(
-        prioritySet().getHostSet(priority).healthyHosts().size());
-    info_->stats().membership_total_.set(prioritySet().getHostSet(priority).hosts().size());
+    uint32_t healthy_hosts = 0;
+    uint32_t hosts = 0;
+    for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
+      hosts += host_set->hosts().size();
+      healthy_hosts += host_set->healthyHosts().size();
+    }
+    info_->stats().membership_total_.set(hosts);
+    info_->stats().membership_healthy_.set(healthy_hosts);
   });
 }
 

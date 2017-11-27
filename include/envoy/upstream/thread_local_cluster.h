@@ -14,7 +14,7 @@ public:
   virtual ~ThreadLocalCluster() {}
 
   /**
-   * @return const HostSet& the backing host set.
+   * @return const PrioritySet& the backing priority set.
    */
   virtual const PrioritySet& prioritySet() PURE;
 
