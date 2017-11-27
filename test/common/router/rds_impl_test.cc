@@ -31,9 +31,9 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::api::v2::filter::http::HttpConnectionManager
+envoy::api::v2::filter::network::HttpConnectionManager
 parseHttpConnectionManagerFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::http::HttpConnectionManager http_connection_manager;
+  envoy::api::v2::filter::network::HttpConnectionManager http_connection_manager;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::FilterJson::translateHttpConnectionManager(*json_object_ptr,
                                                             http_connection_manager);
@@ -428,7 +428,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
     )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::filter::http::Rds rds;
+  envoy::api::v2::filter::network::Rds rds;
   Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
@@ -451,7 +451,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
     )EOF";
 
   Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
-  envoy::api::v2::filter::http::Rds rds2;
+  envoy::api::v2::filter::network::Rds rds2;
   Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
 
   RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_.getRouteConfigProvider(
@@ -493,7 +493,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
     )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::filter::http::Rds rds;
+  envoy::api::v2::filter::network::Rds rds;
   Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
@@ -516,7 +516,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
     )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::filter::http::Rds rds;
+  envoy::api::v2::filter::network::Rds rds;
   Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.

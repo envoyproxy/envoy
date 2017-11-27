@@ -124,11 +124,28 @@ protected:
 };
 
 class ServerInstanceImplDeathTest : public ServerInstanceImplTest {
-  void TearDown() override {}
+  void TearDown() override { thread_local_.shutdownGlobalThreading(); }
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+INSTANTIATE_TEST_CASE_P(IpVersionsDeath, ServerInstanceImplDeathTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ServerInstanceImplDeathTest, V2ConfigOnly) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.v2_config_only_ = true;
+  EXPECT_DEATH(initialize(std::string()), ".*Unable to parse JSON as proto.*");
+}
+
+TEST_P(ServerInstanceImplTest, V1ConfigFallback) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.v2_config_only_ = false;
+  initialize(std::string());
+}
 
 TEST_P(ServerInstanceImplTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";

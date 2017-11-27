@@ -40,19 +40,19 @@ std::string normalizeDate(const std::string& s) {
   return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
 }
 
-void setAllowAbsoluteUrl(envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
+void setAllowAbsoluteUrl(envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
   envoy::api::v2::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
 
-envoy::api::v2::filter::http::HttpConnectionManager::CodecType
+envoy::api::v2::filter::network::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
   case Http::CodecClient::Type::HTTP1:
-    return envoy::api::v2::filter::http::HttpConnectionManager::HTTP1;
+    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP1;
   case Http::CodecClient::Type::HTTP2:
-    return envoy::api::v2::filter::http::HttpConnectionManager::HTTP2;
+    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP2;
   default:
     RELEASE_ASSERT(0);
   }
@@ -240,10 +240,11 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-void HttpIntegrationTest::waitForNextUpstreamRequest() {
+void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    fake_upstream_connection_ =
+        fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_);
   }
   // Wait for the next stream on the upstream connection.
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);

@@ -35,6 +35,12 @@ public:
   virtual void continueIteration() PURE;
 
   /**
+   * Called when headers have been modified by a script. This can only happen prior to headers
+   * being continued.
+   */
+  virtual void onHeadersModified() PURE;
+
+  /**
    * Perform an immediate response.
    * @param headers supplies the response headers.
    * @param body supplies the optional response body.
@@ -268,6 +274,7 @@ private:
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
+    void onHeadersModified() override { callbacks_->clearRouteCache(); }
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     Filter& parent_;
@@ -283,6 +290,7 @@ private:
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->encodingBuffer(); }
     void continueIteration() override { return callbacks_->continueEncoding(); }
+    void onHeadersModified() override {}
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     Filter& parent_;
