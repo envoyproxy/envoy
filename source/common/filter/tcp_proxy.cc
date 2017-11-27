@@ -13,16 +13,40 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/protobuf/utility.h"
 
 #include "api/filter/network/http_connection_manager.pb.h"
+#include "api/rds.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
 namespace Filter {
 
 TcpProxyConfig::Route::Route(
-    const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config) {
+                             const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config, Runtime::RandomGenerator& random): random_(random) {
   cluster_name_ = config.cluster();
+
+  // If this is a weighted_cluster, we create N internal route entries
+  // (called WeightedClusterEntry), such that each object is a simple
+  // single cluster, pointing back to the parent. Metadata criteria
+  // from the weighted cluster (if any) are merged with and override
+  // the criteria from the route.
+  if (config.cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
+    uint64_t total_weight = 0UL;
+    for (const auto& cluster : config().weighted_clusters().clusters()) {
+      const std::string& cluster_name = cluster.name();
+
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(
+                                                          new WeightedClusterEntry(cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_weight += weighted_clusters_.back()->clusterWeight();
+    }
+
+    if (total_weight != WeightedClusterEntry::MAX_CLUSTER_WEIGHT) {
+      throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
+                                       WeightedClusterEntry::MAX_CLUSTER_WEIGHT));
+    }
+  }
 
   source_ips_ = Network::Address::IpList(config.source_ip_list());
   destination_ips_ = Network::Address::IpList(config.destination_ip_list());
@@ -44,19 +68,19 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
   if (config.has_deprecated_v1()) {
     for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
          config.deprecated_v1().routes()) {
-      if (!context.clusterManager().get(route_desc.cluster())) {
-        throw EnvoyException(
-            fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
-      }
-      routes_.emplace_back(Route(route_desc));
+      // if (!context.clusterManager().get(route_desc.cluster())) {
+      //   throw EnvoyException(
+      //       fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
+      // }
+      routes_.emplace_back(Route(route_desc, context.random()));
     }
   }
 
-  if (!config.cluster().empty()) {
-    envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute default_route;
-    default_route.set_cluster(config.cluster());
-    routes_.emplace_back(default_route);
-  }
+  // if (!config.cluster().empty()) {
+  //   envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute default_route;
+  //   default_route.set_cluster(config.cluster());
+  //   routes_.emplace_back(default_route);
+  // }
 
   for (const envoy::api::v2::filter::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
@@ -86,7 +110,30 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
     }
 
     // if we made it past all checks, the route matches
-    return route.cluster_name_;
+    if (weighted_clusters_.empty()) {
+      return route.cluster_name_;
+    }
+
+    uint64_t selected_value = route.random_.random() % TcpProxyConfig::WeightedClusterEntry::MAX_CLUSTER_WEIGHT;
+    uint64_t begin = 0UL;
+    uint64_t end = 0UL;
+
+    // Find the right cluster to route to based on the interval in which
+    // the selected value falls.  The intervals are determined as
+    // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+    for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+      end = begin + cluster->clusterWeight();
+      if (((selected_value >= begin) && (selected_value < end)) ||
+          (end >= TcpProxyConfig::WeightedClusterEntry::MAX_CLUSTER_WEIGHT)) {
+        // end > WeightedClusterEntry::MAX_CLUSTER_WEIGHT : This case can only occur
+        // with Runtimes, when the user specifies invalid weights such that
+        // sum(weights) > WeightedClusterEntry::MAX_CLUSTER_WEIGHT.
+        // In this case, terminate the search and just return the cluster
+        // whose weight caused the overflow
+        return cluster.cluster_name_;
+      }
+      begin = end;
+    }
   }
 
   // no match, no more routes to try

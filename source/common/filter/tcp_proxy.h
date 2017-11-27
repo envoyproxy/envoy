@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -71,14 +72,24 @@ public:
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
 
 private:
+  struct WeightedClusterEntry {
+  WeightedClusterEntry(const std::string& cluster_name, uint64_t cluster_weight): cluster_name_(cluster_name), cluster_weight_(cluster_weight) {}
+      static const uint64_t MAX_CLUSTER_WEIGHT = 100UL;
+      uint64_t cluster_weight_;
+      std::string cluster_name_;
+  };
+
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
   struct Route {
-    Route(const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config);
+      Route(const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config, Runtime::RandomGenerator& random);
 
     Network::Address::IpList source_ips_;
     Network::PortRangeList source_port_ranges_;
     Network::Address::IpList destination_ips_;
     Network::PortRangeList destination_port_ranges_;
     std::string cluster_name_;
+    std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+    Runtime::RandomGenerator& random_;
   };
 
   static TcpProxyStats generateStats(const std::string& name, Stats::Scope& scope);

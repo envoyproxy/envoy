@@ -42,6 +42,7 @@ envoy_cc_library(
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
     external_deps = [
+        "envoy_rds",
         "envoy_filter_network_tcp_proxy",
     ],
     deps = [
@@ -52,6 +53,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/router:router_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
@@ -66,5 +68,6 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
