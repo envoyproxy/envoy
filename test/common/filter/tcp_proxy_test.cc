@@ -625,7 +625,7 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
   upstream_read_filter_->onData(response);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -760,6 +760,54 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   EXPECT_THAT(access_log_data_,
               MatchesRegex(
                   "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
+}
+
+TEST_F(TcpProxyTest, UpstreamFlush) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing))
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  NiceMock<Event::MockTimer>* flush_timeout =
+      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*flush_timeout, enableTimer(_));
+  filter_.reset();
+  EXPECT_EQ(1U, factory_context_.scope_.gauge("tcp.name.upstream_flush_active").value());
+
+  // Simulate flush complete
+  EXPECT_CALL(*flush_timeout, disableTimer());
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(1U, factory_context_.scope_.counter("tcp.name.upstream_flush_total").value());
+  EXPECT_EQ(0U, factory_context_.scope_.gauge("tcp.name.upstream_flush_active").value());
+}
+
+TEST_F(TcpProxyTest, UpstreamFlushTimeout) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing))
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  NiceMock<Event::MockTimer>* flush_timeout =
+      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*flush_timeout, enableTimer(_));
+  filter_.reset();
+  EXPECT_EQ(1U, factory_context_.scope_.gauge("tcp.name.upstream_flush_active").value());
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  flush_timeout->callback_();
+  EXPECT_EQ(1U, factory_context_.scope_.counter("tcp.name.upstream_flush_total").value());
+  EXPECT_EQ(0U, factory_context_.scope_.gauge("tcp.name.upstream_flush_active").value());
+  EXPECT_EQ(1U, factory_context_.scope_.counter("tcp.name.closes_upstream_flush_timeout").value());
 }
 
 class TcpProxyRoutingTest : public testing::Test {
