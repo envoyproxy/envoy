@@ -8,7 +8,7 @@
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -22,7 +22,7 @@ class RdsSubscription : public Http::RestApiFetcher,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
   RdsSubscription(Envoy::Config::SubscriptionStats stats,
-                  const envoy::api::v2::filter::http::Rds& rds, Upstream::ClusterManager& cm,
+                  const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm,
                   Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                   const LocalInfo::LocalInfo& local_info);
 

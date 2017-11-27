@@ -162,7 +162,6 @@ def _envoy_api_deps():
         "buffer",
         "fault",
         "health_check",
-        "http_connection_manager",
         "ip_tagging",
         "lua",
         "rate_limit",
@@ -175,6 +174,7 @@ def _envoy_api_deps():
             actual = "@envoy_api//api/filter/http:" + t + "_cc",
         )
     network_filter_bind_targets = [
+        "http_connection_manager",
         "tcp_proxy",
         "mongo_proxy",
         "redis_proxy",

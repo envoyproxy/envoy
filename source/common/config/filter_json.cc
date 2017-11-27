@@ -120,11 +120,11 @@ void FilterJson::translateAccessLog(const Json::Object& json_access_log,
 
 void FilterJson::translateHttpConnectionManager(
     const Json::Object& json_http_connection_manager,
-    envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager) {
+    envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager) {
   json_http_connection_manager.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
-  envoy::api::v2::filter::http::HttpConnectionManager::CodecType codec_type{};
-  envoy::api::v2::filter::http::HttpConnectionManager::CodecType_Parse(
+  envoy::api::v2::filter::network::HttpConnectionManager::CodecType codec_type{};
+  envoy::api::v2::filter::network::HttpConnectionManager::CodecType_Parse(
       StringUtil::toUpper(json_http_connection_manager.getString("codec_type")), &codec_type);
   http_connection_manager.set_codec_type(codec_type);
 
@@ -167,8 +167,8 @@ void FilterJson::translateHttpConnectionManager(
     const auto json_tracing = json_http_connection_manager.getObject("tracing");
     auto* tracing = http_connection_manager.mutable_tracing();
 
-    envoy::api::v2::filter::http::HttpConnectionManager::Tracing::OperationName operation_name{};
-    envoy::api::v2::filter::http::HttpConnectionManager::Tracing::OperationName_Parse(
+    envoy::api::v2::filter::network::HttpConnectionManager::Tracing::OperationName operation_name{};
+    envoy::api::v2::filter::network::HttpConnectionManager::Tracing::OperationName_Parse(
         StringUtil::toUpper(json_tracing->getString("operation_name")), &operation_name);
     tracing->set_operation_name(operation_name);
 
@@ -201,8 +201,8 @@ void FilterJson::translateHttpConnectionManager(
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, use_remote_address);
   JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, generate_request_id);
 
-  envoy::api::v2::filter::http::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
-  envoy::api::v2::filter::http::HttpConnectionManager::ForwardClientCertDetails_Parse(
+  envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
+  envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails_Parse(
       StringUtil::toUpper(
           json_http_connection_manager.getString("forward_client_cert", "sanitize")),
       &fcc_details);

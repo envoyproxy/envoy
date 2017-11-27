@@ -261,8 +261,22 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
   if (headers_wrapper_.get() != nullptr) {
     headers_wrapper_.pushStack();
   } else {
-    headers_wrapper_.reset(
-        HeaderMapWrapper::create(state, headers_, [this]() { return !headers_continued_; }), true);
+    headers_wrapper_.reset(HeaderMapWrapper::create(state, headers_,
+                                                    [this] {
+                                                      // If we are about to do a modifiable header
+                                                      // operation, blow away the route cache. We
+                                                      // could be a little more intelligent about
+                                                      // when we do this so the performance would be
+                                                      // higher, but this is simple and will get the
+                                                      // job done for now. This is a NOP on the
+                                                      // encoder path.
+                                                      if (!headers_continued_) {
+                                                        callbacks_.onHeadersModified();
+                                                      }
+
+                                                      return !headers_continued_;
+                                                    }),
+                           true);
   }
   return 1;
 }
