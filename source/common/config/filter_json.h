@@ -5,9 +5,10 @@
 #include "api/filter/http/buffer.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/health_check.pb.h"
-#include "api/filter/http/http_connection_manager.pb.h"
 #include "api/filter/http/router.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
+#include "api/filter/network/redis_proxy.pb.h"
 #include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {
@@ -34,14 +35,23 @@ public:
 
   /**
    * Translate a v1 JSON HTTP connection manager object to v2
-   * envoy::api::v2::filter::http::HttpConnectionManager.
+   * envoy::api::v2::filter::network::HttpConnectionManager.
    * @param json_http_connection_manager source v1 JSON HTTP connection manager object.
    * @param http_connection_manager destination v2
-   * envoy::api::v2::filter::http::HttpConnectionManager.
+   * envoy::api::v2::filter::network::HttpConnectionManager.
    */
   static void translateHttpConnectionManager(
       const Json::Object& json_http_connection_manager,
-      envoy::api::v2::filter::http::HttpConnectionManager& http_connection_manager);
+      envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager);
+
+  /**
+   * Translate a v1 JSON Redis proxy object to v2 envoy::api::v2::filter::network::RedisProxy.
+   * @param json_redis_proxy source v1 JSON HTTP connection manager object.
+   * @param redis_proxy destination v2
+   * envoy::api::v2::filter::network::RedisProxy.
+   */
+  static void translateRedisProxy(const Json::Object& json_redis_proxy,
+                                  envoy::api::v2::filter::network::RedisProxy& redis_proxy);
 
   /**
    * Translate a v1 JSON Mongo proxy object to v2 envoy::api::v2::filter::network::MongoProxy.

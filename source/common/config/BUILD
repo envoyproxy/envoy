@@ -89,12 +89,13 @@ envoy_cc_library(
     srcs = ["filter_json.cc"],
     hdrs = ["filter_json.h"],
     external_deps = [
-        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_http_connection_manager",
         "envoy_filter_http_buffer",
         "envoy_filter_http_fault",
         "envoy_filter_http_health_check",
         "envoy_filter_http_router",
         "envoy_filter_network_mongo_proxy",
+        "envoy_filter_network_redis_proxy",
         "envoy_filter_network_tcp_proxy",
     ],
     deps = [
@@ -284,7 +285,7 @@ envoy_cc_library(
         "envoy_eds",
         "envoy_lds",
         "envoy_rds",
-        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_http_connection_manager",
     ],
     deps = [
         ":json_utility_lib",

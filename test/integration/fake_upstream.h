@@ -252,7 +252,7 @@ public:
     connection_.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
-  void waitForData(uint64_t num_bytes);
+  std::string waitForData(uint64_t num_bytes);
   void write(const std::string& data);
 
 private:

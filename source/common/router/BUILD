@@ -58,7 +58,7 @@ envoy_cc_library(
     srcs = ["rds_impl.cc"],
     hdrs = ["rds_impl.h"],
     external_deps = [
-        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_http_connection_manager",
         "envoy_rds",
     ],
     deps = [
@@ -87,7 +87,7 @@ envoy_cc_library(
     srcs = ["rds_subscription.cc"],
     hdrs = ["rds_subscription.h"],
     external_deps = [
-        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_http_connection_manager",
     ],
     deps = [
         "//include/envoy/config:subscription_interface",

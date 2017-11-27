@@ -258,6 +258,31 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(11U, string.size());
     EXPECT_EQ(HeaderString::Type::Reference, string.type());
   }
+
+  // caseInsensitiveContains
+  {
+    const std::string static_string("keep-alive, Upgrade, close");
+    HeaderString string(static_string);
+    EXPECT_TRUE(string.caseInsensitiveContains("keep-alive"));
+    EXPECT_TRUE(string.caseInsensitiveContains("Keep-alive"));
+    EXPECT_TRUE(string.caseInsensitiveContains("Upgrade"));
+    EXPECT_TRUE(string.caseInsensitiveContains("upgrade"));
+    EXPECT_TRUE(string.caseInsensitiveContains("close"));
+    EXPECT_TRUE(string.caseInsensitiveContains("Close"));
+    EXPECT_FALSE(string.caseInsensitiveContains(""));
+    EXPECT_FALSE(string.caseInsensitiveContains("keep"));
+    EXPECT_FALSE(string.caseInsensitiveContains("alive"));
+    EXPECT_FALSE(string.caseInsensitiveContains("grade"));
+
+    const std::string small("close");
+    string.setCopy(small.c_str(), small.size());
+    EXPECT_FALSE(string.caseInsensitiveContains("keep-alive"));
+
+    const std::string empty("");
+    string.setCopy(empty.c_str(), empty.size());
+    EXPECT_FALSE(string.caseInsensitiveContains("keep-alive"));
+    EXPECT_FALSE(string.caseInsensitiveContains(""));
+  }
 }
 
 TEST(HeaderMapImplTest, InlineInsert) {

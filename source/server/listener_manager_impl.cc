@@ -466,7 +466,9 @@ void ListenerManagerImpl::stopListeners() {
 }
 
 void ListenerManagerImpl::stopWorkers() {
-  ASSERT(workers_started_);
+  if (!workers_started_) {
+    return;
+  }
   for (const auto& worker : workers_) {
     worker->stop();
   }
