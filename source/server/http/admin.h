@@ -117,6 +117,7 @@ private:
   static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                 const std::list<Stats::GaugeSharedPtr>& gauges,
                                 Buffer::Instance& response);
+  static std::string sanitizePrometheusName(const std::string& name);
   static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
 
   /**

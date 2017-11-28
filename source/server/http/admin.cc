@@ -313,10 +313,17 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
   return rc;
 }
 
+std::string AdminImpl::sanitizePrometheusName(const std::string& name) {
+  std::string stats_name = name;
+  std::replace(stats_name.begin(), stats_name.end(), '.', '_');
+  return stats_name;
+}
+
 std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}={}", tag.name_, tag.value_));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizePrometheusName(tag.name_),
+                              sanitizePrometheusName(tag.value_)));
   }
   return StringUtil::join(buf, ",");
 }
@@ -325,16 +332,17 @@ void AdminImpl::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& coun
                                   const std::list<Stats::GaugeSharedPtr>& gauges,
                                   Buffer::Instance& response) {
   for (const auto& counter : counters) {
-    const std::string tags = AdminImpl::formatTagsForPrometheus(counter->tags());
-    response.add(fmt::format("# TYPE {0} counter\n", counter->tagExtractedName()));
-    response.add(
-        fmt::format("{0}{{{1}}} {2}\n", counter->tagExtractedName(), tags, counter->value()));
+    const std::string tags = formatTagsForPrometheus(counter->tags());
+    const std::string metric_name = sanitizePrometheusName(counter->tagExtractedName());
+    response.add(fmt::format("# TYPE {0} counter\n", metric_name));
+    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
-    const std::string tags = AdminImpl::formatTagsForPrometheus(gauge->tags());
-    response.add(fmt::format("# TYPE {0} gauge\n", gauge->tagExtractedName()));
-    response.add(fmt::format("{0}{{{1}}} {2}\n", gauge->tagExtractedName(), tags, gauge->value()));
+    const std::string tags = formatTagsForPrometheus(gauge->tags());
+    const std::string metric_name = sanitizePrometheusName(gauge->tagExtractedName());
+    response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
+    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
 }
 
