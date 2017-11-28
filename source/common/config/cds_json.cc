@@ -11,6 +11,14 @@
 namespace Envoy {
 namespace Config {
 
+void CdsJson::translateRingHashLbConfig(
+    const Json::Object& json_ring_hash_lb_config,
+    envoy::api::v2::Cluster::RingHashLbConfig& ring_hash_lb_config) {
+  JSON_UTIL_SET_INTEGER(json_ring_hash_lb_config, ring_hash_lb_config, minimum_ring_size);
+  JSON_UTIL_SET_BOOL(json_ring_hash_lb_config, *ring_hash_lb_config.mutable_deprecated_v1(),
+                     use_std_hash);
+}
+
 void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
                                    envoy::api::v2::HealthCheck& health_check) {
   json_health_check.validateSchema(Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA);
@@ -148,6 +156,11 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   } else {
     ASSERT(lb_type == "ring_hash");
     cluster.set_lb_policy(envoy::api::v2::Cluster::RING_HASH);
+  }
+
+  if (json_cluster.hasObject("ring_hash_lb_config")) {
+    translateRingHashLbConfig(*json_cluster.getObject("ring_hash_lb_config"),
+                              *cluster.mutable_ring_hash_lb_config());
   }
 
   if (json_cluster.hasObject("health_check")) {
