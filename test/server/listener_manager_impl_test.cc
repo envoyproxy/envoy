@@ -2,6 +2,7 @@
 
 #include "common/network/address_impl.h"
 
+#include "server/config/network/http_connection_manager.h"
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
 
@@ -739,6 +740,238 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
+  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        sni_domains: "example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
+  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        sni_domains: "example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+    - filter_chain_match:
+        sni_domains: "www.example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       SniWithTwoEqualFilterChainsWithDifferentSessionTicketKeys) {
+  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        sni_domains: "example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+    - filter_chain_match:
+        sni_domains: "www.example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_b"
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       SniWithTwoEqualFilterChainsWithMixedUseOfSessionTicketKeys) {
+  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        sni_domains: "example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+        session_ticket_keys:
+          keys:
+          - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+    - filter_chain_match:
+        sni_domains: "www.example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml)),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': filter chains with mixed use "
+                            "of Session Ticket Keys are currently not supported");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) {
+  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        sni_domains: "example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo } 
+    - filter_chain_match:
+        sni_domains: "www.example.com"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          route_config:
+            virtual_hosts:
+            - routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_bar } 
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml)),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': use of different filter "
+                            "chains is currently not supported");
 }
 
 } // namespace Server
