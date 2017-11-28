@@ -21,6 +21,7 @@ envoy_cc_test(
     external_deps = ["ssl"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/json:json_loader_lib",

@@ -18,19 +18,19 @@ public:
   /**
    * @return the number of days in this context until the next certificate will expire
    */
-  virtual size_t daysUntilFirstCertExpires() PURE;
+  virtual size_t daysUntilFirstCertExpires() const PURE;
 
   /**
    * @return a string of ca certificate path, certificate serial number and days until certificate
    * expiration
    */
-  virtual std::string getCaCertInformation() PURE;
+  virtual std::string getCaCertInformation() const PURE;
 
   /**
    * @return a string of cert chain certificate path, certificate serial number and days until
    * certificate expiration
    */
-  virtual std::string getCertChainInformation() PURE;
+  virtual std::string getCertChainInformation() const PURE;
 };
 
 class ClientContext : public virtual Context {};
