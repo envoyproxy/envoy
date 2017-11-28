@@ -33,7 +33,7 @@ struct IoResult {
  * Callbacks used by transport socket instances to communicate with connection
  */
 class TransportSocketCallbacks {
- public:
+public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
@@ -63,7 +63,6 @@ class TransportSocketCallbacks {
    */
   virtual void raiseEvent(ConnectionEvent event) PURE;
 };
-
 
 class TransportSocket {
 public:
@@ -115,7 +114,5 @@ public:
 
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
 
-
-
-} // Network
-} // Envoy
+} // namespace Network
+} // namespace Envoy

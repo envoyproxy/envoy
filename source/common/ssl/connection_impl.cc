@@ -28,7 +28,7 @@ SslSocket::SslSocket(Context& ctx, InitialState state)
   }
 }
 
-void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks &callbacks) {
+void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
@@ -117,7 +117,9 @@ PostIoAction SslSocket::doHandshake() {
     callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
-    return callbacks_->connection().state() == Network::Connection::State::Open ? PostIoAction::KeepOpen : PostIoAction::Close;
+    return callbacks_->connection().state() == Network::Connection::State::Open
+               ? PostIoAction::KeepOpen
+               : PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl_.get(), rc);
     ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
@@ -146,8 +148,9 @@ void SslSocket::drainErrorQueue() {
     }
     saw_error = true;
 
-    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_->connection(), err, ERR_lib_error_string(err),
-                   ERR_func_error_string(err), ERR_reason_error_string(err));
+    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_->connection(), err,
+                   ERR_lib_error_string(err), ERR_func_error_string(err),
+                   ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
   }
   if (saw_error && !saw_counted_error) {
@@ -310,7 +313,8 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Co
 void ClientConnectionImpl::connect() { doConnect(); }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
-  if (handshake_complete_ && callbacks_->connection().state() != Network::Connection::State::Closed) {
+  if (handshake_complete_ &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
     // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
     // there is no room on the socket. We can extend the state machine to handle this at some point
     // if needed.

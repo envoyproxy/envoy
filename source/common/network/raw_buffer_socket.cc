@@ -5,11 +5,11 @@
 namespace Envoy {
 namespace Network {
 
-void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks &callbacks) {
+void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
 
-IoResult RawBufferSocket::doRead(Buffer::Instance &buffer) {
+IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   do {
@@ -43,10 +43,9 @@ IoResult RawBufferSocket::doRead(Buffer::Instance &buffer) {
   } while (true);
 
   return {action, bytes_read};
-
 }
 
-IoResult RawBufferSocket::doWrite(Buffer::Instance &buffer) {
+IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer) {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
@@ -73,14 +72,9 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance &buffer) {
   return {action, bytes_written};
 }
 
-std::string RawBufferSocket::protocol() const {
-  return EMPTY_STRING;
-}
+std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }
 
+void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
-void RawBufferSocket::onConnected() {
-  callbacks_->raiseEvent(ConnectionEvent::Connected);
-}
-
-}
-}
+} // namespace Network
+} // namespace Envoy

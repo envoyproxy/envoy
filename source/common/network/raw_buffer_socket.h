@@ -1,15 +1,15 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
-#include "common/common/logger.h"
 #include "envoy/network/transport_socket.h"
+
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Network {
 
-class RawBufferSocket : public TransportSocket,
-                    protected Logger::Loggable<Logger::Id::connection> {
- public:
+class RawBufferSocket : public TransportSocket, protected Logger::Loggable<Logger::Id::connection> {
+public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -19,11 +19,9 @@ class RawBufferSocket : public TransportSocket,
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer) override;
 
- private:
+private:
   TransportSocketCallbacks* callbacks_{};
 };
 
-}
-}
-
-
+} // namespace Network
+} // namespace Envoy

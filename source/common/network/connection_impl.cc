@@ -59,15 +59,14 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
     : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                     TransportSocketPtr{new RawBufferSocket}, using_original_dst, connected) {
+                     TransportSocketPtr{new RawBufferSocket}, using_original_dst, connected) {}
 
-}
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
-                               TransportSocketPtr transport_socket,
-                               bool using_original_dst, bool connected)
+                               TransportSocketPtr transport_socket, bool using_original_dst,
+                               bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address),
       local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
                                                 : local_address),
@@ -75,9 +74,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      transport_socket_(std::move(transport_socket)),
-      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
-      using_original_dst_(using_original_dst) {
+      transport_socket_(std::move(transport_socket)), dispatcher_(dispatcher), fd_(fd),
+      id_(++next_global_id_), using_original_dst_(using_original_dst) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -139,7 +137,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush || !transport_socket_->canFlushClose()) {
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
+      !transport_socket_->canFlushClose()) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.

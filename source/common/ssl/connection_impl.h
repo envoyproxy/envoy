@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/network/transport_socket.h"
+
 #include "common/network/connection_impl.h"
 #include "common/ssl/context_impl.h"
 
@@ -18,7 +19,7 @@ class SslSocket : public Network::TransportSocket,
                   public Connection,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  SslSocket(Context &ctx, InitialState state);
+  SslSocket(Context& ctx, InitialState state);
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
@@ -28,7 +29,7 @@ public:
   std::string uriSanPeerCertificate() override;
 
   // Network::TransportSocket
-  void setTransportSocketCallbacks(Network::TransportSocketCallbacks &callbacks) override;
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
@@ -50,19 +51,20 @@ private:
 };
 
 class ConnectionImpl : public Network::ConnectionImpl {
- public:
-  ConnectionImpl(Event::DispatcherImpl &dispatcher, int fd,
+public:
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Network::Address::InstanceConstSharedPtr remote_address,
                  Network::Address::InstanceConstSharedPtr local_address,
                  Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
-                 bool connected, Context &ctx, InitialState state);
+                 bool connected, Context& ctx, InitialState state);
   ~ConnectionImpl();
 
   // Network::Connection
-  Ssl::Connection *ssl() override { return dynamic_cast<SslSocket*>(transport_socket_.get()); }
-  const Ssl::Connection *ssl() const override { return dynamic_cast<SslSocket*>(transport_socket_.get()); }
+  Ssl::Connection* ssl() override { return dynamic_cast<SslSocket*>(transport_socket_.get()); }
+  const Ssl::Connection* ssl() const override {
+    return dynamic_cast<SslSocket*>(transport_socket_.get());
+  }
 };
-
 
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
