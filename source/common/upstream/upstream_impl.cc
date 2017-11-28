@@ -232,12 +232,8 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
                                                    ssl_context_manager, added_via_api)) {
-  priority_set_.addMemberUpdateCb([this](uint32_t priority,
-                                         const std::vector<HostSharedPtr>& hosts_added,
+  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
-    if (priority != 0)
-      return;
-
     if (!hosts_added.empty() || !hosts_removed.empty()) {
       info_->stats().membership_change_.inc();
     }

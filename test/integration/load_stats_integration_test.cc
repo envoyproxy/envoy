@@ -226,7 +226,7 @@ public:
     cleanupUpstreamConnection();
   }
 
-  static constexpr uint32_t upstream_endpoints_ = 3;
+  static constexpr uint32_t upstream_endpoints_ = 5;
 
   FakeHttpConnectionPtr fake_loadstats_connection_;
   FakeStreamPtr loadstats_stream_;
@@ -256,28 +256,32 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   sendLoadStatsResponse({"cluster_0", "cluster_1"}, 1);
   test_server_->waitForCounterGe("load_reporter.requests", 1);
 
-  updateClusterLoadAssignment({0}, {1}, {}, {});
-  test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 2);
+  updateClusterLoadAssignment({0}, {1}, {3}, {});
+  test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 3);
 
   for (uint32_t i = 0; i < 4; ++i) {
     sendAndReceiveUpstream(i % 2);
   }
 
-  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0)});
+  // TODO(alyssawilk) add priority to stats.
+  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0),
+                           localityStats("winter", 0, 0, 0)});
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_EQ(2, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
-  // 33%/67% split between dragon/winter localities.
-  updateClusterLoadAssignment({0}, {1, 2}, {}, {});
+  // 33%/67% split between dragon/winter primary localities.
+  updateClusterLoadAssignment({0}, {1, 2}, {}, {4});
   sendLoadStatsResponse({"cluster_0"}, 1);
-  test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 3);
+  test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", 4);
 
   for (uint32_t i = 0; i < 6; ++i) {
     sendAndReceiveUpstream((i + 1) % 3);
   }
 
+  // No locality for priotiy=1 since there's no "winter" endpoints.
+  // The hosts for dragon were receiced because membership_total is accurate.
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 4, 0, 0)});
 
   EXPECT_EQ(2, test_server_->counter("load_reporter.requests")->value());

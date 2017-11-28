@@ -94,8 +94,8 @@ void EdsClusterImpl::UpdateHostsPerLocality(HostSet& host_set,
   std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(),
-              host_set.hosts().size());
+    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({}) priority {}", info_->name(),
+              host_set.hosts().size(), host_set.priority());
     HostListsSharedPtr per_locality(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local locality is not defined then skip populating per locality hosts.
