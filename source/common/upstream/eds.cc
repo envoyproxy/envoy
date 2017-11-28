@@ -43,7 +43,7 @@ void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *thi
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   typedef std::unique_ptr<std::vector<HostSharedPtr>> HostListPtr;
-  std::vector<HostListPtr> new_hosts;
+  std::vector<HostListPtr> new_hosts(1);
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -62,7 +62,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     uint32_t priority = locality_lb_endpoint.priority().value();
     if (new_hosts.size() <= priority) {
-      new_hosts.resize(2 * (priority + 1));
+      new_hosts.resize(priority + 1);
     }
     if (new_hosts[priority] == nullptr) {
       new_hosts[priority] = HostListPtr{new std::vector<HostSharedPtr>};
