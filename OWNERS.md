@@ -13,6 +13,7 @@
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
+* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (stephan@turbinelabs.io)
 
 # Emeritus maintainers
 
