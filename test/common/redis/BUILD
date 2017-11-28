@@ -51,6 +51,7 @@ envoy_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
     deps = [
+        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/redis:proxy_filter_lib",
         "//test/mocks:common_lib",

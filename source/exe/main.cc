@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
   };
 #endif
 
-  Envoy::OptionsImpl options(argc, argv, hot_restart_version_cb, spdlog::level::warn);
+  Envoy::OptionsImpl options(argc, argv, hot_restart_version_cb, spdlog::level::info);
 
   return Envoy::main_common(options);
 }

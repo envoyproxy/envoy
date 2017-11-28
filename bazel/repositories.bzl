@@ -162,7 +162,6 @@ def _envoy_api_deps():
         "buffer",
         "fault",
         "health_check",
-        "http_connection_manager",
         "ip_tagging",
         "lua",
         "rate_limit",
@@ -175,6 +174,7 @@ def _envoy_api_deps():
             actual = "@envoy_api//api/filter/http:" + t + "_cc",
         )
     network_filter_bind_targets = [
+        "http_connection_manager",
         "tcp_proxy",
         "mongo_proxy",
         "redis_proxy",
@@ -232,6 +232,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
+    _com_google_absl()
     _com_github_bombela_backward()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
@@ -356,6 +357,13 @@ def _com_google_googletest():
     native.bind(
         name = "googletest",
         actual = "@com_google_googletest//:gtest",
+    )
+
+def _com_google_absl():
+    _repository_impl("com_google_absl")
+    native.bind(
+        name = "abseil_base",
+        actual = "@com_google_absl//absl/base:base",
     )
 
 def _com_google_protobuf():

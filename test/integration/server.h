@@ -36,6 +36,7 @@ public:
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
+  bool v2ConfigOnly() override { return false; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
@@ -44,7 +45,7 @@ public:
   const std::string& logPath() override { return log_path_; }
   uint64_t restartEpoch() override { return 0; }
   std::chrono::milliseconds fileFlushIntervalMsec() override {
-    return std::chrono::milliseconds(10000);
+    return std::chrono::milliseconds(50);
   }
   Mode mode() const override { return Mode::Serve; }
   const std::string& serviceClusterName() override { return service_cluster_name_; }

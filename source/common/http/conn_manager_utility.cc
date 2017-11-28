@@ -21,18 +21,29 @@ void ConnectionManagerUtility::mutateRequestHeaders(
     ConnectionManagerConfig& config, const Router::Config& route_config,
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
+  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // as we forward them verbatim to the upstream hosts.
+  if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
+    // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
+    // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
+    // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
+    // content-length both do not exist this means there is no request body. After transfer-encoding
+    // is stripped here, the upstream request becomes invalid. We can fix it by explicitly adding a
+    // "content-length: 0" request header here.
+    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
+    if (no_body) {
+      request_headers.insertContentLength().value(uint64_t(0));
+    }
+  } else {
+    request_headers.removeConnection();
+    request_headers.removeUpgrade();
+  }
+
   // Clean proxy headers.
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
-
-  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
-  // as we forward them verbatim to the upstream hosts.
-  if (protocol != Protocol::Http11 || !Utility::isWebSocketUpgradeRequest(request_headers)) {
-    request_headers.removeConnection();
-    request_headers.removeUpgrade();
-  }
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
@@ -188,19 +199,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap& request_headers,
-                                                     const Router::Config& route_config) {
+                                                     const Http::HeaderMap& request_headers) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
-
-  for (const Http::LowerCaseString& to_remove : route_config.responseHeadersToRemove()) {
-    response_headers.remove(to_remove);
-  }
-
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       route_config.responseHeadersToAdd()) {
-    response_headers.addReference(to_add.first, to_add.second);
-  }
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());

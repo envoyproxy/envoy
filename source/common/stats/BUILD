@@ -18,10 +18,10 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:singleton",
         "//source/common/common:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
+        "//source/common/singleton:const_singleton",
     ],
 )
 

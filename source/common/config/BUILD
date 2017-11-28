@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
     ],
 )
@@ -88,14 +89,17 @@ envoy_cc_library(
     srcs = ["filter_json.cc"],
     hdrs = ["filter_json.h"],
     external_deps = [
-        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_http_connection_manager",
         "envoy_filter_http_buffer",
         "envoy_filter_http_fault",
         "envoy_filter_http_health_check",
         "envoy_filter_http_router",
         "envoy_filter_network_mongo_proxy",
+        "envoy_filter_network_redis_proxy",
+        "envoy_filter_network_tcp_proxy",
     ],
     deps = [
+        ":address_json_lib",
         ":json_utility_lib",
         ":protocol_json_lib",
         ":rds_json_lib",
@@ -205,8 +209,8 @@ envoy_cc_library(
     hdrs = ["metadata.h"],
     external_deps = ["envoy_base"],
     deps = [
-        "//source/common/common:singleton",
         "//source/common/protobuf",
+        "//source/common/singleton:const_singleton",
     ],
 )
 
@@ -224,7 +228,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resources_lib",
     hdrs = ["resources.h"],
-    deps = ["//source/common/common:singleton"],
+    deps = ["//source/common/singleton:const_singleton"],
 )
 
 envoy_cc_library(
@@ -281,7 +285,7 @@ envoy_cc_library(
         "envoy_eds",
         "envoy_lds",
         "envoy_rds",
-        "envoy_filter_http_http_connection_manager",
+        "envoy_filter_network_http_connection_manager",
     ],
     deps = [
         ":json_utility_lib",
@@ -295,11 +299,11 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
-        "//source/common/common:singleton",
         "//source/common/grpc:common_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
     ],
 )
@@ -308,5 +312,5 @@ envoy_cc_library(
     name = "well_known_names",
     srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
-    deps = ["//source/common/common:singleton"],
+    deps = ["//source/common/singleton:const_singleton"],
 )

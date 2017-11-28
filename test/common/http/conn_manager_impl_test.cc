@@ -1073,6 +1073,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
+  upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
 
   // rewritten authority header when auto_host_rewrite is true
   EXPECT_STREQ("newhost", raw_header_ptr->Host()->value().c_str());

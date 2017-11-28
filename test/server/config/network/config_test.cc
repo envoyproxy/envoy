@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-TEST(NetworkFilterConfigTest, RedisProxy) {
+TEST(NetworkFilterConfigTest, RedisProxyCorrectJson) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
@@ -41,6 +41,46 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, RedisProxyCorrectProto) {
+  std::string json_string = R"EOF(
+  {
+    "cluster_name": "fake_cluster",
+    "stat_prefix": "foo",
+    "conn_pool": {
+      "op_timeout_ms": 20
+    }
+  }
+  )EOF";
+
+  envoy::api::v2::filter::network::RedisProxy config{};
+  config.set_cluster("fake_cluster");
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
+
+  NiceMock<MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
+  NiceMock<MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  envoy::api::v2::filter::network::RedisProxy config =
+      *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_cluster("fake_cluster");
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
+
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -324,7 +364,7 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   ASSERT_NE(nullptr, message);
 
-  envoy::api::v2::filter::FileAccessLog file_access_log;
+  envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
   file_access_log.set_path("/dev/null");
   file_access_log.set_format("%START_TIME%");
   MessageUtil::jsonConvert(file_access_log, *message);
@@ -336,6 +376,22 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
       factory->createAccessLogInstance(*message, std::move(filter), context);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<AccessLog::FileAccessLog*>(instance.get()));
+}
+
+// Test that a minimal TcpProxy v2 config works.
+TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
+  NiceMock<MockFactoryContext> context;
+  TcpProxyConfigFactory factory;
+  envoy::api::v2::filter::network::TcpProxy config =
+      *dynamic_cast<envoy::api::v2::filter::network::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
 }
 
 } // namespace Configuration

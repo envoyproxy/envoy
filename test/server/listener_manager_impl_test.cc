@@ -742,6 +742,14 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+TEST_F(ListenerManagerImplTest, EarlyShutdown) {
+  // If stopWorkers is called before the workers are started, it should be a no-op: they should be
+  // neither started nor stopped.
+  EXPECT_CALL(*worker_, start(_)).Times(0);
+  EXPECT_CALL(*worker_, stop()).Times(0);
+  manager_->stopWorkers();
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
   Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
 

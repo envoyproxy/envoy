@@ -6,6 +6,10 @@
 #include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
+#include "common/protobuf/protobuf.h"
+
+#include "api/address.pb.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -39,14 +43,9 @@ public:
   bool operator==(const CidrRange& other) const;
 
   /**
-   * @return Ipv4 address data IFF length >= 0 and version() == IpVersion::v4, otherwise nullptr.
+   * @return Ip address data IFF length >= 0, otherwise nullptr.
    */
-  const Ipv4* ipv4() const;
-
-  /**
-   * @return Ipv6 address data IFF length >= 0 and version() == IpVersion::v6, otherwise nullptr.
-   */
-  const Ipv6* ipv6() const;
+  const Ip* ip() const;
 
   /**
    * TODO(jamessynge) Consider making this Optional<int> length, or modifying the create() methods
@@ -55,11 +54,6 @@ public:
    *         or invalid, else in the range 0 to 32 for IPv4, and 0 to 128 for IPv6.
    */
   int length() const;
-
-  /**
-   * @return the version of IP address.
-   */
-  IpVersion version() const;
 
   /**
    * @return true if the address argument is in the range of this object, false if not, including
@@ -100,6 +94,11 @@ public:
   static CidrRange create(const std::string& range);
 
   /**
+   * Constructs a CidrRange from envoy::api::v2::CidrRange.
+   */
+  static CidrRange create(const envoy::api::v2::CidrRange& cidr);
+
+  /**
    * Given an IP address and a length of high order bits to keep, returns an address
    * where those high order bits are unmodified, and the remaining bits are all zero.
    * length_io is reduced to be at most 32 for IPv4 address and at most 128 for IPv6
@@ -127,6 +126,7 @@ class IpList {
 public:
   IpList(const std::vector<std::string>& subnets);
   IpList(const Json::Object& config, const std::string& member_name);
+  IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::CidrRange>& cidrs);
   IpList(){};
 
   bool contains(const Instance& address) const;

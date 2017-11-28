@@ -10,7 +10,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/singleton.h"
+#include "common/singleton/const_singleton.h"
 
 #include "source/common/ratelimit/ratelimit.pb.h"
 

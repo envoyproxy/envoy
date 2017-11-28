@@ -60,6 +60,10 @@ struct RequestInfoImpl : public RequestInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
+  const Optional<std::string>& upstreamLocalAddress() const override {
+    return upstream_local_address_;
+  }
+
   bool healthCheck() const override { return hc_request_; }
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
@@ -76,6 +80,7 @@ struct RequestInfoImpl : public RequestInfo {
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Optional<std::string> upstream_local_address_{};
   bool hc_request_{};
   std::string downstream_address_;
 };

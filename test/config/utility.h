@@ -10,7 +10,7 @@
 #include "api/base.pb.h"
 #include "api/bootstrap.pb.h"
 #include "api/cds.pb.h"
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "api/protocol.pb.h"
 #include "api/rds.pb.h"
 
@@ -23,7 +23,7 @@ public:
   ConfigHelper(const Network::Address::IpVersion version);
 
   typedef std::function<void(envoy::api::v2::Bootstrap&)> ConfigModifierFunction;
-  typedef std::function<void(envoy::api::v2::filter::http::HttpConnectionManager&)>
+  typedef std::function<void(envoy::api::v2::filter::network::HttpConnectionManager&)>
       HttpModifierFunction;
 
   // A string for a basic buffer filter, which can be used with addFilter()
@@ -58,7 +58,7 @@ public:
   void addFilter(const std::string& filter_yaml);
 
   // Sets the client codec to the specified type.
-  void setClientCodec(envoy::api::v2::filter::http::HttpConnectionManager::CodecType type);
+  void setClientCodec(envoy::api::v2::filter::network::HttpConnectionManager::CodecType type);
 
   // Add the default SSL configuration.
   void addSslConfig();
@@ -68,7 +68,7 @@ public:
   void addConfigModifier(ConfigModifierFunction function);
 
   // Allows callers to easily modify the HttpConnectionManager configuration.
-  // Mofidiers will be applied just before ports are modified in finalize
+  // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
 
   // Return the bootstrap configuration for hand-off to Envoy.
@@ -76,10 +76,11 @@ public:
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
-  void loadHttpConnectionManager(envoy::api::v2::filter::http::HttpConnectionManager& hcm);
+  void loadHttpConnectionManager(envoy::api::v2::filter::network::HttpConnectionManager& hcm);
   // Stick the contents of the procided HCM proto and stuff them into the first HCM
   // struct of the first listener.
-  void storeHttpConnectionManager(const envoy::api::v2::filter::http::HttpConnectionManager& hcm);
+  void
+  storeHttpConnectionManager(const envoy::api::v2::filter::network::HttpConnectionManager& hcm);
 
   // The bootstrap proto Envoy will start up with.
   envoy::api::v2::Bootstrap bootstrap_;

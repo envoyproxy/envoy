@@ -396,17 +396,14 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
-  route_config_.response_headers_to_remove_.push_back(LowerCaseString("custom_header"));
-  route_config_.response_headers_to_add_.push_back({LowerCaseString("to_add"), "foo"});
-
   TestHeaderMapImpl response_headers{
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, route_config_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers);
 
   EXPECT_EQ(1UL, response_headers.size());
-  EXPECT_EQ("foo", response_headers.get_("to_add"));
+  EXPECT_EQ("foo", response_headers.get_("custom_header"));
   EXPECT_FALSE(response_headers.has("x-request-id"));
 }
 
@@ -415,7 +412,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                     {"x-envoy-force-trace", "true"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, route_config_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers);
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 

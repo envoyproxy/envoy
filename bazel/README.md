@@ -33,6 +33,11 @@ On Ubuntu, run the following commands:
  apt-get install realpath
 ```
 
+On Fedora (maybe also other red hat distros), run the following:
+```
+dnf install cmake libtool libstdc++
+```
+
 On OS X, you'll need to install several dependencies. This can be accomplished via Homebrew:
 ```
 brew install coreutils # for realpath

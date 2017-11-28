@@ -22,6 +22,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 

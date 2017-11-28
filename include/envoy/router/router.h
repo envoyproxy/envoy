@@ -306,6 +306,14 @@ public:
                                       const AccessLog::RequestInfo& request_info) const PURE;
 
   /**
+   * Do potentially destructive header transforms on response headers prior to forwarding. For
+   * adding or removing headers. This should only be called ONCE immediately after receiving an
+   * upstream's headers.
+   * @param headers supplies the response headers, which may be modified during this call.
+   */
+  virtual void finalizeResponseHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
    * @return const HashPolicy* the optional hash policy for the route.
    */
   virtual const HashPolicy* hashPolicy() const PURE;
@@ -447,19 +455,6 @@ public:
    * (RFC1918) source.
    */
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
-
-  /**
-   * Return a list of header key/value pairs that will be added to every response that transits the
-   * router.
-   */
-  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  responseHeadersToAdd() const PURE;
-
-  /**
-   * Return a list of upstream headers that will be stripped from every response that transits the
-   * router.
-   */
-  virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

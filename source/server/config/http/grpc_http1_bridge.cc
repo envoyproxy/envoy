@@ -10,9 +10,8 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(const Json::Object&,
-                                                                     const std::string&,
-                                                                     FactoryContext& context) {
+HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
+                                                              FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         Http::StreamFilterSharedPtr{new Grpc::Http1BridgeFilter(context.clusterManager())});

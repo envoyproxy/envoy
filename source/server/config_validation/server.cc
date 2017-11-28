@@ -67,8 +67,12 @@ void ValidationInstance::initialize(Options& options,
   try {
     MessageUtil::loadFromFile(options.configPath(), bootstrap);
   } catch (const EnvoyException& e) {
-    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    if (options.v2ConfigOnly()) {
+      throw;
+    } else {
+      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+      ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    }
   }
   if (!bootstrap.has_admin()) {
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
