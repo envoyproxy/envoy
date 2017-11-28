@@ -52,6 +52,14 @@ public:
                  Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected);
 
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                 Address::InstanceConstSharedPtr remote_address,
+                 Address::InstanceConstSharedPtr local_address,
+                 Address::InstanceConstSharedPtr bind_to_address,
+                 TransportSocketPtr transport_socket,
+                 bool using_original_dst,
+                 bool connected);
+
   ~ConnectionImpl();
 
   // Network::FilterManager
@@ -117,6 +125,7 @@ protected:
   // a generic pointer.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
+  TransportSocketPtr transport_socket_;
 
 private:
   // clang-format off
@@ -158,7 +167,6 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
-  TransportSocketPtr transport_socket_;
 };
 
 /**

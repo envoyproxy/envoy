@@ -143,6 +143,7 @@ envoy_cc_library(
     external_deps = ["envoy_base"],
     deps = [
         ":utility_lib",
+        "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
     ],

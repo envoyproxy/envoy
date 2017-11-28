@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/connection.h"
 
 namespace Envoy {
 namespace Network {
@@ -22,8 +23,6 @@ struct IoResult {
    */
   uint64_t bytes_processed_;
 };
-
-class Connection;
 
 /**
  * Callbacks used by transport sockets to communicate with connection
