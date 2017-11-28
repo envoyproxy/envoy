@@ -43,6 +43,7 @@ public:
  */
 class ConnectionImpl : public virtual Connection,
                        public BufferSource,
+                       public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
@@ -64,7 +65,7 @@ public:
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
-  std::string nextProtocol() const override { return ""; }
+  std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
@@ -85,13 +86,12 @@ public:
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
-protected:
-  virtual bool canFlushClose() { return true; }
-  virtual void closeSocket(ConnectionEvent close_type);
-  void doConnect();
-  void raiseEvent(ConnectionEvent event);
+  // Network::TransportSocketCallbacks
+  int fd() override { return fd_; }
+  Connection& connection() override { return *this; }
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
-  bool shouldDrainReadBuffer() {
+  bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
@@ -99,7 +99,12 @@ protected:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
+  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+
+protected:
+  virtual bool canFlushClose() { return transport_socket_->canFlushClose(); }
+  virtual void closeSocket(ConnectionEvent close_type);
+  void doConnect();
 
   void onLowWatermark();
   void onHighWatermark();
@@ -153,6 +158,7 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
+  TransportSocketPtr transport_socket_;
 };
 
 /**
