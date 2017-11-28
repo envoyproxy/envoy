@@ -30,12 +30,7 @@ MockHostSet::MockHostSet() {
 }
 
 MockPrioritySet::MockPrioritySet() {
-  host_sets_.push_back(HostSetPtr{new NiceMock<MockHostSet>});
-  host_sets_[0]->addMemberUpdateCb([this](uint32_t priority,
-                                          const std::vector<HostSharedPtr>& hosts_added,
-                                          const std::vector<HostSharedPtr>& hosts_removed) {
-    runUpdateCallbacks(priority, hosts_added, hosts_removed);
-  });
+  getHostSetInternal(0);
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(testing::Const(*this), hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(*this, getHostSet(_)).WillByDefault(Invoke(this, &MockPrioritySet::getHostSetInternal));
@@ -48,7 +43,7 @@ MockPrioritySet::MockPrioritySet() {
 HostSet& MockPrioritySet::getHostSetInternal(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
-      host_sets_.push_back(HostSetPtr{new MockHostSet});
+      host_sets_.push_back(HostSetPtr{new NiceMock<MockHostSet>});
       host_sets_[i]->addMemberUpdateCb([this](uint32_t priority,
                                               const std::vector<HostSharedPtr>& hosts_added,
                                               const std::vector<HostSharedPtr>& hosts_removed) {

@@ -77,6 +77,7 @@ public:
   MOCK_METHOD1(getHostSet, HostSet&(uint32_t priority));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
+    getHostSetInternal(priority); // Ensure the host set exists.
     return reinterpret_cast<MockHostSet*>(host_sets_[priority].get());
   }
 

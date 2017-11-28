@@ -27,6 +27,7 @@
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -189,16 +190,27 @@ public:
 
   void expectClientCreate(size_t index) {
     TestSession& test_session = *test_sessions_[index];
-
-    auto* codec = test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+    test_session.codec_ = new NiceMock<Http::MockClientConnection>();
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
-    auto create_codec_client = [codec](Upstream::Host::CreateConnectionData& conn_data) {
-      return new CodecClientForTest(std::move(conn_data.connection_), codec, nullptr, nullptr);
-    };
+    connection_index_.push_back(index);
+    codec_index_.push_back(index);
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _))
-        .WillOnce(Return(test_session.client_connection_));
-    EXPECT_CALL(*health_checker_, createCodecClient_(_)).WillOnce(Invoke(create_codec_client));
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+          uint32_t index = connection_index_.front();
+          connection_index_.pop_front();
+          return test_sessions_[index]->client_connection_;
+        }));
+    EXPECT_CALL(*health_checker_, createCodecClient_(_))
+        .WillRepeatedly(
+            Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+              uint32_t index = codec_index_.front();
+              codec_index_.pop_front();
+              TestSession& test_session = *test_sessions_[index];
+              return new CodecClientForTest(std::move(conn_data.connection_), test_session.codec_,
+                                            nullptr, nullptr);
+            }));
   }
 
   void expectStreamCreate(size_t index) {
@@ -242,6 +254,8 @@ public:
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
 };
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
@@ -263,6 +277,69 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80"),
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectSessionCreate();
+  expectStreamCreate(1);
+  EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .Times(2)
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[1]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[1]->timeout_timer_, disableTimer());
+  respond(0, "200", false, true);
+  respond(1, "200", false, true);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->prioritySet().getMockHostSet(1)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectSessionCreate();
+  expectStreamCreate(1);
+  EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .Times(2)
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[1]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[1]->timeout_timer_, disableTimer());
+  respond(0, "200", false, true);
+  respond(1, "200", false, true);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(1)->hosts_[0]->healthy());
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {

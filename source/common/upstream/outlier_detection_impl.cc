@@ -230,6 +230,8 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_monitors_.size();
+  // Note this is not currently checked per-priority level, so it is possible
+  // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
     if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRate) {
       // Deprecated counter, preserving old behaviour until it's removed.

@@ -646,6 +646,54 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   }
 }
 
+TEST(PrioritySet, Extend) {
+  PrioritySetImpl priority_set;
+
+  uint32_t changes = 0;
+  uint32_t last_priority = 0;
+  priority_set.addMemberUpdateCb([&](uint32_t priority, const std::vector<HostSharedPtr>&,
+                                     const std::vector<HostSharedPtr>&) -> void {
+    last_priority = priority;
+    ++changes;
+  });
+
+  // The initial priority set starts with priority level 0..
+  EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
+  EXPECT_EQ(0, priority_set.getHostSet(0).hosts().size());
+  EXPECT_EQ(0, priority_set.getHostSet(0).priority());
+
+  // Add priorities 1 and 2, ensure the callback is called, and that the new
+  // host sets are created with the correct priority.
+  EXPECT_EQ(0, changes);
+  EXPECT_EQ(0, priority_set.getHostSet(2).hosts().size());
+  EXPECT_EQ(3, priority_set.hostSetsPerPriority().size());
+  EXPECT_EQ(2, changes);
+  EXPECT_EQ(last_priority, 2);
+  EXPECT_EQ(1, priority_set.getHostSet(1).priority());
+  EXPECT_EQ(2, priority_set.getHostSet(2).priority());
+
+  // Now add hosts for priority 1, and ensure they're added and subscribers are notified.
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info, "tcp://127.0.0.1:80")}));
+  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>({}));
+  std::vector<HostSharedPtr> hosts_added{hosts->front()};
+  std::vector<HostSharedPtr> hosts_removed{};
+
+  priority_set.getHostSet(1).updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
+                                         hosts_added, hosts_removed);
+  EXPECT_EQ(3, changes);
+  EXPECT_EQ(last_priority, 1);
+  EXPECT_EQ(1, priority_set.getHostSet(1).hosts().size());
+
+  // Test iteration.
+  int i = 0;
+  for (auto& host_set : priority_set.hostSetsPerPriority()) {
+    EXPECT_EQ(host_set.get(), &priority_set.getHostSet(i++));
+  }
+  EXPECT_EQ(3, changes);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
