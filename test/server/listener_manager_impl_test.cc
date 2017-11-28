@@ -2,7 +2,6 @@
 
 #include "common/network/address_impl.h"
 
-#include "server/config/network/http_connection_manager.h"
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
 
@@ -751,8 +750,6 @@ TEST_F(ListenerManagerImplTest, EarlyShutdown) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
-  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
-
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -782,8 +779,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
-  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
-
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -835,8 +830,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
 
 TEST_F(ListenerManagerImplWithRealFiltersTest,
        SniWithTwoEqualFilterChainsWithDifferentSessionTicketKeys) {
-  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
-
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -888,8 +881,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
 TEST_F(ListenerManagerImplWithRealFiltersTest,
        SniWithTwoEqualFilterChainsWithMixedUseOfSessionTicketKeys) {
-  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
-
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -937,8 +928,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) {
-  Server::Configuration::HttpConnectionManagerFilterConfigFactory factory;
-
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
