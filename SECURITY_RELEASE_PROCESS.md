@@ -52,9 +52,10 @@ for added expertise depending on the area of the code that contains the vulnerab
 
 All of the timelines below are suggestions and assume a private disclosure. The Fix Lead drives the
 schedule using their best judgment based on severity and development time. If the Fix Lead is
-dealing with a public disclosure all timelines become ASAP. If the fix relies on another upstream
-project's disclosure timeline, that will adjust the process as well. We will work with the upstream
-project to fit their timeline and best protect our users.
+dealing with a public disclosure all timelines become ASAP (assuming the vulnerability has a CVSS
+score >= 4; see below). If the fix relies on another upstream project's disclosure timeline, that
+will adjust the process as well. We will work with the upstream project to fit their timeline and
+best protect our users.
 
 ### Fix Team Organization
 
@@ -124,8 +125,8 @@ patches, understand exact mitigation steps, etc.
   and include the CVSS and release details.
 - The Fix Lead will email envoy-{dev,users,announce}@googlegroups.com now that everything is public
   announcing the new releases, the CVE number, and the relevant merged PRs to get wide distribution
-  and user action. As much as possible this email should be actionable and include links how to apply
-  the fix to users environments; this can include links to external distributor documentation.
+  and user action. As much as possible this email should be actionable and include links on how to apply
+  the fix to user's environments; this can include links to external distributor documentation.
 - The Fix Lead will remove the Fix Team from the private security repo.
 
 ### Retrospective
