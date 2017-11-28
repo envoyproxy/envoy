@@ -110,8 +110,7 @@ public:
   void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
 
 protected:
-  virtual bool canFlushClose() { return transport_socket_->canFlushClose(); }
-  virtual void closeSocket(ConnectionEvent close_type);
+  void closeSocket(ConnectionEvent close_type);
   void doConnect();
 
   void onLowWatermark();
@@ -138,9 +137,6 @@ private:
   };
   // clang-format on
 
-  virtual IoResult doReadFromSocket();
-  virtual IoResult doWriteToSocket();
-  virtual void onConnected();
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();

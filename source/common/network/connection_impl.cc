@@ -139,11 +139,11 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush || !canFlushClose()) {
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush || !transport_socket_->canFlushClose()) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      doWriteToSocket();
+      transport_socket_->doWrite(*write_buffer_);
     }
 
     closeSocket(ConnectionEvent::LocalClose);
@@ -414,16 +414,12 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 }
 
-IoResult ConnectionImpl::doReadFromSocket() {
-  return transport_socket_->doRead(read_buffer_);
-}
-
 void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
   ASSERT(!(state_ & InternalState::Connecting));
 
-  IoResult result = doReadFromSocket();
+  IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
   onRead(new_buffer_size);
@@ -433,14 +429,6 @@ void ConnectionImpl::onReadReady() {
     ENVOY_CONN_LOG(debug, "remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
   }
-}
-
-IoResult ConnectionImpl::doWriteToSocket() {
-  return transport_socket_->doWrite(*write_buffer_);
-}
-
-void ConnectionImpl::onConnected() {
-  transport_socket_->onConnected();
 }
 
 void ConnectionImpl::onWriteReady() {
@@ -456,7 +444,7 @@ void ConnectionImpl::onWriteReady() {
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
       state_ &= ~InternalState::Connecting;
-      onConnected();
+      transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
         ENVOY_CONN_LOG(debug, "close during connected callback", *this);
@@ -469,7 +457,7 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  IoResult result = doWriteToSocket();
+  IoResult result = transport_socket_->doWrite(*write_buffer_);
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 

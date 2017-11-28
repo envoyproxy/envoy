@@ -16,7 +16,7 @@ enum class InitialState { Client, Server };
 
 class SslSocket : public Network::TransportSocket,
                   public Connection,
-                  public Logger::Loggable<Logger::Id::connection> {
+                  protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Context &ctx, InitialState state);
 
@@ -27,8 +27,6 @@ public:
   std::string subjectPeerCertificate() const override;
   std::string uriSanPeerCertificate() override;
 
-  SSL* rawSslForTest() { return ssl_.get(); }
-
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks &callbacks) override;
   std::string protocol() const override;
@@ -37,6 +35,8 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer) override;
   void onConnected() override;
+
+  SSL* rawSslForTest() { return ssl_.get(); }
 
 private:
   Network::PostIoAction doHandshake();
@@ -51,7 +51,6 @@ private:
 
 class ConnectionImpl : public Network::ConnectionImpl {
  public:
-
   ConnectionImpl(Event::DispatcherImpl &dispatcher, int fd,
                  Network::Address::InstanceConstSharedPtr remote_address,
                  Network::Address::InstanceConstSharedPtr local_address,
