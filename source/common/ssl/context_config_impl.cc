@@ -32,6 +32,34 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
 
 const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
 
+static bssl::UniquePtr<X509_CRL> loadCRL(const envoy::api::v2::CertificateValidationContext& vctx) {
+  if (!vctx.has_crl()) {
+    return bssl::UniquePtr<X509_CRL>(nullptr);
+  }
+
+  auto crl_conf = vctx.crl();
+  X509_CRL* crl = nullptr;
+
+  if (crl_conf.filename().length()) {
+    std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(crl_conf.filename().c_str(), "r"), &fclose);
+    if (!fp.get() || !PEM_read_X509_CRL(fp.get(), &crl, nullptr, nullptr)) {
+      throw EnvoyException(fmt::format("Failed to load CRL file '{}'", crl_conf.filename().c_str()));
+    }
+
+  } else {
+    std::unique_ptr<BIO, decltype(&BIO_free_all)> bio(
+      BIO_new_mem_buf(crl_conf.inline_().c_str(), crl_conf.inline_().length()),
+      BIO_free_all
+    );
+
+    if (!bio.get() || !PEM_read_bio_X509_CRL(bio.get(), &crl, nullptr, nullptr)) {
+      throw EnvoyException(fmt::format("Failed to load inline CRL"));
+    }
+  }
+
+  return bssl::UniquePtr<X509_CRL>(crl);
+}
+
 ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config)
     : alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       alt_alpn_protocols_(config.deprecated_v1().alt_alpn_protocols()),
@@ -46,6 +74,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
       private_key_file_(config.tls_certificates().empty()
                             ? ""
                             : config.tls_certificates()[0].private_key().filename()),
+      certificate_revocation_list_(loadCRL(config.validation_context())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()

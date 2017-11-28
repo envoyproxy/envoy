@@ -92,6 +92,12 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     }
   }
 
+  if (config.certificateRevocationList()) {
+    X509_STORE *cs = SSL_CTX_get_cert_store(ctx_.get());
+    X509_STORE_add_crl(cs, config.certificateRevocationList().get());
+    X509_STORE_set_flags(cs, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+  }
+
   SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv3);
 
   // use the server's cipher list preferences

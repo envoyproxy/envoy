@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -52,6 +54,11 @@ public:
    * @return The private key chain file used to identify the local side.
    */
   virtual const std::string& privateKeyFile() const PURE;
+
+  /**
+   * @return The CRL to check if a cert is revoked.
+   */
+  virtual const bssl::UniquePtr<X509_CRL>& certificateRevocationList() const PURE;
 
   /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""
