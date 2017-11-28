@@ -174,7 +174,7 @@ public:
     Runtime::MockLoader runtime;
     ContextManagerImpl manager(runtime);
     Stats::IsolatedStoreImpl store;
-    ServerContextPtr server_ctx(manager.createSslServerContext(store, cfg));
+    ServerContextPtr server_ctx(manager.createSslServerContext("", {}, store, cfg, true));
   }
 
   static void loadConfigV2(envoy::api::v2::DownstreamTlsContext& cfg) {

@@ -85,7 +85,7 @@ Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   Ssl::ServerContextConfigImpl cfg(*loader);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
+  return context_manager_->createSslServerContext("", {}, *upstream_stats_store, cfg, true);
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {

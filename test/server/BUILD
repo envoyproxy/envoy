@@ -118,6 +118,7 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/server:listener_manager_lib",
+        "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],
