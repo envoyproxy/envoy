@@ -48,8 +48,8 @@ void WorkerImpl::addListenerWorker(Listener& listener) {
                                                      .use_original_dst_ = listener.useOriginalDst(),
                                                      .per_connection_buffer_limit_bytes_ =
                                                          listener.perConnectionBufferLimitBytes()};
-  if (listener.sslContext()) {
-    handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
+  if (listener.defaultSslContext()) {
+    handler_->addSslListener(listener.filterChainFactory(), *listener.defaultSslContext(),
                              listener.socket(), listener.listenerScope(), listener.listenerTag(),
                              listener_options);
   } else {

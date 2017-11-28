@@ -354,10 +354,10 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
 
 TEST(TcpProxyConfigTest, AccessLogConfig) {
   envoy::api::v2::filter::network::TcpProxy config;
-  envoy::api::v2::filter::AccessLog* log = config.mutable_access_log()->Add();
+  envoy::api::v2::filter::accesslog::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Config::AccessLogNames::get().FILE);
   {
-    envoy::api::v2::filter::FileAccessLog file_access_log;
+    envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
@@ -367,7 +367,7 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   log = config.mutable_access_log()->Add();
   log->set_name(Config::AccessLogNames::get().FILE);
   {
-    envoy::api::v2::filter::FileAccessLog file_access_log;
+    envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
     MessageUtil::jsonConvert(file_access_log, *custom_config);
@@ -423,9 +423,9 @@ public:
   // Return the default config, plus one file access log with the specified format
   envoy::api::v2::filter::network::TcpProxy accessLogConfig(const std::string access_log_format) {
     envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
-    envoy::api::v2::filter::AccessLog* access_log = config.mutable_access_log()->Add();
+    envoy::api::v2::filter::accesslog::AccessLog* access_log = config.mutable_access_log()->Add();
     access_log->set_name(Config::AccessLogNames::get().FILE);
-    envoy::api::v2::filter::FileAccessLog file_access_log;
+    envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
     MessageUtil::jsonConvert(file_access_log, *access_log->mutable_config());

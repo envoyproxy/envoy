@@ -56,6 +56,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
         "//source/common/common:hex_lib",
     ],
 )

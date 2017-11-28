@@ -179,7 +179,7 @@ public:
 
   MOCK_METHOD0(filterChainFactory, Network::FilterChainFactory&());
   MOCK_METHOD0(socket, Network::ListenSocket&());
-  MOCK_METHOD0(sslContext, Ssl::ServerContext*());
+  MOCK_METHOD0(defaultSslContext, Ssl::ServerContext*());
   MOCK_METHOD0(useProxyProto, bool());
   MOCK_METHOD0(bindToPort, bool());
   MOCK_METHOD0(useOriginalDst, bool());
