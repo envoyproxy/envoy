@@ -1328,7 +1328,7 @@ TEST_P(SslConnectionImplTest, SniClientCertificate) {
              "ssl.no_certificate", 1, GetParam());
 }
 
-TEST_P(SslConnectionImplTest, SniSettingsParameters) {
+TEST_P(SslConnectionImplTest, SniALPN) {
   envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
@@ -1340,11 +1340,6 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   server_cert1->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
-      filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  server_ctx1->add_alpn_protocols("srv1");
-  server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
-  server_ctx1->mutable_tls_params()->add_ecdh_curves("X25519");
 
   // san_multiple_dns_cert.pem: server2.example.com
   envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
@@ -1355,19 +1350,22 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
+
+  envoy::api::v2::CommonTlsContext* server_ctx1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context();
   envoy::api::v2::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  server_ctx2->add_alpn_protocols("srv2");
-  server_ctx2->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  server_ctx2->mutable_tls_params()->add_ecdh_curves("P-256");
-
   envoy::api::v2::UpstreamTlsContext client_ctx;
+
+  // Test ALPN.
+  server_ctx1->add_alpn_protocols("srv1");
+  server_ctx2->add_alpn_protocols("srv2");
 
   // Connection to server1.example.com succeeds, negotiated ALPN is "srv1".
   // ssl.handshake logged by both: client & server.
+  client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->add_alpn_protocols("srv1");
   client_ctx.mutable_common_tls_context()->add_alpn_protocols("srv2");
-  client_ctx.set_sni("server1.example.com");
   testUtilV2(listener, client_ctx, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "srv1",
              "ssl.handshake", 2, GetParam());
@@ -1378,6 +1376,40 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "srv2",
              "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, SniCipherSuites) {
+  envoy::api::v2::Listener listener;
+
+  // san_dns_cert.pem: server1.example.com
+  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
+  envoy::api::v2::TlsCertificate* server_cert1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert1->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert1->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  // san_multiple_dns_cert.pem: server2.example.com
+  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
+  envoy::api::v2::TlsCertificate* server_cert2 =
+      filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
+  server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
+
+  envoy::api::v2::CommonTlsContext* server_ctx1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context();
+  envoy::api::v2::CommonTlsContext* server_ctx2 =
+      filter_chain2->mutable_tls_context()->mutable_common_tls_context();
+  envoy::api::v2::UpstreamTlsContext client_ctx;
+
+  // Test cipher suites.
+  server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_ctx2->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
 
   // Connection to server1.example.com using ECDHE-RSA-CHACHA20-POLY1305 succeeds.
   // ssl.handshake logged by both: client & server.
@@ -1385,7 +1417,7 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_cipher_suites(
       "ECDHE-RSA-CHACHA20-POLY1305");
   testUtilV2(listener, client_ctx, "", true, "",
-             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "srv1",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
              "ssl.handshake", 2, GetParam());
 
   // Connection to server2.example.com using ECDHE-RSA-CHACHA20-POLY1305 fails.
@@ -1405,17 +1437,51 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server2.example.com");
   testUtilV2(listener, client_ctx, "", true, "",
-             "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "srv2",
+             "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.handshake", 2, GetParam());
+}
 
-  client_ctx.mutable_common_tls_context()->mutable_tls_params()->clear_cipher_suites();
+TEST_P(SslConnectionImplTest, SniEcdhCurves) {
+  envoy::api::v2::Listener listener;
+
+  // san_dns_cert.pem: server1.example.com
+  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
+  envoy::api::v2::TlsCertificate* server_cert1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert1->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert1->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  // san_multiple_dns_cert.pem: server2.example.com
+  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
+  envoy::api::v2::TlsCertificate* server_cert2 =
+      filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
+  server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
+
+  envoy::api::v2::CommonTlsContext* server_ctx1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context();
+  envoy::api::v2::CommonTlsContext* server_ctx2 =
+      filter_chain2->mutable_tls_context()->mutable_common_tls_context();
+  envoy::api::v2::UpstreamTlsContext client_ctx;
+
+  // Test ECDH curves.
+  server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_ctx1->mutable_tls_params()->add_ecdh_curves("X25519");
+  server_ctx2->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_ctx2->mutable_tls_params()->add_ecdh_curves("P-256");
 
   // Connection to server1.example.com using X25519 succeeds.
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
   testUtilV2(listener, client_ctx, "", true, "",
-             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "srv1",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
              "ssl.handshake", 2, GetParam());
 
   // Connection to server2.example.com using X25519 fails.
@@ -1434,10 +1500,8 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server2.example.com");
   testUtilV2(listener, client_ctx, "", true, "",
-             "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "srv2",
+             "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.handshake", 2, GetParam());
-
-  client_ctx.mutable_common_tls_context()->mutable_tls_params()->clear_ecdh_curves();
 }
 
 class SslReadBufferLimitTest : public SslCertsTest,
