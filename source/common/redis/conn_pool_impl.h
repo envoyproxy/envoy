@@ -81,7 +81,6 @@ private:
              DecoderFactory& decoder_factory, const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
-  void putOutlierDetectorCode(Http::Code code);
 
   // Redis::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;

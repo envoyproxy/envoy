@@ -72,7 +72,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
-  putOutlierDetectorCode(Http::Code::GatewayTimeout);
+  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::GatewayTimeout));
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
   } else {
@@ -82,17 +82,11 @@ void ClientImpl::onConnectOrOpTimeout() {
   connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-void ClientImpl::putOutlierDetectorCode(Http::Code code) {
-  if (!config_.disableOutlierEvents()) {
-    host_->outlierDetector().putHttpResponseCode(enumToInt(code));
-  }
-}
-
 void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
-    putOutlierDetectorCode(Http::Code::InternalServerError);
+    host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::InternalServerError));
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -104,7 +98,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {
-        putOutlierDetectorCode(Http::Code::ServiceUnavailable);
+        host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
       if (event == Network::ConnectionEvent::LocalClose) {
@@ -153,7 +147,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  putOutlierDetectorCode(Http::Code::OK);
+  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
