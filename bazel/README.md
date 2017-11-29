@@ -25,10 +25,10 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+2.  Install external dependencies libtool, cmake, and realpath libraries separately.
 On Ubuntu, run the following commands:
 ```
- apt-get install libtoolize
+ apt-get install libtool
  apt-get install cmake
  apt-get install realpath
 ```

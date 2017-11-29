@@ -110,7 +110,7 @@ public:
     host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, host_set_, nullptr, stats_, runtime_, random_,
-                                     subset_info_));
+                                     subset_info_, ring_hash_lb_config_));
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -152,7 +152,7 @@ public:
                                  local_hosts_per_locality_, {}, {});
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, host_set_, local_host_set_.get(), stats_, runtime_,
-                                     random_, subset_info_));
+                                     random_, subset_info_, ring_hash_lb_config_));
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -260,6 +260,7 @@ public:
   NiceMock<MockHostSet> host_set_;
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  envoy::api::v2::Cluster::RingHashLbConfig ring_hash_lb_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -639,7 +640,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
   lb_.reset(new SubsetLoadBalancer(lb_type_, host_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_));
+                                   subset_info_, ring_hash_lb_config_));
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 

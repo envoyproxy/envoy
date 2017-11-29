@@ -124,6 +124,12 @@ envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string)
   return bootstrap;
 }
 
+envoy::api::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::Bootstrap bootstrap;
+  MessageUtil::loadFromYaml(yaml, bootstrap);
+  return bootstrap;
+}
+
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   const std::string json = R"EOF(
   {
@@ -343,6 +349,48 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
   EXPECT_THROW_WITH_MESSAGE(
       create(bootstrap), EnvoyException,
       "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
+}
+
+TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [{
+      "name": "redis_cluster",
+      "lb_type": "ring_hash",
+      "ring_hash_lb_config": {
+        "minimum_ring_size": 125,
+        "use_std_hash": true
+      },
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "hosts": [{"url": "tcp://127.0.0.1:8000"}, {"url": "tcp://127.0.0.1:8001"}]
+    }]
+  }
+  )EOF";
+  create(parseBootstrapFromJson(json));
+}
+
+TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: redis_cluster
+      connect_timeout: 0.250s
+      lb_policy: RING_HASH
+      hosts:
+      - socket_address:
+          address: 127.0.0.1
+          port_value: 8000
+      - socket_address:
+          address: 127.0.0.1
+          port_value: 8001
+      dns_lookup_family: V4_ONLY
+      ring_hash_lb_config:
+        minimum_ring_size: 125
+        deprecated_v1:
+          use_std_hash: true
+  )EOF";
+  create(parseBootstrapFromV2Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {

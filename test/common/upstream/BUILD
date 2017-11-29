@@ -207,12 +207,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "ring_hash_lb_test",
-    srcs = select({
-        # TODO(zuercher): enable test for OSX once a known algorithm is in use (see TODO in
-        # ring_hash_lb_test.cc)
-        "@bazel_tools//tools/osx:darwin": [],
-        "//conditions:default": ["ring_hash_lb_test.cc"],
-    }),
+    srcs = ["ring_hash_lb_test.cc"],
     deps = [
         ":utility_lib",
         "//include/envoy/router:router_interface",
