@@ -184,10 +184,11 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
 }
 
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+  // In firefox the "Connection" request header value is "keep-alive, Upgrade",
+  // we should check if it contains the "Upgrade" token.
   return (headers.Connection() && headers.Upgrade() &&
-          (0 == StringUtil::caseInsensitiveCompare(
-                    headers.Connection()->value().c_str(),
-                    Http::Headers::get().ConnectionValues.Upgrade.c_str())) &&
+          headers.Connection()->value().caseInsensitiveContains(
+              Http::Headers::get().ConnectionValues.Upgrade.c_str()) &&
           (0 == StringUtil::caseInsensitiveCompare(
                     headers.Upgrade()->value().c_str(),
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));

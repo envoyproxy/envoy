@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Router {
 
 RdsSubscription::RdsSubscription(Envoy::Config::SubscriptionStats stats,
-                                 const envoy::api::v2::filter::http::Rds& rds,
+                                 const envoy::api::v2::filter::network::Rds& rds,
                                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)
@@ -64,7 +64,7 @@ void RdsSubscription::onFetchFailure(const EnvoyException* e) {
   if (e) {
     ENVOY_LOG(warn, "rds: fetch failure: {}", e->what());
   } else {
-    ENVOY_LOG(info, "rds: fetch failure: network error");
+    ENVOY_LOG(debug, "rds: fetch failure: network error");
   }
 }
 

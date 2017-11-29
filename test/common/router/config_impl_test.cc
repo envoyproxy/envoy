@@ -476,7 +476,8 @@ TEST(RouteMatcherTest, TestRoutes) {
   }
 }
 
-TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
+// Validates behavior of request_headers_to_add at router, vhost, and route levels.
+TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -562,6 +563,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Request header manipulation testing.
@@ -603,16 +605,202 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
     }
   }
+}
+
+// Validates behavior of request_headers_to_add at router, vhost, and route levels when append
+// is disabled.
+TEST(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: x-global-header
+          value: vhost-www2
+        append: false
+      - header:
+          key: x-vhost-header
+          value: vhost-www2
+        append: false
+    routes:
+      - match: { prefix: "/endpoint" }
+        route:
+          cluster: www2
+          request_headers_to_add:
+            - header:
+                key: x-global-header
+                value: route-endpoint
+              append: false
+            - header:
+                key: x-vhost-header
+                value: route-endpoint
+              append: false
+            - header:
+                key: x-route-header
+                value: route-endpoint
+              append: false
+      - match: { prefix: "/" }
+        route: { cluster: www2 }
+request_headers_to_add:
+  - header:
+      key: x-global-header
+      value: global
+    append: false
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+
+  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+  ConfigImpl config(route_config, runtime, cm, true);
+
+  // Request header manipulation testing.
+  {
+    // Global and virtual host override route.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers, request_info);
+      EXPECT_EQ("global", headers.get_("x-global-header"));
+      EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
+      EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
+    }
+
+    // Global overrides virtual host.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers, request_info);
+      EXPECT_EQ("global", headers.get_("x-global-header"));
+      EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
+    }
+  }
+}
+
+// Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
+// and route levels.
+TEST(RouteMatcherTest, TestAddRemoveResponseHeaders) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    response_headers_to_add:
+      - header:
+          key: x-global-header1
+          value: vhost-override
+      - header:
+          key: x-vhost-header1
+          value: vhost1-www2
+    response_headers_to_remove: ["x-vhost-remove"]
+    routes:
+      - match: { prefix: "/new_endpoint" }
+        route:
+          prefix_rewrite: "/api/new_endpoint"
+          cluster: www2
+          response_headers_to_add:
+            - header:
+                key: x-global-header1
+                value: route-override
+            - header:
+                key: x-vhost-header1
+                value: route-override
+            - header:
+                key: x-route-header
+                value: route-new_endpoint
+      - match: { path: "/" }
+        route:
+          cluster: root_www2
+          response_headers_to_add:
+            - header:
+                key: x-route-header
+                value: route-allpath
+          response_headers_to_remove: ["x-route-remove"]
+      - match: { prefix: "/" }
+        route: { cluster: "www2" }
+  - name: www2_staging
+    domains: ["www-staging.lyft.net"]
+    response_headers_to_add:
+      - header:
+          key: x-vhost-header1
+          value: vhost1-www2_staging
+    routes:
+      - match: { prefix: "/" }
+        route:
+          cluster: www2_staging
+          response_headers_to_add:
+            - header:
+                key: x-route-header
+                value: route-allprefix
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "instant-server" }
+internal_only_headers: ["x-lyft-user-id"]
+response_headers_to_add:
+  - header:
+      key: x-global-header1
+      value: global1
+response_headers_to_remove: ["x-global-remove"]
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
 
   // Response header manipulation testing.
+  {
+    {
+      Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+      const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+      Http::TestHeaderMapImpl headers;
+      route->finalizeResponseHeaders(headers);
+      EXPECT_EQ("route-override", headers.get_("x-global-header1"));
+      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
+    }
+
+    // Multiple routes can have same route-level headers with different values.
+    {
+      Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
+      const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+      Http::TestHeaderMapImpl headers;
+      route->finalizeResponseHeaders(headers);
+      EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
+    }
+
+    // Multiple virtual hosts can have same virtual host level headers with different values.
+    {
+      Http::TestHeaderMapImpl req_headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
+      const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+      Http::TestHeaderMapImpl headers;
+      route->finalizeResponseHeaders(headers);
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
+    }
+
+    // Global headers.
+    {
+      Http::TestHeaderMapImpl req_headers = genHeaders("api.lyft.com", "/", "GET");
+      const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+      Http::TestHeaderMapImpl headers;
+      route->finalizeResponseHeaders(headers);
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+    }
+  }
+
   EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
-  EXPECT_THAT((std::list<std::pair<Http::LowerCaseString, std::string>>(
-                  {{Http::LowerCaseString("x-envoy-upstream-canary"), "true"}})),
-              ContainerEq(config.responseHeadersToAdd()));
-  EXPECT_THAT(std::list<Http::LowerCaseString>({Http::LowerCaseString("x-envoy-upstream-canary"),
-                                                Http::LowerCaseString("x-envoy-virtual-cluster")}),
-              ContainerEq(config.responseHeadersToRemove()));
 }
 
 TEST(RouteMatcherTest, Priority) {
@@ -2145,8 +2333,6 @@ TEST(NullConfigImplTest, All) {
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
   EXPECT_EQ(nullptr, config.route(headers, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
-  EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
-  EXPECT_EQ(0UL, config.responseHeadersToRemove().size());
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
@@ -2821,7 +3007,7 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
   EXPECT_EQ((*it)->value().value().string_value(), "override3");
 }
 
-TEST(RoutEntryMetadataMatchTest, ParsesMetadata) {
+TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
   auto route_config = envoy::api::v2::RouteConfiguration();
   auto* vhost = route_config.add_virtual_hosts();
   vhost->set_name("vhost");

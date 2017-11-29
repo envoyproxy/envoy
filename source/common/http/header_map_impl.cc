@@ -6,8 +6,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/singleton.h"
 #include "common/common/utility.h"
+#include "common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Http {
@@ -360,6 +360,22 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   new_value.setCopy(value.c_str(), value.size());
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());
+  ASSERT(new_value.empty());
+}
+
+void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString ref_value(value);
+  remove(key);
+  insertByKey(std::move(ref_key), std::move(ref_value));
+}
+
+void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString new_value;
+  new_value.setCopy(value.c_str(), value.size());
+  remove(key);
+  insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty());
 }
 

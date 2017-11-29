@@ -194,6 +194,7 @@ public:
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD2(finalizeRequestHeaders,
                      void(Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info));
+  MOCK_CONST_METHOD1(finalizeResponseHeaders, void(Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
@@ -256,14 +257,9 @@ public:
   // Router::Config
   MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
-  MOCK_CONST_METHOD0(responseHeadersToAdd,
-                     const std::list<std::pair<Http::LowerCaseString, std::string>>&());
-  MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
-  std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
-  std::list<Http::LowerCaseString> response_headers_to_remove_;
 };
 
 class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {
@@ -273,7 +269,7 @@ public:
 
   MOCK_METHOD0(routeConfigProviders, std::vector<RdsRouteConfigProviderSharedPtr>());
   MOCK_METHOD5(getRouteConfigProvider,
-               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::http::Rds& rds,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::network::Rds& rds,
                                             Upstream::ClusterManager& cm, Stats::Scope& scope,
                                             const std::string& stat_prefix,
                                             Init::Manager& init_manager));

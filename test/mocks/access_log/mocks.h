@@ -56,6 +56,7 @@ public:
   MOCK_CONST_METHOD0(duration, std::chrono::microseconds());
   MOCK_CONST_METHOD1(getResponseFlag, bool(AccessLog::ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
+  MOCK_CONST_METHOD0(upstreamLocalAddress, const Optional<std::string>&());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
   MOCK_CONST_METHOD0(getDownstreamAddress, const std::string&());
@@ -63,8 +64,8 @@ public:
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
-  std::chrono::microseconds request_received_duration_;
-  std::chrono::microseconds response_received_duration_;
+  Optional<std::chrono::microseconds> request_received_duration_;
+  Optional<std::chrono::microseconds> response_received_duration_;
 };
 
 } // namespace AccessLog

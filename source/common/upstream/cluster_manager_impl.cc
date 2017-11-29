@@ -58,7 +58,7 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
     }
   }
 
-  ENVOY_LOG(info, "cm init: adding: cluster={} primary={} secondary={}", cluster.info()->name(),
+  ENVOY_LOG(debug, "cm init: adding: cluster={} primary={} secondary={}", cluster.info()->name(),
             primary_init_clusters_.size(), secondary_init_clusters_.size());
 }
 
@@ -80,7 +80,7 @@ void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
   // It is possible that the cluster we are removing has already been initialized, and is not
   // present in the initializer list. If so, this is fine.
   cluster_list->remove(&cluster);
-  ENVOY_LOG(info, "cm init: init complete: cluster={} primary={} secondary={}",
+  ENVOY_LOG(debug, "cm init: init complete: cluster={} primary={} secondary={}",
             cluster.info()->name(), primary_init_clusters_.size(), secondary_init_clusters_.size());
   maybeFinishInitialize();
 }
@@ -605,7 +605,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   if (cluster->lbSubsetInfo().isEnabled()) {
     lb_.reset(new SubsetLoadBalancer(cluster->lbType(), host_set_, parent.local_host_set_,
                                      cluster->stats(), parent.parent_.runtime_,
-                                     parent.parent_.random_, cluster->lbSubsetInfo()));
+                                     parent.parent_.random_, cluster->lbSubsetInfo(),
+                                     cluster->lbRingHashConfig()));
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -625,7 +626,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::RingHash: {
       lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
-                                         parent.parent_.random_));
+                                         parent.parent_.random_, cluster->lbRingHashConfig()));
       break;
     }
     case LoadBalancerType::OriginalDst: {

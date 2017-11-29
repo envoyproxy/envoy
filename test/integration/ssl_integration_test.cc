@@ -58,7 +58,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ServerContextConfigImpl cfg(*loader);
-  return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
+  return context_manager_->createSslServerContext("", {}, *upstream_stats_store, cfg, true);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {

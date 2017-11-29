@@ -57,11 +57,10 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "//source/common/common:singleton",
         "//source/common/common:utility_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:const_singleton",
     ],
 )
 

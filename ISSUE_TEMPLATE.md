@@ -33,7 +33,7 @@ privacy concerns, sanitize the data prior to sharing the tarball/pasting.
 *Admin and Stats Output*:
 >Include the admin output for the following endpoints: /stats, 
 /clusters, /routes, /server_info. For more information, refer to the 
-[admin endpoint documentation.](https://envoyproxy.github.io/envoy/operations/admin.html)
+[admin endpoint documentation.](https://www.envoyproxy.io/docs/envoy/latest/operations/admin)
 
 >**Note**: If there are privacy concerns, sanitize the data prior to
 sharing.

@@ -3,11 +3,11 @@
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://envoyproxy.github.io/envoy/install/requirements.html) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements) are typically
 independently sourced, the following steps should be followed:
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Configure, build and/or install the [Envoy dependencies](https://envoyproxy.github.io/envoy/install/requirements.html).
+2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements).
 3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
    to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
    [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
@@ -25,12 +25,17 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+2.  Install external dependencies libtool, cmake, and realpath libraries separately.
 On Ubuntu, run the following commands:
 ```
- apt-get install libtoolize
+ apt-get install libtool
  apt-get install cmake
  apt-get install realpath
+```
+
+On Fedora (maybe also other red hat distros), run the following:
+```
+dnf install cmake libtool libstdc++
 ```
 
 On OS X, you'll need to install several dependencies. This can be accomplished via Homebrew:

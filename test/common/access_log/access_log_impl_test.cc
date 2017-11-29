@@ -30,7 +30,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "api/filter/http/http_connection_manager.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -43,8 +43,9 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-envoy::api::v2::filter::AccessLog parseAccessLogFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::AccessLog access_log;
+envoy::api::v2::filter::accesslog::AccessLog
+parseAccessLogFromJson(const std::string& json_string) {
+  envoy::api::v2::filter::accesslog::AccessLog access_log;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateAccessLog(*json_object_ptr, access_log);
   return access_log;
@@ -85,6 +86,9 @@ public:
     upstream_host_ = host;
   }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
+  const Optional<std::string>& upstreamLocalAddress() const override {
+    return upstream_local_address_;
+  }
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
   const std::string& getDownstreamAddress() const override { return downstream_address_; }
@@ -97,6 +101,7 @@ public:
   uint64_t response_flags_{};
   uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Optional<std::string> upstream_local_address_{};
   bool hc_request_{};
   std::string downstream_address_;
 };
@@ -486,9 +491,9 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 }
 
 TEST_F(AccessLogImplTest, ConfigureFromProto) {
-  envoy::api::v2::filter::AccessLog config;
+  envoy::api::v2::filter::accesslog::AccessLog config;
 
-  envoy::api::v2::filter::FileAccessLog fal_config;
+  envoy::api::v2::filter::accesslog::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
   MessageUtil::jsonConvert(fal_config, *config.mutable_config());
@@ -520,7 +525,7 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   NiceMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr filter_object = loader->getObject("filter");
-  envoy::api::v2::filter::AccessLogFilter config;
+  envoy::api::v2::filter::accesslog::AccessLogFilter config;
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
@@ -554,7 +559,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   NiceMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr filter_object = loader->getObject("filter");
-  envoy::api::v2::filter::AccessLogFilter config;
+  envoy::api::v2::filter::accesslog::AccessLogFilter config;
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 

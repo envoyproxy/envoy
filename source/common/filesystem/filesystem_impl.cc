@@ -15,6 +15,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/stats/stats.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/thread.h"
 
@@ -53,14 +54,14 @@ std::string fileReadToEnd(const std::string& path) {
 }
 
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
-                   Thread::BasicLockable& lock, Api::OsSysCalls& os_sys_calls,
-                   Stats::Store& stats_store, std::chrono::milliseconds flush_interval_msec)
+                   Thread::BasicLockable& lock, Stats::Store& stats_store,
+                   std::chrono::milliseconds flush_interval_msec)
     : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
         flush_event_.notify_one();
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
-      os_sys_calls_(os_sys_calls), flush_interval_msec_(flush_interval_msec),
+      os_sys_calls_(Api::OsSysCallsSingleton::get()), flush_interval_msec_(flush_interval_msec),
       stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {
   open();

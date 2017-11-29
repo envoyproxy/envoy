@@ -301,7 +301,9 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
     const std::string format_key = params.begin()->first;
     const std::string format_value = params.begin()->second;
     if (format_key == "format" && format_value == "json") {
-      response.add(statsAsJson(all_stats));
+      response.add(AdminImpl::statsAsJson(all_stats));
+    } else if (format_key == "format" && format_value == "prometheus") {
+      AdminImpl::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(), response);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -309,6 +311,31 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& res
     }
   }
   return rc;
+}
+
+std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& tags) {
+  std::vector<std::string> buf;
+  for (const Stats::Tag& tag : tags) {
+    buf.push_back(fmt::format("{}={}", tag.name_, tag.value_));
+  }
+  return StringUtil::join(buf, ",");
+}
+
+void AdminImpl::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                  const std::list<Stats::GaugeSharedPtr>& gauges,
+                                  Buffer::Instance& response) {
+  for (const auto& counter : counters) {
+    const std::string tags = AdminImpl::formatTagsForPrometheus(counter->tags());
+    response.add(fmt::format("# TYPE {0} counter\n", counter->tagExtractedName()));
+    response.add(
+        fmt::format("{0}{{{1}}} {2}\n", counter->tagExtractedName(), tags, counter->value()));
+  }
+
+  for (const auto& gauge : gauges) {
+    const std::string tags = AdminImpl::formatTagsForPrometheus(gauge->tags());
+    response.add(fmt::format("# TYPE {0} gauge\n", gauge->tagExtractedName()));
+    response.add(fmt::format("{0}{{{1}}} {2}\n", gauge->tagExtractedName(), tags, gauge->value()));
+  }
 }
 
 std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
@@ -354,7 +381,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
   std::string context_format = "{{\n\t\"ca_cert\": \"{}\",\n\t\"cert_chain\": \"{}\"\n}}\n";
-  server_.sslContextManager().iterateContexts([&](Ssl::Context& context) -> void {
+  server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
     context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
                                         context.getCertChainInformation()));
   });
@@ -369,7 +396,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
 
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
-  ENVOY_STREAM_LOG(info, "request complete: path: {}", *callbacks_, path);
+  ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::Code code = parent_.runCallback(path, response);

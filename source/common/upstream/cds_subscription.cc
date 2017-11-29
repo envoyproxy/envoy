@@ -67,7 +67,7 @@ void CdsSubscription::onFetchFailure(const EnvoyException* e) {
   if (e) {
     ENVOY_LOG(warn, "cds: fetch failure: {}", e->what());
   } else {
-    ENVOY_LOG(info, "cds: fetch failure: network error");
+    ENVOY_LOG(debug, "cds: fetch failure: network error");
   }
 }
 

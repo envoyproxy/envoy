@@ -59,6 +59,8 @@ public:
   void addReferenceKey(const LowerCaseString& key, const std::string& value) override;
   void addCopy(const LowerCaseString& key, uint64_t value) override;
   void addCopy(const LowerCaseString& key, const std::string& value) override;
+  void setReference(const LowerCaseString& key, const std::string& value) override;
+  void setReferenceKey(const LowerCaseString& key, const std::string& value) override;
 
   uint64_t byteSize() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;

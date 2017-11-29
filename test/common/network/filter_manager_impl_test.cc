@@ -127,22 +127,11 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.addReadFilter(ReadFilterSharedPtr{
       new RateLimit::TcpFilter::Instance(rl_config, RateLimit::ClientPtr{rl_client})});
 
-  std::string tcp_proxy_json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "cluster": "fake_cluster"
-          }
-        ]
-      }
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr tcp_proxy_config_loader = Json::Factory::loadFromString(tcp_proxy_json);
+  envoy::api::v2::filter::network::TcpProxy tcp_proxy;
+  tcp_proxy.set_stat_prefix("name");
+  tcp_proxy.set_cluster("fake_cluster");
   Envoy::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
-      new Envoy::Filter::TcpProxyConfig(*tcp_proxy_config_loader, factory_context));
+      new Envoy::Filter::TcpProxyConfig(tcp_proxy, factory_context));
   manager.addReadFilter(ReadFilterSharedPtr{
       new Envoy::Filter::TcpProxy(tcp_proxy_config, factory_context.cluster_manager_)});
 

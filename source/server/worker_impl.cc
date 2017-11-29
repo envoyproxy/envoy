@@ -48,8 +48,8 @@ void WorkerImpl::addListenerWorker(Listener& listener) {
                                                      .use_original_dst_ = listener.useOriginalDst(),
                                                      .per_connection_buffer_limit_bytes_ =
                                                          listener.perConnectionBufferLimitBytes()};
-  if (listener.sslContext()) {
-    handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
+  if (listener.defaultSslContext()) {
+    handler_->addSslListener(listener.filterChainFactory(), *listener.defaultSslContext(),
                              listener.socket(), listener.listenerScope(), listener.listenerTag(),
                              listener_options);
   } else {
@@ -104,11 +104,11 @@ void WorkerImpl::stopListeners() {
 }
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
-  ENVOY_LOG(info, "worker entering dispatch loop");
+  ENVOY_LOG(debug, "worker entering dispatch loop");
   auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  ENVOY_LOG(info, "worker exited dispatch loop");
+  ENVOY_LOG(debug, "worker exited dispatch loop");
   guard_dog.stopWatching(watchdog);
 
   // We must close all active connections before we actually exit the thread. This prevents any

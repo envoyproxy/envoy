@@ -195,6 +195,7 @@ public:
   COUNTER  (upstream_cx_http2_total)                                                               \
   COUNTER  (upstream_cx_connect_fail)                                                              \
   COUNTER  (upstream_cx_connect_timeout)                                                           \
+  COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \
   COUNTER  (upstream_cx_overflow)                                                                  \
   HISTOGRAM(upstream_cx_connect_ms)                                                                \
   HISTOGRAM(upstream_cx_length_ms)                                                                 \
@@ -311,6 +312,11 @@ public:
    * @return the type of load balancing that the cluster should use.
    */
   virtual LoadBalancerType lbType() const PURE;
+
+  /**
+   * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
+   */
+  virtual const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

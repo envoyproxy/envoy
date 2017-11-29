@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "common/common/singleton.h"
+#include "common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Zipkin {

@@ -13,6 +13,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
 
@@ -25,7 +26,9 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-SharedMemory& SharedMemory::initialize(Options& options, Api::OsSysCalls& os_sys_calls) {
+SharedMemory& SharedMemory::initialize(Options& options) {
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+
   const uint64_t entry_size = Stats::RawStatData::size();
   const uint64_t total_size = sizeof(SharedMemory) + (entry_size * options.maxStats());
 
@@ -105,12 +108,11 @@ std::string SharedMemory::version() {
   return version(num_stats_, Stats::RawStatData::maxNameLength());
 }
 
-HotRestartImpl::HotRestartImpl(Options& options, Api::OsSysCalls& os_sys_calls)
-    : options_(options), shmem_(SharedMemory::initialize(options, os_sys_calls)),
-      log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
-      stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
-
-  my_domain_socket_ = bindDomainSocket(options.restartEpoch(), os_sys_calls);
+HotRestartImpl::HotRestartImpl(Options& options)
+    : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
+      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
+      init_lock_(shmem_.init_lock_) {
+  my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
   if (options.restartEpoch() != 0) {
@@ -158,7 +160,8 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   memset(&data, 0, Stats::RawStatData::size());
 }
 
-int HotRestartImpl::bindDomainSocket(uint64_t id, Api::OsSysCalls& os_sys_calls) {
+int HotRestartImpl::bindDomainSocket(uint64_t id) {
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
@@ -422,7 +425,7 @@ void HotRestartImpl::onSocketEvent() {
     }
 
     case RpcMessageType::TerminateRequest: {
-      ENVOY_LOG(warn, "shutting down due to child request");
+      ENVOY_LOG(info, "shutting down due to child request");
       kill(getpid(), SIGTERM);
       break;
     }
