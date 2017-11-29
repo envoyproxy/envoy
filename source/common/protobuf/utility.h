@@ -67,6 +67,25 @@ public:
                            }) +
            "]";
   }
+
+  // Based on MessageUtil::hash() defined below.
+  template <class ProtoType>
+  static std::size_t hash(const google::protobuf::RepeatedPtrField<ProtoType>& source) {
+    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
+    // message doesn't hash to different values.
+    ProtobufTypes::String text;
+    {
+      // For memory safety, the StringOutputStream needs to be destroyed before
+      // we read the string.
+      Protobuf::io::StringOutputStream string_stream(&text);
+      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
+      coded_stream.SetSerializationDeterministic(true);
+      for (const auto& message : source) {
+        message.SerializeToCodedStream(&coded_stream);
+      }
+    }
+    return HashUtil::xxHash64(text);
+  }
 };
 
 class MessageUtil {

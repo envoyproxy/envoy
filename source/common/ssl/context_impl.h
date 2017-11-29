@@ -27,6 +27,7 @@ namespace Ssl {
   COUNTER(handshake)                                                                               \
   COUNTER(session_reused)                                                                          \
   COUNTER(no_certificate)                                                                          \
+  COUNTER(fail_no_sni_match)                                                                       \
   COUNTER(fail_verify_no_cert)                                                                     \
   COUNTER(fail_verify_error)                                                                       \
   COUNTER(fail_verify_san)                                                                         \
@@ -42,8 +43,6 @@ struct SslStats {
 
 class ContextImpl : public virtual Context {
 public:
-  ~ContextImpl() { parent_.releaseContext(this); }
-
   virtual bssl::UniquePtr<SSL> newSsl() const;
 
   /**
@@ -72,9 +71,9 @@ public:
   SslStats& stats() { return stats_; }
 
   // Ssl::Context
-  size_t daysUntilFirstCertExpires() override;
-  std::string getCaCertInformation() override;
-  std::string getCertChainInformation() override;
+  size_t daysUntilFirstCertExpires() const override;
+  std::string getCaCertInformation() const override;
+  std::string getCertChainInformation() const override;
 
 protected:
   ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
@@ -102,11 +101,11 @@ protected:
 
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
-  int32_t getDaysUntilExpiration(const X509* cert);
+  int32_t getDaysUntilExpiration(const X509* cert) const;
   bssl::UniquePtr<X509> loadCert(const std::string& cert_file);
-  static std::string getSerialNumber(X509* cert);
-  std::string getCaFileName() { return ca_file_path_; };
-  std::string getCertChainFileName() { return cert_chain_file_path_; };
+  static std::string getSerialNumber(const X509* cert);
+  std::string getCaFileName() const { return ca_file_path_; };
+  std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
   ContextManagerImpl& parent_;
   bssl::UniquePtr<SSL_CTX> ctx_;
@@ -119,11 +118,13 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
+  const std::string ecdh_curves_;
 };
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
   ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ClientContextConfig& config);
+  ~ClientContextImpl() { parent_.releaseClientContext(this); }
 
   bssl::UniquePtr<SSL> newSsl() const override;
 
@@ -133,19 +134,28 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ServerContextConfig& config,
+  ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
+                    const std::vector<std::string>& server_names, Stats::Scope& scope,
+                    ServerContextConfig& config, bool skip_context_update,
                     Runtime::Loader& runtime);
+  ~ServerContextImpl() { parent_.releaseServerContext(this, listener_name_, server_names_); }
 
 private:
+  ssl_select_cert_result_t processClientHello(const SSL_CLIENT_HELLO* client_hello);
+  void updateConnectionContext(SSL* ssl);
+
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
 
+  const std::string listener_name_;
+  const std::vector<std::string> server_names_;
+  const bool skip_context_update_;
   Runtime::Loader& runtime_;
   std::vector<uint8_t> parsed_alt_alpn_protocols_;
   const std::vector<ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };
 
-} // Ssl
-} // Envoy
+} // namespace Ssl
+} // namespace Envoy

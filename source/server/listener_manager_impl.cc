@@ -78,6 +78,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
           Network::Utility::parseInternetAddress(config.address().socket_address().address(),
                                                  config.address().socket_address().port_value())),
       global_scope_(parent_.server_.stats().createScope("")),
+      listener_scope_(
+          parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       use_proxy_proto_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)),
@@ -89,19 +91,49 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
-  ASSERT(config.filter_chains().size() == 1);
-  const auto& filter_chain = config.filter_chains()[0];
+  ASSERT(config.filter_chains().size() >= 1);
 
-  listener_scope_ =
-      parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()));
+  // Skip lookup and update of the SSL Context if there is only one filter chain
+  // and it doesn't enforce any SNI restrictions.
+  const bool skip_context_update =
+      (config.filter_chains().size() == 1 &&
+       config.filter_chains()[0].filter_chain_match().sni_domains().empty());
 
-  if (filter_chain.has_tls_context()) {
-    Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
-    ssl_context_ = parent_.server_.sslContextManager().createSslServerContext(*listener_scope_,
-                                                                              context_config);
+  Optional<uint64_t> filters_hash;
+  uint32_t has_tls = 0;
+  uint32_t has_stk = 0;
+  for (const auto& filter_chain : config.filter_chains()) {
+    std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
+                                         filter_chain.filter_chain_match().sni_domains().end());
+    if (!filters_hash.valid()) {
+      filters_hash.value(RepeatedPtrUtil::hash(filter_chain.filters()));
+      filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+    } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
+      throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
+                                       "is currently not supported",
+                                       address_->asString()));
+    }
+    if (filter_chain.has_tls_context()) {
+      Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
+      tls_contexts_.emplace_back(parent_.server_.sslContextManager().createSslServerContext(
+          name_, sni_domains, *listener_scope_, context_config, skip_context_update));
+      has_tls++;
+      if (filter_chain.tls_context().has_session_ticket_keys()) {
+        has_stk++;
+      }
+    }
   }
 
-  filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+  // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
+  // This doesn't work right now, because BoringSSL uses "session context" (initial SSL_CTX that
+  // accepted connection, before SNI update) for session related stuff, including Session Ticket
+  // callback, which is going to be called iff it's set on the initial SSL_CTX, even if it's not
+  // set on the current SSL_CTX that doesn't have any Session Ticket Keys configured.
+  if (has_stk != 0 && has_stk != has_tls) {
+    throw EnvoyException(fmt::format("error adding listener '{}': filter chains with mixed use of "
+                                     "Session Ticket Keys are currently not supported",
+                                     address_->asString()));
+  }
 }
 
 ListenerImpl::~ListenerImpl() {
