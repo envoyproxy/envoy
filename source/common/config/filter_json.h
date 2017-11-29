@@ -105,6 +105,26 @@ public:
    */
   static void translateTcpProxy(const Json::Object& json_tcp_proxy,
                                 envoy::api::v2::filter::network::TcpProxy& tcp_proxy);
+
+  /**
+   * Translate a v1 JSON Tcp Rate Limit filter object to v2
+   * envoy::api::v2::filter::network::RateLimit.
+   * @param json_rate_limit source v1 JSON Tcp Rate Limit Filter object.
+   * @param rate_limit destination v2 envoy::api::v2::filter::network::RateLimit.
+   */
+  static void translateTcpRateLimitFilter(const Json::Object& json_rate_limit,
+                                    envoy::api::v2::filter::network::RateLimit& rate_limit);
+
+
+  /**
+   * Translate a v1 JSON Http Rate Limit filter object to v2
+   * envoy::api::v2::filter::http::RateLimit.
+   * @param json_rate_limit source v1 JSON Http Rate Limit Filter object.
+   * @param rate_limit destination v2 envoy::api::v2::filter::http::RateLimit.
+   */
+  static void translateHttpRateLimitFilter(const Json::Object& json_rate_limit,
+                                    envoy::api::v2::filter::http::RateLimit& rate_limit);
+
 };
 
 } // namespace Config

@@ -336,5 +336,35 @@ void FilterJson::translateTcpProxy(const Json::Object& json_tcp_proxy,
   }
 }
 
+void FilterJson::translateTcpRateLimitFilter(const Json::Object& json_rate_limit,
+                                             envoy::api::v2::filter::network::RateLimit& rate_limit) {
+  json_tcp_proxy.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_rate_limit, rate_limit, stat_prefix);
+  JSON_UTIL_SET_STRING(json_rate_limit, rate_limit, domain);
+  JSON_UTIL_SET_DURATION(json_rate_limit, rate_limit, timeout);
+
+  auto* descriptors = rate_limit.mutable_descriptors();
+  for (const auto& json_descriptor : json_rate_limit.getObjectArray("descriptors", false)) {
+    auto* descriptor = descriptors->Add();
+    auto* entries = descriptor->mutable_entries();
+    for (const auto& json_entry : json_descriptor.asObjectArray()) {
+      auto* entry = entries->Add();
+      JSON_UTIL_SET_STRING(json_entry, entry, key);
+      JSON_UTIL_SET_STRING(json_entry, entry, value);
+    }
+  }
+}
+
+void FilterJson::translateHttpRateLimitFilter(const Json::Object& json_rate_limit,
+                                              envoy::api::v2::filter::http::RateLimit& rate_limit) {
+  json_tcp_proxy.validateSchema(Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_rate_limit, rate_limit, domain);
+  JSON_UTIL_SET_INTEGER(json_rate_limit, rate_limit, stage);
+  JSON_UTIL_SET_STRING(json_rate_limit, rate_limit, request_type);
+  JSON_UTIL_SET_DURATION(json_rate_limit, rate_limit, timeout);
+}
+
 } // namespace Config
 } // namespace Envoy

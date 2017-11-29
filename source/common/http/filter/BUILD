@@ -83,6 +83,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
+    external_deps = [ "envoy_filter_http_rate_limit" ],
     deps = [
         ":ratelimit_includes",
         "//include/envoy/http:codes_interface",
