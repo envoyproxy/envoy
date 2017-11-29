@@ -84,6 +84,12 @@ public:
    *         all operations use the same timeout.
    */
   virtual std::chrono::milliseconds opTimeout() const PURE;
+
+  /**
+   * @return bool the healthcheck pool can disable outlier events even if the cluster has it
+   * enabled.
+   */
+  virtual bool disableOutlierEvents() const PURE;
 };
 
 /**
