@@ -119,11 +119,14 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 /**
- * Base host set interface.  This contains all of the endpoints for a given LocalityLbEndpoints
+ * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
  */
 class HostSet {
 public:
+  typedef std::shared_ptr<const std::vector<HostSharedPtr>> HostVectorConstSharedPtr;
+  typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostListsConstSharedPtr;
+
   virtual ~HostSet() {}
 
   // TODO(alyssawilk) remove this once LBs use PrioritySet.
@@ -182,16 +185,14 @@ public:
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    */
-  virtual void updateHosts(
-      std::shared_ptr<const std::vector<HostSharedPtr>> hosts,
-      std::shared_ptr<const std::vector<HostSharedPtr>> healthy_hosts,
-      std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> hosts_per_locality,
-      std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> healthy_hosts_per_locality,
-      const std::vector<HostSharedPtr>& hosts_added,
-      const std::vector<HostSharedPtr>& hosts_removed) PURE;
+  virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
+                           HostListsConstSharedPtr hosts_per_locality,
+                           HostListsConstSharedPtr healthy_hosts_per_locality,
+                           const std::vector<HostSharedPtr>& hosts_added,
+                           const std::vector<HostSharedPtr>& hosts_removed) PURE;
 
   /**
-   * @return the priority of this host set.
+   * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
 };
@@ -215,6 +216,7 @@ public:
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
    */
   virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
@@ -222,17 +224,17 @@ public:
    * Returns the host sets for this priority set, ordered by priority.
    * The first element in the vector is the host set for priority 0, and so on.
    *
-   * @return the host sets for this priority set.
+   * @return std::vector<HostSetPtr>& the host sets for this priority set.
    */
   virtual std::vector<HostSetPtr>& hostSetsPerPriority() PURE;
 
   /**
-   * @return the const host sets for this priority set, ordered by priority.
+   * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
    */
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return the host sets for this priority.  If no such host set exists, it will be created.
+   * @return HostSet& the host set for the priority. If no such host set exists, it will be created.
    */
   virtual HostSet& getHostSet(uint32_t priority) PURE;
 };
