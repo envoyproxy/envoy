@@ -6,6 +6,8 @@
 
 #include "common/config/well_known_names.h"
 
+#include "api/filter/network/client_ssl_auth.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -16,9 +18,21 @@ namespace Configuration {
 class ClientSslAuthConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
-                                             FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilter(const Json::Object& config,
+                                      FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                      FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::network::ClientSSLAuth()};
+  }
+
   std::string name() override { return Config::NetworkFilterNames::get().CLIENT_SSL_AUTH; }
+
+private:
+  NetworkFilterFactoryCb
+  createFilter(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+               FactoryContext& context);
 };
 
 } // namespace Configuration

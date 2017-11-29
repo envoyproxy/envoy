@@ -160,6 +160,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http/filter:ratelimit_includes",
         "//source/common/http/filter:ratelimit_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
