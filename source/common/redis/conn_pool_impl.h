@@ -81,6 +81,7 @@ private:
              DecoderFactory& decoder_factory, const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
+  void putOutlierEvent(Upstream::Outlier::Result result);
 
   // Redis::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;
