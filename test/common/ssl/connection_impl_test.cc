@@ -139,8 +139,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
       *client_ctx, socket.localAddress(), Network::Address::InstanceConstSharedPtr());
 
   if (!client_session.empty()) {
-    Ssl::ConnectionImpl* ssl_connection =
-        dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+    Ssl::SslSocket* ssl_connection = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
     SSL* client_ssl_connection = ssl_connection->rawSslForTest();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_connection);
     SSL_SESSION* client_ssl_session =
@@ -175,8 +174,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
         EXPECT_EQ(expected_alpn_protocol, client_connection->nextProtocol());
       }
       EXPECT_EQ(expected_client_cert_uri, server_connection->ssl()->uriSanPeerCertificate());
-      Ssl::ConnectionImpl* ssl_connection =
-          dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
+      Ssl::SslSocket* ssl_connection = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
       SSL* client_ssl_connection = ssl_connection->rawSslForTest();
       SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_connection);
       EXPECT_FALSE(client_ssl_session->not_resumable);
