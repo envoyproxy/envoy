@@ -1504,6 +1504,79 @@ TEST_P(SslConnectionImplTest, SniEcdhCurves) {
              "ssl.handshake", 2, GetParam());
 }
 
+TEST_P(SslConnectionImplTest, SniProtocolVersions) {
+  envoy::api::v2::Listener listener;
+
+  // san_dns_cert.pem: server1.example.com
+  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
+  envoy::api::v2::TlsCertificate* server_cert1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert1->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert1->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  // san_multiple_dns_cert.pem: server2.example.com
+  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
+  envoy::api::v2::TlsCertificate* server_cert2 =
+      filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
+  server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
+
+  envoy::api::v2::CommonTlsContext* server_ctx1 =
+      filter_chain1->mutable_tls_context()->mutable_common_tls_context();
+  envoy::api::v2::CommonTlsContext* server_ctx2 =
+      filter_chain2->mutable_tls_context()->mutable_common_tls_context();
+  envoy::api::v2::UpstreamTlsContext client_ctx;
+
+  // Test protocol versions.
+  server_ctx1->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_2);
+  server_ctx1->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_3);
+
+  server_ctx2->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_0);
+  server_ctx2->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_2);
+
+  // Connection to server1.example.com using TLSv1.3 succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_ctx.set_sni("server1.example.com");
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_3);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.3",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
+             "ssl.handshake", 2, GetParam());
+
+  // Connection to server2.example.com using TLSv1.3 fails.
+  client_ctx.set_sni("server2.example.com");
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
+
+  // Connection to server1.example.com using TLSv1.0 fails.
+  client_ctx.set_sni("server1.example.com");
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_0);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::api::v2::TlsParameters::TLSv1_0);
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
+
+  // Connection to server2.example.com using TLSv1.0 succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_ctx.set_sni("server2.example.com");
+  testUtilV2(listener, client_ctx, "", true, "TLSv1",
+             "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
+             "ssl.handshake", 2, GetParam());
+}
+
 class SslReadBufferLimitTest : public SslCertsTest,
                                public testing::WithParamInterface<Network::Address::IpVersion> {
 public:

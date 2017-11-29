@@ -29,16 +29,17 @@ int ContextImpl::sslContextIndex() {
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
+      min_version_(config.minProtocolVersion()), max_version_(config.maxProtocolVersion()),
       ecdh_curves_(config.ecdhCurves()) {
   RELEASE_ASSERT(ctx_);
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
   RELEASE_ASSERT(rc == 1);
 
-  rc = SSL_CTX_set_min_proto_version(ctx_.get(), config.minProtocolVersion());
+  rc = SSL_CTX_set_min_proto_version(ctx_.get(), min_version_);
   RELEASE_ASSERT(rc == 1);
 
-  rc = SSL_CTX_set_max_proto_version(ctx_.get(), config.maxProtocolVersion());
+  rc = SSL_CTX_set_max_proto_version(ctx_.get(), max_version_);
   RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
@@ -548,8 +549,15 @@ void ServerContextImpl::updateConnectionContext(SSL* ssl) {
   ASSERT(SSL_CTX_get_ex_data(ctx_.get(), sslContextIndex()) == this);
 
   // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
+  // TODO(PiotrSikora): add SSL_early_set_SSL_CTX() to BoringSSL.
+
+  // TODO(PiotrSikora): add getters to BoringSSL.
+  SSL_set_min_proto_version(ssl, min_version_);
+  SSL_set_max_proto_version(ssl, max_version_);
+
   SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx_.get()), SSL_CTX_get_verify_callback(ctx_.get()));
 
+  // TODO(PiotrSikora): add getters to BoringSSL.
   int rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
   ASSERT(rc == 1);
   UNREFERENCED_PARAMETER(rc);
