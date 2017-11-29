@@ -14,8 +14,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb RateLimitConfigFactory::createFilter(
-    const envoy::api::v2::filter::network::RateLimit& config, FactoryContext& context) {
+NetworkFilterFactoryCb
+RateLimitConfigFactory::createFilter(const envoy::api::v2::filter::network::RateLimit& config,
+                                     FactoryContext& context) {
 
   ASSERT(!config.stat_prefix().empty());
   ASSERT(!config.domain().empty());
@@ -29,7 +30,6 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilter(
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new RateLimit::TcpFilter::Instance(
         config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms)))});
   };
-
 }
 
 NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
@@ -42,8 +42,8 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::O
 NetworkFilterFactoryCb
 RateLimitConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
                                                      FactoryContext& context) {
-  return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::network::RateLimit&>(config), context);
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::RateLimit&>(config),
+                      context);
 }
 
 /**

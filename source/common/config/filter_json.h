@@ -113,8 +113,7 @@ public:
    * @param proto_config destination v2 envoy::api::v2::filter::network::RateLimit.
    */
   static void translateTcpRateLimitFilter(const Json::Object& json_config,
-                                    envoy::api::v2::filter::network::RateLimit& proto_config);
-
+                                          envoy::api::v2::filter::network::RateLimit& proto_config);
 
   /**
    * Translate a v1 JSON Http Rate Limit filter object to v2
@@ -123,7 +122,7 @@ public:
    * @param proto_config destination v2 envoy::api::v2::filter::http::RateLimit.
    */
   static void translateHttpRateLimitFilter(const Json::Object& json_config,
-                                    envoy::api::v2::filter::http::RateLimit& proto_config);
+                                           envoy::api::v2::filter::http::RateLimit& proto_config);
 
   /**
    * Translate a v1 JSON Client SSL Auth filter object to v2
@@ -131,8 +130,9 @@ public:
    * @param json_config source v1 JSON Client SSL Auth Filter object.
    * @param proto_config destination v2 envoy::api::v2::filter::network::ClientSSLAuth.
    */
-  static void translateClientSslAuthFilter(const Json::Object& json_config,
-                                           envoy::api::v2::filter::network::ClientSSLAuth& proto_config);
+  static void
+  translateClientSslAuthFilter(const Json::Object& json_config,
+                               envoy::api::v2::filter::network::ClientSSLAuth& proto_config);
 };
 
 } // namespace Config

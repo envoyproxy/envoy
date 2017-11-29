@@ -16,7 +16,7 @@ NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
     const envoy::api::v2::filter::network::ClientSslAuth& config, FactoryContext& context) {
   ASSERT(!config.auth_api_cluster().empty());
   ASSERT(!config.stat_prefix().empty());
-  
+
   Filter::Auth::ClientSsl::ConfigSharedPtr config(Filter::Auth::ClientSsl::Config::create(
       config, context.threadLocal(), context.clusterManager(), context.dispatcher(),
       context.scope(), context.random()));
@@ -26,8 +26,9 @@ NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
   };
 }
 
-NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                                                   FactoryContext& context) {
+NetworkFilterFactoryCb
+ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
+                                                FactoryContext& context) {
   envoy::api::v2::filter::network::ClientSslAuth config;
   Config::FilterJson::translateClientSslAuthFilter(json_config, config);
   return createFilter(config, stats_prefix, context);
@@ -35,9 +36,9 @@ NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilterFactory(const Jso
 
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                     FactoryContext& context) {
-  return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::network::ClientSslAuth&>(config), context);
+                                                         FactoryContext& context) {
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::ClientSslAuth&>(config),
+                      context);
 }
 
 /**

@@ -42,7 +42,8 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const envoy::api::v2::filter::network::RateLimit& config, Stats::Scope& scope, Runtime::Loader& runtime);
+  Config(const envoy::api::v2::filter::network::RateLimit& config, Stats::Scope& scope,
+         Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
   const std::vector<Descriptor>& descriptors() { return descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }

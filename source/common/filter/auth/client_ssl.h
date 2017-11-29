@@ -75,16 +75,18 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  */
 class Config : public Http::RestApiFetcher {
 public:
-    static ConfigSharedPtr create(const envoy::api::v2::filter::network::ClientSSLAuth& config, ThreadLocal::SlotAllocator& tls,
-                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                Stats::Scope& scope, Runtime::RandomGenerator& random);
+  static ConfigSharedPtr create(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+                                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
+                                Event::Dispatcher& dispatcher, Stats::Scope& scope,
+                                Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::Address::IpList& ipWhiteList() { return ip_white_list_; }
   GlobalStats& stats() { return stats_; }
 
 private:
-  Config(const envoy::api::v2::filter::network::ClientSSLAuth& config, ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
+  Config(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+         ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);

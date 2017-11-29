@@ -25,7 +25,7 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
-    external_deps = [ "envoy_filter_network_rate_limit" ],
+    external_deps = ["envoy_filter_network_rate_limit"],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",

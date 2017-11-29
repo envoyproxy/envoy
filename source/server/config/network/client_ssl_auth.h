@@ -18,8 +18,7 @@ namespace Configuration {
 class ClientSslAuthConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilter(const Json::Object& config,
-                                      FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilter(const Json::Object& config, FactoryContext& context) override;
   NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                       FactoryContext& context) override;
 
@@ -30,9 +29,8 @@ public:
   std::string name() override { return Config::NetworkFilterNames::get().CLIENT_SSL_AUTH; }
 
 private:
-  NetworkFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::network::ClientSSLAuth& config,
-               FactoryContext& context);
+  NetworkFilterFactoryCb createFilter(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+                                      FactoryContext& context);
 };
 
 } // namespace Configuration

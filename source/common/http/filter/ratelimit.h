@@ -30,12 +30,14 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
- FilterConfig(const envoy::api::v2::filter::http::RateLimit& config, const LocalInfo::LocalInfo& local_info,
-              Stats::Scope& scope, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-      : domain_(config.domain()),
-        stage_(static_cast<uint64_t>(config.stage())),
-        request_type_(config.request_type().empty() ? stringToType("both") : stringToType(config.request_type()))
-        local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm) {}
+  FilterConfig(const envoy::api::v2::filter::http::RateLimit& config,
+               const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+      : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
+        request_type_(config.request_type().empty() ? stringToType("both")
+                                                    : stringToType(config.request_type()))
+            local_info_(local_info),
+        scope_(scope), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }

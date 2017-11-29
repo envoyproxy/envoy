@@ -11,9 +11,10 @@ namespace Envoy {
 namespace RateLimit {
 namespace TcpFilter {
 
-Config::Config(const envoy::api::v2::filter::network::RateLimit& config, Stats::Scope& scope, Runtime::Loader& runtime)
-  : domain_(config.domain()),
-    stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime) {
+Config::Config(const envoy::api::v2::filter::network::RateLimit& config, Stats::Scope& scope,
+               Runtime::Loader& runtime)
+    : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
+      runtime_(runtime) {
 
   for (const auto& descriptor : config.descriptors()) {
     Descriptor new_descriptor;

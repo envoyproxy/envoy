@@ -46,7 +46,8 @@ ConfigSharedPtr Config::create(const envoy::api::v2::filter::network::ClientSSLA
   return new_config;
 }
 
-const AllowedPrincipals& Config::allowedPrincipals() { return tls_->getTyped<AllowedPrincipals>(); }
+const AllowedPrincipals& Config::allowedPrincipals() {
+  return tls_->getTyped<AllowedPrincipals>(); }
 
 GlobalStats Config::generateStats(Stats::Scope& scope, const std::string& prefix) {
   std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
@@ -70,7 +71,8 @@ void Config::parseResponse(const Http::Message& message) {
   stats_.total_principals_.set(new_principals->size());
 }
 
-void Config::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(); }
+void Config::onFetchFailure(const EnvoyException*) {
+  stats_.update_failure_.inc(); }
 
 static const std::string Path = "/v1/certs/list/approved";
 

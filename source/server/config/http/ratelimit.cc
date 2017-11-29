@@ -34,11 +34,10 @@ HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(const Json::Objec
   return createFilter(config, stats_prefix, context);
 }
 
-HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                        const std::string& stats_prefix,
-                                                                        FactoryContext& context) {
+HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProto(
+    const Protobuf::Message& config, const std::string& stats_prefix, FactoryContext& context) {
   return createFilter(dynamic_cast<const envoy::api::v2::filter::http::RateLimit&>(config),
-                           stats_prefix, context);
+                      stats_prefix, context);
 }
 
 /**

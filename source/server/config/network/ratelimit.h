@@ -31,10 +31,8 @@ public:
   std::string name() override { return Config::NetworkFilterNames::get().RATE_LIMIT; }
 
 private:
-  NetworkFilterFactoryCb
-      createFilter(const envoy::api::v2::filter::network::RateLimit& config,
-                   FactoryContext& context);
-
+  NetworkFilterFactoryCb createFilter(const envoy::api::v2::filter::network::RateLimit& config,
+                                      FactoryContext& context);
 };
 
 } // namespace Configuration
