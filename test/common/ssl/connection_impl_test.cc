@@ -103,6 +103,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                              const envoy::api::v2::UpstreamTlsContext& client_ctx_proto,
                              const std::string& client_session, bool expect_success,
+                             const std::string& expected_protocol_version,
                              const std::string& expected_server_cert_digest,
                              const std::string& expected_client_cert_uri,
                              const std::string& expected_alpn_protocol,
@@ -178,6 +179,9 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
       Ssl::ConnectionImpl* ssl_connection =
           dynamic_cast<Ssl::ConnectionImpl*>(client_connection->ssl());
       SSL* client_ssl_connection = ssl_connection->rawSslForTest();
+      if (!expected_protocol_version.empty()) {
+        EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_connection));
+      }
       SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_connection);
       EXPECT_FALSE(client_ssl_session->not_resumable);
       uint8_t* session_data;
@@ -1013,6 +1017,88 @@ TEST_P(SslConnectionImplTest, SslError) {
   EXPECT_EQ(1UL, stats_store.counter("ssl.connection_error").value());
 }
 
+TEST_P(SslConnectionImplTest, ProtocolVersions) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::TlsParameters* server_params =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
+
+  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+
+  // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using TLSv1.0 (client) and defaults (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using TLSv1.1 (client) and defaults (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.1", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using TLSv1.2 (client) and defaults (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using TLSv1.3 (client) and defaults (server) fails.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
+
+  // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.3", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client) and TLSv1.0 (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_params->clear_tls_minimum_protocol_version();
+  client_params->clear_tls_maximum_protocol_version();
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client) and TLSv1.1 (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.1", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client) and TLSv1.2 (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client) and TLSv1.3 (server) succeeds.
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
+
+  // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
+  // ssl.handshake logged by both: client & server.
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  testUtilV2(listener, client_ctx, "", true, "TLSv1.3", "", "", "", "ssl.handshake", 2, GetParam());
+}
+
 TEST_P(SslConnectionImplTest, SniCertificate) {
   envoy::api::v2::Listener listener;
 
@@ -1042,7 +1128,7 @@ TEST_P(SslConnectionImplTest, SniCertificate) {
   // Connection to server1.example.com succeeds, client receives san_dns_cert.pem (exact match).
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server1.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
              "ssl.handshake", 2, GetParam());
 
@@ -1050,17 +1136,19 @@ TEST_P(SslConnectionImplTest, SniCertificate) {
   // (wildcard match).
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("www.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.handshake", 2, GetParam());
 
   // Connection without SNI fails, since there is no match.
   client_ctx.clear_sni();
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.fail_no_sni_match", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.fail_no_sni_match", 1,
+             GetParam());
 
   // Connection to bar.foo.com fails, since there is no match.
   client_ctx.set_sni("bar.foo.com");
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.fail_no_sni_match", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.fail_no_sni_match", 1,
+             GetParam());
 
   // no_san_cert.pem: * (no SNI restrictions)
   envoy::api::v2::FilterChain* filter_chain3 = listener.add_filter_chains();
@@ -1074,14 +1162,14 @@ TEST_P(SslConnectionImplTest, SniCertificate) {
   // Connection without SNI succeeds, client receives no_san_cert.pem (exact match on "").
   // ssl.handshake logged by both: client & server.
   client_ctx.clear_sni();
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "",
              "ssl.handshake", 2, GetParam());
 
   // Connection to bar.foo.com succeeds, client receives no_san_cert.pem (exact match on "").
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("bar.foo.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "",
              "ssl.handshake", 2, GetParam());
 }
@@ -1132,26 +1220,26 @@ TEST_P(SslConnectionImplTest, SniSessionResumption) {
   // Connection to www.example.com succeeds, new session established.
   client_ctx.set_sni("www.example.com");
   std::string client_session =
-      testUtilV2(listener, client_ctx, "", true,
+      testUtilV2(listener, client_ctx, "", true, "",
                  "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
                  "ssl.session_reused", 0, GetParam());
 
   // Connection to www.example.com succeeds, session resumed.
   // ssl.session_reused logged by both: client & server.
-  testUtilV2(listener, client_ctx, client_session, true,
+  testUtilV2(listener, client_ctx, client_session, true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.session_reused", 2, GetParam());
 
   // Connection without SNI succeeds, but session is NOT resumed on a different filter chain.
   client_ctx.clear_sni();
-  testUtilV2(listener, client_ctx, client_session, true,
+  testUtilV2(listener, client_ctx, client_session, true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
              "ssl.session_reused", 0, GetParam());
 
   // Connection to protected.example.com succeeds, but session is NOT resumed on a different
   // filter chain, even though it's serving the same certificate.
   client_ctx.set_sni("protected.example.com");
-  testUtilV2(listener, client_ctx, client_session, true,
+  testUtilV2(listener, client_ctx, client_session, true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.session_reused", 0, GetParam());
 
@@ -1160,7 +1248,7 @@ TEST_P(SslConnectionImplTest, SniSessionResumption) {
   // NOTE: Tested last to make sure that the session is still resumable.
   // ssl.session_reused logged by both: client & server.
   client_ctx.set_sni("server2.example.com");
-  testUtilV2(listener, client_ctx, client_session, true,
+  testUtilV2(listener, client_ctx, client_session, true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.session_reused", 2, GetParam());
 }
@@ -1206,13 +1294,14 @@ TEST_P(SslConnectionImplTest, SniClientCertificate) {
   // Connection to www.example.com succeeds.
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("www.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.handshake", 2, GetParam());
 
   // Connection to protected.example.com fails, since there is no client certificate.
   client_ctx.set_sni("protected.example.com");
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1,
+             GetParam());
 
   // Connection to protected.example.com with a valid client certificate fails, beacuse its SAN
   // is not whitelisted.
@@ -1222,19 +1311,19 @@ TEST_P(SslConnectionImplTest, SniClientCertificate) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
   client_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.fail_verify_san", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.fail_verify_san", 1, GetParam());
 
   // Connection to protected.example.com with a valid client certificate succeeds.
   // ssl.handshake logged by both: client & server.
   validation_ctx2->add_verify_subject_alt_name("spiffe://lyft.com/test-team");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 
   // Connection to www.example.com with a valid client certificate succeeds,
   // but the client certificate is not requested.
   client_ctx.set_sni("www.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "",
              "ssl.no_certificate", 1, GetParam());
 }
@@ -1279,14 +1368,14 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   client_ctx.mutable_common_tls_context()->add_alpn_protocols("srv1");
   client_ctx.mutable_common_tls_context()->add_alpn_protocols("srv2");
   client_ctx.set_sni("server1.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "srv1",
              "ssl.handshake", 2, GetParam());
 
   // Connection to server2.example.com succeeds, negotiated ALPN is "srv2".
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server2.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "srv2",
              "ssl.handshake", 2, GetParam());
 
@@ -1295,25 +1384,27 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_cipher_suites(
       "ECDHE-RSA-CHACHA20-POLY1305");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "srv1",
              "ssl.handshake", 2, GetParam());
 
   // Connection to server2.example.com using ECDHE-RSA-CHACHA20-POLY1305 fails.
   client_ctx.set_sni("server2.example.com");
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.connection_error", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
 
   // Connection to server1.example.com using ECDHE-RSA-AES128-GCM-SHA256 fails.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->clear_cipher_suites();
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_cipher_suites(
       "ECDHE-RSA-AES128-GCM-SHA256");
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.connection_error", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
 
   // Connection to server2.example.com using ECDHE-RSA-AES128-GCM-SHA256 succeeds.
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server2.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "srv2",
              "ssl.handshake", 2, GetParam());
 
@@ -1323,24 +1414,26 @@ TEST_P(SslConnectionImplTest, SniSettingsParameters) {
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "srv1",
              "ssl.handshake", 2, GetParam());
 
   // Connection to server2.example.com using X25519 fails.
   client_ctx.set_sni("server2.example.com");
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.connection_error", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
 
   // Connection to server1.example.com using P-256 fails.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->clear_ecdh_curves();
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("P-256");
-  testUtilV2(listener, client_ctx, "", false, "", "", "", "ssl.connection_error", 1, GetParam());
+  testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
+             GetParam());
 
   // Connection to server2.example.com using P-256 succeeds.
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server2.example.com");
-  testUtilV2(listener, client_ctx, "", true,
+  testUtilV2(listener, client_ctx, "", true, "",
              "77b3c289abbded6ad508d9853ba0bd36a1f6a9680eaba01e0f32774c0676ebe8", "", "srv2",
              "ssl.handshake", 2, GetParam());
 
