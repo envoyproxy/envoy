@@ -299,6 +299,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 
 void TcpProxy::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
+  read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
   request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
 
@@ -348,6 +349,8 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connecting) {
       request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
+      read_callbacks_->upstreamHost()->outlierDetector().putResult(
+          Upstream::Outlier::Result::CONNECT_FAILED);
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
       closeUpstreamConnection();
@@ -364,6 +367,8 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     // so we have a place to send downstream data to.
     read_callbacks_->connection().readDisable(false);
 
+    read_callbacks_->upstreamHost()->outlierDetector().putResult(
+        Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
   }
 }
