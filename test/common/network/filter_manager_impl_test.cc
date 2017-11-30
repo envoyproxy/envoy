@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/config/filter_json.h"
 #include "common/filter/ratelimit.h"
 #include "common/filter/tcp_proxy.h"
 #include "common/network/filter_manager_impl.h"
@@ -119,10 +120,12 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
           featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
-  Json::ObjectSharedPtr rl_config_loader = Json::Factory::loadFromString(rl_json);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(rl_json);
+  envoy::api::v2::filter::network::RateLimit proto_config{};
+  Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
 
   RateLimit::TcpFilter::ConfigSharedPtr rl_config(new RateLimit::TcpFilter::Config(
-      *rl_config_loader, factory_context.scope_, factory_context.runtime_loader_));
+      proto_config, factory_context.scope_, factory_context.runtime_loader_));
   RateLimit::MockClient* rl_client = new RateLimit::MockClient();
   manager.addReadFilter(ReadFilterSharedPtr{
       new RateLimit::TcpFilter::Instance(rl_config, RateLimit::ClientPtr{rl_client})});

@@ -5,14 +5,14 @@
 #include "api/filter/http/buffer.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/health_check.pb.h"
-#include "api/filter/http/router.pb.h"
 #include "api/filter/http/rate_limit.pb.h"
+#include "api/filter/http/router.pb.h"
+#include "api/filter/network/client_ssl_auth.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
+#include "api/filter/network/rate_limit.pb.h"
 #include "api/filter/network/redis_proxy.pb.h"
 #include "api/filter/network/tcp_proxy.pb.h"
-#include "api/filter/network/rate_limit.pb.h"
-#include "api/filter/network/client_ssl_auth.pb.h"
 
 namespace Envoy {
 namespace Config {

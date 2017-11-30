@@ -75,6 +75,7 @@ envoy_cc_test(
     srcs = ["filter_manager_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/filter:ratelimit_lib",
         "//source/common/filter:tcp_proxy_lib",

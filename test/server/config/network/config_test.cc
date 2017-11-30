@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
+#include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
 #include "common/dynamo/dynamo_filter.h"
 
@@ -47,30 +48,48 @@ TEST(NetworkFilterConfigTest, RedisProxyCorrectJson) {
 }
 
 TEST(NetworkFilterConfigTest, RedisProxyCorrectProto) {
-  envoy::api::v2::filter::network::RedisProxy config{};
-  config.set_cluster("fake_cluster");
-  config.set_stat_prefix("foo");
-  config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
+  std::string json_string = R"EOF(
+  {
+    "cluster_name": "fake_cluster",
+    "stat_prefix": "foo",
+    "conn_pool": {
+      "op_timeout_ms": 20
+    }
+  }
+  )EOF";
 
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::api::v2::filter::network::RedisProxy proto_config{};
+  Config::FilterJson::translateRedisProxy(*json_config, proto_config);
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
 TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
+  std::string json_string = R"EOF(
+  {
+    "cluster_name": "fake_cluster",
+    "stat_prefix": "foo",
+    "conn_pool": {
+      "op_timeout_ms": 20
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  envoy::api::v2::filter::network::RedisProxy config =
+  envoy::api::v2::filter::network::RedisProxy proto_config =
       *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
           factory.createEmptyConfigProto().get());
-  config.set_cluster("fake_cluster");
-  config.set_stat_prefix("foo");
-  config.mutable_settings()->mutable_op_timeout()->set_seconds(1);
 
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Config::FilterJson::translateRedisProxy(*json_config, proto_config);
+
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -153,6 +172,51 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectJson) {
   cb(connection);
 }
 
+TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectProto) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list":)EOF" + GetParam() +
+                            R"EOF(
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
+  NiceMock<MockFactoryContext> context;
+  ClientSslAuthConfigFactory factory;
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list":)EOF" + GetParam() +
+                            R"EOF(
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  ClientSslAuthConfigFactory factory;
+  envoy::api::v2::filter::network::ClientSSLAuth proto_config =
+      *dynamic_cast<envoy::api::v2::filter::network::ClientSSLAuth*>(
+          factory.createEmptyConfigProto().get());
+
+  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
 TEST(NetworkFilterConfigTest, RatelimitCorrectJson) {
   std::string json_string = R"EOF(
   {
@@ -173,16 +237,18 @@ TEST(NetworkFilterConfigTest, RatelimitCorrectJson) {
 }
 
 TEST(NetworkFilterConfigTest, RatelimitCorrectProto) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "domain" : "fake_domain",
+    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
+    "timeout_ms": 1337
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   envoy::api::v2::filter::network::RateLimit proto_config{};
-  proto_config.set_domain("fake_domain");
-  proto_config.set_stat_prefix("foo");
-  proto_config.mutable_timeout()->set_seconds(1);
-  auto* descriptors = proto_config.mutable_descriptors();
-  auto* descriptor = descriptors->Add();
-  auto* entries = descriptor->mutable_entries();
-  auto* entry = entries->Add();
-  entry->set_key("my_key");
-  entry->set_value("my_value");
+  Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
 
   NiceMock<MockFactoryContext> context;
   RateLimitConfigFactory factory;
@@ -193,20 +259,24 @@ TEST(NetworkFilterConfigTest, RatelimitCorrectProto) {
 }
 
 TEST(NetworkFilterConfigTest, RatelimitEmptyProto) {
-  envoy::api::v2::filter::network::RateLimit proto_config = *dynamic_cast<envoy::api::v2::filter::network::RateLimit*>(factory.createEmptyConfigProto().get());
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "domain" : "fake_domain",
+    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
+    "timeout_ms": 1337
+  }
+  )EOF";
 
-  proto_config.set_domain("fake_domain");
-  proto_config.set_stat_prefix("foo");
-  proto_config.mutable_timeout()->set_seconds(1);
-  auto* descriptors = proto_config.mutable_descriptors();
-  auto* descriptor = descriptors->Add();
-  auto* entries = descriptor->mutable_entries();
-  auto* entry = entries->Add();
-  entry->set_key("my_key");
-  entry->set_value("my_value");
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
 
   NiceMock<MockFactoryContext> context;
   RateLimitConfigFactory factory;
+  envoy::api::v2::filter::network::RateLimit proto_config =
+      *dynamic_cast<envoy::api::v2::filter::network::RateLimit*>(
+          factory.createEmptyConfigProto().get());
+  Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
+
   NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));

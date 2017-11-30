@@ -99,7 +99,7 @@ envoy_cc_library(
         "envoy_filter_network_redis_proxy",
         "envoy_filter_network_tcp_proxy",
         "envoy_filter_network_rate_limit",
-	"envoy_filter_network_client_ssl_auth",
+        "envoy_filter_network_client_ssl_auth",
     ],
     deps = [
         ":address_json_lib",

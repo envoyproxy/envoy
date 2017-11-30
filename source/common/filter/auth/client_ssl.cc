@@ -20,13 +20,14 @@ namespace Filter {
 namespace Auth {
 namespace ClientSsl {
 
-Config::Config(const envoy::api::v2::filter::network::ClientSSLAuth& config, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Stats::Scope& scope,
-               Runtime::RandomGenerator& random)
-  : RestApiFetcher(cm, config.auth_api_cluster(), dispatcher, random,
-                   std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000))),
-    tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
-    stats_(generateStats(scope, config.stat_prefix())) {
+Config::Config(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
+               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random)
+    : RestApiFetcher(
+          cm, config.auth_api_cluster(), dispatcher, random,
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000))),
+      tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
+      stats_(generateStats(scope, config.stat_prefix())) {
 
   if (!cm.get(remote_cluster_name_)) {
     throw EnvoyException(
@@ -38,16 +39,16 @@ Config::Config(const envoy::api::v2::filter::network::ClientSSLAuth& config, Thr
       [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
 }
 
-ConfigSharedPtr Config::create(const envoy::api::v2::filter::network::ClientSSLAuth& config, ThreadLocal::SlotAllocator& tls,
-                               Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                               Stats::Scope& scope, Runtime::RandomGenerator& random) {
+ConfigSharedPtr Config::create(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+                               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
+                               Event::Dispatcher& dispatcher, Stats::Scope& scope,
+                               Runtime::RandomGenerator& random) {
   ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, scope, random));
   new_config->initialize();
   return new_config;
 }
 
-const AllowedPrincipals& Config::allowedPrincipals() {
-  return tls_->getTyped<AllowedPrincipals>(); }
+const AllowedPrincipals& Config::allowedPrincipals() { return tls_->getTyped<AllowedPrincipals>(); }
 
 GlobalStats Config::generateStats(Stats::Scope& scope, const std::string& prefix) {
   std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
@@ -71,8 +72,7 @@ void Config::parseResponse(const Http::Message& message) {
   stats_.total_principals_.set(new_principals->size());
 }
 
-void Config::onFetchFailure(const EnvoyException*) {
-  stats_.update_failure_.inc(); }
+void Config::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(); }
 
 static const std::string Path = "/v1/certs/list/approved";
 

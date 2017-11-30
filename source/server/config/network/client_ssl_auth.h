@@ -18,7 +18,8 @@ namespace Configuration {
 class ClientSslAuthConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config, FactoryContext& context) override;
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
+                                             FactoryContext& context) override;
   NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                       FactoryContext& context) override;
 
