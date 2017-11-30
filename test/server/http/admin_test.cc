@@ -26,12 +26,13 @@ public:
   AdminFilterTest()
       : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
                TestEnvironment::temporaryPath("admin.address"),
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_),
+               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   NiceMock<MockInstance> server_;
+  Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -67,7 +68,7 @@ public:
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_) {
+               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_) {
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
   }
@@ -75,6 +76,7 @@ public:
   std::string address_out_path_;
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
+  Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
 };
 
@@ -99,7 +101,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
   AdminImpl admin_bad_profile_path(
       "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), server_);
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_);
   admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
@@ -115,7 +117,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, bad_path,
                                        Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                       server_);
+                                       server_, listener_scope_);
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 

@@ -125,7 +125,10 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_THAT(response->body(),
               testing::HasSubstr("http.downstream_rq{envoy.response_code_class=4xx,envoy.http_conn_"
-                                 "manager_prefix=admin} 4\n"));
+                                 "manager_prefix=admin} 2\n"));
+  EXPECT_THAT(response->body(),
+              testing::HasSubstr("listener.admin.http.downstream_rq{envoy.response_code_class=4xx,"
+                                 "envoy.http_conn_manager_prefix=admin} 2\n"));
   EXPECT_THAT(response->body(), testing::HasSubstr("# TYPE http.downstream_rq counter\n"));
   EXPECT_THAT(response->body(),
               testing::HasSubstr("cluster.upstream_cx_active{envoy.cluster_name=cds} 0\n"));
