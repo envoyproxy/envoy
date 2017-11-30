@@ -200,8 +200,8 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   //                     we will need to add thread local cluster removal callbacks so that we can
   //                     safely clean things up and fail requests.
   ASSERT(!cluster_->info()->addedViaApi());
-  local_host_set_member_update_cb_handle_ = cluster_->hostSet().addMemberUpdateCb(
-      [this](const std::vector<Upstream::HostSharedPtr>&,
+  local_host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
+      [this](uint32_t, const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });

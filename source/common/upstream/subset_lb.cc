@@ -31,7 +31,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   update(host_set.hosts(), {});
 
   // Configure future updates.
-  host_set.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
+  host_set.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed) {
     update(hosts_added, hosts_removed);
   });

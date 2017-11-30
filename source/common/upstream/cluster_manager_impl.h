@@ -196,12 +196,12 @@ private:
                                                LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
-      const HostSet& hostSet() override { return host_set_; }
+      const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
 
       ThreadLocalClusterManagerImpl& parent_;
-      HostSetImpl host_set_;
+      PrioritySetImpl priority_set_;
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
@@ -214,7 +214,8 @@ private:
     ~ThreadLocalClusterManagerImpl();
     void drainConnPools(const std::vector<HostSharedPtr>& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    static void updateClusterMembership(const std::string& name, HostVectorConstSharedPtr hosts,
+    static void updateClusterMembership(const std::string& name, uint32_t priority,
+                                        HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
                                         HostListsConstSharedPtr hosts_per_locality,
                                         HostListsConstSharedPtr healthy_hosts_per_locality,
@@ -227,7 +228,7 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
-    const HostSet* local_host_set_{};
+    const PrioritySet* local_priority_set_{};
   };
 
   struct PrimaryClusterData {
@@ -242,7 +243,7 @@ private:
   static ClusterManagerStats generateStats(Stats::Scope& scope);
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void postInitializeCluster(Cluster& cluster);
-  void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
+  void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
