@@ -37,17 +37,18 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return the file descriptor associated with the connection.
+   * @return int the file descriptor associated with the connection.
    */
   virtual int fd() PURE;
 
   /**
    * @return the connection interface.
    */
-  virtual Connection& connection() PURE;
+  virtual Network::Connection& connection() PURE;
 
   /**
-   * @return return whether the read buffer should be drained
+   * @return whether the read buffer should be drained. This is used to enforce yielding for
+   *         configured read limits.
    */
   virtual bool shouldDrainReadBuffer() PURE;
 
@@ -58,18 +59,22 @@ public:
   virtual void setReadBufferReady() PURE;
 
   /**
-   * Raise a connection event to the connection.
+   * Raise a connection event to the connection. This can be used by a secure socket (e.g. TLS) 
+   * to raise a connected event when handshake is done.
    * @param event supplies the connection event
    */
   virtual void raiseEvent(ConnectionEvent event) PURE;
 };
 
+/**
+ * A transport socket that does actual read / write.
+ */
 class TransportSocket {
 public:
   virtual ~TransportSocket() {}
 
   /**
-   * Called by connection once to intiialize the transport socket callbacks that the transport
+   * Called by connection once to initialize the transport socket callbacks that the transport
    * socket should use.
    * @param callbacks supplies the callbacks instance.
    */
@@ -89,13 +94,13 @@ public:
 
   /**
    * Closes the transport socket.
-   * @param event suuplies the connection event that closing the socket.
+   * @param event suuplies the connection event that is closing the socket.
    */
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
    *
-   * @param buffer supplies the buffer read to.
+   * @param buffer supplies the buffer to read to.
    * @return the IoResult of the read action.
    */
   virtual IoResult doRead(Buffer::Instance& buffer) PURE;
@@ -107,7 +112,7 @@ public:
   virtual IoResult doWrite(Buffer::Instance& buffer) PURE;
 
   /**
-   * Called when connection established.
+   * Called when underlying transport is established.
    */
   virtual void onConnected() PURE;
 };

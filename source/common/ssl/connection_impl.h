@@ -50,6 +50,7 @@ private:
   bool handshake_complete_{};
 };
 
+// TODO(lizan): Remove Ssl::ConnectionImpl entirely when factory of TransportSocket is ready.
 class ConnectionImpl : public Network::ConnectionImpl {
 public:
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,

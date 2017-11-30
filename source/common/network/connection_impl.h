@@ -46,6 +46,7 @@ class ConnectionImpl : public virtual Connection,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
+  // TODO(lizan): Remove the old style constructor when factory is ready.
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
@@ -56,7 +57,7 @@ public:
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address,
-                 TransportSocketPtr transport_socket, bool using_original_dst, bool connected);
+                 TransportSocketPtr&& transport_socket, bool using_original_dst, bool connected);
 
   ~ConnectionImpl();
 

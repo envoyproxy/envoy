@@ -65,7 +65,7 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
-                               TransportSocketPtr transport_socket, bool using_original_dst,
+                               TransportSocketPtr&& transport_socket, bool using_original_dst,
                                bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address),
       local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
