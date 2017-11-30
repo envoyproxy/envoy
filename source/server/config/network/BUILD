@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/filter/auth:client_ssl_lib",
     ],
@@ -94,8 +95,10 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/filter:ratelimit_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

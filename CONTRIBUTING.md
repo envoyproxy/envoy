@@ -24,17 +24,17 @@ maximize the chances of your PR being merged.
   APIs (SDS, CDS, RDS, etc.), and CLI switches. We will also try to not change behavioral semantics
   (e.g., HTTP header processing order), though this is harder to outright guarantee.
 * We reserve the right to deprecate configuration, and at the beginning of the following release
-  cycle remove the deprecated configuration. For example, all deprecations between 1.3.0 and 
+  cycle remove the deprecated configuration. For example, all deprecations between 1.3.0 and
   1.4.0 will be deleted soon AFTER 1.4.0 is tagged and released (at the beginning of the 1.5.0
   release cycle).
-* This policy means that organizations deploying master should have some time to get ready for 
+* This policy means that organizations deploying master should have some time to get ready for
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
   conforms to the public interface documentation should continue to compile and work within the
   deprecation window. We make no guarantees about code or deployments that rely on undocumented
   behavior.
 * All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
-* All deprecations/breaking changes will be announced to the 
+* All deprecations/breaking changes will be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
 # Release cadence
@@ -57,7 +57,9 @@ maximize the chances of your PR being merged.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
-* Any PR that changes user-facing behavior **must** have associated documentation.
+* Any PR that changes user-facing behavior **must** have associated documentation in
+  [data-plane-api](https://github.com/envoyproxy/data-plane-api/tree/master/docs) as well as
+  [raw release notes](RAW_RELEASE_NOTES.md).
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -80,7 +82,7 @@ maximize the chances of your PR being merged.
   Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
-* If your PR involves any changes to 
+* If your PR involves any changes to
   [envoy-filter-example](https://github.com/envoyproxy/envoy-filter-example) (for example making a new
   branch so that CI can pass) it is your responsibility to follow through with merging those
   changes back to master once the CI dance is done.
@@ -103,7 +105,7 @@ maximize the chances of your PR being merged.
 * Please **clean up the commit message** before merging. By default, GitHub fills the squash merge
   commit message with every individual commit from the PR. Generally, we want a commit message
   that is roughly equal to the original PR title and description.
-* If a PR includes a deprecation/breaking change, notification should be sent to the 
+* If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
 # DCO: Sign your work

@@ -13,9 +13,8 @@
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
-#include "common/json/json_validator.h"
+
+#include "api/filter/http/rate_limit.pb.h"
 
 namespace Envoy {
 namespace Http {
@@ -29,14 +28,14 @@ enum class FilterRequestType { Internal, External, Both };
 /**
  * Global configuration for the HTTP rate limit filter.
  */
-class FilterConfig : Json::Validator {
+class FilterConfig {
 public:
-  FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
-               Stats::Scope& scope, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-      : Json::Validator(config, Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA),
-        domain_(config.getString("domain")),
-        stage_(static_cast<uint64_t>(config.getInteger("stage", 0))),
-        request_type_(stringToType(config.getString("request_type", "both"))),
+  FilterConfig(const envoy::api::v2::filter::http::RateLimit& config,
+               const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+      : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
+        request_type_(config.request_type().empty() ? stringToType("both")
+                                                    : stringToType(config.request_type())),
         local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }

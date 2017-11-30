@@ -38,9 +38,9 @@ public:
   virtual ~HttpTracerFactory() {}
 
   /**
-   * Create a particular HttpTracer implementation.  If the implementation is unable to produce an
+   * Create a particular HttpTracer implementation. If the implementation is unable to produce an
    * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
-   * general error or a Json::Exception if the json configuration is erroneous.  The returned
+   * general error or a Json::Exception if the json configuration is erroneous. The returned
    * pointer should always be valid.
    * @param json_config supplies the general json configuration for the HttpTracer
    * @param server supplies the server instance

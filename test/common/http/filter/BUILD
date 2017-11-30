@@ -75,6 +75,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
+        "//source/common/config:filter_json_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/filter:ratelimit_includes",
         "//source/common/http/filter:ratelimit_lib",

@@ -11,7 +11,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/json/json_loader.h"
+#include "api/filter/network/rate_limit.pb.h"
 
 namespace Envoy {
 namespace RateLimit {
@@ -42,7 +42,8 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const Json::Object& config, Stats::Scope& scope, Runtime::Loader& runtime);
+  Config(const envoy::api::v2::filter::network::RateLimit& config, Stats::Scope& scope,
+         Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
   const std::vector<Descriptor>& descriptors() { return descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }

@@ -114,13 +114,13 @@ TEST_F(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
 
 TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
-  // there is no death.  The positive case is covered in MultiKillDeathTest.
+  // there is no death. The positive case is covered in MultiKillDeathTest.
   InSequence s;
   GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
   auto unpet_dog = gd.createWatchDog(0);
   auto pet_dog = gd.createWatchDog(1);
   // This part "waits" 600 milliseconds while one dog is touched every 100, and
-  // the other is not.  600ms is over the threshold of 500ms for multi-kill but
+  // the other is not. 600ms is over the threshold of 500ms for multi-kill but
   // only one is nonresponsive, so there should be no kill (single kill
   // threshold of 1s is not reached).
   for (int i = 0; i < 6; i++) {
