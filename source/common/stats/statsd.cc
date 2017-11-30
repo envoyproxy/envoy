@@ -55,9 +55,7 @@ void Writer::send(const std::string& message) {
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address)
     : tls_(tls.allocateSlot()), server_address_(address) {
-  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<Writer>(this->server_address_);
-  });
+  setWriter<Writer>();
 }
 
 void UdpStatsdSink::flushCounter(const Counter& counter, uint64_t delta) {

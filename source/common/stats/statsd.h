@@ -31,9 +31,10 @@ public:
   // Called in unit test to validate address.
   int getFdForTests() const { return fd_; };
 
-private:
+protected:
   void send(const std::string& message);
 
+private:
   int fd_;
 };
 
@@ -54,8 +55,16 @@ public:
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
 
-private:
+protected:
   ThreadLocal::SlotPtr tls_;
+
+  template <class T> void setWriter() {
+    tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<T>(this->server_address_);
+    });
+  }
+
+private:
   Network::Address::InstanceConstSharedPtr server_address_;
 };
 

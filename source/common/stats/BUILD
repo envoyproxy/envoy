@@ -44,6 +44,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dog_statsd_lib",
+    srcs = ["dog_statsd.cc"],
+    hdrs = ["dog_statsd.h"],
+    deps = [
+        "statsd_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "thread_local_store_lib",
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
