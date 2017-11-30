@@ -368,44 +368,6 @@ TEST(RedisClientFactoryImplTest, Basic) {
   client->close();
 }
 
-// TEST(RedisClientFactoryImplTest, OutlierDisabled) {
-//   ClientFactoryImpl factory;
-//   Upstream::MockHost::MockCreateConnectionData conn_info;
-//   conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
-//   std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
-//   EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
-//   NiceMock<Event::MockDispatcher> dispatcher;
-//   ConfigOutlierDisabled config;
-//   ClientPtr client = factory.create(host, dispatcher, config);
-//   client->
-
-//   //   InSequence s;
-
-//   // setup();
-
-//   // NiceMock<Network::MockConnectionCallbacks> connection_callbacks;
-//   // client_->addConnectionCallbacks(connection_callbacks);
-
-//   // RespValue request1;
-//   // MockPoolCallbacks callbacks1;
-//   // EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-//   // PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
-//   // EXPECT_NE(nullptr, handle1);
-
-//   // onConnected();
-
-//   // EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SERVER_FAILURE));
-//   // EXPECT_CALL(callbacks1, onFailure());
-//   // EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-//   // EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
-//   // upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-//   // EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
-//   // EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_remote_with_active_rq_.value());
-
-//   client->close();
-// }
-
 class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
 public:
   RedisConnPoolImplTest() {
