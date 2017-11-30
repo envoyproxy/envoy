@@ -6,7 +6,7 @@ To build Envoy with Bazel in a production environment, where the [Envoy
 dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements) are typically
 independently sourced, the following steps should be followed:
 
-1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
+1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements).
 3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
    to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
@@ -24,11 +24,11 @@ dependencies are provided. These are provided as is, they are only suitable for 
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
 up-to-date with the latest security patches.
 
-1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
+2.  Install external dependencies libtool, cmake, and realpath libraries separately.
 On Ubuntu, run the following commands:
 ```
- apt-get install libtoolize
+ apt-get install libtool
  apt-get install cmake
  apt-get install realpath
 ```

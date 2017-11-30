@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "common/json/config_schemas.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "fmt/format.h"
@@ -12,16 +11,15 @@ namespace Envoy {
 namespace RateLimit {
 namespace TcpFilter {
 
-Config::Config(const Json::Object& config, Stats::Scope& scope, Runtime::Loader& runtime)
-    : domain_(config.getString("domain")),
-      stats_(generateStats(config.getString("stat_prefix"), scope)), runtime_(runtime) {
+Config::Config(const envoy::api::v2::filter::network::RateLimit& config, Stats::Scope& scope,
+               Runtime::Loader& runtime)
+    : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
+      runtime_(runtime) {
 
-  config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
-
-  for (const Json::ObjectSharedPtr& descriptor : config.getObjectArray("descriptors")) {
+  for (const auto& descriptor : config.descriptors()) {
     Descriptor new_descriptor;
-    for (const Json::ObjectSharedPtr& entry : descriptor->asObjectArray()) {
-      new_descriptor.entries_.push_back({entry->getString("key"), entry->getString("value")});
+    for (const auto& entry : descriptor.entries()) {
+      new_descriptor.entries_.push_back({entry.key(), entry.value()});
     }
     descriptors_.push_back(new_descriptor);
   }

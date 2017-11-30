@@ -9,7 +9,7 @@ namespace Server {
 
 /**
  * The GuardDog runs a background thread which scans a number of shared WatchDog
- * objects periodically to verify that they have been recently touched.  If some
+ * objects periodically to verify that they have been recently touched. If some
  * of the watched items have not responded the GuardDog will take action ranging
  * from stats counter increments to killing the entire process (if a deadlock is
  * suspected).
@@ -24,7 +24,7 @@ public:
    * Get a WatchDog object pointer to a new WatchDog.
    *
    * After this method returns the WatchDog object must be touched periodically
-   * to avoid triggering the GuardDog.  If no longer needed use the
+   * to avoid triggering the GuardDog. If no longer needed use the
    * stopWatching() method to remove it from the list of watched objects.
    *
    * @param thread_id A numeric thread ID, like from Thread::currentThreadId()

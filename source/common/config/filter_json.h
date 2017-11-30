@@ -5,9 +5,12 @@
 #include "api/filter/http/buffer.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/health_check.pb.h"
+#include "api/filter/http/rate_limit.pb.h"
 #include "api/filter/http/router.pb.h"
+#include "api/filter/network/client_ssl_auth.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
+#include "api/filter/network/rate_limit.pb.h"
 #include "api/filter/network/redis_proxy.pb.h"
 #include "api/filter/network/tcp_proxy.pb.h"
 
@@ -18,92 +21,121 @@ class FilterJson {
 public:
   /**
    * Translate a v1 JSON access log filter object to v2
-   * envoy::api::v2::filter::AccessLogFilter.
-   * @param json_access_log_filter source v1 JSON access log object.
-   * @param access_log_filter destination v2 envoy::api::v2::filter::AccessLog.
+   * envoy::api::v2::filter::accesslog::AccessLogFilter.
+   * @param json_config source v1 JSON access log object.
+   * @param proto_config destination v2 envoy::api::v2::filter::accesslog::AccessLog.
    */
-  static void translateAccessLogFilter(const Json::Object& json_access_log_filter,
-                                       envoy::api::v2::filter::AccessLogFilter& access_log_filter);
+  static void
+  translateAccessLogFilter(const Json::Object& json_config,
+                           envoy::api::v2::filter::accesslog::AccessLogFilter& proto_config);
 
   /**
-   * Translate a v1 JSON access log object to v2 envoy::api::v2::filter::AccessLog.
-   * @param json_access_log source v1 JSON access log object.
-   * @param access_log destination v2 envoy::api::v2::filter::AccessLog.
+   * Translate a v1 JSON access log object to v2 envoy::api::v2::filter::accesslog::AccessLog.
+   * @param json_config source v1 JSON access log object.
+   * @param proto_config destination v2 envoy::api::v2::filter::accesslog::AccessLog.
    */
-  static void translateAccessLog(const Json::Object& json_access_log,
-                                 envoy::api::v2::filter::AccessLog& access_log);
+  static void translateAccessLog(const Json::Object& json_config,
+                                 envoy::api::v2::filter::accesslog::AccessLog& proto_config);
 
   /**
    * Translate a v1 JSON HTTP connection manager object to v2
    * envoy::api::v2::filter::network::HttpConnectionManager.
-   * @param json_http_connection_manager source v1 JSON HTTP connection manager object.
-   * @param http_connection_manager destination v2
+   * @param json_config source v1 JSON HTTP connection manager object.
+   * @param proto_config destination v2
    * envoy::api::v2::filter::network::HttpConnectionManager.
    */
   static void translateHttpConnectionManager(
-      const Json::Object& json_http_connection_manager,
-      envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager);
+      const Json::Object& json_config,
+      envoy::api::v2::filter::network::HttpConnectionManager& proto_config);
 
   /**
    * Translate a v1 JSON Redis proxy object to v2 envoy::api::v2::filter::network::RedisProxy.
-   * @param json_redis_proxy source v1 JSON HTTP connection manager object.
-   * @param redis_proxy destination v2
+   * @param json_config source v1 JSON HTTP connection manager object.
+   * @param proto_config destination v2
    * envoy::api::v2::filter::network::RedisProxy.
    */
-  static void translateRedisProxy(const Json::Object& json_redis_proxy,
-                                  envoy::api::v2::filter::network::RedisProxy& redis_proxy);
+  static void translateRedisProxy(const Json::Object& json_config,
+                                  envoy::api::v2::filter::network::RedisProxy& proto_config);
 
   /**
    * Translate a v1 JSON Mongo proxy object to v2 envoy::api::v2::filter::network::MongoProxy.
-   * @param json_mongo_proxy source v1 JSON HTTP connection manager object.
-   * @param mongo_proxy destination v2
+   * @param json_config source v1 JSON HTTP connection manager object.
+   * @param proto_config destination v2
    * envoy::api::v2::filter::network::MongoProxy.
    */
-  static void translateMongoProxy(const Json::Object& json_mongo_proxy,
-                                  envoy::api::v2::filter::network::MongoProxy& mongo_proxy);
+  static void translateMongoProxy(const Json::Object& json_config,
+                                  envoy::api::v2::filter::network::MongoProxy& proto_config);
 
   /**
    * Translate a v1 JSON Fault filter object to v2 envoy::api::v2::filter::http::HTTPFault.
-   * @param json_fault source v1 JSON HTTP Fault Filter object.
-   * @param fault destination v2
+   * @param json_config source v1 JSON HTTP Fault Filter object.
+   * @param proto_config destination v2
    * envoy::api::v2::filter::http::HTTPFault.
    */
-  static void translateFaultFilter(const Json::Object& json_fault,
-                                   envoy::api::v2::filter::http::HTTPFault& fault);
+  static void translateFaultFilter(const Json::Object& json_config,
+                                   envoy::api::v2::filter::http::HTTPFault& proto_config);
 
   /**
    * Translate a v1 JSON Health Check filter object to v2 envoy::api::v2::filter::http::HealthCheck.
-   * @param config source v1 JSON Health Check Filter object.
-   * @param health_check destination v2
+   * @param json_config source v1 JSON Health Check Filter object.
+   * @param proto_config destination v2
    * envoy::api::v2::filter::http::HealthCheck.
    */
-  static void translateHealthCheckFilter(const Json::Object& config,
-                                         envoy::api::v2::filter::http::HealthCheck& health_check);
+  static void translateHealthCheckFilter(const Json::Object& json_config,
+                                         envoy::api::v2::filter::http::HealthCheck& proto_config);
 
-  /*
+  /**
    * Translate a v1 JSON Router object to v2 envoy::api::v2::filter::http::Router.
-   * @param json_router source v1 JSON HTTP router object.
-   * @param router destination v2 envoy::api::v2::filter::http::Router.
+   * @param json_config source v1 JSON HTTP router object.
+   * @param proto_config destination v2 envoy::api::v2::filter::http::Router.
    */
-  static void translateRouter(const Json::Object& json_router,
-                              envoy::api::v2::filter::http::Router& router);
+  static void translateRouter(const Json::Object& json_config,
+                              envoy::api::v2::filter::http::Router& proto_config);
 
   /**
    * Translate a v1 JSON Buffer filter object to v2 envoy::api::v2::filter::http::Buffer.
-   * @param json_buffer source v1 JSON HTTP Buffer Filter object.
-   * @param buffer destination v2
+   * @param json_config source v1 JSON HTTP Buffer Filter object.
+   * @param proto_config destination v2
    * envoy::api::v2::filter::http::Buffer.
    */
-  static void translateBufferFilter(const Json::Object& json_buffer,
-                                    envoy::api::v2::filter::http::Buffer& buffer);
+  static void translateBufferFilter(const Json::Object& json_config,
+                                    envoy::api::v2::filter::http::Buffer& proto_config);
 
   /**
    * Translate a v1 JSON TCP proxy filter object to a v2 envoy::api::v2::filter::network::TcpProxy.
-   * @param json_tcp_proxy source v1 JSON TCP proxy object.
-   * @param tcp_proxy destination v2 envoy::api::v2::filter::network::TcpProxy.
+   * @param json_config source v1 JSON TCP proxy object.
+   * @param proto_config destination v2 envoy::api::v2::filter::network::TcpProxy.
    */
-  static void translateTcpProxy(const Json::Object& json_tcp_proxy,
-                                envoy::api::v2::filter::network::TcpProxy& tcp_proxy);
+  static void translateTcpProxy(const Json::Object& json_config,
+                                envoy::api::v2::filter::network::TcpProxy& proto_config);
+
+  /**
+   * Translate a v1 JSON TCP Rate Limit filter object to v2
+   * envoy::api::v2::filter::network::RateLimit.
+   * @param json_config source v1 JSON Tcp Rate Limit Filter object.
+   * @param proto_config destination v2 envoy::api::v2::filter::network::RateLimit.
+   */
+  static void translateTcpRateLimitFilter(const Json::Object& json_config,
+                                          envoy::api::v2::filter::network::RateLimit& proto_config);
+
+  /**
+   * Translate a v1 JSON HTTP Rate Limit filter object to v2
+   * envoy::api::v2::filter::http::RateLimit.
+   * @param json_config source v1 JSON Http Rate Limit Filter object.
+   * @param proto_config destination v2 envoy::api::v2::filter::http::RateLimit.
+   */
+  static void translateHttpRateLimitFilter(const Json::Object& json_config,
+                                           envoy::api::v2::filter::http::RateLimit& proto_config);
+
+  /**
+   * Translate a v1 JSON Client SSL Auth filter object to v2
+   * envoy::api::v2::filter::network::ClientSSLAuth.
+   * @param json_config source v1 JSON Client SSL Auth Filter object.
+   * @param proto_config destination v2 envoy::api::v2::filter::network::ClientSSLAuth.
+   */
+  static void
+  translateClientSslAuthFilter(const Json::Object& json_config,
+                               envoy::api::v2::filter::network::ClientSSLAuth& proto_config);
 };
 
 } // namespace Config

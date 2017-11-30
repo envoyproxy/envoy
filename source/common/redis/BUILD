@@ -47,8 +47,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/http:codes_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
     ],

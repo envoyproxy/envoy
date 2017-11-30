@@ -605,7 +605,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   if (cluster->lbSubsetInfo().isEnabled()) {
     lb_.reset(new SubsetLoadBalancer(cluster->lbType(), host_set_, parent.local_host_set_,
                                      cluster->stats(), parent.parent_.runtime_,
-                                     parent.parent_.random_, cluster->lbSubsetInfo()));
+                                     parent.parent_.random_, cluster->lbSubsetInfo(),
+                                     cluster->lbRingHashConfig()));
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -625,7 +626,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::RingHash: {
       lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
-                                         parent.parent_.random_));
+                                         parent.parent_.random_, cluster->lbRingHashConfig()));
       break;
     }
     case LoadBalancerType::OriginalDst: {

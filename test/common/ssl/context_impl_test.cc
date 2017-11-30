@@ -174,7 +174,7 @@ public:
     Runtime::MockLoader runtime;
     ContextManagerImpl manager(runtime);
     Stats::IsolatedStoreImpl store;
-    ServerContextPtr server_ctx(manager.createSslServerContext(store, cfg));
+    ServerContextPtr server_ctx(manager.createSslServerContext("", {}, store, cfg, true));
   }
 
   static void loadConfigV2(envoy::api::v2::DownstreamTlsContext& cfg) {
@@ -214,7 +214,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
-  // First key is valid, second key isn't.  Should throw if any keys are invalid.
+  // First key is valid, second key isn't. Should throw if any keys are invalid.
   std::string json = R"EOF(
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",

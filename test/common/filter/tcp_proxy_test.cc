@@ -354,10 +354,10 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
 
 TEST(TcpProxyConfigTest, AccessLogConfig) {
   envoy::api::v2::filter::network::TcpProxy config;
-  envoy::api::v2::filter::AccessLog* log = config.mutable_access_log()->Add();
+  envoy::api::v2::filter::accesslog::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Config::AccessLogNames::get().FILE);
   {
-    envoy::api::v2::filter::FileAccessLog file_access_log;
+    envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
@@ -367,7 +367,7 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   log = config.mutable_access_log()->Add();
   log->set_name(Config::AccessLogNames::get().FILE);
   {
-    envoy::api::v2::filter::FileAccessLog file_access_log;
+    envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
     MessageUtil::jsonConvert(file_access_log, *custom_config);
@@ -423,9 +423,9 @@ public:
   // Return the default config, plus one file access log with the specified format
   envoy::api::v2::filter::network::TcpProxy accessLogConfig(const std::string access_log_format) {
     envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
-    envoy::api::v2::filter::AccessLog* access_log = config.mutable_access_log()->Add();
+    envoy::api::v2::filter::accesslog::AccessLog* access_log = config.mutable_access_log()->Add();
     access_log->set_name(Config::AccessLogNames::get().FILE);
-    envoy::api::v2::filter::FileAccessLog file_access_log;
+    envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
     MessageUtil::jsonConvert(file_access_log, *access_log->mutable_config());
@@ -438,6 +438,7 @@ public:
   void setup(uint32_t connections, const envoy::api::v2::filter::network::TcpProxy& config) {
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
+    upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     if (connections >= 1) {
       {
         testing::InSequence sequence;
@@ -450,12 +451,15 @@ public:
 
       for (uint32_t i = 0; i < connections; i++) {
         upstream_connections_.push_back(new NiceMock<Network::MockClientConnection>());
+        upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
         conn_infos_.push_back(Upstream::MockHost::MockCreateConnectionData());
         conn_infos_.at(i).connection_ = upstream_connections_.back();
-        conn_infos_.at(i).host_description_ = Upstream::makeTestHost(
-            factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
-            "tcp://127.0.0.1:80");
+        conn_infos_.at(i).host_description_ = upstream_hosts_.back();
 
+        ON_CALL(*upstream_hosts_.at(i), cluster())
+            .WillByDefault(ReturnPointee(
+                factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
+        ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
         ON_CALL(*upstream_connections_.at(i), localAddress())
             .WillByDefault(ReturnPointee(upstream_local_address_));
         EXPECT_CALL(*upstream_connections_.at(i), addReadFilter(_))
@@ -498,6 +502,7 @@ public:
   TcpProxyConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
   std::vector<NiceMock<Network::MockClientConnection>*> upstream_connections_{};
   std::vector<Upstream::MockHost::MockCreateConnectionData> conn_infos_;
   Network::ReadFilterSharedPtr upstream_read_filter_;
@@ -505,6 +510,7 @@ public:
   std::unique_ptr<TcpProxy> filter_;
   std::string access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
 
 TEST_F(TcpProxyTest, UpstreamDisconnect) {
@@ -588,6 +594,25 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_no_successful_host")
                     .value());
+}
+
+// Test that the tcp proxy sends the correct notifications to the outlier detector
+TEST_F(TcpProxyTest, OutlierDetection) {
+  envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
+  config.mutable_max_connect_attempts()->set_value(3);
+  setup(3, config);
+
+  EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::TIMEOUT));
+  connect_timers_.at(0)->callback_();
+
+  EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::CONNECT_FAILED));
+  upstream_connections_.at(1)->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::SUCCESS));
+  raiseEventUpstreamConnected(2);
 }
 
 TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {

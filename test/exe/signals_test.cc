@@ -18,7 +18,7 @@ namespace Envoy {
 
 // Death tests that expect a particular output are disabled under address sanitizer.
 // The sanitizer does its own special signal handling and prints messages that are
-// not ours instead of what this test expects.  As of latest Clang this appears
+// not ours instead of what this test expects. As of latest Clang this appears
 // to include abort() as well.
 #ifndef ASANITIZED
 TEST(Signals, InvalidAddressDeathTest) {
@@ -36,7 +36,7 @@ TEST(Signals, BusDeathTest) {
   SignalAction actions;
   EXPECT_DEATH(
       []() -> void {
-        // Bus error is tricky.  There's one way that can work on POSIX systems
+        // Bus error is tricky. There's one way that can work on POSIX systems
         // described below but it depends on mmaping a file. Just make it easy and
         // raise a bus.
         //
@@ -53,7 +53,7 @@ TEST(Signals, BadMathDeathTest) {
   EXPECT_DEATH(
       []() -> void {
         // It turns out to be really hard to not have the optimizer get rid of a
-        // division by zero.  Just raise the signal for this test.
+        // division by zero. Just raise the signal for this test.
         raise(SIGFPE);
       }(),
       "backtrace.*Floating point");

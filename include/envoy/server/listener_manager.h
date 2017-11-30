@@ -72,9 +72,9 @@ public:
   virtual Network::ListenSocket& socket() PURE;
 
   /**
-   * @return Ssl::ServerContext* the SSL context
+   * @return Ssl::ServerContext* the default SSL context.
    */
-  virtual Ssl::ServerContext* sslContext() PURE;
+  virtual Ssl::ServerContext* defaultSslContext() PURE;
 
   /**
    * @return bool whether to use the PROXY Protocol V1

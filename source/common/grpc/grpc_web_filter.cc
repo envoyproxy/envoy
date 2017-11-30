@@ -72,7 +72,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
+Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (!is_grpc_web_request_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -83,13 +83,23 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   }
 
   // Parse application/grpc-web-text format.
-  if (data.length() + decoding_buffer_.length() < 4) {
+  const uint64_t available = data.length() + decoding_buffer_.length();
+  if (end_stream) {
+    if (available == 0) {
+      return Http::FilterDataStatus::Continue;
+    }
+    if (available % 4 != 0) {
+      // Client end stream with invalid base64. Note, base64 padding is mandatory.
+      Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
+                                    "Bad gRPC-web request, invalid base64 data.");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+  } else if (available < 4) {
     decoding_buffer_.move(data);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  const uint64_t needed =
-      (data.length() + decoding_buffer_.length()) / 4 * 4 - decoding_buffer_.length();
+  const uint64_t needed = available / 4 * 4 - decoding_buffer_.length();
   decoding_buffer_.move(data, needed);
   const std::string decoded = Base64::decode(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),

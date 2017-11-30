@@ -10,7 +10,7 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/accesslog.pb.h"
+#include "api/filter/accesslog/accesslog.pb.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -23,7 +23,7 @@ public:
   /**
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
-  static FilterPtr fromProto(const envoy::api::v2::filter::AccessLogFilter& config,
+  static FilterPtr fromProto(const envoy::api::v2::filter::accesslog::AccessLogFilter& config,
                              Runtime::Loader& runtime);
 };
 
@@ -32,12 +32,12 @@ public:
  */
 class ComparisonFilter : public Filter {
 protected:
-  ComparisonFilter(const envoy::api::v2::filter::ComparisonFilter& config,
+  ComparisonFilter(const envoy::api::v2::filter::accesslog::ComparisonFilter& config,
                    Runtime::Loader& runtime);
 
   bool compareAgainstValue(uint64_t lhs);
 
-  envoy::api::v2::filter::ComparisonFilter config_;
+  envoy::api::v2::filter::accesslog::ComparisonFilter config_;
   Runtime::Loader& runtime_;
 };
 
@@ -46,7 +46,8 @@ protected:
  */
 class StatusCodeFilter : public ComparisonFilter {
 public:
-  StatusCodeFilter(const envoy::api::v2::filter::StatusCodeFilter& config, Runtime::Loader& runtime)
+  StatusCodeFilter(const envoy::api::v2::filter::accesslog::StatusCodeFilter& config,
+                   Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
@@ -58,7 +59,8 @@ public:
  */
 class DurationFilter : public ComparisonFilter {
 public:
-  DurationFilter(const envoy::api::v2::filter::DurationFilter& config, Runtime::Loader& runtime)
+  DurationFilter(const envoy::api::v2::filter::accesslog::DurationFilter& config,
+                 Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
@@ -70,8 +72,9 @@ public:
  */
 class OperatorFilter : public Filter {
 public:
-  OperatorFilter(const Protobuf::RepeatedPtrField<envoy::api::v2::filter::AccessLogFilter>& configs,
-                 Runtime::Loader& runtime);
+  OperatorFilter(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::filter::accesslog::AccessLogFilter>& configs,
+      Runtime::Loader& runtime);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -82,7 +85,7 @@ protected:
  */
 class AndFilter : public OperatorFilter {
 public:
-  AndFilter(const envoy::api::v2::filter::AndFilter& config, Runtime::Loader& runtime);
+  AndFilter(const envoy::api::v2::filter::accesslog::AndFilter& config, Runtime::Loader& runtime);
 
   // AccessLog::Filter
   bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
@@ -93,7 +96,7 @@ public:
  */
 class OrFilter : public OperatorFilter {
 public:
-  OrFilter(const envoy::api::v2::filter::OrFilter& config, Runtime::Loader& runtime);
+  OrFilter(const envoy::api::v2::filter::accesslog::OrFilter& config, Runtime::Loader& runtime);
 
   // AccessLog::Filter
   bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
@@ -124,7 +127,8 @@ public:
  */
 class RuntimeFilter : public Filter {
 public:
-  RuntimeFilter(const envoy::api::v2::filter::RuntimeFilter& config, Runtime::Loader& runtime);
+  RuntimeFilter(const envoy::api::v2::filter::accesslog::RuntimeFilter& config,
+                Runtime::Loader& runtime);
 
   // AccessLog::Filter
   bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
@@ -142,7 +146,7 @@ public:
   /**
    * Read a filter definition from proto and instantiate an Instance.
    */
-  static InstanceSharedPtr fromProto(const envoy::api::v2::filter::AccessLog& config,
+  static InstanceSharedPtr fromProto(const envoy::api::v2::filter::accesslog::AccessLog& config,
                                      Server::Configuration::FactoryContext& context);
 };
 

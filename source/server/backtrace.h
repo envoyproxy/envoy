@@ -14,7 +14,7 @@ namespace Envoy {
 
 /**
  * Use the Backward library ( https://github.com/bombela/backward-cpp ) to log
- * stack traces on demand.  To use this just do:
+ * stack traces on demand. To use this just do:
  *
  * BackwardsTrace tracer;
  * tracer.capture(); // Trace is captured as of here.
@@ -29,11 +29,11 @@ namespace Envoy {
  *
  * To resolve the addresses in the backtrace output and de-interleave
  * multithreaded output use the tools/stack_decode.py command and pass the
- * log/stderr output to stdin of the tool.  Backtrace lines will be resolved,
+ * log/stderr output to stdin of the tool. Backtrace lines will be resolved,
  * other lines will be passed through and echo'd unchanged.
  *
  * The stack_decode.py tool can also run envoy or a test as a child process if
- * you pass the command and arguments as arguments to the tool.  This enables
+ * you pass the command and arguments as arguments to the tool. This enables
  * you to run tests containing backtrace commands added for debugging and see
  * the output like this:
  *

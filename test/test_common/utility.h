@@ -35,7 +35,7 @@ namespace Envoy {
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
 
-// Random number generator which logs its seed to stderr.  To repeat a test run with a non-zero seed
+// Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {
 public:
@@ -164,7 +164,7 @@ public:
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.
-   * For many tests, we want a loopback address other than 127.0.0.1 where possible.  For some
+   * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
    * platforms such as OSX, only 127.0.0.1 is available for IPv4 loopback.
    *
    * @return string 127.0.0.x , where x is "1" for OSX and "9" otherwise.

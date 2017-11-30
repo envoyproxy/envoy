@@ -29,7 +29,7 @@ size_t roundUpMultipleNaturalAlignment(size_t val) {
 
 size_t RawStatData::size() {
   // Normally the compiler would do this, but because name_ is a flexible-array-length
-  // element, the compiler can't.  RawStatData is put into an array in HotRestartImpl, so
+  // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
   // it's important that each element starts on the required alignment for the type.
   return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + nameSize());
 }

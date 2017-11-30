@@ -10,10 +10,11 @@
 namespace Envoy {
 namespace Upstream {
 
-RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stats,
-                                           Runtime::Loader& runtime,
-                                           Runtime::RandomGenerator& random)
-    : host_set_(host_set), stats_(stats), runtime_(runtime), random_(random) {
+RingHashLoadBalancer::RingHashLoadBalancer(
+    HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random,
+    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
+    : host_set_(host_set), stats_(stats), runtime_(runtime), random_(random), config_(config) {
   host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
                                      const std::vector<HostSharedPtr>&) -> void { refresh(); });
 
@@ -76,8 +77,9 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* c
   }
 }
 
-void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
-                                        const std::vector<HostSharedPtr>& hosts) {
+void RingHashLoadBalancer::Ring::create(
+    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    const std::vector<HostSharedPtr>& hosts) {
   ENVOY_LOG(trace, "ring hash: building ring");
   ring_.clear();
   if (hosts.empty()) {
@@ -92,7 +94,9 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
   //       standpoint and duplicates the regeneration computation. In the future we might want
   //       to generate the rings centrally and then just RCU them out to each thread. This is
   //       sufficient for getting started.
-  uint64_t min_ring_size = runtime.snapshot().getInteger("upstream.ring_hash.min_ring_size", 1024);
+  const uint64_t min_ring_size =
+      config.valid() ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, 1024)
+                     : 1024;
 
   uint64_t hashes_per_host = 1;
   if (hosts.size() < min_ring_size) {
@@ -102,14 +106,18 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
     }
   }
 
-  ENVOY_LOG(trace, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size,
-            hashes_per_host);
+  ENVOY_LOG(info, "ring hash: min_ring_size={} hashes_per_host={}", min_ring_size, hashes_per_host);
   ring_.reserve(hosts.size() * hashes_per_host);
+
+  const bool use_std_hash =
+      config.valid()
+          ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, true)
+          : true;
   for (const auto& host : hosts) {
     for (uint64_t i = 0; i < hashes_per_host; i++) {
-      std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
-      // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
-      uint64_t hash = std::hash<std::string>()(hash_key);
+      const std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
+      const uint64_t hash =
+          use_std_hash ? std::hash<std::string>()(hash_key) : HashUtil::xxHash64(hash_key);
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
       ring_.push_back({hash, host});
     }
@@ -126,8 +134,8 @@ void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
 }
 
 void RingHashLoadBalancer::refresh() {
-  all_hosts_ring_.create(runtime_, host_set_.hosts());
-  healthy_hosts_ring_.create(runtime_, host_set_.healthyHosts());
+  all_hosts_ring_.create(config_, host_set_.hosts());
+  healthy_hosts_ring_.create(config_, host_set_.healthyHosts());
 }
 
 } // namespace Upstream

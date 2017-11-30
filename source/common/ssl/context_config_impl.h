@@ -26,11 +26,16 @@ public:
     return verify_subject_alt_name_list_;
   };
   const std::string& verifyCertificateHash() const override { return verify_certificate_hash_; };
+  unsigned minProtocolVersion() const override { return min_protocol_version_; };
+  unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
 protected:
   ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config);
 
 private:
+  static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
+                                      unsigned default_version);
+
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_ECDH_CURVES;
 
@@ -43,6 +48,8 @@ private:
   const std::string private_key_file_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::string verify_certificate_hash_;
+  const unsigned min_protocol_version_;
+  const unsigned max_protocol_version_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {

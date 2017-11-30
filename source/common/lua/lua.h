@@ -235,7 +235,7 @@ public:
    */
   void reset() {
     unref();
-    object_ = {};
+    object_ = std::pair<T*, lua_State*>{};
     ref_ = LUA_NOREF;
   }
 

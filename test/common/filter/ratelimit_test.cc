@@ -3,7 +3,9 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/config/filter_json.h"
 #include "common/filter/ratelimit.h"
+#include "common/json/json_loader.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -45,8 +47,10 @@ public:
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
         .WillByDefault(Return(true));
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new Config(*config, stats_store_, runtime_));
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+    envoy::api::v2::filter::network::RateLimit proto_config{};
+    Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
+    config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new MockClient();
     filter_.reset(new Instance(config_, ClientPtr{client_}));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -82,7 +86,10 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  EXPECT_THROW(Config(*json_config, stats_store_, runtime_), Json::Exception);
+  envoy::api::v2::filter::network::RateLimit proto_config{};
+
+  EXPECT_THROW(Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config),
+               Json::Exception);
 }
 
 TEST_F(RateLimitFilterTest, OK) {
