@@ -77,15 +77,15 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   if (line_parts[1] == "UNKNOWN") {
     // at this point we know it's a proxy protocol line, so we can remove it from the socket
     // and continue
-    auto local_address = Envoy::Network::Address::addressFromFd(fd_);
-    auto remote_address = Envoy::Network::Address::peerAddressFromFd(fd_);
-    ListenerImpl& listener = listener_;
-    int fd = fd_;
-    fd_ = -1;
-
-    removeFromList(parent_.connections_);
-
-    listener.newConnection(fd, remote_address, local_address, true);
+    Address::InstanceConstSharedPtr local_address = Envoy::Network::Address::addressFromFd(fd_);
+    Address::InstanceConstSharedPtr remote_address;
+    // we don't know the remote address
+    if (local_address->ip()->version() == Address::IpVersion::v4) {
+      remote_address = std::make_shared<Address::Ipv4Instance>(Address::Ipv4Instance("0.0.0.0"));
+    } else {
+      remote_address = std::make_shared<Address::Ipv6Instance>(Address::Ipv6Instance("::"));
+    }
+    reconnect(remote_address, local_address);
     return;
   }
 
@@ -124,6 +124,13 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   if (!remote_address->ip()->isUnicastAddress() || !local_address->ip()->isUnicastAddress()) {
     throw EnvoyException("failed to read proxy protocol");
   }
+
+  reconnect(remote_address, local_address);
+}
+
+void ProxyProtocol::ActiveConnection::reconnect(Address::InstanceConstSharedPtr remote_address,
+                                                Address::InstanceConstSharedPtr local_address) {
+
   ListenerImpl& listener = listener_;
   int fd = fd_;
   fd_ = -1;
