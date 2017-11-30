@@ -60,7 +60,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                      cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    const uint32_t priority = locality_lb_endpoint.priority().value();
+    const uint32_t priority = locality_lb_endpoint.priority();
     if (new_hosts.size() <= priority) {
       new_hosts.resize(priority + 1);
     }

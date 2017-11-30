@@ -279,7 +279,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   uint32_t port = 1000;
   auto add_hosts_to_priority = [cluster_load_assignment, &port](uint32_t priority, uint32_t n) {
     auto* endpoints = cluster_load_assignment->add_endpoints();
-    endpoints->mutable_priority()->set_value(priority);
+    endpoints->set_priority(priority);
 
     for (uint32_t i = 0; i < n; ++i) {
       auto* socket_address = endpoints->add_lb_endpoints()
@@ -341,7 +341,7 @@ TEST_F(EdsTest, PriorityAndLocality) {
       [cluster_load_assignment, &port](const std::string& region, const std::string& zone,
                                        const std::string& sub_zone, uint32_t priority, uint32_t n) {
         auto* endpoints = cluster_load_assignment->add_endpoints();
-        endpoints->mutable_priority()->set_value(priority);
+        endpoints->set_priority(priority);
         auto* locality = endpoints->mutable_locality();
         locality->set_region(region);
         locality->set_zone(zone);

@@ -49,7 +49,7 @@ public:
     }
 
     auto* winter_p1 = cluster_load_assignment.add_endpoints();
-    winter_p1->mutable_priority()->set_value(1);
+    winter_p1->set_priority(1);
     winter_p1->mutable_locality()->set_region("some_region");
     winter_p1->mutable_locality()->set_zone("zone_name");
     winter_p1->mutable_locality()->set_sub_zone("winter");
@@ -58,7 +58,7 @@ public:
     }
 
     auto* dragon_p1 = cluster_load_assignment.add_endpoints();
-    dragon_p1->mutable_priority()->set_value(1);
+    dragon_p1->set_priority(1);
     dragon_p1->mutable_locality()->set_region("some_region");
     dragon_p1->mutable_locality()->set_zone("zone_name");
     dragon_p1->mutable_locality()->set_sub_zone("dragon");
@@ -193,7 +193,8 @@ public:
   }
 
   envoy::api::v2::UpstreamLocalityStats localityStats(const std::string& sub_zone, uint64_t success,
-                                                      uint64_t error, uint64_t active) {
+                                                      uint64_t error, uint64_t active,
+                                                      uint32_t priority = 0) {
     envoy::api::v2::UpstreamLocalityStats locality_stats;
     auto* locality = locality_stats.mutable_locality();
     locality->set_region("some_region");
@@ -202,6 +203,7 @@ public:
     locality_stats.set_total_successful_requests(success);
     locality_stats.set_total_error_requests(error);
     locality_stats.set_total_requests_in_progress(active);
+    locality_stats.set_priority(priority);
     return locality_stats;
   }
 
@@ -264,7 +266,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   }
 
   // Verify we do not get empty stats for non-zero priorities.
-  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0)});
+  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0),
+                           localityStats("winter", 0, 0, 0, 1)});
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_EQ(2, test_server_->counter("load_reporter.responses")->value());
