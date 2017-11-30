@@ -42,7 +42,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
-  std::vector<HostSharedPtr> new_hosts;
+  typedef std::unique_ptr<std::vector<HostSharedPtr>> HostListPtr;
+  std::vector<HostListPtr> new_hosts(1);
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -59,20 +60,42 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                      cluster_load_assignment.cluster_name()));
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    const uint32_t priority = locality_lb_endpoint.priority();
+    if (new_hosts.size() <= priority) {
+      new_hosts.resize(priority + 1);
+    }
+    if (new_hosts[priority] == nullptr) {
+      new_hosts[priority] = HostListPtr{new std::vector<HostSharedPtr>};
+    }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      new_hosts.emplace_back(new HostImpl(
+      new_hosts[priority]->emplace_back(new HostImpl(
           info_, "", Network::Address::resolveProtoAddress(lb_endpoint.endpoint().address()),
           lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
           locality_lb_endpoint.locality()));
     }
   }
 
-  HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(hosts()));
+  for (size_t i = 0; i < new_hosts.size(); ++i) {
+    if (new_hosts[i] != nullptr) {
+      updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *new_hosts[i]);
+    }
+  }
+
+  // If we didn't setup to initialize when our first round of health checking is complete, just
+  // do it now.
+  onPreInitComplete();
+}
+
+void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set,
+                                            std::vector<HostSharedPtr>& new_hosts) {
+  HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(host_set.hosts()));
+
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({})", info_->name(), hosts().size());
+    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({}) priority {}", info_->name(),
+              host_set.hosts().size(), host_set.priority());
     HostListsSharedPtr per_locality(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local locality is not defined then skip populating per locality hosts.
@@ -97,14 +120,10 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       }
     }
 
-    updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), per_locality,
-                createHealthyHostLists(*per_locality), hosts_added, hosts_removed);
-    onPreInitComplete();
+    host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
+                         per_locality, createHealthyHostLists(*per_locality), hosts_added,
+                         hosts_removed);
   }
-
-  // If we didn't setup to initialize when our first round of health checking is complete, just
-  // do it now.
-  onPreInitComplete();
 }
 
 void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
