@@ -304,8 +304,7 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
-  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SERVER_FAILURE))
-      .Times(0);
+  EXPECT_CALL(host_->outlier_detector_, putResult(_)).Times(0);
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
