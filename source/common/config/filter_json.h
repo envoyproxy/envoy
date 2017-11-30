@@ -110,7 +110,7 @@ public:
                                 envoy::api::v2::filter::network::TcpProxy& proto_config);
 
   /**
-   * Translate a v1 JSON Tcp Rate Limit filter object to v2
+   * Translate a v1 JSON TCP Rate Limit filter object to v2
    * envoy::api::v2::filter::network::RateLimit.
    * @param json_config source v1 JSON Tcp Rate Limit Filter object.
    * @param proto_config destination v2 envoy::api::v2::filter::network::RateLimit.
@@ -119,7 +119,7 @@ public:
                                           envoy::api::v2::filter::network::RateLimit& proto_config);
 
   /**
-   * Translate a v1 JSON Http Rate Limit filter object to v2
+   * Translate a v1 JSON HTTP Rate Limit filter object to v2
    * envoy::api::v2::filter::http::RateLimit.
    * @param json_config source v1 JSON Http Rate Limit Filter object.
    * @param proto_config destination v2 envoy::api::v2::filter::http::RateLimit.
