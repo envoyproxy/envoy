@@ -365,7 +365,7 @@ void FilterJson::translateClientSslAuthFilter(
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
   JSON_UTIL_SET_DURATION(json_config, proto_config, refresh_delay);
 
-  AddressJson::translateCidrRangeList(json_config->getStringArray("ip_white_list", true),
+  AddressJson::translateCidrRangeList(json_config.getStringArray("ip_white_list", true),
                                       *proto_config.mutable_ip_white_list());
 }
 
