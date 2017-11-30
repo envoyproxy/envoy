@@ -63,6 +63,16 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& verifyCertificateHash() const PURE;
+
+  /**
+   * @return The minimum TLS protocol version to negotiate.
+   */
+  virtual unsigned minProtocolVersion() const PURE;
+
+  /**
+   * @return The maximum TLS protocol version to negotiate.
+   */
+  virtual unsigned maxProtocolVersion() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

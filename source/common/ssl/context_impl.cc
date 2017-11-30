@@ -29,10 +29,17 @@ int ContextImpl::sslContextIndex() {
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
-      ecdh_curves_(config.ecdhCurves()) {
+      min_protocol_version_(config.minProtocolVersion()),
+      max_protocol_version_(config.maxProtocolVersion()), ecdh_curves_(config.ecdhCurves()) {
   RELEASE_ASSERT(ctx_);
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
+  RELEASE_ASSERT(rc == 1);
+
+  rc = SSL_CTX_set_min_proto_version(ctx_.get(), min_protocol_version_);
+  RELEASE_ASSERT(rc == 1);
+
+  rc = SSL_CTX_set_max_proto_version(ctx_.get(), max_protocol_version_);
   RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
@@ -91,8 +98,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
           fmt::format("Failed to load private key file {}", config.privateKeyFile()));
     }
   }
-
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv3);
 
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
@@ -544,9 +549,18 @@ void ServerContextImpl::updateConnectionContext(SSL* ssl) {
   ASSERT(SSL_CTX_get_ex_data(ctx_.get(), sslContextIndex()) == this);
 
   // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
+  // TODO(PiotrSikora): add SSL_early_set_SSL_CTX() to BoringSSL.
+
+  // TODO(PiotrSikora): add getters to BoringSSL.
+  int rc = SSL_set_min_proto_version(ssl, min_protocol_version_);
+  ASSERT(rc == 1);
+  rc = SSL_set_max_proto_version(ssl, max_protocol_version_);
+  ASSERT(rc == 1);
+
   SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx_.get()), SSL_CTX_get_verify_callback(ctx_.get()));
 
-  int rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
+  // TODO(PiotrSikora): add getters to BoringSSL.
+  rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
   ASSERT(rc == 1);
   UNREFERENCED_PARAMETER(rc);
 }
