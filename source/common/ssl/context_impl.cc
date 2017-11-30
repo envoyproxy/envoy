@@ -552,13 +552,15 @@ void ServerContextImpl::updateConnectionContext(SSL* ssl) {
   // TODO(PiotrSikora): add SSL_early_set_SSL_CTX() to BoringSSL.
 
   // TODO(PiotrSikora): add getters to BoringSSL.
-  SSL_set_min_proto_version(ssl, min_protocol_version_);
-  SSL_set_max_proto_version(ssl, max_protocol_version_);
+  int rc = SSL_set_min_proto_version(ssl, min_protocol_version_);
+  ASSERT(rc == 1);
+  rc = SSL_set_max_proto_version(ssl, max_protocol_version_);
+  ASSERT(rc == 1);
 
   SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx_.get()), SSL_CTX_get_verify_callback(ctx_.get()));
 
   // TODO(PiotrSikora): add getters to BoringSSL.
-  int rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
+  rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
   ASSERT(rc == 1);
   UNREFERENCED_PARAMETER(rc);
 }
