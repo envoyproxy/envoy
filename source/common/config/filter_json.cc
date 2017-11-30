@@ -352,7 +352,7 @@ void FilterJson::translateHttpRateLimitFilter(
   json_config.validateSchema(Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, domain);
-  proto_config.set_stage(json_config.getInteger("stage"));
+  proto_config.set_stage(json_config.getInteger("stage", 0));
 
   JSON_UTIL_SET_STRING(json_config, proto_config, request_type);
   JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
