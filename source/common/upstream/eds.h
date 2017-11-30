@@ -33,7 +33,7 @@ public:
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:
-  void UpdateHostsPerLocality(HostSet& host_set, std::vector<HostSharedPtr>& new_hosts);
+  void updateHostsPerLocality(HostSet& host_set, std::vector<HostSharedPtr>& new_hosts);
 
   // ClusterImplBase
   void startPreInit() override;

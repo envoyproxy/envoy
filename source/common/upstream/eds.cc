@@ -77,7 +77,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
   for (size_t i = 0; i < new_hosts.size(); ++i) {
     if (new_hosts[i] != nullptr) {
-      UpdateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *new_hosts[i]);
+      updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *new_hosts[i]);
     }
   }
 
@@ -86,7 +86,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   onPreInitComplete();
 }
 
-void EdsClusterImpl::UpdateHostsPerLocality(HostSet& host_set,
+void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set,
                                             std::vector<HostSharedPtr>& new_hosts) {
   HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(host_set.hosts()));
 

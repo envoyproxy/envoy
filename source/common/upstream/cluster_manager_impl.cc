@@ -611,7 +611,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
 
-  // TODO(alyssawilk) make lb priority-set aware in a follow-up patch
+  // TODO(alyssawilk) make lb priority-set aware in a follow-up patch.
   HostSet& host_set = priority_set_.getOrCreateHostSet(0);
   HostSet* local_host_set = nullptr;
   if (parent.local_priority_set_) {
