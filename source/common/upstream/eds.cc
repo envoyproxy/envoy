@@ -77,7 +77,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
   for (size_t i = 0; i < new_hosts.size(); ++i) {
     if (new_hosts[i] != nullptr) {
-      UpdateHostsPerLocality(prioritySet().getHostSet(i), *new_hosts[i]);
+      UpdateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *new_hosts[i]);
     }
   }
 

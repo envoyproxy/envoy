@@ -263,9 +263,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
     sendAndReceiveUpstream(i % 2);
   }
 
-  // TODO(alyssawilk) add priority to stats.
-  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0),
-                           localityStats("winter", 0, 0, 0)});
+  // Verify we do not get empty stats for non-zero priorities.
+  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0)});
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_EQ(2, test_server_->counter("load_reporter.responses")->value());

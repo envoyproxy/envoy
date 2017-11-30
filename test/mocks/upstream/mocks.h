@@ -67,17 +67,16 @@ public:
   MockPrioritySet();
   ~MockPrioritySet() {}
 
-  HostSet& getHostSetInternal(uint32_t priority);
+  HostSet& getHostSet(uint32_t priority);
   void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
                           const std::vector<HostSharedPtr>& hosts_removed);
 
   MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
   MOCK_CONST_METHOD0(hostSetsPerPriority, const std::vector<HostSetPtr>&());
   MOCK_METHOD0(hostSetsPerPriority, std::vector<HostSetPtr>&());
-  MOCK_METHOD1(getHostSet, HostSet&(uint32_t priority));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
-    getHostSetInternal(priority); // Ensure the host set exists.
+    getHostSet(priority); // Ensure the host set exists.
     return reinterpret_cast<MockHostSet*>(host_sets_[priority].get());
   }
 

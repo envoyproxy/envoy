@@ -106,8 +106,8 @@ OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
 
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
   // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(prioritySet().hostSetsPerPriority().size() == 1);
-  auto& first_host_set = prioritySet().getHostSet(0);
+  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
+  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>(first_host_set.hosts()));
   new_hosts->emplace_back(host);
   first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
@@ -118,8 +118,8 @@ void OriginalDstCluster::cleanup() {
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>);
   std::vector<HostSharedPtr> to_be_removed;
   // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(prioritySet().hostSetsPerPriority().size() == 1);
-  auto& host_set = prioritySet().getHostSet(0);
+  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
+  auto& host_set = priority_set_.getOrCreateHostSet(0);
 
   ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
   for (const HostSharedPtr& host : host_set.hosts()) {

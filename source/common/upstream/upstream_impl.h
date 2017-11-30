@@ -241,7 +241,8 @@ public:
     return host_sets_;
   }
   std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
-  HostSet& getHostSet(uint32_t priority) override;
+  // Get the host set for this priority level, creating it if necessary.
+  HostSet& getOrCreateHostSet(uint32_t priority);
 
 private:
   virtual void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
@@ -401,11 +402,13 @@ protected:
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
+protected:
+  PrioritySetImpl priority_set_;
+
 private:
   void finishInitialization();
   void reloadHealthyHosts();
 
-  PrioritySetImpl priority_set_;
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};

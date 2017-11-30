@@ -67,9 +67,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(128U, new_weight)); }
 
-PrioritySetImpl::PrioritySetImpl() { getHostSet(0); }
+PrioritySetImpl::PrioritySetImpl() { getOrCreateHostSet(0); }
 
-HostSet& PrioritySetImpl::getHostSet(uint32_t priority) {
+HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       host_sets_.push_back(HostSetPtr{new HostSetImpl(i)});
@@ -465,8 +465,8 @@ void StaticClusterImpl::startPreInit() {
   }
 
   // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(prioritySet().hostSetsPerPriority().size() == 1);
-  auto& first_host_set = prioritySet().getHostSet(0);
+  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
+  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
                              empty_host_lists_, empty_host_lists_, *initial_hosts_, {});
   initial_hosts_ = nullptr;
@@ -607,8 +607,8 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostSharedPtr>& host
   }
 
   // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(prioritySet().hostSetsPerPriority().size() == 1);
-  auto& first_host_set = prioritySet().getHostSet(0);
+  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
+  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
                              empty_host_lists_, hosts_added, hosts_removed);
 }

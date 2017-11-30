@@ -264,12 +264,12 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
 }
 
 void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
-  for (size_t i = 0; i < cluster.prioritySet().hostSetsPerPriority().size(); ++i) {
-    auto& host_set = cluster.prioritySet().getHostSet(i);
-    if (host_set.hosts().empty()) {
+  for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    if (host_set->hosts().empty()) {
       continue;
     }
-    postThreadLocalClusterUpdate(cluster, i, host_set.hosts(), std::vector<HostSharedPtr>{});
+    postThreadLocalClusterUpdate(cluster, host_set->priority(), host_set->hosts(),
+                                 std::vector<HostSharedPtr>{});
   }
 }
 
@@ -576,7 +576,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
-  config.thread_local_clusters_[name]->priority_set_.getHostSet(priority).updateHosts(
+  config.thread_local_clusters_[name]->priority_set_.getOrCreateHostSet(priority).updateHosts(
       std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
       std::move(healthy_hosts_per_locality), hosts_added, hosts_removed);
 }
@@ -612,7 +612,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
 
   // TODO(alyssawilk) make lb priority-set aware in a follow-up patch
-  HostSet& host_set = priority_set_.getHostSet(0);
+  HostSet& host_set = priority_set_.getOrCreateHostSet(0);
   HostSet* local_host_set = nullptr;
   if (parent.local_priority_set_) {
     local_host_set = parent.local_priority_set_->hostSetsPerPriority()[0].get();

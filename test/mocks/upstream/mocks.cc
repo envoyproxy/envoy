@@ -30,17 +30,16 @@ MockHostSet::MockHostSet() {
 }
 
 MockPrioritySet::MockPrioritySet() {
-  getHostSetInternal(0);
+  getHostSet(0);
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(testing::Const(*this), hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
-  ON_CALL(*this, getHostSet(_)).WillByDefault(Invoke(this, &MockPrioritySet::getHostSetInternal));
   ON_CALL(*this, addMemberUpdateCb(_))
       .WillByDefault(Invoke([this](HostSet::MemberUpdateCb cb) -> Common::CallbackHandle* {
         return member_update_cb_helper_.add(cb);
       }));
 }
 
-HostSet& MockPrioritySet::getHostSetInternal(uint32_t priority) {
+HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       host_sets_.push_back(HostSetPtr{new NiceMock<MockHostSet>});

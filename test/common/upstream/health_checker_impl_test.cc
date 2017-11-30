@@ -279,6 +279,7 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
 
+// Test host check success with multiple hosts.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
@@ -310,6 +311,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->healthy());
 }
 
+// Test host check success with multiple hosts across multiple priorities.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);

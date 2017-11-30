@@ -143,7 +143,7 @@ TEST_F(EdsTest, EndpointMetadata) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
-  auto& hosts = cluster_->prioritySet().getHostSet(0).hosts();
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
   EXPECT_EQ(hosts[0]->metadata().filter_metadata_size(), 2);
   EXPECT_EQ(Config::Metadata::metadataValue(hosts[0]->metadata(),
@@ -194,7 +194,7 @@ TEST_F(EdsTest, EndpointLocality) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
-  auto& hosts = cluster_->prioritySet().getHostSet(0).hosts();
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
   for (int i = 0; i < 2; ++i) {
     const auto& locality = hosts[i]->locality();
@@ -238,7 +238,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
   EXPECT_TRUE(initialized);
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().getHostSet(0).hostsPerLocality();
+    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
     EXPECT_EQ(2, hosts_per_locality.size());
     EXPECT_EQ(1, hosts_per_locality[0].size());
     EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(hosts_per_locality[0][0]->locality()));
@@ -255,7 +255,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().getHostSet(0).hostsPerLocality();
+    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
     EXPECT_EQ(4, hosts_per_locality.size());
     EXPECT_EQ(1, hosts_per_locality[0].size());
     EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(hosts_per_locality[0][0]->locality()));
@@ -301,8 +301,8 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_TRUE(initialized);
 
   ASSERT_EQ(2, cluster_->prioritySet().hostSetsPerPriority().size());
-  ASSERT_EQ(2, cluster_->prioritySet().getHostSet(0).hosts().size());
-  ASSERT_EQ(1, cluster_->prioritySet().getHostSet(1).hosts().size());
+  EXPECT_EQ(2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
 
   // Add 2 more hosts to priority 0, and add five hosts to priority 2.
   // Note the (illegal) gap (no priority 1.)  Until we have config validation,
@@ -313,23 +313,25 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
   ASSERT_EQ(4, cluster_->prioritySet().hostSetsPerPriority().size());
-  ASSERT_EQ(4, cluster_->prioritySet().getHostSet(0).hosts().size());
-  ASSERT_EQ(1, cluster_->prioritySet().getHostSet(1).hosts().size());
-  ASSERT_EQ(0, cluster_->prioritySet().getHostSet(2).hosts().size());
-  ASSERT_EQ(5, cluster_->prioritySet().getHostSet(3).hosts().size());
+  EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
+  EXPECT_EQ(5, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 
-  // Update the number of hosts in priority #4.  Make sure no other priority
+  // Update the number of hosts in priority #4. Make sure no other priority
   // levels are affected.
   cluster_load_assignment->clear_endpoints();
   add_hosts_to_priority(3, 4);
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   ASSERT_EQ(4, cluster_->prioritySet().hostSetsPerPriority().size());
-  ASSERT_EQ(4, cluster_->prioritySet().getHostSet(0).hosts().size());
-  ASSERT_EQ(1, cluster_->prioritySet().getHostSet(1).hosts().size());
-  ASSERT_EQ(0, cluster_->prioritySet().getHostSet(2).hosts().size());
-  ASSERT_EQ(4, cluster_->prioritySet().getHostSet(3).hosts().size());
+  EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
+  EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 }
 
+// Set up an EDS config with multiple priorities and localitie and make sure
+// they are loaded and reloaded as expected.
 TEST_F(EdsTest, PriorityAndLocality) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
@@ -355,6 +357,7 @@ TEST_F(EdsTest, PriorityAndLocality) {
         }
       };
 
+  // Set up both priority 0 and priority 1 with 2 localities.
   add_hosts_to_locality_and_priority("oceania", "koala", "ingsoc", 0, 2);
   add_hosts_to_locality_and_priority("", "us-east-1a", "", 0, 1);
   add_hosts_to_locality_and_priority("", "us-east-1a", "", 1, 8);
@@ -366,7 +369,8 @@ TEST_F(EdsTest, PriorityAndLocality) {
   EXPECT_TRUE(initialized);
 
   {
-    auto& first_hosts_per_locality = cluster_->prioritySet().getHostSet(0).hostsPerLocality();
+    auto& first_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
     EXPECT_EQ(2, first_hosts_per_locality.size());
     EXPECT_EQ(1, first_hosts_per_locality[0].size());
     EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(first_hosts_per_locality[0][0]->locality()));
@@ -376,19 +380,22 @@ TEST_F(EdsTest, PriorityAndLocality) {
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
               Locality(first_hosts_per_locality[1][1]->locality()));
 
-    auto& second_hosts_per_locality = cluster_->prioritySet().getHostSet(1).hostsPerLocality();
+    auto& second_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality();
     ASSERT_EQ(2, second_hosts_per_locality.size());
     EXPECT_EQ(8, second_hosts_per_locality[0].size());
     EXPECT_EQ(2, second_hosts_per_locality[1].size());
   }
 
+  // Add one more locality to both priority 0 and priority 1.
   add_hosts_to_locality_and_priority("oceania", "koala", "eucalyptus", 0, 3);
   add_hosts_to_locality_and_priority("general", "koala", "ingsoc", 1, 5);
 
   EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
   {
-    auto& first_hosts_per_locality = cluster_->prioritySet().getHostSet(0).hostsPerLocality();
+    auto& first_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
     EXPECT_EQ(3, first_hosts_per_locality.size());
     EXPECT_EQ(1, first_hosts_per_locality[0].size());
     EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(first_hosts_per_locality[0][0]->locality()));
@@ -399,7 +406,8 @@ TEST_F(EdsTest, PriorityAndLocality) {
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
               Locality(first_hosts_per_locality[2][0]->locality()));
 
-    auto& second_hosts_per_locality = cluster_->prioritySet().getHostSet(1).hostsPerLocality();
+    auto& second_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality();
     EXPECT_EQ(3, second_hosts_per_locality.size());
     EXPECT_EQ(8, second_hosts_per_locality[0].size());
     EXPECT_EQ(Locality("", "us-east-1a", ""),

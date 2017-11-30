@@ -61,6 +61,11 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+      // TODO(alyssawilk) add priority to the stats reporting before supporting
+      // priority-aware LBs.
+      if (host_set->priority() != 0) {
+        break;
+      }
       for (auto& hosts : host_set->hostsPerLocality()) {
         auto* locality_stats = cluster_stats->add_upstream_locality_stats();
         ASSERT(hosts.size() > 0);

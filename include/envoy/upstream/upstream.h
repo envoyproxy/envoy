@@ -232,11 +232,6 @@ public:
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
    */
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
-
-  /**
-   * @return HostSet& the host set for the priority. If no such host set exists, it will be created.
-   */
-  virtual HostSet& getHostSet(uint32_t priority) PURE;
 };
 
 /**
