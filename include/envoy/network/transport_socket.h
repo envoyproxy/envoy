@@ -42,12 +42,12 @@ public:
   virtual int fd() PURE;
 
   /**
-   * @return the connection interface.
+   * @return Network::Connection& the connection interface.
    */
   virtual Network::Connection& connection() PURE;
 
   /**
-   * @return whether the read buffer should be drained. This is used to enforce yielding for
+   * @return bool whether the read buffer should be drained. This is used to enforce yielding for
    *         configured read limits.
    */
   virtual bool shouldDrainReadBuffer() PURE;
@@ -59,7 +59,7 @@ public:
   virtual void setReadBufferReady() PURE;
 
   /**
-   * Raise a connection event to the connection. This can be used by a secure socket (e.g. TLS) 
+   * Raise a connection event to the connection. This can be used by a secure socket (e.g. TLS)
    * to raise a connected event when handshake is done.
    * @param event supplies the connection event
    */
@@ -67,7 +67,8 @@ public:
 };
 
 /**
- * A transport socket that does actual read / write.
+ * A transport socket that does actual read / write. It can also do some transformations on
+ * the data (e.g. TLS).
  */
 class TransportSocket {
 public:
@@ -81,33 +82,33 @@ public:
   virtual void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) PURE;
 
   /**
-   * @return the protocol to use as selected by network level negotiation. (E.g., ALPN).
+   * @return std::string the protocol to use as selected by network level negotiation. (E.g., ALPN).
    *         If network level negotation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
   virtual std::string protocol() const PURE;
 
   /**
-   * @return whether the socket can be flush closed.
+   * @return bool whether the socket can be flush closed.
    */
   virtual bool canFlushClose() PURE;
 
   /**
    * Closes the transport socket.
-   * @param event suuplies the connection event that is closing the socket.
+   * @param event supplies the connection event that is closing the socket.
    */
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
    *
    * @param buffer supplies the buffer to read to.
-   * @return the IoResult of the read action.
+   * @return IoResult the result of the read action.
    */
   virtual IoResult doRead(Buffer::Instance& buffer) PURE;
 
   /**
    * @param buffer supplies the buffer to write from
-   * @return the IoResult of the write action.
+   * @return IoResult the result of the write action.
    */
   virtual IoResult doWrite(Buffer::Instance& buffer) PURE;
 

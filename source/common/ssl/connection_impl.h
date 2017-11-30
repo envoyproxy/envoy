@@ -61,6 +61,7 @@ public:
   ~ConnectionImpl();
 
   // Network::Connection
+  // TOOD(lizan): Consider move ssl() to transport socket.
   Ssl::Connection* ssl() override { return dynamic_cast<SslSocket*>(transport_socket_.get()); }
   const Ssl::Connection* ssl() const override {
     return dynamic_cast<SslSocket*>(transport_socket_.get());
