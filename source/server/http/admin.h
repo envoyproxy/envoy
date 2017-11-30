@@ -33,7 +33,7 @@ class AdminImpl : public Admin,
 public:
   AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server);
+            Server::Instance& server, Stats::Scope& listener_scope);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }
