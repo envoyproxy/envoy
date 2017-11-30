@@ -45,4 +45,4 @@ more comprehensive the testing should be.
 > Description of what is deprecated.
 
 [optional *Release Notes*:] If this change is user impacting you **must** add a release note to
-[RAW_RELEASE_NOTES.md]. Thank you!
+[RAW_RELEASE_NOTES.md](RAW_RELEASE_NOTES.md). Thank you!
