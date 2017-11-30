@@ -33,6 +33,9 @@ protected:
   ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config);
 
 private:
+  static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
+                                      unsigned default_version);
+
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_ECDH_CURVES;
 
@@ -47,9 +50,6 @@ private:
   const std::string verify_certificate_hash_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
-
-  static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
-                                      unsigned default_version);
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
