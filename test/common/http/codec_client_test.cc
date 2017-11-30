@@ -281,7 +281,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Mark the stream read disabled, then send a block of data and close the connection.  Ensure the
+// Mark the stream read disabled, then send a block of data and close the connection. Ensure the
 // data is drained before the connection close is processed.
 // Regression test for https://github.com/envoyproxy/envoy/issues/1679
 TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {

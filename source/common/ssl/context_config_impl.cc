@@ -128,12 +128,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
 void ServerContextConfigImpl::validateAndAppendKey(
     std::vector<ServerContextConfig::SessionTicketKey>& keys, const std::string& key_data) {
   // If this changes, need to figure out how to deal with key files
-  // that previously worked.  For now, just assert so we'll notice that
+  // that previously worked. For now, just assert so we'll notice that
   // it changed if it does.
   static_assert(sizeof(SessionTicketKey) == 80, "Input is expected to be this size");
 
   if (key_data.size() != sizeof(SessionTicketKey)) {
-    throw EnvoyException(fmt::format("Incorrect TLS session ticket key length.  "
+    throw EnvoyException(fmt::format("Incorrect TLS session ticket key length. "
                                      "Length {}, expected length {}.",
                                      key_data.size(), sizeof(SessionTicketKey)));
   }

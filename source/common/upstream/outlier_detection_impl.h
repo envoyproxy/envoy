@@ -29,6 +29,7 @@ public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
+  void putResult(Result) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const Optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const Optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
@@ -120,6 +121,7 @@ public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
+  void putResult(Result result) override;
   void putResponseTime(std::chrono::milliseconds) override {}
   const Optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
   const Optional<MonotonicTime>& lastUnejectionTime() override { return last_unejection_time_; }

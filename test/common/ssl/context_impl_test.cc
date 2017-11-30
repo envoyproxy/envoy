@@ -214,7 +214,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
-  // First key is valid, second key isn't.  Should throw if any keys are invalid.
+  // First key is valid, second key isn't. Should throw if any keys are invalid.
   std::string json = R"EOF(
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",

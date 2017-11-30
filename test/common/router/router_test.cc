@@ -1788,7 +1788,7 @@ TEST_F(WatermarkTest, FilterWatermarks) {
                     .counter("upstream_flow_control_backed_up_total")
                     .value());
 
-  // Send one extra byte.  This should cause the buffer to go over the limit and pause downstream
+  // Send one extra byte. This should cause the buffer to go over the limit and pause downstream
   // data.
   Buffer::OwnedImpl last_byte("!");
   router_.decodeData(last_byte, true);
@@ -1796,7 +1796,7 @@ TEST_F(WatermarkTest, FilterWatermarks) {
                     .counter("upstream_flow_control_backed_up_total")
                     .value());
 
-  // Now set up the downstream connection.  The encoder will be given the buffered request body,
+  // Now set up the downstream connection. The encoder will be given the buffered request body,
   // The mock invocation below drains it, and the buffer will go under the watermark limit again.
   EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_drained_total")

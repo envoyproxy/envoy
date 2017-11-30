@@ -5,7 +5,7 @@
 namespace Envoy {
 TEST(Backward, Basic) {
   // There isn't much to test here and this feature is really just useful for
-  // debugging.  This test simply verifies that we do not cause a crash when
+  // debugging. This test simply verifies that we do not cause a crash when
   // logging a backtrace, and covers the added lines.
   BackwardsTrace tracer;
   tracer.capture();

@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/protobuf/utility.h"
@@ -73,6 +74,30 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
+}
+
+void DetectorHostMonitorImpl::putResult(Result result) {
+  Http::Code http_code = Http::Code::InternalServerError;
+
+  switch (result) {
+  case Result::SUCCESS:
+    http_code = Http::Code::OK;
+    break;
+  case Result::TIMEOUT:
+    http_code = Http::Code::GatewayTimeout;
+    break;
+  case Result::CONNECT_FAILED:
+    http_code = Http::Code::ServiceUnavailable;
+    break;
+  case Result::REQUEST_FAILED:
+    http_code = Http::Code::InternalServerError;
+    break;
+  case Result::SERVER_FAILURE:
+    http_code = Http::Code::ServiceUnavailable;
+    break;
+  }
+
+  putHttpResponseCode(enumToInt(http_code));
 }
 
 DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& config)

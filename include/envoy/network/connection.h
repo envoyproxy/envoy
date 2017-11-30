@@ -77,7 +77,7 @@ public:
     Stats::Gauge& read_current_;
     Stats::Counter& write_total_;
     Stats::Gauge& write_current_;
-    // Counter* as this is an optional counter.  Bind errors will not be tracked if this is nullptr.
+    // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
   };
 
@@ -182,9 +182,9 @@ public:
    * Set a soft limit on the size of buffers for the connection.
    * For the read buffer, this limits the bytes read prior to flushing to further stages in the
    * processing pipeline.
-   * For the write buffer, it sets watermarks.  When enough data is buffered it triggers a call to
+   * For the write buffer, it sets watermarks. When enough data is buffered it triggers a call to
    * onAboveWriteBufferHighWatermark, which allows subscribers to enforce flow control by disabling
-   * reads on the socket funneling data to the write buffer.  When enough data is drained from the
+   * reads on the socket funneling data to the write buffer. When enough data is drained from the
    * write buffer, onBelowWriteBufferHighWatermark is called which similarly allows subscribers
    * resuming reading.
    */

@@ -6,8 +6,6 @@
 #include <vector>
 
 #include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
 
 namespace Envoy {
 namespace Redis {
@@ -72,7 +70,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
-  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::GatewayTimeout));
+  host_->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
   } else {
@@ -86,7 +84,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
-    host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::InternalServerError));
+    host_->outlierDetector().putResult(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -98,7 +96,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {
-        host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
+        host_->outlierDetector().putResult(Upstream::Outlier::Result::SERVER_FAILURE);
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
       if (event == Network::ConnectionEvent::LocalClose) {
@@ -147,7 +145,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));
+  host_->outlierDetector().putResult(Upstream::Outlier::Result::SUCCESS);
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)

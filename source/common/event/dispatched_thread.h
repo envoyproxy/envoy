@@ -50,7 +50,7 @@ public:
   Dispatcher& dispatcher() { return *dispatcher_; }
 
   /**
-   * Exit the dispatched thread.  Will block until the thread joins.
+   * Exit the dispatched thread. Will block until the thread joins.
    */
   void exit();
 

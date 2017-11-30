@@ -39,7 +39,7 @@ public:
   }
 
   /**
-   * Gets a factory by name.  If the name isn't found in the registry, returns nullptr.
+   * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(const std::string& name) {
     auto it = factories().find(name);

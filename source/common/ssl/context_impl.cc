@@ -414,7 +414,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1);
 
-  // Hash the CommonName/SANs of the server certificate.  This makes sure that
+  // Hash the CommonName/SANs of the server certificate. This makes sure that
   // sessions can only be resumed to a certificate for the same name, but allows
   // resuming to unique certs in the case that different Envoy instances each have
   // their own certs.
@@ -457,7 +457,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
   RELEASE_ASSERT(rc == 1);
 
   // Hash all the settings that affect whether the server will allow/accept
-  // the client connection.  This ensures that the client is always validated against
+  // the client connection. This ensures that the client is always validated against
   // the correct settings, even if session resumption across different listeners
   // is enabled.
   if (ca_cert_ != nullptr) {

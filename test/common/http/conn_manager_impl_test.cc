@@ -172,7 +172,7 @@ public:
                                     : FilterDataStatus::StopIterationAndBuffer;
     EXPECT_CALL(*decoder_filters_[1], decodeData(_, true)).WillOnce(Return(status));
 
-    // Kick off the incoming data.  |fake_input| is not sent, but instead kicks
+    // Kick off the incoming data. |fake_input| is not sent, but instead kicks
     // off sending the headers and |data| queued up in setUpEncoderAndDecoder().
     Buffer::OwnedImpl fake_input("asdf");
     conn_manager_->onData(fake_input);
@@ -1660,7 +1660,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();
 
-  // Mimic the upstream connection backing up.  The router would call
+  // Mimic the upstream connection backing up. The router would call
   // onDecoderFilterAboveWriteBufferHighWatermark which should readDisable the stream and increment
   // stats.
   EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream_));
@@ -1669,7 +1669,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_paused_reading_total_.value());
 
-  // Resume the flow of data.  When the router buffer drains it calls
+  // Resume the flow of data. When the router buffer drains it calls
   // onDecoderFilterBelowWriteBufferLowWatermark which should re-enable reads on the stream.
   EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(false));
@@ -1807,12 +1807,12 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   setup(false, "");
   setUpEncoderAndDecoder();
 
-  // The filter is a streaming filter.  Sending 4 bytes should hit the
+  // The filter is a streaming filter. Sending 4 bytes should hit the
   // watermark limit and disable reads on the stream.
   EXPECT_CALL(stream_, readDisable(true));
   sendReqestHeadersAndData();
 
-  // Change the limit so the buffered data is below the new watermark.  The
+  // Change the limit so the buffered data is below the new watermark. The
   // stream should be read-enabled
   EXPECT_CALL(stream_, readDisable(false));
   int buffer_len = decoder_filters_[0]->callbacks_->decodingBuffer()->length();
@@ -1827,7 +1827,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   MockDownstreamWatermarkCallbacks callbacks;
   decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
 
-  // Now overload the buffer with response data.  The downstream watermark
+  // Now overload the buffer with response data. The downstream watermark
   // callbacks should be called.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
@@ -1848,7 +1848,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();
 
-  // Set the filter to be a buffering filter.  Sending any data will hit the
+  // Set the filter to be a buffering filter. Sending any data will hit the
   // watermark limit and result in a 413 being sent to the user.
   Http::TestHeaderMapImpl response_headers{
       {":status", "413"}, {"content-length", "17"}, {"content-type", "text/plain"}};
@@ -1912,7 +1912,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
 
-  // Now overload the buffer with response data.  The filter returns
+  // Now overload the buffer with response data. The filter returns
   // StopIterationAndBuffer, which will trigger an early response.
 
   expectOnDestroy();
@@ -1948,7 +1948,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
 
-  // Now overload the buffer with response data.  The filter returns
+  // Now overload the buffer with response data. The filter returns
   // StopIterationAndBuffer, which will trigger an early reset.
   const std::string data = "A long enough string to go over watermarks";
   Buffer::OwnedImpl fake_response(data);

@@ -588,7 +588,7 @@ TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
   output.clear();
 
-  // Simulate the underlying connection being backed up.  Ensure that it is
+  // Simulate the underlying connection being backed up. Ensure that it is
   // read-enabled as the new stream is created.
   EXPECT_CALL(connection_, readEnabled())
       .Times(2)
