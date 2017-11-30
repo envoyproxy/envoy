@@ -65,7 +65,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
                                 envoy::api::v2::Locality().default_instance()));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
-        // Add the new host to the map.  We just failed to find it in
+        // Add the new host to the map. We just failed to find it in
         // our local map above, so insert without checking (2nd arg == false).
         host_map_.insert(host, false);
 

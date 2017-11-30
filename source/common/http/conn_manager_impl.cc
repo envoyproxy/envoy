@@ -194,7 +194,7 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   // Send the data through WebSocket handlers if this connection is a
-  // WebSocket connection.  N.B. The first request from the client to Envoy
+  // WebSocket connection. N.B. The first request from the client to Envoy
   // will still be processed as a normal HTTP/1.1 request, where Envoy will
   // detect the WebSocket upgrade and establish a connection to the
   // upstream.
@@ -472,7 +472,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // header size. For HTTP/1.1 the entire headers data has be less than ~80K (hard coded in
   // http_parser). For HTTP/2 the default allowed header block length is 64k.
   // In order to have generally uniform behavior we also check total header size here and keep it
-  // under 60K.  Ultimately it would be nice to have a configuration option ranging from the largest
+  // under 60K. Ultimately it would be nice to have a configuration option ranging from the largest
   // header size http_parser and nghttp2 will allow, down to 16k or 8k for
   // envoy users who do not wish to proxy large headers.
   if (request_headers_->byteSize() > (60 * 1024)) {

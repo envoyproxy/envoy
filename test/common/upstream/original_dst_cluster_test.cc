@@ -157,7 +157,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_CALL(connection, usingOriginalDst()).WillOnce(Return(false));
     // First argument is normally the reference to the ThreadLocalCluster's HostSet, but in these
     // tests we do not have the thread local clusters, so we pass a reference to the HostSet of the
-    // primary cluster.  The implementation handles both cases the same.
+    // primary cluster. The implementation handles both cases the same.
     OriginalDstCluster::LoadBalancer lb(*cluster_, cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);

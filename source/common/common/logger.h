@@ -65,7 +65,7 @@ private:
 /**
  * An optionally locking stderr or file logging sink.
  *
- * This sink outputs to either stderr or to a file.  It shares both implementations (instead of
+ * This sink outputs to either stderr or to a file. It shares both implementations (instead of
  * being two separate classes) because we can't setup file logging until after the AccessLogManager
  * is available, but by that time some loggers have cached their logger from the registry already,
  * so we need to be able switch implementations without replacing the object.
@@ -160,7 +160,7 @@ protected:
 #define LOG_PREFIX __FILE__ ":" LINE_STRING "] "
 
 /**
- * Base logging macros.  It is expected that users will use the convenience macros below rather than
+ * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
 #ifdef NVLOG
