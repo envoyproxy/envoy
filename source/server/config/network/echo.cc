@@ -22,6 +22,17 @@ public:
     };
   }
 
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                      FactoryContext&) override {
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Filter::Echo()});
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
   std::string name() override { return Config::NetworkFilterNames::get().ECHO; }
 };
 
