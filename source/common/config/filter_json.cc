@@ -339,10 +339,10 @@ void FilterJson::translateTcpRateLimitFilter(
   for (const auto& json_descriptor : json_config.getObjectArray("descriptors", false)) {
     auto* descriptor = descriptors->Add();
     auto* entries = descriptor->mutable_entries();
-    for (const auto& json_entry : json_descriptor.asObjectArray()) {
+    for (const auto& json_entry : json_descriptor->asObjectArray()) {
       auto* entry = entries->Add();
-      JSON_UTIL_SET_STRING(json_entry, *entry, key);
-      JSON_UTIL_SET_STRING(json_entry, *entry, value);
+      JSON_UTIL_SET_STRING(*json_entry, *entry, key);
+      JSON_UTIL_SET_STRING(*json_entry, *entry, value);
     }
   }
 }
@@ -352,23 +352,24 @@ void FilterJson::translateHttpRateLimitFilter(
   json_config.validateSchema(Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, domain);
-  JSON_UTIL_SET_INTEGER(json_config, proto_config, stage);
+  proto_config.set_stage(json_config.getInteger("stage"));
+
   JSON_UTIL_SET_STRING(json_config, proto_config, request_type);
   JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
 }
 
 void FilterJson::translateClientSslAuthFilter(
-    const Json::Object& json_config, envoy::api::v2::filter::network::ClientSslAuth& proto_config) {
+    const Json::Object& json_config, envoy::api::v2::filter::network::ClientSSLAuth& proto_config) {
   json_config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, auth_api_cluster);
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
   JSON_UTIL_SET_DURATION(json_config, proto_config, refresh_delay);
 
-  auto* ip_white_list = proto_config.mutable_ip_white_list();
-  for (const auto& json_ip : json_config.getObjectArray("ip_white_list", true)) {
-    ip_white_list->Add(json_ip);
-  }
+  // auto* ip_white_list = proto_config.mutable_ip_white_list();
+  // for (const auto& json_ip : json_config.getObjectArray("ip_white_list", true)) {
+  //   ip_white_list->Add(json_ip);
+  // }
 }
 
 } // namespace Config

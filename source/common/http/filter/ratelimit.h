@@ -14,7 +14,7 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 
-#include "api/http/rate_limit.pb.h"
+#include "api/filter/http/rate_limit.pb.h"
 
 namespace Envoy {
 namespace Http {
@@ -35,8 +35,8 @@ public:
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
-                                                    : stringToType(config.request_type()))
-            local_info_(local_info),
+		      : stringToType(config.request_type())),
+        local_info_(local_info),
         scope_(scope), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }
