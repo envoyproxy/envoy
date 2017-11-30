@@ -1,7 +1,7 @@
 *title*: *one line description*
 
 >Title can be a one or two words to describe the subsystem or the aspect
- this PR applies to. Title and description must be lower case. For example: 
+ this PR applies to. Title and description must be lower case. For example:
 * ci: update build image to 44d539cb
 * docs: fix indent, buffer: add copyOut() method
 * router:add x-envoy-overloaded header
@@ -23,7 +23,7 @@ feature get enabled? By default, config change, etc...
 >Low: Small bug fix or small optional feature.
 
 >Medium: New features that are not enabled(for example: new filter). Small-medium
-features added to existing components(for example: modification to an existing 
+features added to existing components(for example: modification to an existing
 filter).
 
 >High: Complicated changes such as flow control, rewrites of critical
@@ -33,16 +33,16 @@ components, etc.
 please ask if you have any concerns about the risk of the PR.
 
 *Testing*:
->Explanation of what testing was done, for example: unit test, 
+>Explanation of what testing was done, for example: unit test,
 integration, manual testing, etc.
 
->Note: It isn’t expected to do all 
-forms of testing, please use your best judgement or ask for guidance 
+>Note: It isn’t expected to do all
+forms of testing, please use your best judgement or ask for guidance
 if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.
 
 [optional *Deprecated*:]
 > Description of what is deprecated.
 
-[optional *Release Notes*:]
- > Description of what to add to next point release notes.
+[optional *Release Notes*:] If this change is user impacting you **must** add a release note to
+[RAW_RELEASE_NOTES.md]. Thank you!
