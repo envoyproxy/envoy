@@ -29,7 +29,7 @@ enum class Result {
   CONNECT_FAILED, // Remote host rejected the connection.
 
   // The entries below only make sense when Envoy understands requests/responses for the
-  // protocol being proxied.  They do not make sense for TcpProxy, for example.
+  // protocol being proxied. They do not make sense for TcpProxy, for example.
 
   REQUEST_FAILED, // Request was not completed successfully.
   SERVER_FAILURE, // The server indicated it cannot process a request.
