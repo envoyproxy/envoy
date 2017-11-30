@@ -97,6 +97,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ratelimit_includes",
     hdrs = ["ratelimit.h"],
+    external_deps = ["envoy_filter_http_rate_limit"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/local_info:local_info_interface",
