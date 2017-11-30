@@ -20,15 +20,15 @@ RateLimitConfigFactory::createFilter(const envoy::api::v2::filter::network::Rate
 
   ASSERT(!config.stat_prefix().empty());
   ASSERT(!config.domain().empty());
-  ASSERT(config.has_descriptors());
+  ASSERT(config.descriptors_size() > 0);
 
-  RateLimit::TcpFilter::ConfigSharedPtr config(
+  RateLimit::TcpFilter::ConfigSharedPtr filter_config(
       new RateLimit::TcpFilter::Config(config, context.scope(), context.runtime()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(config, timeout, 20);
 
-  return [config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
+  return [filter_config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new RateLimit::TcpFilter::Instance(
-        config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms)))});
+        filter_config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms)))});
   };
 }
 
@@ -36,7 +36,7 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::O
                                                                    FactoryContext& context) {
   envoy::api::v2::filter::network::RateLimit config;
   Config::FilterJson::translateTcpRateLimitFilter(json_config, config);
-  return createFilter(config, stats_prefix, context);
+  return createFilter(config, context);
 }
 
 NetworkFilterFactoryCb

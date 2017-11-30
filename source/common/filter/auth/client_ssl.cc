@@ -24,9 +24,9 @@ Config::Config(const envoy::api::v2::filter::network::ClientSSLAuth& config, Thr
                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Stats::Scope& scope,
                Runtime::RandomGenerator& random)
   : RestApiFetcher(cm, config.auth_api_cluster(), dispatcher, random,
-                   std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
-      tls_(tls.allocateSlot()), ip_white_list_(config, "ip_white_list"),
-                   stats_(generateStats(scope, config.stat_prefix())) {
+                   std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000))),
+    tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
+    stats_(generateStats(scope, config.stat_prefix())) {
 
   if (!cm.get(remote_cluster_name_)) {
     throw EnvoyException(

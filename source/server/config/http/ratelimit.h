@@ -28,11 +28,11 @@ public:
   }
 
   std::string name() override { return Config::HttpFilterNames::get().RATE_LIMIT; }
-};
 
 private:
-HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::RateLimit& config,
-                                 const std::string& stats_prefix, FactoryContext& context);
+  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::RateLimit& config,
+                                   const std::string& stats_prefix, FactoryContext& context);
+};
 
 } // namespace Configuration
 } // namespace Server

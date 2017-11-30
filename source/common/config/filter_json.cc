@@ -366,10 +366,16 @@ void FilterJson::translateClientSslAuthFilter(
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
   JSON_UTIL_SET_DURATION(json_config, proto_config, refresh_delay);
 
-  // auto* ip_white_list = proto_config.mutable_ip_white_list();
-  // for (const auto& json_ip : json_config.getObjectArray("ip_white_list", true)) {
-  //   ip_white_list->Add(json_ip);
-  // }
+  auto* ip_white_list = proto_config.mutable_ip_white_list();
+  for (const std::string& cidr_str : json_config.getStringArray("ip_white_list", true)) {
+    auto* entry = ip_white_list->Add();
+    auto split_index = cidr_str.find("/");
+    entry->set_address_prefix(cidr_str.substr(0, split_index));
+    if (split_index != std::string::npos) {
+      const char* prefix_len_str = cidr_str.substr(split_index+1, std::string::npos).c_str();
+      entry->mutable_prefix_len()->set_value(std::atoi(prefix_len_str));
+    }
+  }
 }
 
 } // namespace Config

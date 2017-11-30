@@ -13,31 +13,31 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
-    const envoy::api::v2::filter::network::ClientSslAuth& config, FactoryContext& context) {
+    const envoy::api::v2::filter::network::ClientSSLAuth& config, FactoryContext& context) {
   ASSERT(!config.auth_api_cluster().empty());
   ASSERT(!config.stat_prefix().empty());
 
-  Filter::Auth::ClientSsl::ConfigSharedPtr config(Filter::Auth::ClientSsl::Config::create(
+  Filter::Auth::ClientSsl::ConfigSharedPtr filter_config(Filter::Auth::ClientSsl::Config::create(
       config, context.threadLocal(), context.clusterManager(), context.dispatcher(),
       context.scope(), context.random()));
-  return [config](Network::FilterManager& filter_manager) -> void {
+  return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        Network::ReadFilterSharedPtr{new Filter::Auth::ClientSsl::Instance(config)});
+        Network::ReadFilterSharedPtr{new Filter::Auth::ClientSsl::Instance(filter_config)});
   };
 }
 
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                 FactoryContext& context) {
-  envoy::api::v2::filter::network::ClientSslAuth config;
+  envoy::api::v2::filter::network::ClientSSLAuth config;
   Config::FilterJson::translateClientSslAuthFilter(json_config, config);
-  return createFilter(config, stats_prefix, context);
+  return createFilter(config, context);
 }
 
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
                                                          FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::ClientSslAuth&>(config),
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::ClientSSLAuth&>(config),
                       context);
 }
 
