@@ -118,6 +118,8 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
+  const uint16_t min_protocol_version_;
+  const uint16_t max_protocol_version_;
   const std::string ecdh_curves_;
 };
 
