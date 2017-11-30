@@ -58,8 +58,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       try {
         Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
       } catch (const EnvoyException& e) {
-        throw EnvoyException(fmt::format("Failed to open log-file '{}'.  e.what(): {}",
-                                         options.logPath(), e.what()));
+        throw EnvoyException(
+            fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
       }
     }
 

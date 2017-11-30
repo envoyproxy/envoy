@@ -55,7 +55,7 @@ void WsHandlerImpl::onConnectionSuccess() {
   // TODO (rshriram): This is a not the strictest WebSocket
   // implementation, as we do not really check the response headers
   // to ensure that the upstream really accepted the upgrade
-  // request.  Doing so requires re-doing bunch of HTTP/1.1 req-resp
+  // request. Doing so requires re-doing bunch of HTTP/1.1 req-resp
   // pair stuff and that is going to just complicate this code. The
   // client could technically send a body along with the request.
   // The server could send a body along with the upgrade response,

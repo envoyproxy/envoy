@@ -768,7 +768,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -800,7 +800,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
     - filter_chain_match:
         sni_domains: "www.example.com"
       tls_context:
@@ -818,7 +818,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -851,7 +851,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
     - filter_chain_match:
         sni_domains: "www.example.com"
       tls_context:
@@ -869,7 +869,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -902,7 +902,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
     - filter_chain_match:
         sni_domains: "www.example.com"
       tls_context:
@@ -917,7 +917,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -946,7 +946,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_foo } 
+                route: { cluster: service_foo }
     - filter_chain_match:
         sni_domains: "www.example.com"
       tls_context:
@@ -961,7 +961,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
             virtual_hosts:
             - routes:
               - match: { prefix: "/" }
-                route: { cluster: service_bar } 
+                route: { cluster: service_bar }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 

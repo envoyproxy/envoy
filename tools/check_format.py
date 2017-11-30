@@ -88,6 +88,8 @@ def checkFileContents(file_path):
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
+    # Strip double space after '.'  This may prove overenthusiastic and need to
+    # be restricted to comments and metadata files but works for now.
     print "%s" % (line.replace('.  ', '. ').rstrip())
 
 

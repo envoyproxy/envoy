@@ -458,7 +458,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   uint64_t end = 0UL;
 
   // Find the right cluster to route to based on the interval in which
-  // the selected value falls.  The intervals are determined as
+  // the selected value falls. The intervals are determined as
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();

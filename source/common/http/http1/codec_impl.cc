@@ -424,7 +424,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
       // When a proxy receives a request with an absolute-form of
       // request-target, the proxy MUST ignore the received Host header field
       // (if any) and instead replace it with the host information of the
-      // request-target.  A proxy that forwards such a request MUST generate a
+      // request-target. A proxy that forwards such a request MUST generate a
       // new Host field-value based on the received request-target rather than
       // forward the received Host field-value.
 

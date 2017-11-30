@@ -142,7 +142,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
 
   // Need to disable reads so that we don't write to an upstream that might fail
-  // in onData().  This will get re-enabled when the upstream connection is
+  // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
 
@@ -203,7 +203,7 @@ void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
 void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
-  // The downstream buffer has been drained.  Resume reading from upstream.
+  // The downstream buffer has been drained. Resume reading from upstream.
   parent_.readDisableUpstream(false);
 }
 
@@ -217,7 +217,7 @@ void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
-  // The upstream write buffer is drained.  Resume reading.
+  // The upstream write buffer is drained. Resume reading.
   parent_.readDisableDownstream(false);
 }
 

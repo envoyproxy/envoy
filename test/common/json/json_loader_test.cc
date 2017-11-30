@@ -319,7 +319,7 @@ TEST(JsonLoaderTest, NestedSchema) {
   )EOF";
 
   std::string json_string = R"EOF(
-  { 
+  {
     "bar": "baz",
     "foo": {
       "value1": "should have been a number",

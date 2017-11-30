@@ -145,7 +145,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(40)));
 
   // The first write to a given file will start the flush thread, which can flush
-  // immediately (race on whether it will or not).  So do a write and flush to
+  // immediately (race on whether it will or not). So do a write and flush to
   // get that state out of the way, then test that small writes don't trigger a flush.
   EXPECT_CALL(os_sys_calls, write_(_, _, _))
       .WillOnce(Invoke([](int, const void*, size_t num_bytes) -> ssize_t { return num_bytes; }));
