@@ -16,7 +16,7 @@ void ContextManagerImpl::releaseClientContext(ClientContext* context) {
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
 
   // context may not be found, in the case that a subclass of Context throws
-  // in it's constructor.  In that case the context did not get added, but
+  // in it's constructor. In that case the context did not get added, but
   // the destructor of Context will run and call releaseContext().
   contexts_.remove(context);
 }
@@ -51,7 +51,7 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
   }
 
   // context may not be found, in the case that a subclass of Context throws
-  // in it's constructor.  In that case the context did not get added, but
+  // in it's constructor. In that case the context did not get added, but
   // the destructor of Context will run and call releaseContext().
   contexts_.remove(context);
 }

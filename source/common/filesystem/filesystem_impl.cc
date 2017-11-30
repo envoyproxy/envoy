@@ -176,7 +176,7 @@ void FileImpl::flush() {
     // flush_lock_ must be held while checking this or else it is
     // possible that flushThreadFunc() has already moved data from
     // flush_buffer_ to about_to_write_buffer_, has unlocked write_lock_,
-    // but has not yet completed doWrite().  This would allow flush() to
+    // but has not yet completed doWrite(). This would allow flush() to
     // return before the pending data has actually been written to disk.
     flush_buffer_lock = std::unique_lock<std::mutex>(flush_lock_);
 

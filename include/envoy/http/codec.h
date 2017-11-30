@@ -147,7 +147,7 @@ public:
 
   /**
    * Enable/disable further data from this stream.
-   * Cessation of data may not be immediate.  For example, for HTTP/2 this may stop further flow
+   * Cessation of data may not be immediate. For example, for HTTP/2 this may stop further flow
    * control window updates which will result in the peer eventually stopping sending data.
    * @param disable informs if reads should be disabled (true) or re-enabled (false).
    */

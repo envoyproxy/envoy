@@ -22,7 +22,7 @@ namespace Server {
  * This feature performs deadlock detection stats collection & enforcement.
  *
  * It launches a thread that scans at an interval the minimum of the configured
- * intervals.  If it finds starved threads or suspected deadlocks it will take
+ * intervals. If it finds starved threads or suspected deadlocks it will take
  * the appropriate action depending on the config parameters described below.
  *
  * Thread lifetime is tied to GuardDog object lifetime (RAII style).

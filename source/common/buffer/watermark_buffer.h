@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Buffer {
 
 // A subclass of OwnedImpl which does watermark validation.
-// Each time the buffer is resized (written to or drained), the watermarks are checked.  As the
+// Each time the buffer is resized (written to or drained), the watermarks are checked. As the
 // buffer size transitions from under the low watermark to above the high watermark, the
 // above_high_watermark function is called one time. It will not be called again until the buffer
 // is drained below the low watermark, at which point the below_low_watermark function is called.
@@ -44,7 +44,7 @@ private:
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
 
-  // Used for enforcing buffer limits (off by default).  If these are set to non-zero by a call to
+  // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
   uint32_t high_watermark_{0};
   uint32_t low_watermark_{0};

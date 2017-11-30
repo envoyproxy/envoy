@@ -376,7 +376,7 @@ TEST_P(ConnectionImplTest, Watermarks) {
   disconnect(false);
 }
 
-// Write some data to the connection.  It will automatically attempt to flush
+// Write some data to the connection. It will automatically attempt to flush
 // it to the upstream file descriptor via a write() call to buffer_, which is
 // configured to succeed and accept all bytes read.
 TEST_P(ConnectionImplTest, BasicWrite) {
@@ -431,7 +431,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_EQ(data_to_write, data_written);
 
   // Now do the write again, but this time configure buffer_ to reject the write
-  // with errno set to EAGAIN via failWrite().  This should result in going above the high
+  // with errno set to EAGAIN via failWrite(). This should result in going above the high
   // watermark and not returning.
   Buffer::OwnedImpl second_buffer_to_write(data_to_write);
   EXPECT_CALL(*client_write_buffer_, move(_))
@@ -448,7 +448,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   client_connection_->write(second_buffer_to_write);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Clean up the connection.  The close() (called via disconnect) will attempt to flush.  The
+  // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
@@ -515,7 +515,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
       is_above = false;
     }
 
-    // Do the actual work.  Write |buffer_to_write| bytes to the connection and
+    // Do the actual work. Write |buffer_to_write| bytes to the connection and
     // drain |bytes_to_flush| before having the buffer failWrite()
     EXPECT_CALL(*client_write_buffer_, move(_))
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));

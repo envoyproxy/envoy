@@ -10,8 +10,8 @@ namespace Server {
 
 /**
  * WatchDog objects are an individual thread's interface with the deadlock
- * GuardDog.  A shared pointer to a WatchDog is obtained from the GuardDog at
- * thread startup.  After this point the "touch" method must be called
+ * GuardDog. A shared pointer to a WatchDog is obtained from the GuardDog at
+ * thread startup. After this point the "touch" method must be called
  * periodically to avoid triggering the deadlock detector.
  */
 class WatchDog {
@@ -24,7 +24,7 @@ public:
    * This will automatically call the touch() method at the interval specified
    * during construction.
    *
-   * The timer object is stored within the WatchDog object.  It will go away if
+   * The timer object is stored within the WatchDog object. It will go away if
    * the object goes out of scope and stop the timer.
    */
   virtual void startWatchdog(Event::Dispatcher& dispatcher) PURE;

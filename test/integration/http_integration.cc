@@ -277,7 +277,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
     bool close_upstream, ConnectionCreationFunction* create_connection) {
-  // This is called multiple times per test in ads_integration_test.  Only call
+  // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized_) {
     initialize();
@@ -626,7 +626,7 @@ void HttpIntegrationTest::testRetryHittingBufferLimit() {
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
 }
 
-// Test hitting the dynamo filter with too many request bytes to buffer.  Ensure the connection
+// Test hitting the dynamo filter with too many request bytes to buffer. Ensure the connection
 // manager sends a 413.
 void HttpIntegrationTest::testHittingDecoderFilterLimit() {
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
@@ -636,7 +636,7 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Envoy will likely connect and proxy some unspecified amount of data before
-  // hitting the buffer limit and disconnecting.  Ignore this if it happens.
+  // hitting the buffer limit and disconnecting. Ignore this if it happens.
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
                                                              {":path", "/dynamo/url"},
@@ -651,7 +651,7 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
   EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
 }
 
-// Test hitting the dynamo filter with too many response bytes to buffer.  Given the request headers
+// Test hitting the dynamo filter with too many response bytes to buffer. Given the request headers
 // are sent on early, the stream/connection will be reset.
 void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
