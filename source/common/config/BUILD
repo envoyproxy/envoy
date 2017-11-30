@@ -93,10 +93,13 @@ envoy_cc_library(
         "envoy_filter_http_buffer",
         "envoy_filter_http_fault",
         "envoy_filter_http_health_check",
+        "envoy_filter_http_rate_limit",
         "envoy_filter_http_router",
         "envoy_filter_network_mongo_proxy",
         "envoy_filter_network_redis_proxy",
         "envoy_filter_network_tcp_proxy",
+        "envoy_filter_network_rate_limit",
+        "envoy_filter_network_client_ssl_auth",
     ],
     deps = [
         ":address_json_lib",

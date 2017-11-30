@@ -17,9 +17,9 @@ namespace Config {
 
 namespace {
 
-void translateComparisonFilter(const Json::Object& config,
+void translateComparisonFilter(const Json::Object& json_config,
                                envoy::api::v2::filter::accesslog::ComparisonFilter& filter) {
-  const std::string op = config.getString("op");
+  const std::string op = json_config.getString("op");
   if (op == ">=") {
     filter.set_op(envoy::api::v2::filter::accesslog::ComparisonFilter::GE);
   } else {
@@ -28,41 +28,41 @@ void translateComparisonFilter(const Json::Object& config,
   }
 
   auto* runtime = filter.mutable_value();
-  runtime->set_default_value(config.getInteger("value"));
-  runtime->set_runtime_key(config.getString("runtime_key", ""));
+  runtime->set_default_value(json_config.getInteger("value"));
+  runtime->set_runtime_key(json_config.getString("runtime_key", ""));
 }
 
-void translateStatusCodeFilter(const Json::Object& config,
+void translateStatusCodeFilter(const Json::Object& json_config,
                                envoy::api::v2::filter::accesslog::StatusCodeFilter& filter) {
-  translateComparisonFilter(config, *filter.mutable_comparison());
+  translateComparisonFilter(json_config, *filter.mutable_comparison());
 }
 
-void translateDurationFilter(const Json::Object& config,
+void translateDurationFilter(const Json::Object& json_config,
                              envoy::api::v2::filter::accesslog::DurationFilter& filter) {
-  translateComparisonFilter(config, *filter.mutable_comparison());
+  translateComparisonFilter(json_config, *filter.mutable_comparison());
 }
 
-void translateRuntimeFilter(const Json::Object& config,
+void translateRuntimeFilter(const Json::Object& json_config,
                             envoy::api::v2::filter::accesslog::RuntimeFilter& filter) {
-  filter.set_runtime_key(config.getString("key"));
+  filter.set_runtime_key(json_config.getString("key"));
 }
 
 void translateRepeatedFilter(
-    const Json::Object& config,
+    const Json::Object& json_config,
     Protobuf::RepeatedPtrField<envoy::api::v2::filter::accesslog::AccessLogFilter>& filters) {
-  for (const auto& json_filter : config.getObjectArray("filters")) {
+  for (const auto& json_filter : json_config.getObjectArray("filters")) {
     FilterJson::translateAccessLogFilter(*json_filter, *filters.Add());
   }
 }
 
-void translateOrFilter(const Json::Object& config,
+void translateOrFilter(const Json::Object& json_config,
                        envoy::api::v2::filter::accesslog::OrFilter& filter) {
-  translateRepeatedFilter(config, *filter.mutable_filters());
+  translateRepeatedFilter(json_config, *filter.mutable_filters());
 }
 
-void translateAndFilter(const Json::Object& config,
+void translateAndFilter(const Json::Object& json_config,
                         envoy::api::v2::filter::accesslog::AndFilter& filter) {
-  translateRepeatedFilter(config, *filter.mutable_filters());
+  translateRepeatedFilter(json_config, *filter.mutable_filters());
 }
 
 void translateRepeatedAccessLog(
@@ -77,76 +77,74 @@ void translateRepeatedAccessLog(
 } // namespace
 
 void FilterJson::translateAccessLogFilter(
-    const Json::Object& json_access_log_filter,
-    envoy::api::v2::filter::accesslog::AccessLogFilter& access_log_filter) {
-  const std::string type = json_access_log_filter.getString("type");
+    const Json::Object& json_config,
+    envoy::api::v2::filter::accesslog::AccessLogFilter& proto_config) {
+  const std::string type = json_config.getString("type");
   if (type == "status_code") {
-    translateStatusCodeFilter(json_access_log_filter,
-                              *access_log_filter.mutable_status_code_filter());
+    translateStatusCodeFilter(json_config, *proto_config.mutable_status_code_filter());
   } else if (type == "duration") {
-    translateDurationFilter(json_access_log_filter, *access_log_filter.mutable_duration_filter());
+    translateDurationFilter(json_config, *proto_config.mutable_duration_filter());
   } else if (type == "runtime") {
-    translateRuntimeFilter(json_access_log_filter, *access_log_filter.mutable_runtime_filter());
+    translateRuntimeFilter(json_config, *proto_config.mutable_runtime_filter());
   } else if (type == "logical_or") {
-    translateOrFilter(json_access_log_filter, *access_log_filter.mutable_or_filter());
+    translateOrFilter(json_config, *proto_config.mutable_or_filter());
   } else if (type == "logical_and") {
-    translateAndFilter(json_access_log_filter, *access_log_filter.mutable_and_filter());
+    translateAndFilter(json_config, *proto_config.mutable_and_filter());
   } else if (type == "not_healthcheck") {
-    access_log_filter.mutable_not_health_check_filter();
+    proto_config.mutable_not_health_check_filter();
   } else {
     ASSERT(type == "traceable_request");
-    access_log_filter.mutable_traceable_filter();
+    proto_config.mutable_traceable_filter();
   }
 }
 
-void FilterJson::translateAccessLog(const Json::Object& json_access_log,
-                                    envoy::api::v2::filter::accesslog::AccessLog& access_log) {
-  json_access_log.validateSchema(Json::Schema::ACCESS_LOG_SCHEMA);
+void FilterJson::translateAccessLog(const Json::Object& json_config,
+                                    envoy::api::v2::filter::accesslog::AccessLog& proto_config) {
+  json_config.validateSchema(Json::Schema::ACCESS_LOG_SCHEMA);
 
   envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
 
-  JSON_UTIL_SET_STRING(json_access_log, file_access_log, path);
-  JSON_UTIL_SET_STRING(json_access_log, file_access_log, format);
+  JSON_UTIL_SET_STRING(json_config, file_access_log, path);
+  JSON_UTIL_SET_STRING(json_config, file_access_log, format);
 
-  ProtobufWkt::Struct& custom_config = *access_log.mutable_config();
+  ProtobufWkt::Struct& custom_config = *proto_config.mutable_config();
   MessageUtil::jsonConvert(file_access_log, custom_config);
 
   // Statically registered access logs are a v2-only feature, so use the standard internal file
   // access log for json config conversion.
-  access_log.set_name(Config::AccessLogNames::get().FILE);
+  proto_config.set_name(Config::AccessLogNames::get().FILE);
 
-  if (json_access_log.hasObject("filter")) {
-    translateAccessLogFilter(*json_access_log.getObject("filter"), *access_log.mutable_filter());
+  if (json_config.hasObject("filter")) {
+    translateAccessLogFilter(*json_config.getObject("filter"), *proto_config.mutable_filter());
   }
 }
 
 void FilterJson::translateHttpConnectionManager(
-    const Json::Object& json_http_connection_manager,
-    envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager) {
-  json_http_connection_manager.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
+    const Json::Object& json_config,
+    envoy::api::v2::filter::network::HttpConnectionManager& proto_config) {
+  json_config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
   envoy::api::v2::filter::network::HttpConnectionManager::CodecType codec_type{};
   envoy::api::v2::filter::network::HttpConnectionManager::CodecType_Parse(
-      StringUtil::toUpper(json_http_connection_manager.getString("codec_type")), &codec_type);
-  http_connection_manager.set_codec_type(codec_type);
+      StringUtil::toUpper(json_config.getString("codec_type")), &codec_type);
+  proto_config.set_codec_type(codec_type);
 
-  JSON_UTIL_SET_STRING(json_http_connection_manager, http_connection_manager, stat_prefix);
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
 
-  if (json_http_connection_manager.hasObject("rds")) {
-    Utility::translateRdsConfig(*json_http_connection_manager.getObject("rds"),
-                                *http_connection_manager.mutable_rds());
+  if (json_config.hasObject("rds")) {
+    Utility::translateRdsConfig(*json_config.getObject("rds"), *proto_config.mutable_rds());
   }
-  if (json_http_connection_manager.hasObject("route_config")) {
-    if (json_http_connection_manager.hasObject("rds")) {
+  if (json_config.hasObject("route_config")) {
+    if (json_config.hasObject("rds")) {
       throw EnvoyException(
           "http connection manager must have either rds or route_config but not both");
     }
-    RdsJson::translateRouteConfiguration(*json_http_connection_manager.getObject("route_config"),
-                                         *http_connection_manager.mutable_route_config());
+    RdsJson::translateRouteConfiguration(*json_config.getObject("route_config"),
+                                         *proto_config.mutable_route_config());
   }
 
-  for (const auto& json_filter : json_http_connection_manager.getObjectArray("filters", true)) {
-    auto* filter = http_connection_manager.mutable_http_filters()->Add();
+  for (const auto& json_filter : json_config.getObjectArray("filters", true)) {
+    auto* filter = proto_config.mutable_http_filters()->Add();
     JSON_UTIL_SET_STRING(*json_filter, *filter, name);
 
     // Translate v1 name to v2 name.
@@ -154,20 +152,21 @@ void FilterJson::translateHttpConnectionManager(
         Config::HttpFilterNames::get().v1_converter_.getV2Name(json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
-                                    json_filter->getObject("config")->asJsonString() + "}";
+    const std::string deprecated_config = "{\"deprecated_v1\": true, \"value\": " +
+                                          json_filter->getObject("config")->asJsonString() + "}";
 
-    const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
+    const auto status =
+        Protobuf::util::JsonStringToMessage(deprecated_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
     UNREFERENCED_PARAMETER(status);
   }
 
-  JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, add_user_agent);
+  JSON_UTIL_SET_BOOL(json_config, proto_config, add_user_agent);
 
-  if (json_http_connection_manager.hasObject("tracing")) {
-    const auto json_tracing = json_http_connection_manager.getObject("tracing");
-    auto* tracing = http_connection_manager.mutable_tracing();
+  if (json_config.hasObject("tracing")) {
+    const auto json_tracing = json_config.getObject("tracing");
+    auto* tracing = proto_config.mutable_tracing();
 
     envoy::api::v2::filter::network::HttpConnectionManager::Tracing::OperationName operation_name{};
     envoy::api::v2::filter::network::HttpConnectionManager::Tracing::OperationName_Parse(
@@ -180,72 +179,64 @@ void FilterJson::translateHttpConnectionManager(
     }
   }
 
-  if (json_http_connection_manager.hasObject("http1_settings")) {
-    ProtocolJson::translateHttp1ProtocolOptions(
-        *json_http_connection_manager.getObject("http1_settings"),
-        *http_connection_manager.mutable_http_protocol_options());
+  if (json_config.hasObject("http1_settings")) {
+    ProtocolJson::translateHttp1ProtocolOptions(*json_config.getObject("http1_settings"),
+                                                *proto_config.mutable_http_protocol_options());
   }
 
-  if (json_http_connection_manager.hasObject("http2_settings")) {
-    ProtocolJson::translateHttp2ProtocolOptions(
-        *json_http_connection_manager.getObject("http2_settings"),
-        *http_connection_manager.mutable_http2_protocol_options());
+  if (json_config.hasObject("http2_settings")) {
+    ProtocolJson::translateHttp2ProtocolOptions(*json_config.getObject("http2_settings"),
+                                                *proto_config.mutable_http2_protocol_options());
   }
 
-  JSON_UTIL_SET_STRING(json_http_connection_manager, http_connection_manager, server_name);
-  JSON_UTIL_SET_DURATION_SECONDS(json_http_connection_manager, http_connection_manager,
-                                 idle_timeout);
-  JSON_UTIL_SET_DURATION(json_http_connection_manager, http_connection_manager, drain_timeout);
+  JSON_UTIL_SET_STRING(json_config, proto_config, server_name);
+  JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, idle_timeout);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, drain_timeout);
 
-  translateRepeatedAccessLog(json_http_connection_manager.getObjectArray("access_log", true),
-                             *http_connection_manager.mutable_access_log());
+  translateRepeatedAccessLog(json_config.getObjectArray("access_log", true),
+                             *proto_config.mutable_access_log());
 
-  JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, use_remote_address);
-  JSON_UTIL_SET_BOOL(json_http_connection_manager, http_connection_manager, generate_request_id);
+  JSON_UTIL_SET_BOOL(json_config, proto_config, use_remote_address);
+  JSON_UTIL_SET_BOOL(json_config, proto_config, generate_request_id);
 
   envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails fcc_details{};
   envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails_Parse(
-      StringUtil::toUpper(
-          json_http_connection_manager.getString("forward_client_cert", "sanitize")),
-      &fcc_details);
-  http_connection_manager.set_forward_client_cert_details(fcc_details);
+      StringUtil::toUpper(json_config.getString("forward_client_cert", "sanitize")), &fcc_details);
+  proto_config.set_forward_client_cert_details(fcc_details);
 
   for (const std::string& detail :
-       json_http_connection_manager.getStringArray("set_current_client_cert_details", true)) {
+       json_config.getStringArray("set_current_client_cert_details", true)) {
     if (detail == "Subject") {
-      http_connection_manager.mutable_set_current_client_cert_details()
-          ->mutable_subject()
-          ->set_value(true);
+      proto_config.mutable_set_current_client_cert_details()->mutable_subject()->set_value(true);
     } else {
       ASSERT(detail == "SAN");
-      http_connection_manager.mutable_set_current_client_cert_details()->mutable_san()->set_value(
-          true);
+      proto_config.mutable_set_current_client_cert_details()->mutable_san()->set_value(true);
     }
   }
 }
 
-void FilterJson::translateRedisProxy(const Json::Object& json_redis_proxy,
-                                     envoy::api::v2::filter::network::RedisProxy& redis_proxy) {
-  json_redis_proxy.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
-  JSON_UTIL_SET_STRING(json_redis_proxy, redis_proxy, stat_prefix);
-  redis_proxy.set_cluster(json_redis_proxy.getString("cluster_name"));
+void FilterJson::translateRedisProxy(const Json::Object& json_config,
+                                     envoy::api::v2::filter::network::RedisProxy& proto_config) {
+  json_config.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  proto_config.set_cluster(json_config.getString("cluster_name"));
 
-  const auto json_conn_pool = json_redis_proxy.getObject("conn_pool");
+  const auto json_conn_pool = json_config.getObject("conn_pool");
   json_conn_pool->validateSchema(Json::Schema::REDIS_CONN_POOL_SCHEMA);
 
-  auto* conn_pool = redis_proxy.mutable_settings();
+  auto* conn_pool = proto_config.mutable_settings();
   JSON_UTIL_SET_DURATION(*json_conn_pool, *conn_pool, op_timeout);
 }
 
-void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
-                                     envoy::api::v2::filter::network::MongoProxy& mongo_proxy) {
-  json_mongo_proxy.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
+void FilterJson::translateMongoProxy(const Json::Object& json_config,
+                                     envoy::api::v2::filter::network::MongoProxy& proto_config) {
+  json_config.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
 
-  JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, stat_prefix);
-  JSON_UTIL_SET_STRING(json_mongo_proxy, mongo_proxy, access_log);
-  if (json_mongo_proxy.hasObject("fault")) {
-    const auto json_fault = json_mongo_proxy.getObject("fault")->getObject("fixed_delay");
-    auto* delay = mongo_proxy.mutable_delay();
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  JSON_UTIL_SET_STRING(json_config, proto_config, access_log);
+  if (json_config.hasObject("fault")) {
+    const auto json_fault = json_config.getObject("fault")->getObject("fixed_delay");
+    auto* delay = proto_config.mutable_delay();
 
     delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
     delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
@@ -253,79 +244,79 @@ void FilterJson::translateMongoProxy(const Json::Object& json_mongo_proxy,
   }
 }
 
-void FilterJson::translateFaultFilter(const Json::Object& json_fault,
-                                      envoy::api::v2::filter::http::HTTPFault& fault) {
-  json_fault.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
+void FilterJson::translateFaultFilter(const Json::Object& json_config,
+                                      envoy::api::v2::filter::http::HTTPFault& proto_config) {
+  json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
 
-  const Json::ObjectSharedPtr config_abort = json_fault.getObject("abort", true);
-  const Json::ObjectSharedPtr config_delay = json_fault.getObject("delay", true);
+  const Json::ObjectSharedPtr json_config_abort = json_config.getObject("abort", true);
+  const Json::ObjectSharedPtr json_config_delay = json_config.getObject("delay", true);
 
-  if (!config_abort->empty()) {
-    auto* abort_fault = fault.mutable_abort();
-    abort_fault->set_percent(static_cast<uint32_t>(config_abort->getInteger("abort_percent")));
+  if (!json_config_abort->empty()) {
+    auto* abort_fault = proto_config.mutable_abort();
+    abort_fault->set_percent(static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
 
     // TODO(mattklein123): Throw error if invalid return code is provided
-    abort_fault->set_http_status(static_cast<uint32_t>(config_abort->getInteger("http_status")));
+    abort_fault->set_http_status(
+        static_cast<uint32_t>(json_config_abort->getInteger("http_status")));
   }
 
-  if (!config_delay->empty()) {
-    auto* delay = fault.mutable_delay();
+  if (!json_config_delay->empty()) {
+    auto* delay = proto_config.mutable_delay();
     delay->set_type(envoy::api::v2::filter::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(config_delay->getInteger("fixed_delay_percent")));
-    JSON_UTIL_SET_DURATION_FROM_FIELD(*config_delay, *delay, fixed_delay, fixed_duration);
+    delay->set_percent(static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 
-  for (const auto json_header_matcher : json_fault.getObjectArray("headers", true)) {
-    auto* header_matcher = fault.mutable_headers()->Add();
+  for (const auto json_header_matcher : json_config.getObjectArray("headers", true)) {
+    auto* header_matcher = proto_config.mutable_headers()->Add();
     RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
   }
 
-  JSON_UTIL_SET_STRING(json_fault, fault, upstream_cluster);
+  JSON_UTIL_SET_STRING(json_config, proto_config, upstream_cluster);
 
-  for (auto json_downstream_node : json_fault.getStringArray("downstream_nodes", true)) {
-    auto* downstream_node = fault.mutable_downstream_nodes()->Add();
+  for (auto json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
+    auto* downstream_node = proto_config.mutable_downstream_nodes()->Add();
     *downstream_node = json_downstream_node;
   }
 }
 
 void FilterJson::translateHealthCheckFilter(
-    const Json::Object& json_health_check,
-    envoy::api::v2::filter::http::HealthCheck& health_check) {
-  json_health_check.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
+    const Json::Object& json_config, envoy::api::v2::filter::http::HealthCheck& proto_config) {
+  json_config.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
 
-  JSON_UTIL_SET_BOOL(json_health_check, health_check, pass_through_mode);
-  JSON_UTIL_SET_DURATION(json_health_check, health_check, cache_time);
-  JSON_UTIL_SET_STRING(json_health_check, health_check, endpoint);
+  JSON_UTIL_SET_BOOL(json_config, proto_config, pass_through_mode);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, cache_time);
+  JSON_UTIL_SET_STRING(json_config, proto_config, endpoint);
 }
 
-void FilterJson::translateRouter(const Json::Object& json_router,
-                                 envoy::api::v2::filter::http::Router& router) {
-  json_router.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
+void FilterJson::translateRouter(const Json::Object& json_config,
+                                 envoy::api::v2::filter::http::Router& proto_config) {
+  json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
 
-  router.mutable_dynamic_stats()->set_value(json_router.getBoolean("dynamic_stats", true));
-  router.set_start_child_span(json_router.getBoolean("start_child_span", false));
+  proto_config.mutable_dynamic_stats()->set_value(json_config.getBoolean("dynamic_stats", true));
+  proto_config.set_start_child_span(json_config.getBoolean("start_child_span", false));
 }
 
-void FilterJson::translateBufferFilter(const Json::Object& json_buffer,
-                                       envoy::api::v2::filter::http::Buffer& buffer) {
-  json_buffer.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
+void FilterJson::translateBufferFilter(const Json::Object& json_config,
+                                       envoy::api::v2::filter::http::Buffer& proto_config) {
+  json_config.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
 
-  JSON_UTIL_SET_INTEGER(json_buffer, buffer, max_request_bytes);
-  JSON_UTIL_SET_DURATION_SECONDS(json_buffer, buffer, max_request_time);
+  JSON_UTIL_SET_INTEGER(json_config, proto_config, max_request_bytes);
+  JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, max_request_time);
 }
 
-void FilterJson::translateTcpProxy(const Json::Object& json_tcp_proxy,
-                                   envoy::api::v2::filter::network::TcpProxy& tcp_proxy) {
-  json_tcp_proxy.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
+void FilterJson::translateTcpProxy(const Json::Object& json_config,
+                                   envoy::api::v2::filter::network::TcpProxy& proto_config) {
+  json_config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
-  JSON_UTIL_SET_STRING(json_tcp_proxy, tcp_proxy, stat_prefix);
-  translateRepeatedAccessLog(json_tcp_proxy.getObjectArray("access_log", true),
-                             *tcp_proxy.mutable_access_log());
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  translateRepeatedAccessLog(json_config.getObjectArray("access_log", true),
+                             *proto_config.mutable_access_log());
 
   for (const Json::ObjectSharedPtr& route_desc :
-       json_tcp_proxy.getObject("route_config")->getObjectArray("routes")) {
+       json_config.getObject("route_config")->getObjectArray("routes")) {
     envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute* route =
-        tcp_proxy.mutable_deprecated_v1()->mutable_routes()->Add();
+        proto_config.mutable_deprecated_v1()->mutable_routes()->Add();
     JSON_UTIL_SET_STRING(*route_desc, *route, cluster);
     JSON_UTIL_SET_STRING(*route_desc, *route, destination_ports);
     JSON_UTIL_SET_STRING(*route_desc, *route, source_ports);
@@ -333,6 +324,57 @@ void FilterJson::translateTcpProxy(const Json::Object& json_tcp_proxy,
                                         *route->mutable_source_ip_list());
     AddressJson::translateCidrRangeList(route_desc->getStringArray("destination_ip_list", true),
                                         *route->mutable_destination_ip_list());
+  }
+}
+
+void FilterJson::translateTcpRateLimitFilter(
+    const Json::Object& json_config, envoy::api::v2::filter::network::RateLimit& proto_config) {
+  json_config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  JSON_UTIL_SET_STRING(json_config, proto_config, domain);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
+
+  auto* descriptors = proto_config.mutable_descriptors();
+  for (const auto& json_descriptor : json_config.getObjectArray("descriptors", false)) {
+    auto* descriptor = descriptors->Add();
+    auto* entries = descriptor->mutable_entries();
+    for (const auto& json_entry : json_descriptor->asObjectArray()) {
+      auto* entry = entries->Add();
+      JSON_UTIL_SET_STRING(*json_entry, *entry, key);
+      JSON_UTIL_SET_STRING(*json_entry, *entry, value);
+    }
+  }
+}
+
+void FilterJson::translateHttpRateLimitFilter(
+    const Json::Object& json_config, envoy::api::v2::filter::http::RateLimit& proto_config) {
+  json_config.validateSchema(Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_config, proto_config, domain);
+  proto_config.set_stage(json_config.getInteger("stage", 0));
+
+  JSON_UTIL_SET_STRING(json_config, proto_config, request_type);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
+}
+
+void FilterJson::translateClientSslAuthFilter(
+    const Json::Object& json_config, envoy::api::v2::filter::network::ClientSSLAuth& proto_config) {
+  json_config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_config, proto_config, auth_api_cluster);
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, refresh_delay);
+
+  auto* ip_white_list = proto_config.mutable_ip_white_list();
+  for (const std::string& cidr_str : json_config.getStringArray("ip_white_list", true)) {
+    auto* entry = ip_white_list->Add();
+    auto split_index = cidr_str.find("/");
+    entry->set_address_prefix(cidr_str.substr(0, split_index));
+    if (split_index != std::string::npos) {
+      const char* prefix_len_str = cidr_str.substr(split_index + 1, std::string::npos).c_str();
+      entry->mutable_prefix_len()->set_value(std::atoi(prefix_len_str));
+    }
   }
 }
 

@@ -55,18 +55,14 @@ const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
     R"EOF(
 name: envoy.buffer
 config:
-  deprecated_v1: true
-  value:
     max_request_bytes : 5242880
-    max_request_time_s : 120
+    max_request_time : 120s
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
     R"EOF(
 name: envoy.health_check
 config:
-  deprecated_v1: true
-  value:
     pass_through_mode: false
     endpoint: /healthcheck
 )EOF";
