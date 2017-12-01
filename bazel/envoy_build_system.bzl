@@ -1,3 +1,5 @@
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
@@ -309,15 +311,26 @@ def _proto_header(proto_path):
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
-    internal_proto_lib_name = name + "_internal_proto_lib"
-    native.proto_library(
-        name = internal_proto_lib_name,
-        srcs = srcs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
-    )
-    native.cc_proto_library(
+    # Ideally this would be native.{proto_library, cc_proto_library}.
+    # Unfortunately, this doesn't work with http_api_protos due to the PGV
+    # requirement to also use them in the non-native protobuf.bzl
+    # cc_proto_library; you end up with the same file built twice. So, also
+    # using protobuf.bzl cc_proto_library here.
+    cc_proto_deps = []
+
+    if "http_api_protos" in external_deps:
+        cc_proto_deps.append("@googleapis//:http_api_protos")
+
+    if "well_known_protos" in external_deps:
+        cc_proto_deps.append("@com_google_protobuf//:cc_wkt_protos")
+
+    cc_proto_library(
         name = name,
-        deps = [internal_proto_lib_name],
+        srcs = srcs,
+        default_runtime = "@com_google_protobuf//:protobuf",
+        protoc = "@com_google_protobuf//:protoc",
+        deps = deps + cc_proto_deps,
+        visibility = ["//visibility:public"],
     )
 
 # Envoy proto descriptor targets should be specified with this function.
