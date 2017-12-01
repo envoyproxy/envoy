@@ -123,6 +123,14 @@ TEST_P(IntegrationAdminTest, Admin) {
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_THAT(response->body(),
+              testing::Not(testing::HasSubstr(
+                  "cluster_upstream_rq{envoy_response_code_class=\"5xx\",envoy_cluster_name"
+                  "=\"lds\"} 1\n")));
+  EXPECT_THAT(
+      response->body(),
+      testing::HasSubstr("cluster_upstream_rq{envoy_response_code=\"503\",envoy_cluster_name"
+                         "=\"lds\"} 1\n"));
   EXPECT_THAT(
       response->body(),
       testing::HasSubstr("http_downstream_rq{envoy_response_code_class=\"4xx\",envoy_http_conn_"
