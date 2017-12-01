@@ -179,6 +179,16 @@ private:
    */
   Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
 
+  /**
+   * Helper function used by handlerRoutes. The function loops through the providers
+   * and adds them to the response.
+   * @param response supplies the buffer to fill with information.
+   * @param providers supplies the vector of providers to add to the response.
+   * @return Http::Code OK.
+   */
+  Http::Code handlerRoutesLoop(Buffer::Instance& response,
+                               const std::vector<RdsRouteConfigProviderSharedPtr> providers);
+
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
   Runtime::Loader& runtime_;
