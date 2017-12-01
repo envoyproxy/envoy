@@ -77,6 +77,7 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     deps = [
+        "//source/common/config:filter_json_lib",
         "//source/common/grpc:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
