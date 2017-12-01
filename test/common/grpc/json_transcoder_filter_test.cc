@@ -44,13 +44,13 @@ class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
   GrpcJsonTranscoderConfigTest() {}
 
-  const envoy::api::v2::filter::http::GrpcJsonTranscoder&
+  const envoy::api::v2::filter::http::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
     envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
-    Envoy::Config::FilterJson(*json_config, proto_config);
+    Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
     return proto_config;
   }
 
@@ -188,12 +188,12 @@ public:
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  const envoy::api::v2::filter::http::GrpcJsonTranscoder& bookstoreProtoConfig() {
+  const envoy::api::v2::filter::http::GrpcJsonTranscoder bookstoreProtoConfig() {
     std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                               "\",\"services\": [\"bookstore.Bookstore\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
     envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
-    Envoy::Config::FilterJson(*json_config, proto_config);
+    Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
     return proto_config;
   }
 
@@ -332,17 +332,20 @@ public:
     auto json_config =
         Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_));
     envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
-    Envoy::Config::FilterJson(*json_config, proto_config);
-
-    config_(proto_config);
-    filter_(config_);
-
-    filter_.setDecoderFilterCallbacks(decoder_callbacks_);
-    filter_.setEncoderFilterCallbacks(encoder_callbacks_);
+    Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
+    config_ = new JsonTranscoderConfig(proto_config);
+    filter_ = new JsonTranscoderFilter(*config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  JsonTranscoderConfig config_;
-  JsonTranscoderFilter filter_;
+  ~GrpcJsonTranscoderFilterPrintTest() {
+    delete filter_;
+    delete config_;
+  }
+
+  JsonTranscoderConfig* config_;
+  JsonTranscoderFilter* filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -350,7 +353,7 @@ public:
 TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
   Http::TestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "GET"}, {":path", "/authors/101"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   bookstore::Author author;
   author.set_id(101);
@@ -359,7 +362,7 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
 
   const auto response_data = Common::serializeBody(author);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
-            filter_.encodeData(*response_data, false));
+            filter_->encodeData(*response_data, false));
 
   std::string response_json = TestUtility::bufferToString(*response_data);
   EXPECT_EQ(GetParam().expected_response_, response_json);
