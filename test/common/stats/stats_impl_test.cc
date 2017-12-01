@@ -292,14 +292,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   Tag response_code_class;
   response_code_class.name_ = tag_names.RESPONSE_CODE_CLASS;
-  response_code_class.value_ = "2xx";
+  response_code_class.value_ = "2";
 
   Tag response_code;
   response_code.name_ = tag_names.RESPONSE_CODE;
   response_code.value_ = "200";
 
   regex_tester.testRegex("vhost.vhost_1.vcluster.vcluster_1.upstream_rq_2xx",
-                         "vhost.vcluster.upstream_rq", {vhost, vcluster, response_code_class});
+                         "vhost.vcluster.upstream_rq_xx", {vhost, vcluster, response_code_class});
   regex_tester.testRegex("vhost.vhost_1.vcluster.vcluster_1.upstream_rq_200",
                          "vhost.vcluster.upstream_rq", {vhost, vcluster, response_code});
 
@@ -309,10 +309,10 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   listener_http_prefix.value_ = "http_prefix";
 
   listener_address.value_ = "127.0.0.1_3012";
-  response_code_class.value_ = "5xx";
+  response_code_class.value_ = "5";
 
   regex_tester.testRegex("listener.127.0.0.1_3012.http.http_prefix.downstream_rq_5xx",
-                         "listener.http.downstream_rq",
+                         "listener.http.downstream_rq_xx",
                          {listener_http_prefix, listener_address, response_code_class});
 
   // User agent
