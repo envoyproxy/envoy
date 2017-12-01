@@ -58,8 +58,8 @@ public:
     /**
      * Helper function that replaces the current connection with the specified one.
      */
-    void reconnect(Address::InstanceConstSharedPtr remote_address,
-                   Address::InstanceConstSharedPtr local_address);
+    void finishConnection(Address::InstanceConstSharedPtr remote_address,
+                          Address::InstanceConstSharedPtr local_address);
 
     ProxyProtocol& parent_;
     int fd_;
