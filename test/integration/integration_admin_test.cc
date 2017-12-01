@@ -140,6 +140,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("version_info::\n"));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);

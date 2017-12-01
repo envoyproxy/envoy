@@ -174,6 +174,8 @@ public:
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
 
+  const std::string versionInfo() const override;
+
 private:
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
