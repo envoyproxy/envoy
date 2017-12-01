@@ -44,8 +44,8 @@ class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
   GrpcJsonTranscoderConfigTest() {}
 
-  const envoy::api::v2::filter::http::GrpcJsonTranscoder& getProtoConfig(const std::string& descriptor_path,
-                                                                        const std::string& service_name) {
+  const envoy::api::v2::filter::http::GrpcJsonTranscoder&
+  getProtoConfig(const std::string& descriptor_path, const std::string& service_name) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
@@ -111,7 +111,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
   EXPECT_THROW_WITH_MESSAGE(
       JsonTranscoderConfig config(
           getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                      "grpc.service.UnknownService")),
+                         "grpc.service.UnknownService")),
       EnvoyException,
       "transcoding_filter: Could not find 'grpc.service.UnknownService' in the proto descriptor");
 }
@@ -119,9 +119,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
 TEST_F(GrpcJsonTranscoderConfigTest, IncompleteProto) {
   EXPECT_THROW_WITH_MESSAGE(
       JsonTranscoderConfig config(getProtoConfig(makeProtoDescriptor([&](FileDescriptorSet& pb) {
-                                                stripImports(pb, "test/proto/bookstore.proto");
-                                              }),
-                                              "bookstore.Bookstore")),
+                                                   stripImports(pb, "test/proto/bookstore.proto");
+                                                 }),
+                                                 "bookstore.Bookstore")),
       EnvoyException, "transcoding_filter: Unable to build proto descriptor pool");
 }
 
@@ -329,7 +329,8 @@ class GrpcJsonTranscoderFilterPrintTest
     : public testing::TestWithParam<GrpcJsonTranscoderFilterPrintTestParam> {
 public:
   GrpcJsonTranscoderFilterPrintTest() {
-    auto json_config = Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_));
+    auto json_config =
+        Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_));
     envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
     Envoy::Config::FilterJson(*json_config, proto_config);
 

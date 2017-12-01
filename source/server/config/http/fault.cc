@@ -28,9 +28,10 @@ HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(const Json::Object& j
   return createFilter(proto_config, stats_prefix, context);
 }
 
-HttpFilterFactoryCb FaultFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                                    const std::string& stats_prefix,
-                                                                    FactoryContext& context) {
+HttpFilterFactoryCb
+FaultFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                const std::string& stats_prefix,
+                                                FactoryContext& context) {
   return createFilter(dynamic_cast<const envoy::api::v2::filter::http::HTTPFault&>(proto_config),
                       stats_prefix, context);
 }

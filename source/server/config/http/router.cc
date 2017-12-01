@@ -13,12 +13,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb RouterFilterConfig::createFilter(const envoy::api::v2::filter::http::Router& proto_config,
-                                                     const std::string& stat_prefix,
-                                                     FactoryContext& context) {
+HttpFilterFactoryCb
+RouterFilterConfig::createFilter(const envoy::api::v2::filter::http::Router& proto_config,
+                                 const std::string& stat_prefix, FactoryContext& context) {
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
       stat_prefix, context,
-      Router::ShadowWriterPtr{new Router::ShadowWriterImpl(context.clusterManager())}, proto_config));
+      Router::ShadowWriterPtr{new Router::ShadowWriterImpl(context.clusterManager())},
+      proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));
@@ -33,10 +34,12 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& 
   return createFilter(proto_config, stat_prefix, context);
 }
 
-HttpFilterFactoryCb RouterFilterConfig::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stat_prefix, FactoryContext& context) {
-  return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::http::Router&>(proto_config), stat_prefix, context);
+HttpFilterFactoryCb
+RouterFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                 const std::string& stat_prefix,
+                                                 FactoryContext& context) {
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::Router&>(proto_config),
+                      stat_prefix, context);
 }
 
 /**

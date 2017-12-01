@@ -15,8 +15,8 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb
-BufferFilterConfig::createBufferFilter(const envoy::api::v2::filter::http::Buffer& proto_config,
-                                       const std::string& stats_prefix, FactoryContext& context) {
+BufferFilterConfig::createFilter(const envoy::api::v2::filter::http::Buffer& proto_config,
+                                 const std::string& stats_prefix, FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
   ASSERT(proto_config.has_max_request_time());
 
@@ -38,8 +38,10 @@ HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& 
   return createFilter(proto_config, stats_prefix, context);
 }
 
-HttpFilterFactoryCb BufferFilterConfig::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stats_prefix, FactoryContext& context) {
+HttpFilterFactoryCb
+BufferFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                 const std::string& stats_prefix,
+                                                 FactoryContext& context) {
   return createFilter(dynamic_cast<const envoy::api::v2::filter::http::Buffer&>(proto_config),
                       stats_prefix, context);
 }

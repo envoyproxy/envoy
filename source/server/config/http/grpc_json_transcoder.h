@@ -8,6 +8,8 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+#include "api/filter/http/transcoder.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -31,8 +33,9 @@ public:
   std::string name() override { return Config::HttpFilterNames::get().GRPC_JSON_TRANSCODER; };
 
 private:
-  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::GrpcJsonTranscodert& proto_config,
-                                   const std::string& stats_prefix, FactoryContext& context);
+  HttpFilterFactoryCb
+  createFilter(const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config,
+               const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

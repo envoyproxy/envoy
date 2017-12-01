@@ -9,8 +9,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb LuaFilterConfig::createFilter(const envoy::api::v2::filter::http::Lua& proto_config,
-                                                  const std::string&, FactoryContext& context) {
+HttpFilterFactoryCb
+LuaFilterConfig::createFilter(const envoy::api::v2::filter::http::Lua& proto_config,
+                              const std::string&, FactoryContext& context) {
   Http::Filter::Lua::FilterConfigConstSharedPtr filter_config(new Http::Filter::Lua::FilterConfig{
       proto_config.inline_code(), context.threadLocal(), context.clusterManager()});
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -26,9 +27,10 @@ HttpFilterFactoryCb LuaFilterConfig::createFilterFactory(const Json::Object& jso
   return createFilter(proto_config, stat_prefix, context);
 }
 
-HttpFilterFactoryCb LuaFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                                  const std::string& stat_prefix,
-                                                                  FactoryContext& context) {
+HttpFilterFactoryCb
+LuaFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                              const std::string& stat_prefix,
+                                              FactoryContext& context) {
   return createFilter(dynamic_cast<const envoy::api::v2::filter::http::Lua&>(proto_config),
                       stat_prefix, context);
 }

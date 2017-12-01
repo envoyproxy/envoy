@@ -294,18 +294,22 @@ void FilterJson::translateGrpcJsonTranscoder(
     envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config) {
   json_config.validateSchema(Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA);
   JSON_UTIL_SET_STRING(json_config, proto_config, proto_descriptor);
-  auto *services = proto_config.mutable_services();
-  for (const auto& service_name : config.getStringArray("services")) {
-    services->Add()->set_value(service_name);      
+  auto* services = proto_config.mutable_services();
+  for (const auto& service_name : json_config.getStringArray("services")) {
+    *services->Add() = service_name;
   }
 
   if (json_config.hasObject("print_options")) {
-    auto *json_print_options = json_config.getObject("print_options");
-    auto *proto_print_options = proto_config.mutable_print_options();
-    proto_print_options->set_add_whitespace(json_print_options.getBoolean("add_whitespace", false));
-    proto_print_options->set_always_print_primitive_fields(json_print_options.getBoolean("always_print_primitive_fields", false));
-    proto_print_options->set_always_print_enums_as_ints(json_print_options.getBoolean("always_print_enums_as_ints", false));
-    proto_print_options->set_preserve_proto_field_names(json_print_options.getBoolean("preserve_proto_field_names", false));
+    auto json_print_options = json_config.getObject("print_options");
+    auto* proto_print_options = proto_config.mutable_print_options();
+    proto_print_options->set_add_whitespace(
+        json_print_options->getBoolean("add_whitespace", false));
+    proto_print_options->set_always_print_primitive_fields(
+        json_print_options->getBoolean("always_print_primitive_fields", false));
+    proto_print_options->set_always_print_enums_as_ints(
+        json_print_options->getBoolean("always_print_enums_as_ints", false));
+    proto_print_options->set_preserve_proto_field_names(
+        json_print_options->getBoolean("preserve_proto_field_names", false));
   }
 }
 

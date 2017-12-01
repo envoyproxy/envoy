@@ -17,8 +17,9 @@ HttpFilterFactoryCb
 RateLimitFilterConfig::createFilter(const envoy::api::v2::filter::http::RateLimit& proto_config,
                                     const std::string&, FactoryContext& context) {
   ASSERT(!proto_config.domain().empty());
-  Http::RateLimit::FilterConfigSharedPtr filter_config(new Http::RateLimit::FilterConfig(
-      proto_config, context.localInfo(), context.scope(), context.runtime(), context.clusterManager()));
+  Http::RateLimit::FilterConfigSharedPtr filter_config(
+      new Http::RateLimit::FilterConfig(proto_config, context.localInfo(), context.scope(),
+                                        context.runtime(), context.clusterManager()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
   return [filter_config, timeout_ms,
           &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -35,8 +36,10 @@ HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(const Json::Objec
   return createFilter(proto_config, stats_prefix, context);
 }
 
-HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stats_prefix, FactoryContext& context) {
+HttpFilterFactoryCb
+RateLimitFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                    const std::string& stats_prefix,
+                                                    FactoryContext& context) {
   return createFilter(dynamic_cast<const envoy::api::v2::filter::http::RateLimit&>(proto_config),
                       stats_prefix, context);
 }

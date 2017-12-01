@@ -32,10 +32,9 @@ public:
 
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
 
- private:
+private:
   HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Router& proto_config,
-                                   const std::string& stat_prefix,
-                                   FactoryContext& context);
+                                   const std::string& stat_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

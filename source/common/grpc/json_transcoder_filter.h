@@ -9,12 +9,11 @@
 #include "common/grpc/transcoder_input_stream_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "api/filter/http/transcoder.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"
 #include "grpc_transcoding/type_helper.h"
-
-#include "api/filter/http/transcoder.pb.h"
 
 namespace Envoy {
 namespace Grpc {

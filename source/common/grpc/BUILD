@@ -80,8 +80,8 @@ envoy_cc_library(
         "path_matcher",
         "grpc_transcoding",
         "http_api_protos",
+        "envoy_filter_http_transcoder",
     ],
-    external_deps = ["envoy_filter_http_transcoder"],
     deps = [
         ":codec_lib",
         ":common_lib",

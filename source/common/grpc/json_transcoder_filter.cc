@@ -72,7 +72,8 @@ private:
 
 } // namespace
 
-  JsonTranscoderConfig::JsonTranscoderConfig(const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config) {
+JsonTranscoderConfig::JsonTranscoderConfig(
+    const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config) {
   const std::string proto_descriptor_file = proto_config.proto_descriptor();
   FileDescriptorSet descriptor_set;
   if (!descriptor_set.ParseFromString(Filesystem::fileReadToEnd(proto_descriptor_file))) {
