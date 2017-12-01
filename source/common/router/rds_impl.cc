@@ -215,7 +215,7 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
   if (query_params.size() == 1 && it != query_params.end()) {
     // Create a vector with all the providers that have the queried route_config_name.
     std::vector<RdsRouteConfigProviderSharedPtr> selected_providers;
-    for (const auto provider : rdsRouteConfigProviders()) {
+    for (const auto& provider : rdsRouteConfigProviders()) {
       if (provider->routeConfigName() == it->second) {
         selected_providers.push_back(provider);
       }
