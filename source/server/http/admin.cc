@@ -331,6 +331,8 @@ std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& ta
 }
 
 std::string AdminImpl::prometheusMetricName(const std::string& extractedName) {
+  // Add namespacing prefix to avoid conflicts, as per best practice:
+  // https://prometheus.io/docs/practices/naming/#metric-names
   return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName));
 }
 
