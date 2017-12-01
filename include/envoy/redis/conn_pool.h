@@ -86,8 +86,9 @@ public:
   virtual std::chrono::milliseconds opTimeout() const PURE;
 
   /**
-   * @return bool disable outlier events even if the cluster has it enabled, useful for the
-   * healthcheck pool.
+   * @return bool disable outlier events even if the cluster has it enabled. This is used by the
+   * healthchecker's connection pool to avoid double counting active healthcheck operations as
+   * passive healthcheck operations.
    */
   virtual bool disableOutlierEvents() const PURE;
 };

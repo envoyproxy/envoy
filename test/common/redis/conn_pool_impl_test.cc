@@ -58,8 +58,8 @@ public:
     finishSetup();
   }
 
-  void setup(Config* config) {
-    config_.reset(config);
+  void setup(std::unique_ptr<Config>&& config) {
+    config_ = std::move(config);
     finishSetup();
   }
 
@@ -296,7 +296,7 @@ class ConfigOutlierDisabled : public Config {
 TEST_F(RedisClientImplTest, OutlierDisabled) {
   InSequence s;
 
-  setup(new ConfigOutlierDisabled());
+  setup(std::make_unique<ConfigOutlierDisabled>());
 
   RespValue request1;
   MockPoolCallbacks callbacks1;
