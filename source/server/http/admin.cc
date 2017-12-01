@@ -330,19 +330,23 @@ std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& ta
   return StringUtil::join(buf, ",");
 }
 
+std::string AdminImpl::prometheusMetricName(const std::string& extractedName) {
+  return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName));
+}
+
 void AdminImpl::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                   const std::list<Stats::GaugeSharedPtr>& gauges,
                                   Buffer::Instance& response) {
   for (const auto& counter : counters) {
     const std::string tags = formatTagsForPrometheus(counter->tags());
-    const std::string metric_name = sanitizePrometheusName(counter->tagExtractedName());
+    const std::string metric_name = prometheusMetricName(counter->tagExtractedName());
     response.add(fmt::format("# TYPE {0} counter\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
     const std::string tags = formatTagsForPrometheus(gauge->tags());
-    const std::string metric_name = sanitizePrometheusName(gauge->tagExtractedName());
+    const std::string metric_name = prometheusMetricName(gauge->tagExtractedName());
     response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
