@@ -1,11 +1,5 @@
 workspace(name = "envoy")
 
-git_repository(
-    name = "io_bazel_rules_go",
-    remote = "https://github.com/bazelbuild/rules_go.git",
-    commit = "4374be38e9a75ff5957c3922adb155d32086fe14",
-)
-
 load("//bazel:repositories.bzl", "envoy_dependencies")
 load("//bazel:cc_configure.bzl", "cc_configure")
 
