@@ -157,37 +157,39 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
 
     response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
                              cluster.second.get().info()->addedViaApi()));
+    for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
+      for (auto& host : host_set->hosts()) {
+        std::map<std::string, uint64_t> all_stats;
+        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+          all_stats[counter->name()] = counter->value();
+        }
 
-    for (auto& host : cluster.second.get().hosts()) {
-      std::map<std::string, uint64_t> all_stats;
-      for (const Stats::CounterSharedPtr& counter : host->counters()) {
-        all_stats[counter->name()] = counter->value();
+        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+          all_stats[gauge->name()] = gauge->value();
+        }
+
+        for (auto stat : all_stats) {
+          response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
+                                   host->address()->asString(), stat.first, stat.second));
+        }
+
+        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(),
+                                 Upstream::HostUtility::healthFlagsToString(*host)));
+        response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->weight()));
+        response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->locality().region()));
+        response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->locality().zone()));
+        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->locality().sub_zone()));
+        response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->canary()));
+        response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(),
+                                 host->outlierDetector().successRate()));
       }
-
-      for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-        all_stats[gauge->name()] = gauge->value();
-      }
-
-      for (auto stat : all_stats) {
-        response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), stat.first, stat.second));
-      }
-
-      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(),
-                               Upstream::HostUtility::healthFlagsToString(*host)));
-      response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->weight()));
-      response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->locality().region()));
-      response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->locality().zone()));
-      response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->locality().sub_zone()));
-      response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->canary()));
-      response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->outlierDetector().successRate()));
     }
   }
 
@@ -328,19 +330,25 @@ std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& ta
   return StringUtil::join(buf, ",");
 }
 
+std::string AdminImpl::prometheusMetricName(const std::string& extractedName) {
+  // Add namespacing prefix to avoid conflicts, as per best practice:
+  // https://prometheus.io/docs/practices/naming/#metric-names
+  return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName));
+}
+
 void AdminImpl::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                   const std::list<Stats::GaugeSharedPtr>& gauges,
                                   Buffer::Instance& response) {
   for (const auto& counter : counters) {
     const std::string tags = formatTagsForPrometheus(counter->tags());
-    const std::string metric_name = sanitizePrometheusName(counter->tagExtractedName());
+    const std::string metric_name = prometheusMetricName(counter->tagExtractedName());
     response.add(fmt::format("# TYPE {0} counter\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
     const std::string tags = formatTagsForPrometheus(gauge->tags());
-    const std::string metric_name = sanitizePrometheusName(gauge->tagExtractedName());
+    const std::string metric_name = prometheusMetricName(gauge->tagExtractedName());
     response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }

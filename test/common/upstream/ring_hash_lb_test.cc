@@ -37,7 +37,8 @@ class RingHashLoadBalancerTest : public testing::Test {
 public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
-  NiceMock<MockCluster> cluster_;
+  NiceMock<MockHostSet> host_set_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
@@ -46,25 +47,23 @@ public:
 };
 
 TEST_F(RingHashLoadBalancerTest, NoHost) {
-  RingHashLoadBalancer lb{cluster_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
   EXPECT_EQ(nullptr, lb.chooseHost(nullptr));
 };
 
 TEST_F(RingHashLoadBalancerTest, Basic) {
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:90"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:91"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:92"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:93"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:94"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:95")};
-  cluster_.healthy_hosts_ = cluster_.hosts_;
-  cluster_.runCallbacks({}, {});
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
 
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
 
-  RingHashLoadBalancer lb{cluster_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
 
   // hash ring:
   // port | position
@@ -84,31 +83,31 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
 
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[4], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(cluster_.hosts_[4], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(3551244743356806947);
-    EXPECT_EQ(cluster_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(3551244743356806948);
-    EXPECT_EQ(cluster_.hosts_[3], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb.chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(16117243373044804880UL));
-    EXPECT_EQ(cluster_.hosts_[0], lb.chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[0], lb.chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
-  cluster_.healthy_hosts_.clear();
-  cluster_.runCallbacks({}, {});
+  host_set_.healthy_hosts_.clear();
+  host_set_.runCallbacks({}, {});
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[4], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb.chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
@@ -118,19 +117,17 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
 // TODO(danielhochman): After v1 is deprecated this test can be deleted since std::hash will no
 // longer be in use.
 TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:83"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:84"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:85")};
-  cluster_.healthy_hosts_ = cluster_.hosts_;
-  cluster_.runCallbacks({}, {});
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
 
   // use_std_hash defaults to true so don't set it here.
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
-  RingHashLoadBalancer lb{cluster_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // ring hash: host=127.0.0.1:85 hash=1358027074129602068
@@ -147,37 +144,37 @@ TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
   // ring hash: host=127.0.0.1:80 hash=17613279263364193813
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(cluster_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602068);
-    EXPECT_EQ(cluster_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602069);
-    EXPECT_EQ(cluster_.hosts_[3], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb.chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
-    EXPECT_EQ(cluster_.hosts_[2], lb.chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[2], lb.chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 #endif
 
 TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
-  cluster_.runCallbacks({}, {});
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.runCallbacks({}, {});
 
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(3);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
-  RingHashLoadBalancer lb{cluster_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
 
   // hash ring:
   // port | position
@@ -189,12 +186,12 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
 
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[0], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb.chooseHost(&context));
   }
 
-  cluster_.hosts_ = {makeTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     makeTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
-  cluster_.runCallbacks({}, {});
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
+                      makeTestHost(info_, "tcp://127.0.0.1:82")};
+  host_set_.runCallbacks({}, {});
 
   // hash ring:
   // port | position
@@ -206,7 +203,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
 
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(cluster_.hosts_[0], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb.chooseHost(&context));
   }
 }
 
@@ -244,15 +241,15 @@ TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   // TODO(danielhochman): add support for more hosts if necessary with another loop for subnet
   ASSERT_LT(num_hosts, 256);
   for (uint64_t i = 0; i < num_hosts; i++) {
-    cluster_.hosts_.push_back(makeTestHost(cluster_.info_, fmt::format("tcp://10.0.0.{}:6379", i)));
+    host_set_.hosts_.push_back(makeTestHost(info_, fmt::format("tcp://10.0.0.{}:6379", i)));
   }
-  cluster_.healthy_hosts_ = cluster_.hosts_;
-  cluster_.runCallbacks({}, {});
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
 
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
-  RingHashLoadBalancer lb{cluster_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
 
   for (uint64_t i = 0; i < keys_to_simulate; i++) {
     TestLoadBalancerContext context(std::hash<std::string>()(fmt::format("{}", i)));

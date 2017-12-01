@@ -23,12 +23,13 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
     : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
       local_host_set_(local_host_set) {
   if (local_host_set_) {
-    host_set_.addMemberUpdateCb(
-        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
-          regenerateLocalityRoutingStructures();
-        });
-    local_host_set_member_update_cb_handle_ = local_host_set_->addMemberUpdateCb(
-        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+    host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                       const std::vector<HostSharedPtr>&) -> void {
+      regenerateLocalityRoutingStructures();
+    });
+    local_host_set_member_update_cb_handle_ =
+        local_host_set_->addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                                  const std::vector<HostSharedPtr>&) -> void {
           regenerateLocalityRoutingStructures();
         });
   }
@@ -247,7 +248,7 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
                                                    ClusterStats& stats, Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
     : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {
-  host_set.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
+  host_set.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
     if (last_host_) {
       for (const HostSharedPtr& host : hosts_removed) {
