@@ -185,14 +185,10 @@ def _envoy_api_deps():
         native.bind(
             name = "envoy_filter_network_" + t,
             actual = "@envoy_api//api/filter/network:" + t + "_cc",
-        )    
+        )
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
-    )
-    native.bind(
-        name = "http_api_protos_lib",
-        actual = "@googleapis//:http_api_protos_lib",
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):

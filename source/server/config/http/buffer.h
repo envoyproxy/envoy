@@ -20,7 +20,7 @@ public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                           const std::string& stats_prefix,
                                           FactoryContext& context) override;
-  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                    const std::string& stats_prefix,
                                                    FactoryContext& context) override;
 
@@ -31,8 +31,8 @@ public:
   std::string name() override { return Config::HttpFilterNames::get().BUFFER; }
 
 private:
-  HttpFilterFactoryCb createBufferFilter(const envoy::api::v2::filter::http::Buffer& buffer,
-                                         const std::string& stats_prefix, FactoryContext& context);
+  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Buffer& proto_config,
+                                   const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration
