@@ -59,9 +59,11 @@ envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -116,6 +118,7 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/server:listener_manager_lib",
+        "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],

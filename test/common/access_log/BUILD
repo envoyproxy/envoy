@@ -24,7 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
-    external_deps = ["envoy_filter_http_http_connection_manager"],
+    external_deps = ["envoy_filter_network_http_connection_manager"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",

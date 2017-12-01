@@ -13,20 +13,24 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/redis/codec_impl.h"
+
+#include "api/filter/network/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
 // TODO(mattklein123): Circuit breaking
+// TODO(rshriram): Fault injection
 
-class ConfigImpl : public Config, Json::Validator {
+class ConfigImpl : public Config {
 public:
-  ConfigImpl(const Json::Object& config);
+  ConfigImpl(const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config);
 
+  bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
 
 private:
@@ -77,6 +81,7 @@ private:
              DecoderFactory& decoder_factory, const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
+  void putOutlierEvent(Upstream::Outlier::Result result);
 
   // Redis::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;
@@ -113,7 +118,7 @@ class InstanceImpl : public Instance {
 public:
   InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
                ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-               const Json::Object& config);
+               const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config);
 
   // Redis::ConnPool::Instance
   PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,

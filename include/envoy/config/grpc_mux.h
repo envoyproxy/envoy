@@ -32,7 +32,7 @@ public:
 };
 
 /**
- * Handle on an muxed gRPC subscription.  The subscription is canceled on destruction.
+ * Handle on an muxed gRPC subscription. The subscription is canceled on destruction.
  */
 class GrpcMuxWatch {
 public:

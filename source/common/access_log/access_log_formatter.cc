@@ -301,6 +301,17 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
 
       return upstream_cluster_name.empty() ? UnspecifiedValueString : upstream_cluster_name;
     };
+  } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      const Optional<std::string>& upstream_local_address = request_info.upstreamLocalAddress();
+      return upstream_local_address.valid() ? upstream_local_address.value()
+                                            : UnspecifiedValueString;
+    };
+  } else if (field_name == "DOWNSTREAM_ADDRESS") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      const std::string& downstream_address = request_info.getDownstreamAddress();
+      return downstream_address.empty() ? UnspecifiedValueString : downstream_address;
+    };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));
   }

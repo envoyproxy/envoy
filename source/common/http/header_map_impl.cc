@@ -6,8 +6,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/singleton.h"
 #include "common/common/utility.h"
+#include "common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Http {
@@ -88,7 +88,7 @@ void HeaderString::append(const char* data, uint32_t size) {
     if (type_ == Type::Inline) {
       const uint64_t new_capacity = (static_cast<uint64_t>(string_length_) + size) * 2;
       // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
-      // imminent.  Fast-fail rather than allow a buffer overflow attack (issue #1421)
+      // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
       RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max());
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
@@ -360,6 +360,22 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   new_value.setCopy(value.c_str(), value.size());
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());
+  ASSERT(new_value.empty());
+}
+
+void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString ref_value(value);
+  remove(key);
+  insertByKey(std::move(ref_key), std::move(ref_value));
+}
+
+void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::string& value) {
+  HeaderString ref_key(key);
+  HeaderString new_value;
+  new_value.setCopy(value.c_str(), value.size());
+  remove(key);
+  insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty());
 }
 

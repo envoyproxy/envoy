@@ -169,12 +169,13 @@ typedef std::shared_ptr<std::vector<std::vector<HostSharedPtr>>> HostListsShared
 typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostListsConstSharedPtr;
 
 /**
- * Base class for all clusters as well as thread local host sets.
+ * A class for management of the set of hosts for a given priority level.
  */
-class HostSetImpl : public virtual HostSet {
+class HostSetImpl : public HostSet {
 public:
-  HostSetImpl()
-      : hosts_(new std::vector<HostSharedPtr>()), healthy_hosts_(new std::vector<HostSharedPtr>()),
+  HostSetImpl(uint32_t priority)
+      : priority_(priority), hosts_(new std::vector<HostSharedPtr>()),
+        healthy_hosts_(new std::vector<HostSharedPtr>()),
         hosts_per_locality_(new std::vector<std::vector<HostSharedPtr>>()),
         healthy_hosts_per_locality_(new std::vector<std::vector<HostSharedPtr>>()) {}
 
@@ -182,7 +183,7 @@ public:
                    HostListsConstSharedPtr hosts_per_locality,
                    HostListsConstSharedPtr healthy_hosts_per_locality,
                    const std::vector<HostSharedPtr>& hosts_added,
-                   const std::vector<HostSharedPtr>& hosts_removed) {
+                   const std::vector<HostSharedPtr>& hosts_removed) override {
     hosts_ = std::move(hosts);
     healthy_hosts_ = std::move(healthy_hosts);
     hosts_per_locality_ = std::move(hosts_per_locality);
@@ -202,25 +203,61 @@ public:
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
   }
+  uint32_t priority() const override { return priority_; }
 
 protected:
   virtual void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
                                   const std::vector<HostSharedPtr>& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+    member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
   }
 
 private:
+  uint32_t priority_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
   HostListsConstSharedPtr hosts_per_locality_;
   HostListsConstSharedPtr healthy_hosts_per_locality_;
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<const std::vector<HostSharedPtr>&,
+  mutable Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
                                   const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
+
+/**
+ * A class for management of the set of hosts in a given cluster.
+ */
+
+class PrioritySetImpl : public PrioritySet {
+public:
+  PrioritySetImpl();
+
+  // From PrioritySet
+  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
+    return member_update_cb_helper_.add(callback);
+  }
+  const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
+    return host_sets_;
+  }
+  std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
+  // Get the host set for this priority level, creating it if necessary.
+  HostSet& getOrCreateHostSet(uint32_t priority);
+
+private:
+  virtual void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
+                                  const std::vector<HostSharedPtr>& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  }
+  // This vector will always have at lest one member, for priority level 0.
+  // It will expand as host sets are added but currently does not shrink to
+  // avoid any potential lifetime issues.
+  std::vector<std::unique_ptr<HostSet>> host_sets_;
+  // TODO(mattklein123): Remove mutable.
+  mutable Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
+                                  const std::vector<HostSharedPtr>&>
+      member_update_cb_helper_;
+};
 
 /**
  * Implementation of ClusterInfo that reads from JSON.
@@ -244,6 +281,9 @@ public:
   uint64_t features() const override { return features_; }
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const override {
+    return lb_ring_hash_config_;
+  }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
@@ -288,6 +328,7 @@ private:
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
+  Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
 };
@@ -295,9 +336,7 @@ private:
 /**
  * Base class all primary clusters.
  */
-class ClusterImplBase : public Cluster,
-                        public HostSetImpl,
-                        protected Logger::Loggable<Logger::Id::upstream> {
+class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
   static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
@@ -308,6 +347,9 @@ public:
                                  const LocalInfo::LocalInfo& local_info,
                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
                                  bool added_via_api);
+  // From Upstream::Cluster
+  virtual PrioritySet& prioritySet() override { return priority_set_; }
+  virtual const PrioritySet& prioritySet() const override { return priority_set_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -338,8 +380,6 @@ protected:
   static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
   static HostListsConstSharedPtr
   createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
-  void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                          const std::vector<HostSharedPtr>& hosts_removed) override;
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -361,6 +401,9 @@ protected:
              // and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
+
+protected:
+  PrioritySetImpl priority_set_;
 
 private:
   void finishInitialization();

@@ -23,8 +23,6 @@ namespace Envoy {
 namespace Network {
 
 namespace {
-// TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
-// looks at this currently, but we may want to populate this later for logging purposes.
 Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& address) {
   if (address.type() == Address::Type::Ip && address.ip()->version() == Address::IpVersion::v6) {
     return Utility::getIpv6AnyAddress();
@@ -59,7 +57,10 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
-    : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
+    : filter_manager_(*this, *this), remote_address_(remote_address),
+      local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
+                                                : local_address),
+
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
@@ -263,7 +264,7 @@ void ConnectionImpl::readDisable(bool disable) {
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     // If the connection has data buffered there's no guarantee there's also data in the kernel
-    // which will kick off the filter chain.  Instead fake an event to make sure the buffered data
+    // which will kick off the filter chain. Instead fake an event to make sure the buffered data
     // gets processed regardless.
     if (read_buffer_.length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
@@ -320,18 +321,18 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // Due to the fact that writes to the connection and flushing data from the connection are done
   // asynchronously, we have the option of either setting the watermarks aggressively, and regularly
   // enabling/disabling reads from the socket, or allowing more data, but then not triggering
-  // based on watermarks until 2x the data is buffered in the common case.  Given these are all soft
+  // based on watermarks until 2x the data is buffered in the common case. Given these are all soft
   // limits we err on the side of buffering more triggering watermark callbacks less often.
   //
   // Given the current implementation for straight up TCP proxying, the common case is reading
   // |limit| bytes through the socket, passing |limit| bytes to the connection (triggering the high
   // watermarks) and the immediately draining |limit| bytes to the socket (triggering the low
-  // watermarks).  We avoid this by setting the high watermark to limit + 1 so a single read will
+  // watermarks). We avoid this by setting the high watermark to limit + 1 so a single read will
   // not trigger watermarks if the socket is not blocked.
   //
   // If the connection class is changed to write to the buffer and flush to the socket in the same
   // stack then instead of checking watermarks after the write and again after the flush it can
-  // check once after both operations complete.  At that point it would be better to change the high
+  // check once after both operations complete. At that point it would be better to change the high
   // watermark from |limit + 1| to |limit| as the common case (move |limit| bytes, flush |limit|
   // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
   // would result in respecting the exact buffer limit.
@@ -539,6 +540,12 @@ void ConnectionImpl::doConnect() {
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
+
+  // The local address can only be retrieved for IP connections. Other
+  // types, such as UDS, don't have a notion of a local address.
+  if (remote_address_->type() == Address::Type::Ip) {
+    local_address_ = Address::addressFromFd(fd_);
+  }
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
@@ -569,8 +576,8 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(
     Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
     const Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
-                     getNullLocalAddress(*address), source_address, false, false) {}
+    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address, nullptr,
+                     source_address, false, false) {}
 
 } // namespace Network
 } // namespace Envoy

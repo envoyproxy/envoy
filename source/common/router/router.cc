@@ -319,7 +319,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
-    // The request is larger than we should buffer.  Give up on the retry/shadow
+    // The request is larger than we should buffer. Give up on the retry/shadow
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
@@ -602,6 +602,11 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
   for (const auto& header_value : downstream_set_cookies_) {
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
+
+  // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
+  // Router::Filter we'll need to find a better location for this work. One possibility is to
+  // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
+  route_entry_->finalizeResponseHeaders(*headers);
 
   downstream_response_started_ = true;
   if (end_stream) {
@@ -895,6 +900,8 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
+
+  // TODO(ggreenway): set upstream local address in the RequestInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 
@@ -944,7 +951,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
 void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
   request_encoder_ = &request_encoder;
   // Now that there is an encoder, have the connection manager inform the manager when the
-  // downstream buffers are overrun.  This may result in immediate watermark callbacks referencing
+  // downstream buffers are overrun. This may result in immediate watermark callbacks referencing
   // the encoder.
   parent_.callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 }
@@ -959,14 +966,14 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
-  // The downstream connection is overrun.  Pause reads from upstream.
+  // The downstream connection is overrun. Pause reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(true);
 }
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
-  // The downstream connection has buffer available.  Resume reads from upstream.
+  // The downstream connection has buffer available. Resume reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);
 }

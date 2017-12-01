@@ -12,8 +12,8 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/json/json_loader.h"
-#include "common/json/json_validator.h"
+
+#include "api/filter/network/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Redis {
@@ -45,9 +45,10 @@ struct ProxyStats {
 /**
  * Configuration for the redis proxy filter.
  */
-class ProxyFilterConfig : Json::Validator {
+class ProxyFilterConfig {
 public:
-  ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm, Stats::Scope& scope,
+  ProxyFilterConfig(const envoy::api::v2::filter::network::RedisProxy& config,
+                    Upstream::ClusterManager& cm, Stats::Scope& scope,
                     const Network::DrainDecision& drain_decision, Runtime::Loader& runtime);
 
   const Network::DrainDecision& drain_decision_;

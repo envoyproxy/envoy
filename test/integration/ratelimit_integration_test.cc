@@ -29,8 +29,7 @@ public:
 
   void initialize() override {
     config_helper_.addFilter(
-        "{ name: envoy.rate_limit, config: { deprecated_v1: true, value: { domain: "
-        "some_domain, timeout_ms: 500 } } }");
+        "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
     config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
       bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -38,14 +37,15 @@ public:
       ratelimit_cluster->set_name("ratelimit");
       ratelimit_cluster->mutable_http2_protocol_options();
     });
-    config_helper_.addConfigModifier([](envoy::api::v2::filter::http::HttpConnectionManager& hcm) {
-      auto* rate_limit = hcm.mutable_route_config()
-                             ->mutable_virtual_hosts(0)
-                             ->mutable_routes(0)
-                             ->mutable_route()
-                             ->add_rate_limits();
-      rate_limit->add_actions()->mutable_destination_cluster();
-    });
+    config_helper_.addConfigModifier(
+        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+          auto* rate_limit = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->add_rate_limits();
+          rate_limit->add_actions()->mutable_destination_cluster();
+        });
     named_ports_ = {"http"};
     HttpIntegrationTest::initialize();
   }

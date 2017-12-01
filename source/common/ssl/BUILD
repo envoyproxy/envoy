@@ -27,7 +27,10 @@ envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
-    external_deps = ["envoy_sds"],
+    external_deps = [
+        "envoy_sds",
+        "ssl",
+    ],
     deps = [
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
@@ -56,6 +59,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
         "//source/common/common:hex_lib",
     ],
 )

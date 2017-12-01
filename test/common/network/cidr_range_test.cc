@@ -97,7 +97,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isValid());
     EXPECT_EQ(rng.asString(), "0.0.0.0/0");
     EXPECT_EQ(rng.length(), 0);
-    EXPECT_EQ(rng.version(), IpVersion::v4);
+    EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("10.255.255.255")));
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("9.255.255.255")));
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("0.0.0.0")));
@@ -110,7 +110,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isValid());
     EXPECT_EQ(rng.asString(), "10.192.0.0/10");
     EXPECT_EQ(rng.length(), 10);
-    EXPECT_EQ(rng.version(), IpVersion::v4);
+    EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("10.255.255.255")));
     EXPECT_FALSE(rng.isInRange(Ipv4Instance("9.255.255.255")));
     EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
@@ -122,7 +122,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isValid());
     EXPECT_EQ(rng.asString(), "::/0");
     EXPECT_EQ(rng.length(), 0);
-    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("::")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001::")));
@@ -135,7 +135,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isValid());
     EXPECT_EQ(rng.asString(), "::1/128");
     EXPECT_EQ(rng.length(), 128);
-    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
@@ -147,7 +147,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isValid());
     EXPECT_EQ(rng.asString(), "2001:abcd:ef01:2345::/64");
     EXPECT_EQ(rng.length(), 64);
-    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::1")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001::")));
@@ -161,7 +161,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isValid());
     EXPECT_EQ(rng.asString(), "2001:abcd:ef01:2340::/60");
     EXPECT_EQ(rng.length(), 60);
-    EXPECT_EQ(rng.version(), IpVersion::v6);
+    EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2345::")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2340::")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:abcd:ef01:2330::")));
@@ -212,9 +212,7 @@ TEST(CidrRangeTest, OperatorIsEqual) {
 
 TEST(CidrRangeTest, InvalidCidrRange) {
   CidrRange rng1 = CidrRange::create("foo");
-  EXPECT_EQ(nullptr, rng1.ipv4());
-  EXPECT_EQ(nullptr, rng1.ipv6());
-  EXPECT_EQ(IpVersion::v4, rng1.version());
+  EXPECT_EQ(nullptr, rng1.ip());
   EXPECT_EQ("/-1", rng1.asString());
   // Not equal due to invalid CidrRange.
   EXPECT_FALSE(rng1 == rng1);
@@ -228,7 +226,7 @@ TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
   CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.length(), 31);
-  EXPECT_EQ(rng.version(), IpVersion::v4);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.3")));
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.4")));
@@ -249,7 +247,7 @@ TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_EQ(rng.length(), 31);
-  EXPECT_EQ(rng.version(), IpVersion::v4);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.3")));
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.4")));
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
@@ -266,7 +264,7 @@ TEST(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_EQ(rng.length(), 31);
-  EXPECT_EQ(rng.version(), IpVersion::v4);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("1.2.3.3")));
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.4")));
   EXPECT_TRUE(rng.isInRange(Ipv4Instance("1.2.3.5")));
@@ -289,7 +287,7 @@ TEST(Ipv4CidrRangeTest, BigRange) {
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "10.0.0.0/8");
   EXPECT_EQ(rng.length(), 8);
-  EXPECT_EQ(rng.version(), IpVersion::v4);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("9.255.255.255")));
   std::string addr;
   for (int i = 0; i < 256; ++i) {
@@ -306,7 +304,7 @@ TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
   CidrRange rng(CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.length(), 127);
-  EXPECT_EQ(rng.version(), IpVersion::v6);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
   EXPECT_EQ(rng.asString(), "abcd::344/127");
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("abcd::343")));
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("abcd::344")));
@@ -327,7 +325,7 @@ TEST(Ipv6CidrRange, StringAndLengthCtor) {
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "ff::ffc0/122");
   EXPECT_EQ(rng.length(), 122);
-  EXPECT_EQ(rng.version(), IpVersion::v6);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("ff::ffbf")));
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffc0")));
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
@@ -344,7 +342,7 @@ TEST(Ipv6CidrRange, StringCtor) {
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "ff::fc00/118");
   EXPECT_EQ(rng.length(), 118);
-  EXPECT_EQ(rng.version(), IpVersion::v6);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("ff::fbff")));
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::fc00")));
   EXPECT_TRUE(rng.isInRange(Ipv6Instance("ff::ffff")));
@@ -368,7 +366,7 @@ TEST(Ipv6CidrRange, BigRange) {
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.asString(), "2001:db8:85a3::/64");
   EXPECT_EQ(rng.length(), 64);
-  EXPECT_EQ(rng.version(), IpVersion::v6);
+  EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:0db8:85a2:ffff:ffff:ffff:ffff:ffff")));
   std::string addr;
   for (char c : std::string("0123456789abcdef")) {

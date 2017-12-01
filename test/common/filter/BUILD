@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["ratelimit_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/filter:ratelimit_lib",
         "//source/common/stats:stats_lib",
@@ -28,6 +29,7 @@ envoy_cc_test(
     srcs = ["tcp_proxy_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/filter:tcp_proxy_lib",
         "//source/common/network:address_lib",

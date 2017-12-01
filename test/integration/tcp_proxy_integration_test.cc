@@ -1,5 +1,6 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
+#include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -10,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::Invoke;
+using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::_;
 
@@ -110,7 +112,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   ConnectionStatusCallbacks connect_callbacks;
   MockWatermarkBuffer* client_write_buffer;
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
-  // buffer.  This allows us to track the bytes actually written to the socket.
+  // buffer. This allows us to track the bytes actually written to the socket.
 
   EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
       .Times(1)
@@ -130,7 +132,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   ssl_client = dispatcher_->createSslClientConnection(*context, address,
                                                       Network::Address::InstanceConstSharedPtr());
 
-  // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
+  // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
 
   ssl_client->addConnectionCallbacks(connect_callbacks);
@@ -166,6 +168,38 @@ TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) { sendAndReceiveTlsData("h
 TEST_P(TcpProxyIntegrationTest, LargeBidirectionalTlsWrites) {
   std::string large_data(1024 * 8, 'a');
   sendAndReceiveTlsData(large_data, large_data);
+}
+
+TEST_P(TcpProxyIntegrationTest, AccessLog) {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+
+  fake_upstream_connection->write("hello");
+  tcp_client->waitForData("hello");
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForDisconnect();
+
+  const std::string path = TestEnvironment::temporaryPath(fmt::format(
+      "tcp_{}.log", (GetParam() == Network::Address::IpVersion::v4) ? "127.0.0.1" : "[::1]"));
+  std::string log_result;
+
+  // Access logs only get flushed to disk periodically, so poll until the log is non-empty
+  do {
+    log_result = Filesystem::fileReadToEnd(path);
+  } while (log_result.empty());
+
+  // Regex matching localhost:port
+  const std::string localhostIpPortRegex = (GetParam() == Network::Address::IpVersion::v4)
+                                               ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
+                                               : R"EOF(\[::1\]:[0-9]+)EOF";
+
+  // Test that all three addresses were populated correctly. Only check the first line of
+  // log output for simplicity.
+  EXPECT_THAT(log_result,
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={0}\n.*",
+                                       localhostIpPortRegex)));
 }
 
 } // namespace

@@ -57,8 +57,7 @@ std::string fileReadToEnd(const std::string& path);
 class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-           Api::OsSysCalls& osSysCalls, Stats::Store& stats_store,
-           std::chrono::milliseconds flush_interval_msec);
+           Stats::Store& stats_store, std::chrono::milliseconds flush_interval_msec);
   ~FileImpl();
 
   // Filesystem::File
@@ -96,13 +95,13 @@ private:
                                      // not get interleaved by multiple processes writing to
                                      // the same file during hot-restart.
   std::mutex flush_lock_;            // This lock is used to prevent simulataneous flushes from
-                                     // the flush thread and a syncronous flush.  This protects
+                                     // the flush thread and a syncronous flush. This protects
                                      // concurrent access to the about_to_write_buffer_, fd_,
                                      // and all other data used during flushing and file
                                      // re-opening.
   std::mutex write_lock_;            // The lock is used when filling the flush buffer. It allows
                                      // multiple threads to write to the same file at relatively
-                                     // high performance.  It is always local to the process.
+                                     // high performance. It is always local to the process.
   Thread::ThreadPtr flush_thread_;
   std::condition_variable_any flush_event_;
   std::atomic<bool> flush_thread_exit_{};

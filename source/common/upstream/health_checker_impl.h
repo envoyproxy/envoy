@@ -125,6 +125,7 @@ protected:
   HealthCheckerStats stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  const bool reuse_connection_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
@@ -380,6 +381,7 @@ private:
     void onTimeout() override;
 
     // Redis::ConnPool::Config
+    bool disableOutlierEvents() const override { return true; }
     std::chrono::milliseconds opTimeout() const override {
       // Allow the main HC infra to control timeout.
       return parent_.timeout_ * 2;

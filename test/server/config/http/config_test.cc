@@ -4,6 +4,7 @@
 
 #include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/router.h"
@@ -37,7 +38,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-TEST(HttpFilterConfigTest, CorrectBufferFilterInJson) {
+TEST(HttpFilterConfigTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "max_request_bytes" : 1028,
@@ -54,7 +55,7 @@ TEST(HttpFilterConfigTest, CorrectBufferFilterInJson) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, BadBufferFilterConfigInJson) {
+TEST(HttpFilterConfigTest, BufferFilterIncorrectJson) {
   std::string json_string = R"EOF(
   {
     "max_request_bytes" : 1028,
@@ -68,7 +69,7 @@ TEST(HttpFilterConfigTest, BadBufferFilterConfigInJson) {
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
-TEST(HttpFilterConfigTest, CorrectBufferFilterInProto) {
+TEST(HttpFilterConfigTest, BufferFilterCorrectProto) {
   envoy::api::v2::filter::http::Buffer config{};
   config.mutable_max_request_bytes()->set_value(1028);
   config.mutable_max_request_time()->set_seconds(2);
@@ -81,7 +82,7 @@ TEST(HttpFilterConfigTest, CorrectBufferFilterInProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, BufferFilterWithEmptyProto) {
+TEST(HttpFilterConfigTest, BufferFilterEmptyProto) {
   BufferFilterConfig factory;
   envoy::api::v2::filter::http::Buffer config =
       *dynamic_cast<envoy::api::v2::filter::http::Buffer*>(factory.createEmptyConfigProto().get());
@@ -96,7 +97,7 @@ TEST(HttpFilterConfigTest, BufferFilterWithEmptyProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, RateLimitFilter) {
+TEST(HttpFilterConfigTest, RateLimitFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "domain" : "test",
@@ -107,6 +108,49 @@ TEST(HttpFilterConfigTest, RateLimitFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RateLimitFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, RateLimitFilterCorrectProto) {
+  std::string json_string = R"EOF(
+  {
+    "domain" : "test",
+    "timeout_ms" : 1337
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::api::v2::filter::http::RateLimit proto_config{};
+  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
+
+  NiceMock<MockFactoryContext> context;
+  RateLimitFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, RateLimitFilterEmptyProto) {
+  std::string json_string = R"EOF(
+  {
+    "domain" : "test",
+    "timeout_ms" : 1337
+  }
+  )EOF";
+
+  NiceMock<MockFactoryContext> context;
+  RateLimitFilterConfig factory;
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::api::v2::filter::http::RateLimit proto_config =
+      *dynamic_cast<envoy::api::v2::filter::http::RateLimit*>(
+          factory.createEmptyConfigProto().get());
+  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
+
   HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -142,7 +186,7 @@ TEST(HttpFilterConfigTest, DynamoFilter) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, CorrectFaultFilterInJson) {
+TEST(HttpFilterConfigTest, FaultFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "delay" : {
@@ -162,7 +206,7 @@ TEST(HttpFilterConfigTest, CorrectFaultFilterInJson) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, CorrectFaultFilterInProto) {
+TEST(HttpFilterConfigTest, FaultFilterCorrectProto) {
   envoy::api::v2::filter::http::HTTPFault config{};
   config.mutable_delay()->set_percent(100);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
@@ -182,7 +226,7 @@ TEST(HttpFilterConfigTest, InvalidFaultFilterInProto) {
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
 }
 
-TEST(HttpFilterConfigTest, FaultFilterWithEmptyProto) {
+TEST(HttpFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
   EXPECT_THROW(

@@ -73,6 +73,8 @@ public:
   static bool is4xx(uint64_t code) { return code >= 400 && code < 500; }
   static bool is5xx(uint64_t code) { return code >= 500 && code < 600; }
 
+  static bool isGatewayError(uint64_t code) { return code >= 502 && code < 505; }
+
   static std::string groupStringForResponseCode(Code response_code);
 };
 

@@ -103,6 +103,31 @@ public:
   bool find(const char* str) const { return strstr(c_str(), str); }
 
   /**
+   * HeaderString is in token list form, each token separated by commas or whitespace,
+   * see https://www.w3.org/Protocols/rfc2616/rfc2616-sec2.html#sec2.1 for more information,
+   * header field value's case sensitivity depends on each header.
+   * @return whether contains token in case insensitive manner.
+   */
+  bool caseInsensitiveContains(const char* token) const {
+    // Avoid dead loop if token argument is empty.
+    const int n = strlen(token);
+    if (n == 0) {
+      return false;
+    }
+
+    // Find token substring, skip if it's partial of other token.
+    const char* tokens = c_str();
+    for (const char* p = tokens; (p = strcasestr(p, token)); p += n) {
+      if ((p == tokens || *(p - 1) == ' ' || *(p - 1) == ',') &&
+          (*(p + n) == '\0' || *(p + n) == ' ' || *(p + n) == ',')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
    */
   void setCopy(const char* data, uint32_t size);
@@ -346,6 +371,32 @@ public:
    * @param value specifies the value of the header to add; it WILL be copied.
    */
   virtual void addCopy(const LowerCaseString& key, const std::string& value) PURE;
+
+  /**
+   * Set a reference header in the map. Both key and value MUST point to data that will live beyond
+   * the lifetime of any request/response using the string (since a codec may optimize for zero
+   * copy). Nothing will be copied.
+   *
+   * Calling setReference multiple times for the same header will result in only the last header
+   * being present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to set; it WILL NOT be copied.
+   * @param value specifies the value of the header to set; it WILL NOT be copied.
+   */
+  virtual void setReference(const LowerCaseString& key, const std::string& value) PURE;
+
+  /**
+   * Set a header with a reference key in the map. The key MUST point to point to data that will
+   * live beyond the lifetime of any request/response using the string (since a codec may optimize
+   * for zero copy). The value will be copied.
+   *
+   * Calling setReferenceKey multiple times for the same header will result in only the last header
+   * being present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to set; it WILL NOT be copied.
+   * @param value specifies the value of the header to set; it WILL be copied.
+   */
+  virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
    * @return uint64_t the approximate size of the header map in bytes.

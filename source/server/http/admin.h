@@ -33,7 +33,7 @@ class AdminImpl : public Admin,
 public:
   AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server);
+            Server::Instance& server, Stats::Scope& listener_scope);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }
@@ -113,7 +113,12 @@ private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
-  std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats);
+  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats);
+  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                const std::list<Stats::GaugeSharedPtr>& gauges,
+                                Buffer::Instance& response);
+  static std::string sanitizePrometheusName(const std::string& name);
+  static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
 
   /**
    * URL handlers.

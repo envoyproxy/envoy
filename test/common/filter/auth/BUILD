@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["client_ssl_test.cc"],
     data = glob(["test_data/**"]),
     deps = [
+        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/filter/auth:client_ssl_lib",

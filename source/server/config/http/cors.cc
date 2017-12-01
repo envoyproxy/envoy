@@ -8,8 +8,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb CorsFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
-                                                          FactoryContext&) {
+HttpFilterFactoryCb CorsFilterConfig::createFilter(const std::string&, FactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Http::CorsFilter()});

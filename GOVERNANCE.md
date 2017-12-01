@@ -27,13 +27,18 @@
 * Start doing PRs and code reviews under the guidance of your senior maintainer.
 * After a period of 1-2 months the existing senior maintainers will discuss granting "standard"
   maintainer access.
-* "Standard" maintainer access can be upgraded to "senior" maintainer access aft
+* "Standard" maintainer access can be upgraded to "senior" maintainer access after another 1-2
+  months of work and another conference of the existing senior committers.
 
 ## Maintainer responsibilities
 
 * Monitor email aliases.
 * Monitor Slack (delayed response is perfectly acceptable).
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
+* Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
+  that although this should be a rare occurrence, if a serious vulnerability is found, the process
+  may take up to several full days of work to implement. This reality should be taken into account
+  when discussing time commitment obligations with employers.
 * In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
   business days per week).
 * Note that currently the above is performed by all maintainers in a best-effort/haphazard way. In

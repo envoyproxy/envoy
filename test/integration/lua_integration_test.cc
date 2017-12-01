@@ -13,6 +13,8 @@ public:
     HttpIntegrationTest::createUpstreams();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
   }
 
   void initializeFilter(const std::string& filter_config) {
@@ -22,7 +24,24 @@ public:
       auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lua_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lua_cluster->set_name("lua_cluster");
+
+      auto* alt_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      alt_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      alt_cluster->set_name("alt_cluster");
     });
+
+    config_helper_.addConfigModifier(
+        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_match()
+              ->set_prefix("/test/long/url");
+
+          auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+          new_route->mutable_match()->set_prefix("/alt/route");
+          new_route->mutable_route()->set_cluster("alt_cluster");
+        });
 
     initialize();
   }
@@ -211,6 +230,38 @@ config:
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("403", response_->headers().Status()->value().c_str());
   EXPECT_EQ("nope", response_->body());
+}
+
+// Filter alters headers and changes route.
+TEST_P(LuaIntegrationTest, ChangeRoute) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+      request_handle:headers():remove(":path")
+      request_handle:headers():add(":path", "/alt/route")
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"}};
+  codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+
+  waitForNextUpstreamRequest(2);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response_->waitForEndStream();
+  cleanup();
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
 } // namespace Envoy

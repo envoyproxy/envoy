@@ -6,17 +6,13 @@
 #include <vector>
 
 #include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
-#include "common/json/config_schemas.h"
 
 namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
-ConfigImpl::ConfigImpl(const Json::Object& config)
-    : Validator(config, Json::Schema::REDIS_CONN_POOL_SCHEMA),
-      op_timeout_(config.getInteger("op_timeout_ms")) {}
+ConfigImpl::ConfigImpl(const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config)
+    : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -74,7 +70,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
-  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::GatewayTimeout));
+  putOutlierEvent(Upstream::Outlier::Result::TIMEOUT);
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
   } else {
@@ -88,9 +84,15 @@ void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
-    host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::InternalServerError));
+    putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+}
+
+void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
+  if (!config_.disableOutlierEvents()) {
+    host_->outlierDetector().putResult(result);
   }
 }
 
@@ -100,7 +102,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     if (!pending_requests_.empty()) {
       host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
       if (event == Network::ConnectionEvent::RemoteClose) {
-        host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
+        putOutlierEvent(Upstream::Outlier::Result::SERVER_FAILURE);
         host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
       }
       if (event == Network::ConnectionEvent::LocalClose) {
@@ -149,7 +151,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  host_->outlierDetector().putHttpResponseCode(enumToInt(Http::Code::OK));
+  putOutlierEvent(Upstream::Outlier::Result::SUCCESS);
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
@@ -180,9 +182,10 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                             config);
 }
 
-InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                           ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-                           const Json::Object& config)
+InstanceImpl::InstanceImpl(
+    const std::string& cluster_name, Upstream::ClusterManager& cm, ClientFactory& client_factory,
+    ThreadLocal::SlotAllocator& tls,
+    const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -203,8 +206,8 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   //                     we will need to add thread local cluster removal callbacks so that we can
   //                     safely clean things up and fail requests.
   ASSERT(!cluster_->info()->addedViaApi());
-  local_host_set_member_update_cb_handle_ = cluster_->hostSet().addMemberUpdateCb(
-      [this](const std::vector<Upstream::HostSharedPtr>&,
+  local_host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
+      [this](uint32_t, const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });

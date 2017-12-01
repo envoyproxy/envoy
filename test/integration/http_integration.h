@@ -84,7 +84,7 @@ protected:
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
-  // Set up the fake upstream connections.  This is called by initialize() and
+  // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
   virtual void createUpstreams();
   // sets downstream_protocol_ and alters the client protocol in the config_helper_
@@ -105,7 +105,7 @@ protected:
 
   // Wait for the end of stream on the next upstream stream on fake_upstreams_
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
-  void waitForNextUpstreamRequest();
+  void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();

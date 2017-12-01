@@ -1,4 +1,8 @@
 REPOSITORY_LOCATIONS = dict(
+    com_google_absl = dict(
+        commit = "6de53819a7173bd446156237a37f53464b7732cc",
+        remote = "https://github.com/abseil/abseil-cpp",
+    ),
     com_github_bombela_backward = dict(
         commit = "cd1c4bd9e48afe812a0e996d335298c455afcd92",  # v1.3
         remote = "https://github.com/bombela/backward-cpp",
@@ -50,16 +54,13 @@ REPOSITORY_LOCATIONS = dict(
         commit = "43863938377a9ea1399c0596269e0890b5c5515a",
         remote = "https://github.com/google/googletest",
     ),
-    # TODO(htuch): Protobuf can switch back to a point release http_archive at the next
-    # release (> 3.4.1), we need HEAD proto_library support and
-    # https://github.com/google/protobuf/pull/3761.
     com_google_protobuf = dict(
-        sha256 = "5d4551193416861cb81c3bc0a428f22a6878148c57c31fb6f8f2aa4cf27ff635",
-        strip_prefix = "protobuf-c4f59dcc5c13debc572154c8f636b8a9361aacde",
-        urls = ["https://github.com/google/protobuf/archive/c4f59dcc5c13debc572154c8f636b8a9361aacde.tar.gz"],
+        sha256 = "0cc6607e2daa675101e9b7398a436f09167dffb8ca0489b0307ff7260498c13c",
+        strip_prefix = "protobuf-3.5.0",
+        urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "ae685c66fcb47a49b2b3d6ef41881b1ef664fbb5",
+        commit = "5055a888929d6aca545bff0159ab937ee40532f3",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

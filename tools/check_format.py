@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import fileinput
 import re
 import os
 import os.path
@@ -76,6 +77,22 @@ def isBuildFile(file_path):
   return False
 
 
+def checkFileContents(file_path):
+  with open(file_path) as f:
+    text = f.read()
+    if re.search('\.  ', text, re.MULTILINE):
+      printError("%s has over-enthusiastic spaces" % file_path)
+      return False
+  return True
+
+
+def fixFileContents(file_path):
+  for line in fileinput.input(file_path, inplace=True):
+    # Strip double space after '.'  This may prove overenthusiastic and need to
+    # be restricted to comments and metadata files but works for now.
+    print "%s" % (line.replace('.  ', '. ').rstrip())
+
+
 def checkFilePath(file_path):
   if isBuildFile(file_path):
     if os.system("%s %s | diff -q %s - > /dev/null" %
@@ -86,6 +103,7 @@ def checkFilePath(file_path):
       printError("buildifier check failed for file: %s" % file_path)
     checkProtobufExternalDepsBuild(file_path)
     return
+  checkFileContents(file_path)
   checkNamespace(file_path)
   checkProtobufExternalDeps(file_path)
   command = ("%s %s | diff -q %s - > /dev/null" % (HEADER_ORDER_PATH, file_path,
@@ -105,6 +123,7 @@ def fixFilePath(file_path):
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
       printError("buildifier rewrite failed for file: %s" % file_path)
     return
+  fixFileContents(file_path)
   if not checkNamespace(file_path) or not checkProtobufExternalDepsBuild(
       file_path) or not checkProtobufExternalDeps(file_path):
     printError("This cannot be automatically corrected. Please fix by hand.")

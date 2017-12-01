@@ -185,7 +185,7 @@ public:
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
   uint64_t hash() const { return hash_; }
-  void infoLog(const std::string& message);
+  void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);
@@ -194,7 +194,9 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
-  Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
+  Ssl::ServerContext* defaultSslContext() override {
+    return tls_contexts_.empty() ? nullptr : tls_contexts_[0].get();
+  }
   bool useProxyProto() override { return use_proxy_proto_; }
   bool useOriginalDst() override { return use_original_dst_; }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
@@ -236,7 +238,7 @@ private:
   Network::ListenSocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
-  Ssl::ServerContextPtr ssl_context_;
+  std::vector<Ssl::ServerContextPtr> tls_contexts_;
   const bool bind_to_port_;
   const bool use_proxy_proto_;
   const bool use_original_dst_;

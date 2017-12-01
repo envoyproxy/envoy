@@ -15,7 +15,6 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
-#include "common/common/singleton.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/bootstrap.pb.h"
@@ -58,7 +57,7 @@ public:
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
  * it can be allocated from shared memory if needed.
  *
- * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful.  Use
+ * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful. Use
  * RawStatData::size() instead.
  */
 struct RawStatData {
@@ -74,7 +73,7 @@ struct RawStatData {
   ~RawStatData() = delete;
 
   /**
-   * Configure static settings.  This MUST be called
+   * Configure static settings. This MUST be called
    * before any other static or instance methods.
    */
   static void configure(Server::Options& options);
@@ -86,7 +85,7 @@ struct RawStatData {
   static void configureForTestsOnly(Server::Options& options);
 
   /**
-   * Returns the maximum length of the name of a stat.  This length
+   * Returns the maximum length of the name of a stat. This length
    * does not include a trailing NULL-terminator.
    */
   static size_t maxNameLength() { return maxObjNameLength() + MAX_STAT_SUFFIX_LENGTH; }

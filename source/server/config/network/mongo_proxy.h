@@ -31,7 +31,7 @@ public:
 
 private:
   NetworkFilterFactoryCb
-  createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& mongo_proxy,
+  createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& config,
                           FactoryContext& context);
 };
 

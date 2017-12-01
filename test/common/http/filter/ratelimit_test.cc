@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/config/filter_json.h"
 #include "common/http/filter/ratelimit.h"
 #include "common/http/headers.h"
 
@@ -44,8 +45,10 @@ public:
   }
 
   void SetUpTest(const std::string json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new FilterConfig(*config, local_info_, stats_store_, runtime_, cm_));
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+    envoy::api::v2::filter::http::RateLimit proto_config{};
+    Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
+    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
 
     client_ = new Envoy::RateLimit::MockClient();
     filter_.reset(new Filter(config_, Envoy::RateLimit::ClientPtr{client_}));
@@ -89,8 +92,10 @@ TEST_F(HttpRateLimitFilterTest, BadConfig) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(filter_config);
-  EXPECT_THROW(FilterConfig(*config, local_info_, stats_store_, runtime_, cm_), Json::Exception);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(filter_config);
+  envoy::api::v2::filter::http::RateLimit proto_config{};
+  EXPECT_THROW(Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config),
+               Json::Exception);
 }
 
 TEST_F(HttpRateLimitFilterTest, NoRoute) {

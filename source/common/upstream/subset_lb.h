@@ -19,9 +19,11 @@ namespace Upstream {
 
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
-  SubsetLoadBalancer(LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set,
-                     ClusterStats& stats, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets);
+  SubsetLoadBalancer(
+      LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set,
+      ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const LoadBalancerSubsetInfo& subsets,
+      const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -33,7 +35,7 @@ private:
   class HostSubsetImpl : public HostSetImpl {
   public:
     HostSubsetImpl(const HostSet& original_host_set)
-        : HostSetImpl(), original_host_set_(original_host_set) {}
+        : HostSetImpl(original_host_set.priority()), original_host_set_(original_host_set) {}
 
     void update(const std::vector<HostSharedPtr>& hosts_added,
                 const std::vector<HostSharedPtr>& hosts_removed, HostPredicate predicate);
@@ -71,7 +73,7 @@ private:
     LoadBalancerPtr lb_;
   };
 
-  // Implements HostSet::MemberUpdateCb
+  // Called by HostSet::MemberUpdateCb
   void update(const std::vector<HostSharedPtr>& hosts_added,
               const std::vector<HostSharedPtr>& hosts_removed);
 
@@ -94,9 +96,8 @@ private:
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
 
-  const HostSetImpl& emptyHostSet() { CONSTRUCT_ON_FIRST_USE(HostSetImpl); };
-
   const LoadBalancerType lb_type_;
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
