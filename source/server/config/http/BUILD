@@ -26,14 +26,12 @@ envoy_cc_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
-    external_deps = ["envoy_filter_http_lua"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/config:json_utility_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/http/filter/lua:lua_filter_lib",
-        "//source/common/json:config_schemas_lib",
     ],
 )
 

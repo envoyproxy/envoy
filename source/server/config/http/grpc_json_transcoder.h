@@ -17,9 +17,22 @@ namespace Configuration {
  */
 class GrpcJsonTranscoderFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
+  HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config,
+                                          const std::string& stats_prefix,
                                           FactoryContext& context) override;
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                   const std::string& stats_prefix,
+                                                   FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::GrpcJsonTranscoder()};
+  }
+
   std::string name() override { return Config::HttpFilterNames::get().GRPC_JSON_TRANSCODER; };
+
+private:
+  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::GrpcJsonTranscodert& proto_config,
+                                   const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

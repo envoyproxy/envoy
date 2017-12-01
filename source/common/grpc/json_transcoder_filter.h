@@ -14,6 +14,8 @@
 #include "grpc_transcoding/transcoder.h"
 #include "grpc_transcoding/type_helper.h"
 
+#include "api/filter/http/transcoder.pb.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -43,7 +45,7 @@ public:
    * constructor that loads protobuf descriptors from the file specified in the JSON config.
    * and construct a path matcher for HTTP path bindings.
    */
-  JsonTranscoderConfig(const Json::Object& config);
+  JsonTranscoderConfig(const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config);
 
   /**
    * Create an instance of Transcoder interface based on incoming request

@@ -289,6 +289,26 @@ void FilterJson::translateHealthCheckFilter(
   JSON_UTIL_SET_STRING(json_config, proto_config, endpoint);
 }
 
+void FilterJson::translateGrpcJsonTranscoder(
+    const Json::Object& json_config,
+    envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config) {
+  json_config.validateSchema(Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA);
+  JSON_UTIL_SET_STRING(json_config, proto_config, proto_descriptor);
+  auto *services = proto_config.mutable_services();
+  for (const auto& service_name : config.getStringArray("services")) {
+    services->Add()->set_value(service_name);      
+  }
+
+  if (json_config.hasObject("print_options")) {
+    auto *json_print_options = json_config.getObject("print_options");
+    auto *proto_print_options = proto_config.mutable_print_options();
+    proto_print_options->set_add_whitespace(json_print_options.getBoolean("add_whitespace", false));
+    proto_print_options->set_always_print_primitive_fields(json_print_options.getBoolean("always_print_primitive_fields", false));
+    proto_print_options->set_always_print_enums_as_ints(json_print_options.getBoolean("always_print_enums_as_ints", false));
+    proto_print_options->set_preserve_proto_field_names(json_print_options.getBoolean("preserve_proto_field_names", false));
+  }
+}
+
 void FilterJson::translateRouter(const Json::Object& json_config,
                                  envoy::api::v2::filter::http::Router& proto_config) {
   json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
@@ -303,6 +323,12 @@ void FilterJson::translateBufferFilter(const Json::Object& json_config,
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, max_request_bytes);
   JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, max_request_time);
+}
+
+void FilterJson::translateLuaFilter(const Json::Object& json_config,
+                                    envoy::api::v2::filter::http::Lua& proto_config) {
+  json_config.validateSchema(Json::Schema::LUA_HTTP_FILTER_SCHEMA);
+  JSON_UTIL_SET_STRING(json_config, proto_config, inline_code);
 }
 
 void FilterJson::translateTcpProxy(const Json::Object& json_config,

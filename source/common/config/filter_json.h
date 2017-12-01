@@ -3,9 +3,11 @@
 #include "envoy/json/json_object.h"
 
 #include "api/filter/http/buffer.pb.h"
+#include "api/filter/http/lua.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/health_check.pb.h"
 #include "api/filter/http/rate_limit.pb.h"
+#include "api/filter/http/transcoder.pb.h"
 #include "api/filter/http/router.pb.h"
 #include "api/filter/network/client_ssl_auth.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
@@ -85,6 +87,15 @@ public:
                                          envoy::api::v2::filter::http::HealthCheck& proto_config);
 
   /**
+   * Translate a v1 JSON HTTP Grpc JSON transcoder filter object to v2
+   * envoy::api::v2::filter::http::GrpcJsonTranscoder.
+   * @param json_config source v1 JSON Grpc JSON Transcoder Filter object.
+   * @param proto_config destination v2 envoy::api::v2::filter::http::GrpcJsonTranscoder.
+   */
+  static void translateGrpcJsonTranscoder(const Json::Object& json_config,
+                                          envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config);
+
+  /**
    * Translate a v1 JSON Router object to v2 envoy::api::v2::filter::http::Router.
    * @param json_config source v1 JSON HTTP router object.
    * @param proto_config destination v2 envoy::api::v2::filter::http::Router.
@@ -100,6 +111,15 @@ public:
    */
   static void translateBufferFilter(const Json::Object& json_config,
                                     envoy::api::v2::filter::http::Buffer& proto_config);
+
+  /**
+   * Translate a v1 JSON Lua filter object to v2 envoy::api::v2::filter::http::Lua.
+   * @param json_config source v1 JSON HTTP Lua Filter object.
+   * @param proto_config destination v2
+   * envoy::api::v2::filter::http::Lua.
+   */
+  static void translateLuaFilter(const Json::Object& json_config,
+                                    envoy::api::v2::filter::http::Lua& proto_config);
 
   /**
    * Translate a v1 JSON TCP proxy filter object to a v2 envoy::api::v2::filter::network::TcpProxy.
