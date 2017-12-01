@@ -38,7 +38,8 @@ TcpProxyConfig::Route::Route(
 
 TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
                                Server::Configuration::FactoryContext& context)
-    : stats_(generateStats(config.stat_prefix(), context.scope())),
+    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
+      stats_(generateStats(*stats_scope_)),
       max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_flush_timeout_(std::chrono::seconds(1)), // TODO plumb in real config
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()) {
@@ -122,16 +123,18 @@ TcpProxy::~TcpProxy() {
     }
 
     if (upstream_connection_->state() != Network::Connection::State::Closed) {
-      config_->drainManager().add(config_, std::move(upstream_connection_),
-                                  std::move(upstream_callbacks_));
+      if (config_ != nullptr) {
+        config_->drainManager().add(config_, std::move(upstream_connection_),
+                                    std::move(upstream_callbacks_));
+      } else {
+        upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+      }
     }
   }
 }
 
-TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Scope& scope) {
-  std::string final_prefix = fmt::format("tcp.{}.", name);
-  return {ALL_TCP_PROXY_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                              POOL_GAUGE_PREFIX(scope, final_prefix))};
+TcpProxyStats TcpProxyConfig::generateStats(Stats::Scope& scope) {
+  return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
 void TcpProxy::finalizeUpstreamConnectionStats() {

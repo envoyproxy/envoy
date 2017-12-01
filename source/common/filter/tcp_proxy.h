@@ -90,7 +90,11 @@ private:
     std::string cluster_name_;
   };
 
-  static TcpProxyStats generateStats(const std::string& name, Stats::Scope& scope);
+  static TcpProxyStats generateStats(Stats::Scope& scope);
+
+  // Hold a Scope for the lifetime of the configuration because connections in
+  // the TcpProxyUpstreamDrainManager can live longer than the listener.
+  Stats::ScopePtr stats_scope_;
 
   std::vector<Route> routes_;
   const TcpProxyStats stats_;
