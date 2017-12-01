@@ -47,7 +47,7 @@ enum class FilterDataStatus {
   // continuing processing and so can not push back on streaming data via watermarks.
   //
   // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
-  // be sent to the user.  On the response path exceeding buffer limits will result in a 500.
+  // be sent to the user. On the response path exceeding buffer limits will result in a 500.
   StopIterationAndBuffer,
   // Do not iterate to any of the remaining filters in the chain, and buffer body data for later
   // dispatching. Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
@@ -219,7 +219,7 @@ public:
    * their high watermark.
    *
    * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times.  Any such filter is responsible for calling
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
    * the low watermark callbacks an equal number of times as the respective buffers are drained.
    */
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;

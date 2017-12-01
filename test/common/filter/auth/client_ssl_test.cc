@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "common/config/filter_json.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/filter/auth/client_ssl.h"
 #include "common/http/message_impl.h"
@@ -38,6 +39,22 @@ TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
   EXPECT_EQ(0UL, principals.size());
 }
 
+TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
+  std::string json = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list": ["192.168.3.0/24"],
+    "test" : "a"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+  envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+  EXPECT_THROW(Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config),
+               Json::Exception);
+}
+
 class ClientSslAuthFilterTest : public testing::Test {
 public:
   ClientSslAuthFilterTest()
@@ -56,10 +73,12 @@ public:
     }
     )EOF";
 
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+    envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+    Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
-    config_ = Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_);
+    config_ = Config::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
 
     createAuthFilter();
   }
@@ -103,25 +122,12 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+  envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_),
+  EXPECT_THROW(Config::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
                EnvoyException);
-}
-
-TEST_F(ClientSslAuthFilterTest, BadClientSslAuthConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list": ["192.168.3.0/24"],
-    "test" : "a"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  EXPECT_THROW(Config::create(*json_config, tls_, cm_, dispatcher_, stats_store_, random_),
-               Json::Exception);
 }
 
 TEST_F(ClientSslAuthFilterTest, NoSsl) {

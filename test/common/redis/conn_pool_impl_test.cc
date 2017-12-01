@@ -55,6 +55,15 @@ public:
 
   void setup() {
     config_.reset(new ConfigImpl(createConnPoolSettings()));
+    finishSetup();
+  }
+
+  void setup(std::unique_ptr<Config>&& config) {
+    config_ = std::move(config);
+    finishSetup();
+  }
+
+  void finishSetup() {
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = upstream_connection_;
@@ -118,13 +127,13 @@ TEST_F(RedisClientImplTest, Basic) {
     RespValuePtr response1(new RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
-    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response1));
 
     RespValuePtr response2(new RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response2));
   }));
   upstream_read_filter_->onData(fake_data);
@@ -162,13 +171,13 @@ TEST_F(RedisClientImplTest, Cancel) {
     RespValuePtr response1(new RespValue());
     EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
-    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response1));
 
     RespValuePtr response2(new RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-    EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(200));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response2));
   }));
   upstream_read_filter_->onData(fake_data);
@@ -196,7 +205,7 @@ TEST_F(RedisClientImplTest, FailAll) {
 
   onConnected();
 
-  EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SERVER_FAILURE));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
@@ -250,7 +259,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     throw ProtocolError("error");
   }));
-  EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(500));
+  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::REQUEST_FAILED));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -270,7 +279,32 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
-  EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SERVER_FAILURE));
+  EXPECT_CALL(callbacks1, onFailure());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
+}
+
+class ConfigOutlierDisabled : public Config {
+  bool disableOutlierEvents() const override { return true; }
+  std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
+};
+
+TEST_F(RedisClientImplTest, OutlierDisabled) {
+  InSequence s;
+
+  setup(std::make_unique<ConfigOutlierDisabled>());
+
+  RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  EXPECT_CALL(host_->outlier_detector_, putResult(_)).Times(0);
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -290,7 +324,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
-  EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::TIMEOUT));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -312,7 +346,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   onConnected();
 
-  EXPECT_CALL(host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::TIMEOUT));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -401,7 +435,7 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   EXPECT_EQ(&active_request2, request2);
 
   EXPECT_CALL(*client2, close());
-  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host2});
+  cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, {host2});
 
   EXPECT_CALL(*client1, close());
   tls_.shutdownThread();
@@ -411,7 +445,7 @@ TEST_F(RedisConnPoolImplTest, DeleteFollowedByClusterUpdateCallback) {
   conn_pool_.reset();
 
   std::shared_ptr<Upstream::Host> host(new Upstream::MockHost());
-  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host});
+  cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, {host});
 }
 
 TEST_F(RedisConnPoolImplTest, NoHost) {

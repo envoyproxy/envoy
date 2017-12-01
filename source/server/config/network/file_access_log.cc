@@ -17,7 +17,8 @@ namespace Configuration {
 
 AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter, FactoryContext& context) {
-  const auto& fal_config = dynamic_cast<const envoy::api::v2::filter::FileAccessLog&>(config);
+  const auto& fal_config =
+      dynamic_cast<const envoy::api::v2::filter::accesslog::FileAccessLog&>(config);
   AccessLog::FormatterPtr formatter;
   if (fal_config.format().empty()) {
     formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
@@ -29,7 +30,7 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::FileAccessLog()};
+  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::accesslog::FileAccessLog()};
 }
 
 std::string FileAccessLogFactory::name() const { return Config::AccessLogNames::get().FILE; }

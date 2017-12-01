@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/protobuf/utility.h"
@@ -75,6 +76,30 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
+void DetectorHostMonitorImpl::putResult(Result result) {
+  Http::Code http_code = Http::Code::InternalServerError;
+
+  switch (result) {
+  case Result::SUCCESS:
+    http_code = Http::Code::OK;
+    break;
+  case Result::TIMEOUT:
+    http_code = Http::Code::GatewayTimeout;
+    break;
+  case Result::CONNECT_FAILED:
+    http_code = Http::Code::ServiceUnavailable;
+    break;
+  case Result::REQUEST_FAILED:
+    http_code = Http::Code::InternalServerError;
+    break;
+  case Result::SERVER_FAILURE:
+    http_code = Http::Code::ServiceUnavailable;
+    break;
+  }
+
+  putHttpResponseCode(enumToInt(http_code));
+}
+
 DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& config)
     : interval_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, 10000))),
       base_ejection_time_ms_(
@@ -129,26 +154,28 @@ DetectorImpl::create(const Cluster& cluster,
 }
 
 void DetectorImpl::initialize(const Cluster& cluster) {
-  for (const HostSharedPtr& host : cluster.hosts()) {
-    addHostMonitor(host);
-  }
-
-  cluster.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
-                                   const std::vector<HostSharedPtr>& hosts_removed) -> void {
-    for (const HostSharedPtr& host : hosts_added) {
+  for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
       addHostMonitor(host);
     }
+  }
+  cluster.prioritySet().addMemberUpdateCb(
+      [this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
+             const std::vector<HostSharedPtr>& hosts_removed) -> void {
+        for (const HostSharedPtr& host : hosts_added) {
+          addHostMonitor(host);
+        }
 
-    for (const HostSharedPtr& host : hosts_removed) {
-      ASSERT(host_monitors_.count(host) == 1);
-      if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-        ASSERT(stats_.ejections_active_.value() > 0);
-        stats_.ejections_active_.dec();
-      }
+        for (const HostSharedPtr& host : hosts_removed) {
+          ASSERT(host_monitors_.count(host) == 1);
+          if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+            ASSERT(stats_.ejections_active_.value() > 0);
+            stats_.ejections_active_.dec();
+          }
 
-      host_monitors_.erase(host);
-    }
-  });
+          host_monitors_.erase(host);
+        }
+      });
 
   armIntervalTimer();
 }
@@ -228,6 +255,8 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_monitors_.size();
+  // Note this is not currently checked per-priority level, so it is possible
+  // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
     if (type == EjectionType::Consecutive5xx || type == EjectionType::SuccessRate) {
       // Deprecated counter, preserving old behaviour until it's removed.

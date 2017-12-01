@@ -172,7 +172,7 @@ public:
   void close();
   void readDisable(bool disable);
   // By default waitForDisconnect assumes the next event is a disconnect and
-  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // fails an assert if an unexpected event occurs. If a caller truly wishes to
   // wait until disconnect, set ignore_spurious_events = true.
   void waitForDisconnect(bool ignore_spurious_events = false);
 
@@ -214,7 +214,7 @@ public:
   FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
   Network::Connection& connection() { return connection_; }
   // By default waitForNewStream assumes the next event is a new stream and
-  // fails an assert if an unexpected event occurs.  If a caller truly wishes to
+  // fails an assert if an unexpected event occurs. If a caller truly wishes to
   // wait for a new stream, set ignore_spurious_events = true.
   FakeStreamPtr waitForNewStream(Event::Dispatcher& client_dispatcher,
                                  bool ignore_spurious_events = false);

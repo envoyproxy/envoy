@@ -17,7 +17,7 @@ namespace Address {
 
 /**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
- * a Network::Address::Instance and return a pointer to it.  Raises an EnvoyException on failure.
+ * a Network::Address::Instance and return a pointer to it. Raises an EnvoyException on failure.
  * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
  * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
  *        it is used to validate the structure contents; else if len == 0, it is ignored.

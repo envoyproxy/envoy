@@ -112,7 +112,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   ConnectionStatusCallbacks connect_callbacks;
   MockWatermarkBuffer* client_write_buffer;
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
-  // buffer.  This allows us to track the bytes actually written to the socket.
+  // buffer. This allows us to track the bytes actually written to the socket.
 
   EXPECT_CALL(*mock_buffer_factory_, create_(_, _))
       .Times(1)
@@ -132,7 +132,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   ssl_client = dispatcher_->createSslClientConnection(*context, address,
                                                       Network::Address::InstanceConstSharedPtr());
 
-  // Perform the SSL handshake.  Loopback is whitelisted in tcp_proxy.json for the ssl_auth
+  // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
 
   ssl_client->addConnectionCallbacks(connect_callbacks);
@@ -195,7 +195,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
                                                ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
                                                : R"EOF(\[::1\]:[0-9]+)EOF";
 
-  // Test that all three addresses were populated correctly.  Only check the first line of
+  // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
               MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={0}\n.*",

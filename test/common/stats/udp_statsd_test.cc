@@ -39,7 +39,7 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   sink.flushCounter(counter, 1);
 
   NiceMock<MockGauge> gauge;
-  counter.name_ = "test_gauge";
+  gauge.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
 
   NiceMock<MockHistogram> timer;

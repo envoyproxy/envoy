@@ -54,18 +54,18 @@ public:
    */
   void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
            std::vector<uint32_t> healthy_destination_cluster) {
-    local_host_set_ = new HostSetImpl();
+    local_host_set_ = new HostSetImpl(0);
     // TODO(mattklein123): make load balancer per originating cluster host.
-    RandomLoadBalancer lb(cluster_, local_host_set_, stats_, runtime_, random_);
+    RandomLoadBalancer lb(host_set_, local_host_set_, stats_, runtime_, random_);
 
     HostListsSharedPtr upstream_per_zone_hosts = generateHostsPerZone(healthy_destination_cluster);
     HostListsSharedPtr local_per_zone_hosts = generateHostsPerZone(originating_cluster);
 
     HostVectorSharedPtr originating_hosts = generateHostList(originating_cluster);
     HostVectorSharedPtr healthy_destination = generateHostList(healthy_destination_cluster);
-    cluster_.healthy_hosts_ = *healthy_destination;
+    host_set_.healthy_hosts_ = *healthy_destination;
     HostVectorSharedPtr all_destination = generateHostList(all_destination_cluster);
-    cluster_.hosts_ = *all_destination;
+    host_set_.hosts_ = *all_destination;
 
     std::map<std::string, uint32_t> hits;
     for (uint32_t i = 0; i < total_number_of_requests; ++i) {
@@ -82,8 +82,8 @@ public:
 
         per_zone_upstream->push_back((*upstream_per_zone_hosts)[zone]);
       }
-      cluster_.hosts_per_locality_ = *per_zone_upstream;
-      cluster_.healthy_hosts_per_locality_ = *per_zone_upstream;
+      host_set_.hosts_per_locality_ = *per_zone_upstream;
+      host_set_.healthy_hosts_per_locality_ = *per_zone_upstream;
 
       // Populate host set for originating cluster.
       HostListsSharedPtr per_zone_local(new std::vector<std::vector<HostSharedPtr>>());
@@ -126,7 +126,7 @@ public:
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        ret->push_back(newTestHost(cluster_.info_, url, 1, zone));
+        ret->push_back(newTestHost(info_, url, 1, zone));
       }
     }
 
@@ -145,7 +145,7 @@ public:
 
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        zone_hosts.push_back(newTestHost(cluster_.info_, url, 1, zone));
+        zone_hosts.push_back(newTestHost(info_, url, 1, zone));
       }
 
       ret->push_back(std::move(zone_hosts));
@@ -158,7 +158,8 @@ public:
   std::vector<HostSharedPtr> empty_vector_;
 
   HostSetImpl* local_host_set_;
-  NiceMock<MockCluster> cluster_;
+  NiceMock<MockHostSet> host_set_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;

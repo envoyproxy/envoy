@@ -129,8 +129,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                                dns_resolver, cm, dispatcher, false);
   cluster.initialize([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(2UL, cluster.hosts().size());
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 // Resolve zero hosts, while using health checking.
@@ -164,8 +164,8 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(_));
   resolver.dns_callback_({});
-  EXPECT_EQ(0UL, cluster.hosts().size());
-  EXPECT_EQ(0UL, cluster.healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST(StrictDnsClusterImplTest, Basic) {
@@ -240,8 +240,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.addMemberUpdateCb(
-      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
+  cluster.prioritySet().addMemberUpdateCb(
+      [&](uint32_t, const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
         membership_updated.ready();
       });
 
@@ -251,44 +251,49 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
-  EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-              ContainerEq(hostListToAddresses(cluster.hosts())));
-  EXPECT_EQ("localhost1", cluster.hosts()[0]->hostname());
-  EXPECT_EQ("localhost1", cluster.hosts()[1]->hostname());
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
-  EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-              ContainerEq(hostListToAddresses(cluster.hosts())));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.expectResolve(*dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
-  EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-              ContainerEq(hostListToAddresses(cluster.hosts())));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
-  EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001"}),
-              ContainerEq(hostListToAddresses(cluster.hosts())));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.3:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
-  EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
-              ContainerEq(hostListToAddresses(cluster.hosts())));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.hostsPerLocality().size());
-  EXPECT_EQ(0UL, cluster.healthyHostsPerLocality().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
 
-  for (const HostSharedPtr& host : cluster.hosts()) {
+  for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
   }
 
@@ -315,7 +320,8 @@ TEST(HostImplTest, Weight) {
   MockCluster cluster;
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
-  EXPECT_EQ(100U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 101)->weight());
+  EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 128)->weight());
+  EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 129)->weight());
 
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 50);
   EXPECT_EQ(50U, host->weight());
@@ -323,8 +329,8 @@ TEST(HostImplTest, Weight) {
   EXPECT_EQ(51U, host->weight());
   host->weight(0);
   EXPECT_EQ(1U, host->weight());
-  host->weight(101);
-  EXPECT_EQ(100U, host->weight());
+  host->weight(129);
+  EXPECT_EQ(128U, host->weight());
 }
 
 TEST(HostImplTest, HostnameCanaryAndLocality) {
@@ -366,8 +372,8 @@ TEST(StaticClusterImplTest, EmptyHostname) {
                             false);
   cluster.initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
-  EXPECT_EQ("", cluster.hosts()[0]->hostname());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
@@ -390,7 +396,7 @@ TEST(StaticClusterImplTest, RingHash) {
                             true);
   cluster.initialize([] {});
 
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::RingHash, cluster.info()->lbType());
   EXPECT_TRUE(cluster.info()->addedViaApi());
 }
@@ -419,22 +425,26 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{detector});
   cluster.initialize([] {});
 
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
-  cluster.hosts()[0]->outlierDetector().putHttpResponseCode(503);
-  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  detector->runCallbacks(cluster.hosts()[0]);
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->outlierDetector().putHttpResponseCode(
+      503);
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_NE(cluster.healthyHosts()[0], cluster.hosts()[0]);
+  EXPECT_NE(cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0],
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
 
   // Bring the host back online.
-  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  detector->runCallbacks(cluster.hosts()[0]);
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+      Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 }
 
@@ -466,44 +476,52 @@ TEST(StaticClusterImplTest, HealthyStat) {
   ReadyWatcher initialized;
   cluster.initialize([&initialized] { initialized.ready(); });
 
-  EXPECT_EQ(2UL, cluster.hosts().size());
-  EXPECT_EQ(0UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
 
-  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.hosts()[0], true);
-  cluster.hosts()[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_CALL(initialized, ready());
-  health_checker->runCallbacks(cluster.hosts()[1], true);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1], true);
 
-  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector->runCallbacks(cluster.hosts()[0]);
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
-  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.hosts()[0], true);
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
-  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector->runCallbacks(cluster.hosts()[0]);
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+      Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
-  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.hosts()[0], true);
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 
-  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector->runCallbacks(cluster.hosts()[0]);
-  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
-  cluster.hosts()[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.hosts()[1], true);
-  EXPECT_EQ(0UL, cluster.healthyHosts().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1], true);
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
 }
 
@@ -540,12 +558,13 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
             cluster.info()->http2Settings().hpack_table_size_);
   EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());
-  EXPECT_THAT(std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
-              ContainerEq(hostListToAddresses(cluster.hosts())));
-  EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.hostsPerLocality().size());
-  EXPECT_EQ(0UL, cluster.healthyHostsPerLocality().size());
-  cluster.hosts()[0]->healthChecker().setUnhealthy();
+  EXPECT_THAT(
+      std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy();
 }
 
 TEST(StaticClusterImplTest, UnsupportedLBType) {
@@ -635,6 +654,55 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
+}
+
+// Test creating and extending a priority set.
+TEST(PrioritySet, Extend) {
+  PrioritySetImpl priority_set;
+
+  uint32_t changes = 0;
+  uint32_t last_priority = 0;
+  priority_set.addMemberUpdateCb([&](uint32_t priority, const std::vector<HostSharedPtr>&,
+                                     const std::vector<HostSharedPtr>&) -> void { // fIXME
+    last_priority = priority;
+    ++changes;
+  });
+
+  // The initial priority set starts with priority level 0..
+  EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
+  EXPECT_EQ(0, priority_set.hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0, priority_set.hostSetsPerPriority()[0]->priority());
+
+  // Add priorities 1 and 2, ensure the callback is called, and that the new
+  // host sets are created with the correct priority.
+  EXPECT_EQ(0, changes);
+  EXPECT_EQ(0, priority_set.getOrCreateHostSet(2).hosts().size());
+  EXPECT_EQ(3, priority_set.hostSetsPerPriority().size());
+  EXPECT_EQ(2, changes);
+  EXPECT_EQ(last_priority, 2);
+  EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->priority());
+  EXPECT_EQ(2, priority_set.hostSetsPerPriority()[2]->priority());
+
+  // Now add hosts for priority 1, and ensure they're added and subscribers are notified.
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info, "tcp://127.0.0.1:80")}));
+  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>({}));
+  std::vector<HostSharedPtr> hosts_added{hosts->front()};
+  std::vector<HostSharedPtr> hosts_removed{};
+
+  priority_set.hostSetsPerPriority()[1]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, hosts_added, hosts_removed);
+  EXPECT_EQ(3, changes);
+  EXPECT_EQ(last_priority, 1);
+  EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
+
+  // Test iteration.
+  int i = 0;
+  for (auto& host_set : priority_set.hostSetsPerPriority()) {
+    EXPECT_EQ(host_set.get(), priority_set.hostSetsPerPriority()[i++].get());
+  }
+  EXPECT_EQ(3, changes);
 }
 
 } // namespace

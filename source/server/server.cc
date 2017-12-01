@@ -58,8 +58,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       try {
         Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
       } catch (const EnvoyException& e) {
-        throw EnvoyException(fmt::format("Failed to open log-file '{}'.  e.what(): {}",
-                                         options.logPath(), e.what()));
+        throw EnvoyException(
+            fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
       }
     }
 
@@ -161,8 +161,12 @@ void InstanceImpl::initialize(Options& options,
   try {
     MessageUtil::loadFromFile(options.configPath(), bootstrap);
   } catch (const EnvoyException& e) {
-    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    if (options.v2ConfigOnly()) {
+      throw;
+    } else {
+      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+      ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    }
   }
   if (!bootstrap.has_admin()) {
     Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
@@ -198,11 +202,11 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
+  admin_scope_ = stats_store_.createScope("listener.admin.");
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
                              initial_config.admin().profilePath(), options.adminAddressPath(),
-                             initial_config.admin().address(), *this));
+                             initial_config.admin().address(), *this, *admin_scope_));
 
-  admin_scope_ = stats_store_.createScope("listener.admin.");
   handler_->addListener(*admin_, admin_->mutable_socket(), *admin_scope_, 0,
                         Network::ListenerOptions::listenerOptionsWithBindToPort());
 

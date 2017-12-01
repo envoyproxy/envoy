@@ -16,7 +16,7 @@ namespace Upstream {
 
 /**
  * The OriginalDstCluster is a dynamic cluster that automatically adds hosts as needed based on the
- * original destination address of the downstream connection.  These hosts are also automatically
+ * original destination address of the downstream connection. These hosts are also automatically
  * cleaned up after they have not seen traffic for a configurable cleanup interval time
  * ("cleanup_interval_ms").
  */
@@ -33,10 +33,10 @@ public:
    * Special Load Balancer for Original Dst Cluster.
    *
    * Load balancer gets called with the downstream context which can be used to make sure the
-   * Original Dst cluster has a Host for the original destination.  Normally load balancers can't
+   * Original Dst cluster has a Host for the original destination. Normally load balancers can't
    * modify clusters, but in this case we access a singleton OriginalDstCluster that we can ask to
-   * add hosts on demand.  Additions are synced with all other threads so that the host set in the
-   * cluster remains (eventually) consistent.  If multiple threads add a host to the same upstream
+   * add hosts on demand. Additions are synced with all other threads so that the host set in the
+   * cluster remains (eventually) consistent. If multiple threads add a host to the same upstream
    * address then two distinct HostSharedPtr's (with the same upstream IP address) will be added,
    * and both of them will eventually time out.
    */
@@ -49,7 +49,7 @@ public:
 
   private:
     /**
-     * Map from an host IP address/port to a HostSharedPtr.  Due to races multiple distinct host
+     * Map from an host IP address/port to a HostSharedPtr. Due to races multiple distinct host
      * objects with the same address can be created, so we need to use a multimap.
      */
     class HostMap {

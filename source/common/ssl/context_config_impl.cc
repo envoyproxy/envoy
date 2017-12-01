@@ -7,6 +7,8 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -50,7 +52,11 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
                                    ? ""
-                                   : config.validation_context().verify_certificate_hash()[0]) {
+                                   : config.validation_context().verify_certificate_hash()[0]),
+      min_protocol_version_(
+          tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
+      max_protocol_version_(
+          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
   // TODO(htuch): Support multiple hashes.
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
   if (!config.tls_certificates().empty()) {
@@ -60,6 +66,27 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
     ASSERT(config.tls_certificates()[0].private_key().specifier_case() ==
            envoy::api::v2::DataSource::kFilename);
   }
+}
+
+unsigned
+ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
+                                       unsigned default_version) {
+  switch (version) {
+  case envoy::api::v2::TlsParameters::TLS_AUTO:
+    return default_version;
+  case envoy::api::v2::TlsParameters::TLSv1_0:
+    return TLS1_VERSION;
+  case envoy::api::v2::TlsParameters::TLSv1_1:
+    return TLS1_1_VERSION;
+  case envoy::api::v2::TlsParameters::TLSv1_2:
+    return TLS1_2_VERSION;
+  case envoy::api::v2::TlsParameters::TLSv1_3:
+    return TLS1_3_VERSION;
+  default:
+    NOT_IMPLEMENTED;
+  }
+
+  NOT_REACHED;
 }
 
 ClientContextConfigImpl::ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config)
@@ -128,12 +155,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
 void ServerContextConfigImpl::validateAndAppendKey(
     std::vector<ServerContextConfig::SessionTicketKey>& keys, const std::string& key_data) {
   // If this changes, need to figure out how to deal with key files
-  // that previously worked.  For now, just assert so we'll notice that
+  // that previously worked. For now, just assert so we'll notice that
   // it changed if it does.
   static_assert(sizeof(SessionTicketKey) == 80, "Input is expected to be this size");
 
   if (key_data.size() != sizeof(SessionTicketKey)) {
-    throw EnvoyException(fmt::format("Incorrect TLS session ticket key length.  "
+    throw EnvoyException(fmt::format("Incorrect TLS session ticket key length. "
                                      "Length {}, expected length {}.",
                                      key_data.size(), sizeof(SessionTicketKey)));
   }

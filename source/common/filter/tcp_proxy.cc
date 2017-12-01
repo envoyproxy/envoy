@@ -58,7 +58,7 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
     routes_.emplace_back(default_route);
   }
 
-  for (const envoy::api::v2::filter::AccessLog& log_config : config.access_log()) {
+  for (const envoy::api::v2::filter::accesslog::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 }
@@ -142,7 +142,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
 
   // Need to disable reads so that we don't write to an upstream that might fail
-  // in onData().  This will get re-enabled when the upstream connection is
+  // in onData(). This will get re-enabled when the upstream connection is
   // established.
   read_callbacks_->connection().readDisable(true);
 
@@ -203,7 +203,7 @@ void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
 void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
-  // The downstream buffer has been drained.  Resume reading from upstream.
+  // The downstream buffer has been drained. Resume reading from upstream.
   parent_.readDisableUpstream(false);
 }
 
@@ -217,7 +217,7 @@ void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
-  // The upstream write buffer is drained.  Resume reading.
+  // The upstream write buffer is drained. Resume reading.
   parent_.readDisableDownstream(false);
 }
 
@@ -299,6 +299,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 
 void TcpProxy::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
+  read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
   request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
 
@@ -348,6 +349,8 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connecting) {
       request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
+      read_callbacks_->upstreamHost()->outlierDetector().putResult(
+          Upstream::Outlier::Result::CONNECT_FAILED);
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
       closeUpstreamConnection();
@@ -364,6 +367,8 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     // so we have a place to send downstream data to.
     read_callbacks_->connection().readDisable(false);
 
+    read_callbacks_->upstreamHost()->outlierDetector().putResult(
+        Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
   }
 }

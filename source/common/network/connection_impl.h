@@ -152,7 +152,7 @@ private:
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
   std::unique_ptr<ConnectionStats> connection_stats_;
-  // Tracks the number of times reads have been disabled.  If N different components call
+  // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
