@@ -9,6 +9,7 @@
 #include "common/grpc/transcoder_input_stream_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "api/filter/http/transcoder.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"
@@ -43,7 +44,7 @@ public:
    * constructor that loads protobuf descriptors from the file specified in the JSON config.
    * and construct a path matcher for HTTP path bindings.
    */
-  JsonTranscoderConfig(const Json::Object& config);
+  JsonTranscoderConfig(const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config);
 
   /**
    * Create an instance of Transcoder interface based on incoming request

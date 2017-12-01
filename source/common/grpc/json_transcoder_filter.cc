@@ -72,8 +72,9 @@ private:
 
 } // namespace
 
-JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
-  const std::string proto_descriptor_file = config.getString("proto_descriptor");
+JsonTranscoderConfig::JsonTranscoderConfig(
+    const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config) {
+  const std::string proto_descriptor_file = proto_config.proto_descriptor();
   FileDescriptorSet descriptor_set;
   if (!descriptor_set.ParseFromString(Filesystem::fileReadToEnd(proto_descriptor_file))) {
     throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
@@ -87,7 +88,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
 
-  for (const auto& service_name : config.getStringArray("services")) {
+  for (const auto& service_name : proto_config.services()) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
     if (service == nullptr) {
       throw EnvoyException("transcoding_filter: Could not find '" + service_name +
@@ -109,14 +110,11 @@ JsonTranscoderConfig::JsonTranscoderConfig(const Json::Object& config) {
       new google::grpc::transcoding::TypeHelper(Protobuf::util::NewTypeResolverForDescriptorPool(
           Common::typeUrlPrefix(), &descriptor_pool_)));
 
-  const auto print_config = config.getObject("print_options", true);
-  print_options_.add_whitespace = print_config->getBoolean("add_whitespace", false);
-  print_options_.always_print_primitive_fields =
-      print_config->getBoolean("always_print_primitive_fields", false);
-  print_options_.always_print_enums_as_ints =
-      print_config->getBoolean("always_print_enums_as_ints", false);
-  print_options_.preserve_proto_field_names =
-      print_config->getBoolean("preserve_proto_field_names", false);
+  const auto print_config = proto_config.print_options();
+  print_options_.add_whitespace = print_config.add_whitespace();
+  print_options_.always_print_primitive_fields = print_config.always_print_primitive_fields();
+  print_options_.always_print_enums_as_ints = print_config.always_print_enums_as_ints();
+  print_options_.preserve_proto_field_names = print_config.preserve_proto_field_names();
 }
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
