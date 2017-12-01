@@ -204,7 +204,7 @@ protected:
 };
 
 // This class holds ownership of an upstream connection that needs to finish
-// flushing, when the downstream connection has been closed.  The TcpProxy is
+// flushing, when the downstream connection has been closed. The TcpProxy is
 // destroyed when the downstream connection is closed, so moving the upstream
 // connection here allows it to finish draining or timeout.
 class TcpProxyDrainer : public Event::DeferredDeletable {
@@ -234,7 +234,7 @@ public:
 private:
   // This must be a map instead of set because there is no way to move elements
   // out of a set, and these elements get passed to deferredDelete() instead of
-  // being deleted in-place.  The key and value will always be equal.
+  // being deleted in-place. The key and value will always be equal.
   std::map<TcpProxyDrainer*, TcpProxyDrainerPtr> drainers_;
 };
 
