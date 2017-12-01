@@ -14,6 +14,11 @@ MissingFieldException::MissingFieldException(const std::string& field_name,
     : EnvoyException(
           fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
 
+ProtoValidationException::ProtoValidationException(const std::string& validation_error,
+                                                   const Protobuf::Message& message)
+    : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
+                                 message.DebugString())) {}
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
   const auto status = Protobuf::util::JsonStringToMessage(json, &message);
   if (!status.ok()) {

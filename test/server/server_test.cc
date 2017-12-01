@@ -107,9 +107,11 @@ protected:
   }
 
   void TearDown() override {
-    server_->threadLocal().shutdownGlobalThreading();
-    server_->clusterManager().shutdown();
-    server_->threadLocal().shutdownThread();
+    thread_local_.shutdownGlobalThreading();
+    if (server_) {
+      server_->clusterManager().shutdown();
+      server_->threadLocal().shutdownThread();
+    }
   }
 
   Network::Address::IpVersion version_;
@@ -177,6 +179,15 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+// Negative test for protoc-gen-validate constraints.
+TEST_P(ServerInstanceImplTest, ValidateFail) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.v2_config_only_ = true;
+  EXPECT_DEATH(initialize("test/server/empty_bootstrap.yaml"),
+               ".*Proto constraint validation failed.*");
+}
+
 TEST_P(ServerInstanceImplTest, LogToFile) {
   const std::string path =
       TestEnvironment::temporaryPath("ServerInstanceImplTest_LogToFile_Test.log");
@@ -204,6 +215,7 @@ TEST_P(ServerInstanceImplDeathTest, LogToFileError) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_DEATH(initialize(std::string()), ".*Failed to open log-file.*");
+  server_.reset();
 }
 } // namespace Server
 } // namespace Envoy

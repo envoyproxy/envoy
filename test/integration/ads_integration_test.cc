@@ -118,6 +118,7 @@ public:
         filters:
         - name: envoy.http_connection_manager
           config:
+            stat_prefix: ads_test
             codec_type: HTTP2
             rds:
               route_config_name: {}

@@ -8,6 +8,8 @@
 #include "common/config/filter_json.h"
 #include "common/filter/auth/client_ssl.h"
 
+#include "api/filter/network/client_ssl_auth.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -37,8 +39,10 @@ ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
                                                          FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::ClientSSLAuth&>(config),
-                      context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::ClientSSLAuth&>(
+          config),
+      context);
 }
 
 /**

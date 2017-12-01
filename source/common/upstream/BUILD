@@ -23,6 +23,7 @@ envoy_cc_library(
         "//source/common/config:resources_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -239,6 +240,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

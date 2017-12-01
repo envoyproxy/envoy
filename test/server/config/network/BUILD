@@ -18,6 +18,7 @@ envoy_cc_test(
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:file_access_log_lib",
         "//source/server/config/network:http_connection_manager_lib",
+        "//source/server/config/network:mongo_proxy_lib",
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",

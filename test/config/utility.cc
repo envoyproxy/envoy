@@ -24,6 +24,7 @@ static_resources:
       filters:
         name: envoy.http_connection_manager
         config:
+          stat_prefix: config_test
           http_filters:
             name: envoy.router
           codec_type: HTTP1

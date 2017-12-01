@@ -10,6 +10,8 @@
 #include "common/filter/ratelimit.h"
 #include "common/protobuf/utility.h"
 
+#include "api/filter/network/rate_limit.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -42,8 +44,9 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::O
 NetworkFilterFactoryCb
 RateLimitConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
                                                      FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::RateLimit&>(config),
-                      context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::RateLimit&>(config),
+      context);
 }
 
 /**

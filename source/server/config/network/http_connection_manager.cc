@@ -23,6 +23,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 
+#include "api/filter/network/http_connection_manager.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -82,7 +83,9 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
 NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& config, FactoryContext& context) {
   return createHttpConnectionManagerFilterFactory(
-      dynamic_cast<const envoy::api::v2::filter::network::HttpConnectionManager&>(config), context);
+      MessageUtil::downcastAndValidate<
+          const envoy::api::v2::filter::network::HttpConnectionManager&>(config),
+      context);
 }
 
 /**

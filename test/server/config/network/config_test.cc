@@ -10,6 +10,7 @@
 #include "server/config/network/client_ssl_auth.h"
 #include "server/config/network/file_access_log.h"
 #include "server/config/network/http_connection_manager.h"
+#include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
 #include "server/config/network/tcp_proxy.h"
@@ -26,6 +27,34 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+// Negative test for protoc-gen-validate constraints.
+TEST(NetworkFilterConfigTest, ValidateFail) {
+  NiceMock<MockFactoryContext> context;
+
+  HttpConnectionManagerFilterConfigFactory hcm_factory;
+  envoy::api::v2::filter::network::HttpConnectionManager hcm_proto;
+  MongoProxyFilterConfigFactory mongo_factory;
+  envoy::api::v2::filter::network::MongoProxy mongo_proto;
+  RedisProxyFilterConfigFactory redis_factory;
+  envoy::api::v2::filter::network::RedisProxy redis_proto;
+  TcpProxyConfigFactory tcp_proxy_factory;
+  envoy::api::v2::filter::network::TcpProxy tcp_proxy_proto;
+  const std::vector<std::pair<NamedNetworkFilterConfigFactory&, Protobuf::Message&>> filter_cases =
+      {
+          {hcm_factory, hcm_proto},
+          {mongo_factory, mongo_proto},
+          {redis_factory, redis_proto},
+          {tcp_proxy_factory, tcp_proxy_proto},
+      };
+  // TODO(htuch): Plumb in other tests with validation once the repeated msg
+  // issue in PGV is fixed.
+
+  for (const auto& filter_case : filter_cases) {
+    EXPECT_THROW(filter_case.first.createFilterFactoryFromProto(filter_case.second, context),
+                 ProtoValidationException);
+  }
+}
 
 TEST(NetworkFilterConfigTest, RedisProxyCorrectJson) {
   std::string json_string = R"EOF(

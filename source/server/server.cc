@@ -36,6 +36,7 @@
 #include "server/test_hooks.h"
 
 #include "api/bootstrap.pb.h"
+#include "api/bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -159,7 +160,7 @@ void InstanceImpl::initialize(Options& options,
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::api::v2::Bootstrap bootstrap;
   try {
-    MessageUtil::loadFromFile(options.configPath(), bootstrap);
+    MessageUtil::loadFromFileAndValidate(options.configPath(), bootstrap);
   } catch (const EnvoyException& e) {
     if (options.v2ConfigOnly()) {
       throw;

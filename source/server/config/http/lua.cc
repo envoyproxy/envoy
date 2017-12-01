@@ -5,6 +5,8 @@
 #include "common/config/filter_json.h"
 #include "common/http/filter/lua/lua_filter.h"
 
+#include "api/filter/http/lua.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -31,8 +33,9 @@ HttpFilterFactoryCb
 LuaFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                               const std::string& stat_prefix,
                                               FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::Lua&>(proto_config),
-                      stat_prefix, context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::Lua&>(proto_config),
+      stat_prefix, context);
 }
 
 /**

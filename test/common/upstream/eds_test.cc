@@ -6,6 +6,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "api/eds.pb.h"
 #include "gmock/gmock.h"
@@ -49,6 +50,13 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
+
+// Negative test for protoc-gen-validate constraints.
+TEST_F(EdsTest, ValidateFail) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  resources.Add();
+  EXPECT_THROW(cluster_->onConfigUpdate(resources), ProtoValidationException);
+}
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
