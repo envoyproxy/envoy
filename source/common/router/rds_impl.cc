@@ -202,18 +202,6 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
-void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& provider,
-                                                  Buffer::Instance& response) {
-  // TODO(junr03): change this to proto with JSON transcoding when #1522 is done.
-  response.add("{\n");
-  response.add(fmt::format("\"version_info\": \"{}\",\n", provider.versionInfo()));
-  response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider.routeConfigName()));
-  response.add(fmt::format("\"cluster_name\": \"{}\",\n", provider.clusterName()));
-  response.add("\"route_table_dump\": ");
-  response.add(fmt::format("{}\n", provider.configAsJson()));
-  response.add("}\n");
-}
-
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
                                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
@@ -253,7 +241,13 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutesLoop(
     } else {
       first_item = false;
     }
-    addRouteInfo(*provider, response);
+    response.add("{\n");
+    response.add(fmt::format("\"version_info\": \"{}\",\n", provider->versionInfo()));
+    response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider->routeConfigName()));
+    response.add(fmt::format("\"cluster_name\": \"{}\",\n", provider->clusterName()));
+    response.add("\"route_table_dump\": ");
+    response.add(fmt::format("{}\n", provider->configAsJson()));
+    response.add("}\n");
   }
   response.add("]\n");
   return Http::Code::OK;

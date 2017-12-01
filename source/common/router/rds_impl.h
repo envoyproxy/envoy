@@ -163,13 +163,6 @@ public:
 
 private:
   /**
-   * Add the RdsRouteConfigProvider information to the buffer.
-   * @param provider supplies the Provider to extract information from.
-   * @param response supplies the buffer to fill with information.
-   */
-  void addRouteInfo(const RdsRouteConfigProvider& provider, Buffer::Instance& response);
-
-  /**
    * The handler used in the Admin /routes endpoint. This handler is used to
    * populate the response Buffer::Instance with information about the currently
    * loaded dynamic HTTP Route Tables.
