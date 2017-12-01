@@ -30,6 +30,7 @@ class ConfigImpl : public Config {
 public:
   ConfigImpl(const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config);
 
+  bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
 
 private:
@@ -80,6 +81,7 @@ private:
              DecoderFactory& decoder_factory, const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
+  void putOutlierEvent(Upstream::Outlier::Result result);
 
   // Redis::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;

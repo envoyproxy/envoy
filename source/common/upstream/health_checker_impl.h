@@ -381,6 +381,7 @@ private:
     void onTimeout() override;
 
     // Redis::ConnPool::Config
+    bool disableOutlierEvents() const override { return true; }
     std::chrono::milliseconds opTimeout() const override {
       // Allow the main HC infra to control timeout.
       return parent_.timeout_ * 2;
