@@ -22,7 +22,7 @@ public:
                                           const std::string& stat_prefix,
                                           FactoryContext& context) override;
 
-  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                    const std::string& stat_prefix,
                                                    FactoryContext& context) override;
 
@@ -31,6 +31,10 @@ public:
   }
 
   std::string name() override { return Config::HttpFilterNames::get().ROUTER; }
+
+private:
+  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Router& proto_config,
+                                   const std::string& stat_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

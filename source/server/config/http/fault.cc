@@ -10,29 +10,30 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb
-FaultFilterConfig::createFaultFilter(const envoy::api::v2::filter::http::HTTPFault& fault,
-                                     const std::string& stats_prefix, FactoryContext& context) {
-  Http::FaultFilterConfigSharedPtr config(
-      new Http::FaultFilterConfig(fault, context.runtime(), stats_prefix, context.scope()));
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+FaultFilterConfig::createFilter(const envoy::api::v2::filter::http::HTTPFault& config,
+                                const std::string& stats_prefix, FactoryContext& context) {
+  Http::FaultFilterConfigSharedPtr filter_config(
+      new Http::FaultFilterConfig(config, context.runtime(), stats_prefix, context.scope()));
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
-        Http::StreamDecoderFilterSharedPtr{new Http::FaultFilter(config)});
+        Http::StreamDecoderFilterSharedPtr{new Http::FaultFilter(filter_config)});
   };
 }
 
 HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                            const std::string& stats_prefix,
                                                            FactoryContext& context) {
-  envoy::api::v2::filter::http::HTTPFault fault;
-  Config::FilterJson::translateFaultFilter(json_config, fault);
-  return createFaultFilter(fault, stats_prefix, context);
+  envoy::api::v2::filter::http::HTTPFault proto_config;
+  Config::FilterJson::translateFaultFilter(json_config, proto_config);
+  return createFilter(proto_config, stats_prefix, context);
 }
 
-HttpFilterFactoryCb FaultFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                    const std::string& stats_prefix,
-                                                                    FactoryContext& context) {
-  return createFaultFilter(dynamic_cast<const envoy::api::v2::filter::http::HTTPFault&>(config),
-                           stats_prefix, context);
+HttpFilterFactoryCb
+FaultFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                const std::string& stats_prefix,
+                                                FactoryContext& context) {
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::HTTPFault&>(proto_config),
+                      stats_prefix, context);
 }
 
 /**
