@@ -15,19 +15,21 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createRedisProxyFactory(
-    const envoy::api::v2::filter::network::RedisProxy& config, FactoryContext& context) {
+NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilter(
+    const envoy::api::v2::filter::network::RedisProxy& proto_config, FactoryContext& context) {
 
-  ASSERT(!config.stat_prefix().empty());
-  ASSERT(!config.cluster().empty());
-  ASSERT(config.has_settings());
+  ASSERT(!proto_config.stat_prefix().empty());
+  ASSERT(!proto_config.cluster().empty());
+  ASSERT(proto_config.has_settings());
 
   Redis::ProxyFilterConfigSharedPtr filter_config(
-      std::make_shared<Redis::ProxyFilterConfig>(config, context.clusterManager(), context.scope(),
-                                                 context.drainDecision(), context.runtime()));
+      std::make_shared<Redis::ProxyFilterConfig>(proto_config, context.clusterManager(),
+                                                 context.scope(), context.drainDecision(),
+                                                 context.runtime()));
   Redis::ConnPool::InstancePtr conn_pool(new Redis::ConnPool::InstanceImpl(
       filter_config->cluster_name_, context.clusterManager(),
-      Redis::ConnPool::ClientFactoryImpl::instance_, context.threadLocal(), config.settings()));
+      Redis::ConnPool::ClientFactoryImpl::instance_, context.threadLocal(),
+      proto_config.settings()));
   std::shared_ptr<Redis::CommandSplitter::Instance> splitter(
       new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), context.scope(),
                                                filter_config->stat_prefix_));
@@ -39,19 +41,18 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createRedisProxyFactory(
 }
 
 NetworkFilterFactoryCb
-RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_redis_proxy,
+RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                    FactoryContext& context) {
-  envoy::api::v2::filter::network::RedisProxy redis_proxy;
-  Config::FilterJson::translateRedisProxy(json_redis_proxy, redis_proxy);
-
-  return createRedisProxyFactory(redis_proxy, context);
+  envoy::api::v2::filter::network::RedisProxy proto_config;
+  Config::FilterJson::translateRedisProxy(json_config, proto_config);
+  return createFilter(proto_config, context);
 }
 
 NetworkFilterFactoryCb
-RedisProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
+RedisProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
-  return createRedisProxyFactory(
-      dynamic_cast<const envoy::api::v2::filter::network::RedisProxy&>(config), context);
+  return createFilter(
+      dynamic_cast<const envoy::api::v2::filter::network::RedisProxy&>(proto_config), context);
 }
 
 /**

@@ -14,22 +14,22 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
-    const envoy::api::v2::filter::network::MongoProxy& config, FactoryContext& context) {
+NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilter(
+    const envoy::api::v2::filter::network::MongoProxy& proto_config, FactoryContext& context) {
 
-  ASSERT(!config.stat_prefix().empty());
+  ASSERT(!proto_config.stat_prefix().empty());
 
-  const std::string stat_prefix = fmt::format("mongo.{}.", config.stat_prefix());
+  const std::string stat_prefix = fmt::format("mongo.{}.", proto_config.stat_prefix());
   Mongo::AccessLogSharedPtr access_log;
-  if (!config.access_log().empty()) {
-    access_log.reset(new Mongo::AccessLog(config.access_log(), context.accessLogManager()));
+  if (!proto_config.access_log().empty()) {
+    access_log.reset(new Mongo::AccessLog(proto_config.access_log(), context.accessLogManager()));
   }
 
   Mongo::FaultConfigSharedPtr fault_config;
-  if (config.has_delay()) {
-    auto delay = config.delay();
+  if (proto_config.has_delay()) {
+    auto delay = proto_config.delay();
     ASSERT(delay.has_fixed_delay());
-    fault_config = std::make_shared<Mongo::FaultConfig>(config.delay());
+    fault_config = std::make_shared<Mongo::FaultConfig>(proto_config.delay());
   }
 
   return [stat_prefix, &context, access_log,
@@ -41,19 +41,18 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createMongoProxyFactory(
 }
 
 NetworkFilterFactoryCb
-MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_mongo_proxy,
+MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                    FactoryContext& context) {
-  envoy::api::v2::filter::network::MongoProxy mongo_proxy;
-  Config::FilterJson::translateMongoProxy(json_mongo_proxy, mongo_proxy);
-
-  return createMongoProxyFactory(mongo_proxy, context);
+  envoy::api::v2::filter::network::MongoProxy proto_config;
+  Config::FilterJson::translateMongoProxy(json_config, proto_config);
+  return createFilter(proto_config, context);
 }
 
 NetworkFilterFactoryCb
-MongoProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
+MongoProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
   return createMongoProxyFactory(
-      dynamic_cast<const envoy::api::v2::filter::network::MongoProxy&>(config), context);
+      dynamic_cast<const envoy::api::v2::filter::network::MongoProxy&>(proto_config), context);
 }
 
 /**

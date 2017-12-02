@@ -23,15 +23,15 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb HealthCheckFilterConfig::createHealthCheckFilter(
-    const envoy::api::v2::filter::http::HealthCheck& health_check, const std::string&,
+HttpFilterFactoryCb HealthCheckFilterConfig::createFilter(
+    const envoy::api::v2::filter::http::HealthCheck& proto_config, const std::string&,
     FactoryContext& context) {
-  ASSERT(health_check.has_pass_through_mode());
-  ASSERT(!health_check.endpoint().empty());
+  ASSERT(proto_config.has_pass_through_mode());
+  ASSERT(!proto_config.endpoint().empty());
 
-  const bool pass_through_mode = health_check.pass_through_mode().value();
-  const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(health_check, cache_time, 0);
-  const std::string hc_endpoint = health_check.endpoint();
+  const bool pass_through_mode = proto_config.pass_through_mode().value();
+  const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
+  const std::string hc_endpoint = proto_config.endpoint();
 
   if (!pass_through_mode && cache_time_ms) {
     throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");
@@ -56,15 +56,15 @@ HttpFilterFactoryCb HealthCheckFilterConfig::createHealthCheckFilter(
 HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                                  const std::string& stats_prefix,
                                                                  FactoryContext& context) {
-  envoy::api::v2::filter::http::HealthCheck health_check;
-  Config::FilterJson::translateHealthCheckFilter(json_config, health_check);
-  return createHealthCheckFilter(health_check, stats_prefix, context);
+  envoy::api::v2::filter::http::HealthCheck proto_config;
+  Config::FilterJson::translateHealthCheckFilter(json_config, proto_config);
+  return createFilter(proto_config, stats_prefix, context);
 }
 
 HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProto(
-    const Protobuf::Message& config, const std::string& stats_prefix, FactoryContext& context) {
-  return createHealthCheckFilter(
-      dynamic_cast<const envoy::api::v2::filter::http::HealthCheck&>(config), stats_prefix,
+    const Protobuf::Message& proto_config, const std::string& stats_prefix, FactoryContext& context) {
+  return createFilter(
+      dynamic_cast<const envoy::api::v2::filter::http::HealthCheck&>(proto_config), stats_prefix,
       context);
 }
 

@@ -19,9 +19,9 @@ namespace Configuration {
 
 class HealthCheckFilterConfig : public NamedHttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object& config, const std::string&,
+  HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config, const std::string&,
                                           FactoryContext& context) override;
-  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                    const std::string& stats_prefix,
                                                    FactoryContext& context) override;
 
@@ -33,8 +33,8 @@ public:
 
 private:
   HttpFilterFactoryCb
-  createHealthCheckFilter(const envoy::api::v2::filter::http::HealthCheck& health_check,
-                          const std::string& stats_prefix, FactoryContext& context);
+  createFilter(const envoy::api::v2::filter::http::HealthCheck& proto_config,
+               const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

@@ -52,11 +52,12 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
     }
   }
 
-  if (!config.cluster().empty()) {
-    envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute default_route;
-    default_route.set_cluster(config.cluster());
-    routes_.emplace_back(default_route);
-  }
+  // TODO: remove code above and use the code commented below when filter chain match is ready.
+  // if (!config.cluster().empty()) {
+  //   envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute default_route;
+  //   default_route.set_cluster(config.cluster());
+  //   routes_.emplace_back(default_route);
+  // }
 
   for (const envoy::api::v2::filter::accesslog::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
