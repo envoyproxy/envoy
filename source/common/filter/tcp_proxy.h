@@ -216,8 +216,10 @@ public:
   TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent, TcpProxyConfigSharedPtr config,
                   std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
                   Network::ClientConnectionPtr connection);
+
   void onEvent(Network::ConnectionEvent event);
   void onTimeout();
+  void cancelDrain();
 
 private:
   TcpProxyUpstreamDrainManager& parent_;
@@ -231,6 +233,7 @@ typedef std::unique_ptr<TcpProxyDrainer> TcpProxyDrainerPtr;
 
 class TcpProxyUpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
+  ~TcpProxyUpstreamDrainManager();
   void add(TcpProxyConfigSharedPtr config, Network::ClientConnectionPtr upstream_connection,
            std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks);
   void remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher);

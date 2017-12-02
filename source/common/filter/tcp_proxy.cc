@@ -417,6 +417,20 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
   }
 }
 
+TcpProxyUpstreamDrainManager::~TcpProxyUpstreamDrainManager() {
+  // If connections aren't closed before they are destructed an ASSERT fires,
+  // so cancel all pending drains, which causes the connections to be closed.
+  while (!drainers_.empty()) {
+    auto begin = drainers_.begin();
+    TcpProxyDrainer* key = begin->first;
+    begin->second->cancelDrain();
+
+    // cancelDrain() should cause that drainer to be removed from drainers_.
+    // ASSERT so that we don't end up in an infinite loop.
+    ASSERT(drainers_.find(key) == drainers_.end());
+  }
+}
+
 void TcpProxyUpstreamDrainManager::add(TcpProxyConfigSharedPtr config,
                                        Network::ClientConnectionPtr upstream_connection,
                                        std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks) {
@@ -459,7 +473,10 @@ void TcpProxyDrainer::onEvent(Network::ConnectionEvent event) {
 
 void TcpProxyDrainer::onTimeout() {
   config_->stats().closes_upstream_flush_timeout_.inc();
+  cancelDrain();
+}
 
+void TcpProxyDrainer::cancelDrain() {
   // This sends onEvent(LocalClose).
   upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
 }
