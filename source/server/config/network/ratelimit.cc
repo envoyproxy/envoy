@@ -15,16 +15,16 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb
-RateLimitConfigFactory::createFilter(const envoy::api::v2::filter::network::RateLimit& config,
+RateLimitConfigFactory::createFilter(const envoy::api::v2::filter::network::RateLimit& proto_config,
                                      FactoryContext& context) {
 
-  ASSERT(!config.stat_prefix().empty());
-  ASSERT(!config.domain().empty());
-  ASSERT(config.descriptors_size() > 0);
+  ASSERT(!proto_config.stat_prefix().empty());
+  ASSERT(!proto_config.domain().empty());
+  ASSERT(proto_config.descriptors_size() > 0);
 
   RateLimit::TcpFilter::ConfigSharedPtr filter_config(
-      new RateLimit::TcpFilter::Config(config, context.scope(), context.runtime()));
-  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(config, timeout, 20);
+      new RateLimit::TcpFilter::Config(proto_config, context.scope(), context.runtime()));
+  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
 
   return [filter_config, timeout_ms, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new RateLimit::TcpFilter::Instance(
@@ -34,15 +34,15 @@ RateLimitConfigFactory::createFilter(const envoy::api::v2::filter::network::Rate
 
 NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                                    FactoryContext& context) {
-  envoy::api::v2::filter::network::RateLimit config;
-  Config::FilterJson::translateTcpRateLimitFilter(json_config, config);
-  return createFilter(config, context);
+  envoy::api::v2::filter::network::RateLimit proto_config;
+  Config::FilterJson::translateTcpRateLimitFilter(json_config, proto_config);
+  return createFilter(proto_config, context);
 }
 
 NetworkFilterFactoryCb
-RateLimitConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
+RateLimitConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                      FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::RateLimit&>(config),
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::RateLimit&>(proto_config),
                       context);
 }
 

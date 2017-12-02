@@ -18,9 +18,9 @@ namespace Configuration {
 class RedisProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                              FactoryContext& context) override;
-  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -31,8 +31,8 @@ public:
 
 private:
   NetworkFilterFactoryCb
-  createRedisProxyFactory(const envoy::api::v2::filter::network::RedisProxy& config,
-                          FactoryContext& context);
+  createFilter(const envoy::api::v2::filter::network::RedisProxy& proto_config,
+               FactoryContext& context);
 };
 
 } // namespace Configuration

@@ -35,10 +35,8 @@ const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-namespace {
-
-NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
-    const envoy::api::v2::filter::network::HttpConnectionManager& http_connection_manager,
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
+    const envoy::api::v2::filter::network::HttpConnectionManager& proto_config,
     FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
@@ -55,34 +53,33 @@ NetworkFilterFactoryCb createHttpConnectionManagerFilterFactory(
                 context.threadLocal(), context.admin());
           });
 
-  std::shared_ptr<HttpConnectionManagerConfig> http_config(new HttpConnectionManagerConfig(
-      http_connection_manager, context, *date_provider, *route_config_provider_manager));
+  std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
+      proto_config, context, *date_provider, *route_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count. Moreover, keep in mind the capture list determines
   // destruction order.
-  return [route_config_provider_manager, http_config, &context,
+  return [route_config_provider_manager, filter_config, &context,
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *http_config, context.drainDecision(), context.random(), context.httpTracer(),
+        *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
         context.runtime(), context.localInfo(), context.clusterManager())});
   };
 }
 
-} // namespace
-
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_http_connection_manager, FactoryContext& context) {
-  envoy::api::v2::filter::network::HttpConnectionManager http_connection_manager;
-  Config::FilterJson::translateHttpConnectionManager(json_http_connection_manager,
-                                                     http_connection_manager);
-  return createHttpConnectionManagerFilterFactory(http_connection_manager, context);
+NetworkFilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
+                                                              FactoryContext& context) {
+  envoy::api::v2::filter::network::HttpConnectionManager proto_config;
+  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
+  return createFilter(proto_config, context);
 }
 
 NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& config, FactoryContext& context) {
-  return createHttpConnectionManagerFilterFactory(
-      dynamic_cast<const envoy::api::v2::filter::network::HttpConnectionManager&>(config), context);
+    const Protobuf::Message& proto_config, FactoryContext& context) {
+  return createFilter(
+      dynamic_cast<const envoy::api::v2::filter::network::HttpConnectionManager&>(proto_config),
+      context);
 }
 
 /**
