@@ -1,10 +1,15 @@
 #include "common/http/filter/gzip_filter.h"
 
+#include <iostream>
+#include <regex>
+
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Http {
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
-    : skipCompression_{true}, compressed_data_(), compressor_(), config_(config) {}
+    : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
 
 void GzipFilter::onDestroy() {}
 
@@ -28,23 +33,29 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Skip compression if content-type is not whitelisted.
+  // Skip compression if content-type is not supported.
   if (!isContentTypeAllowed(headers)) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Skip compression if content-length is bellow minimum.
+  if (!isMinimumContentLength(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   // Removing content-length will set transfer-encoding to chunked.
   headers.removeContentLength();
   headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
-  compressor_.init(config_->getCompressionLevel(), config_->getCompressionStrategy(),
-                   config_->getWindowBits(), config_->getMemoryLevel());
+  compressor_.init(config_->getCompressionLevel(),
+                   Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 31,
+                   config_->getMemoryLevel());
 
-  skipCompression_ = false;
+  skip_compression_ = false;
   return Http::FilterHeadersStatus::Continue;
 }
 
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (skipCompression_) {
+  if (skip_compression_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -64,15 +75,30 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) {
-  if (config_->getContentTypes().size() == 0 || headers.ContentType() == nullptr) {
+bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
+  if (!config_->isRestrictedTypes()) {
     return true;
   }
-  for (const auto& content_type : config_->getContentTypes()) {
-    if (headers.ContentType()->value().find(content_type.c_str())) {
-      return true;
-    }
-  };
+
+  if (headers.ContentType() == nullptr) {
+    return false;
+  }
+
+  return std::regex_search(headers.ContentType()->value().c_str(),
+                           std::regex{allowed_types_pattern_, std::regex::optimize});
+}
+
+bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {
+  if (headers.ContentLength() == nullptr) {
+    return true;
+  }
+
+  uint64_t content_length;
+  StringUtil::atoul(headers.ContentLength()->value().c_str(), content_length);
+
+  if (content_length > config_->getMinimumLength()) {
+    return true;
+  }
 
   return false;
 }

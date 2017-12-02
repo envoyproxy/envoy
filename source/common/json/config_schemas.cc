@@ -1084,15 +1084,12 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["best", "speed", "default"]
       },
-      "compression_strategy" : {
-        "type" : "string",
-        "enum" : ["filtered", "huffman", "rle", "default"]
+      "restricted_types" : {
+        "type" : "boolean"
       },
-      "content_types" : {
-        "type" : "array",
-        "minItems" : 1,
-        "uniqueItems" : true,
-        "items" : { "type" : "string" }
+      "min_content_length" : {
+        "type" : "integer",
+        "minimum" : 32
       },
       "memory_level" : {
         "type" : "integer",

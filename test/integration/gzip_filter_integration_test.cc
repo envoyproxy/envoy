@@ -79,20 +79,18 @@ TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"accept-encoding", "deflate, gzip"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/xml"}});
 }
 
 /**
- * Exercises client request and upstream response with gzip encoded data, but with
- * content-type constraint.
+ * Exercises client request when upstream service responds with content-type header
+ * equals to "text/plain"
  */
-TEST_P(GzipIntegrationTest, GzipEncodingByContentTypesAcceptanceTest) {
+TEST_P(GzipIntegrationTest, GzipEncodingContentTypeText) {
   initializeFilter(R"EOF(
       name: envoy.gzip
       config:
         deprecated_v1: true
-        content-types:
-          - text/html
     )EOF");
 
   doRequestAndCompression(
@@ -101,7 +99,27 @@ TEST_P(GzipIntegrationTest, GzipEncodingByContentTypesAcceptanceTest) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"accept-encoding", "deflate, gzip"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/plain"}});
+}
+
+/**
+ * Exercises client request when upstream service responds with content-type header
+ * equals to "application/json"
+ */
+TEST_P(GzipIntegrationTest, GzipEncodingByContentTypesAcceptanceTest) {
+  initializeFilter(R"EOF(
+      name: envoy.gzip
+      config:
+        deprecated_v1: true
+    )EOF");
+
+  doRequestAndCompression(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"},
+                              {"accept-encoding", "deflate, gzip"}},
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}});
 }
 
 /**
@@ -113,8 +131,6 @@ TEST_P(GzipIntegrationTest, GzipEncodingMemmoryLevelAcceptanceTest) {
       name: envoy.gzip
       config:
         deprecated_v1: true
-        content-types:
-          - text/html
         memory_level: 3
     )EOF");
 
@@ -124,7 +140,7 @@ TEST_P(GzipIntegrationTest, GzipEncodingMemmoryLevelAcceptanceTest) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"accept-encoding", "deflate, gzip"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/plain"}});
 }
 
 /**
@@ -136,8 +152,6 @@ TEST_P(GzipIntegrationTest, GzipEncodingCompressionLevelAcceptanceTest) {
       name: envoy.gzip
       config:
         deprecated_v1: true
-        content-types:
-          - text/html
         memory_level: 3
         compression_level: speed
     )EOF");
@@ -148,7 +162,7 @@ TEST_P(GzipIntegrationTest, GzipEncodingCompressionLevelAcceptanceTest) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"accept-encoding", "deflate, gzip"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/plain"}});
 }
 
 /**
@@ -160,10 +174,7 @@ TEST_P(GzipIntegrationTest, GzipEncodingCompressionStrategyAcceptanceTest) {
       name: envoy.gzip
       config:
         deprecated_v1: true
-        content-types:
-          - text/html
         memory_level: 1
-        compression_strategy: rle
     )EOF");
 
   doRequestAndCompression(
@@ -172,7 +183,7 @@ TEST_P(GzipIntegrationTest, GzipEncodingCompressionStrategyAcceptanceTest) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"accept-encoding", "deflate, gzip"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/plain"}});
 }
 
 /**
@@ -192,7 +203,7 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"accept-encoding", "deflate, br"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/plain"}});
 }
 
 /**
@@ -204,8 +215,6 @@ TEST_P(GzipIntegrationTest, NotSupportedContentType) {
       name: envoy.gzip
       config:
         deprecated_v1: true
-        content-types:
-          - application/json
     )EOF");
 
   doRequestAndNoCompression(
@@ -213,8 +222,29 @@ TEST_P(GzipIntegrationTest, NotSupportedContentType) {
                               {":path", "/test/long/url"},
                               {":scheme", "http"},
                               {":authority", "host"},
-                              {"accept-encoding", "deflate, br"}},
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}});
+                              {"accept-encoding", "deflate, gzip"}},
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "image/jpeg"}});
+}
+
+/**
+ * length
+ */
+TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
+  initializeFilter(R"EOF(
+      name: envoy.gzip
+      config:
+        deprecated_v1: true
+        min_content_length: 1024
+    )EOF");
+
+  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                    {":path", "/test/long/url"},
+                                                    {":scheme", "http"},
+                                                    {":authority", "host"},
+                                                    {"accept-encoding", "deflate, gzip"}},
+                            Http::TestHeaderMapImpl{{":status", "200"},
+                                                    {"content-length", "200"},
+                                                    {"content-type", "text/xml"}});
 }
 
 } // namespace Envoy

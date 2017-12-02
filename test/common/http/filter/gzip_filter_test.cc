@@ -17,13 +17,7 @@ public:
   const std::string full_conf_json = R"EOF(
     {
       "memory_level" : 1,
-      "content_types" : [
-        "application/json",
-        "text/html",
-        "text/plain"
-      ],
-      "compression_level": "best",
-      "compression_strategy": "huffman"
+      "compression_level": "best"
     }
   )EOF";
 

@@ -21,15 +21,12 @@ public:
   GzipFilterConfig(const Json::Object& json_config)
       : Json::Validator(json_config, Json::Schema::GZIP_HTTP_FILTER_SCHEMA),
         compression_level_(json_config.getString("compression_level", "default")),
-        compression_strategy_(json_config.getString("compression_strategy", "default")),
-        content_types_(json_config.getStringArray("content_types", true)),
-        memory_level_(json_config.getInteger("memory_level", 8)), window_bits_{31} {}
+        memory_level_(json_config.getInteger("memory_level", 8)),
+        restricted_types_(json_config.getInteger("restricted_types", true)) {}
+
+  uint64_t getMinimumLength() const { return min_content_length_; }
 
   uint64_t getMemoryLevel() const { return memory_level_; }
-
-  uint64_t getWindowBits() const { return window_bits_; }
-
-  std::vector<std::string> getContentTypes() const { return content_types_; }
 
   Compressor::ZlibCompressorImpl::CompressionLevel getCompressionLevel() const {
     if (compression_level_ == "best") {
@@ -38,30 +35,16 @@ public:
     if (compression_level_ == "speed") {
       return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
     }
-
     return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
   }
 
-  Compressor::ZlibCompressorImpl::CompressionStrategy getCompressionStrategy() const {
-    if (compression_level_ == "rle") {
-      return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
-    }
-    if (compression_level_ == "filtered") {
-      return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
-    }
-    if (compression_level_ == "huffman") {
-      return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
-    }
-
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
-  }
+  bool isRestrictedTypes() const { return restricted_types_; }
 
 private:
   const std::string compression_level_{};
-  const std::string compression_strategy_{};
-  const std::vector<std::string> content_types_{};
+  const uint64_t min_content_length_{};
   const uint64_t memory_level_{};
-  const uint64_t window_bits_{};
+  const bool restricted_types_{};
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -99,11 +82,17 @@ public:
   }
 
 private:
-  bool isContentTypeAllowed(const HeaderMap& headers);
+  bool isContentTypeAllowed(const HeaderMap& headers) const;
+  bool isMinimumContentLength(const HeaderMap& headers) const;
 
-  bool skipCompression_;
+  bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;
   Compressor::ZlibCompressorImpl compressor_;
+
+  const std::string allowed_types_pattern_{
+      ".*(text/html|text/css|text/plain|text/xml|"
+      "application/javascript|application/json|application/xml|"
+      "font/eot|font/opentype|font/otf|image/svg+xml).*"};
 
   GzipFilterConfigSharedPtr config_{nullptr};
 
