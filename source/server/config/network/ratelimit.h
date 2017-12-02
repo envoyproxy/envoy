@@ -21,7 +21,7 @@ public:
   NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                              FactoryContext& context) override;
 
-  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -31,8 +31,9 @@ public:
   std::string name() override { return Config::NetworkFilterNames::get().RATE_LIMIT; }
 
 private:
-  NetworkFilterFactoryCb createFilter(const envoy::api::v2::filter::network::RateLimit& config,
-                                      FactoryContext& context);
+  NetworkFilterFactoryCb
+  createFilter(const envoy::api::v2::filter::network::RateLimit& proto_config,
+               FactoryContext& context);
 };
 
 } // namespace Configuration

@@ -13,33 +13,32 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb
-TcpProxyConfigFactory::createFactory(const envoy::api::v2::filter::network::TcpProxy& config,
-                                     FactoryContext& context) {
-  Filter::TcpProxyConfigSharedPtr filter_config(new Filter::TcpProxyConfig(config, context));
+TcpProxyConfigFactory::createFilter(const envoy::api::v2::filter::network::TcpProxy& proto_config,
+                                    FactoryContext& context) {
+  ASSERT(!proto_config.stat_prefix().empty());
+  if (proto_config.has_deprecated_v1()) {
+    ASSERT(proto_config.deprecated_v1().routes_size() > 0);
+  }
+
+  Filter::TcpProxyConfigSharedPtr filter_config(new Filter::TcpProxyConfig(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         new Filter::TcpProxy(filter_config, context.clusterManager())});
   };
 }
 
-NetworkFilterFactoryCb
-TcpProxyConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                    FactoryContext& context) {
-  return createFactory(dynamic_cast<const envoy::api::v2::filter::network::TcpProxy&>(config),
-                       context);
-}
-
 NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                                   FactoryContext& context) {
-  envoy::api::v2::filter::network::TcpProxy tcp_proxy_config;
-  Config::FilterJson::translateTcpProxy(json_config, tcp_proxy_config);
-
-  return createFactory(tcp_proxy_config, context);
+  envoy::api::v2::filter::network::TcpProxy proto_config;
+  Config::FilterJson::translateTcpProxy(json_config, proto_config);
+  return createFilter(proto_config, context);
 }
 
-ProtobufTypes::MessagePtr TcpProxyConfigFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::api::v2::filter::network::TcpProxy>(
-      new envoy::api::v2::filter::network::TcpProxy());
+NetworkFilterFactoryCb
+TcpProxyConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                                                    FactoryContext& context) {
+  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::TcpProxy&>(proto_config),
+                      context);
 }
 
 /**
