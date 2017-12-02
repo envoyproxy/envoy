@@ -16,8 +16,9 @@ NetworkFilterFactoryCb
 TcpProxyConfigFactory::createFilter(const envoy::api::v2::filter::network::TcpProxy& proto_config,
                                     FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
-  ASSERT(proto_config.has_deprecated_v1());
-  ASSERT(proto_config.deprecated_v1().routes_size() > 0);
+  if (proto_config.has_deprecated_v1()) {
+    ASSERT(proto_config.deprecated_v1().routes_size() > 0);
+  }
 
   Filter::TcpProxyConfigSharedPtr filter_config(new Filter::TcpProxyConfig(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
