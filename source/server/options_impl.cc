@@ -82,11 +82,11 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                     "One of 'serve' (default; validate configs and then serve "
                                     "traffic normally) or 'validate' (validate configs and exit).",
                                     false, "serve", "string", cmd);
-  TCLAP::ValueArg<uint64_t> max_stats("", "max-stats",
+  TCLAP::ValueArg<uint32_t> max_stats("", "max-stats",
                                       "Maximum number of stats guages and counters "
                                       "that can be allocated in shared memory.",
                                       false, ENVOY_DEFAULT_MAX_STATS, "uint64_t", cmd);
-  TCLAP::ValueArg<uint64_t> max_obj_name_len("", "max-obj-name-len",
+  TCLAP::ValueArg<uint32_t> max_obj_name_len("", "max-obj-name-len",
                                              "Maximum name length for a field in the config "
                                              "(applies to listener name, route config name and"
                                              " the cluster name)",
