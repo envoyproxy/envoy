@@ -35,7 +35,7 @@ const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-NetworkFilterFactoryCb createFilter(
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
     const envoy::api::v2::filter::network::HttpConnectionManager& proto_config,
     FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
