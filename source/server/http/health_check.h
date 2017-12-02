@@ -32,9 +32,8 @@ public:
   std::string name() override { return Config::HttpFilterNames::get().HEALTH_CHECK; }
 
 private:
-  HttpFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::http::HealthCheck& proto_config,
-               const std::string& stats_prefix, FactoryContext& context);
+  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::HealthCheck& proto_config,
+                                   const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

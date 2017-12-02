@@ -38,8 +38,7 @@ NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                          FactoryContext& context) {
   return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::network::ClientSSLAuth&>(proto_config),
-      context);
+      dynamic_cast<const envoy::api::v2::filter::network::ClientSSLAuth&>(proto_config), context);
 }
 
 /**

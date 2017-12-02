@@ -22,14 +22,13 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilter(
   ASSERT(!proto_config.cluster().empty());
   ASSERT(proto_config.has_settings());
 
-  Redis::ProxyFilterConfigSharedPtr filter_config(
-      std::make_shared<Redis::ProxyFilterConfig>(proto_config, context.clusterManager(),
-                                                 context.scope(), context.drainDecision(),
-                                                 context.runtime()));
-  Redis::ConnPool::InstancePtr conn_pool(new Redis::ConnPool::InstanceImpl(
-      filter_config->cluster_name_, context.clusterManager(),
-      Redis::ConnPool::ClientFactoryImpl::instance_, context.threadLocal(),
-      proto_config.settings()));
+  Redis::ProxyFilterConfigSharedPtr filter_config(std::make_shared<Redis::ProxyFilterConfig>(
+      proto_config, context.clusterManager(), context.scope(), context.drainDecision(),
+      context.runtime()));
+  Redis::ConnPool::InstancePtr conn_pool(
+      new Redis::ConnPool::InstanceImpl(filter_config->cluster_name_, context.clusterManager(),
+                                        Redis::ConnPool::ClientFactoryImpl::instance_,
+                                        context.threadLocal(), proto_config.settings()));
   std::shared_ptr<Redis::CommandSplitter::Instance> splitter(
       new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), context.scope(),
                                                filter_config->stat_prefix_));

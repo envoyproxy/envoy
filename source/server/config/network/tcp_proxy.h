@@ -22,16 +22,15 @@ public:
                                              FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::unique_ptr<envoy::api::v2::filter::network::TcpProxy>(
-      new envoy::api::v2::filter::network::TcpProxy());
+    return std::unique_ptr<envoy::api::v2::filter::network::TcpProxy>(
+        new envoy::api::v2::filter::network::TcpProxy());
   }
 
   std::string name() override { return Config::NetworkFilterNames::get().TCP_PROXY; }
 
 private:
-  NetworkFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::network::TcpProxy& proto_config,
-               FactoryContext& context);
+  NetworkFilterFactoryCb createFilter(const envoy::api::v2::filter::network::TcpProxy& proto_config,
+                                      FactoryContext& context);
 };
 
 } // namespace Configuration

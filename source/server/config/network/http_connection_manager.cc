@@ -67,8 +67,9 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
   };
 }
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_config, FactoryContext& context) {
+NetworkFilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
+                                                              FactoryContext& context) {
   envoy::api::v2::filter::network::HttpConnectionManager proto_config;
   Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
   return createFilter(proto_config, context);
