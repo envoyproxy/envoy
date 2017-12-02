@@ -131,7 +131,7 @@ public:
    * Return the current version info string for dynamic clusters, if CDS is setup.
    *
    * @return std::string the current version info string for dynamic clusters,
-   *                     or EMPTY_STRING if CDS is not in use.
+   *                     or "static" if CDS is not in use.
    */
   virtual const std::string versionInfo() const PURE;
 };
