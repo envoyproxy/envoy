@@ -51,7 +51,7 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
 NetworkFilterFactoryCb
 MongoProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
-  return createMongoProxyFactory(
+  return createFilter(
       dynamic_cast<const envoy::api::v2::filter::network::MongoProxy&>(proto_config), context);
 }
 
