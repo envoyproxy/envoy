@@ -9,4 +9,4 @@ final version.
 
 ## 1.6.0
 
-* Added `versionInfo` string to the `/clusters` admin endpoint.
+* Added `version info` string to the `/clusters` admin endpoint.
