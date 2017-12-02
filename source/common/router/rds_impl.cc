@@ -202,38 +202,25 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
-void RouteConfigProviderManagerImpl::addRouteInfo(const RdsRouteConfigProvider& provider,
-                                                  Buffer::Instance& response) {
-  // TODO(junr03): change this to proto with JSON transcoding when #1522 is done.
-  response.add("{\n");
-  response.add(fmt::format("    \"version_info\": \"{}\",\n", provider.versionInfo()));
-  response.add(fmt::format("    \"route_config_name\": \"{}\",\n", provider.routeConfigName()));
-  response.add(fmt::format("    \"cluster_name\": \"{}\",\n", provider.clusterName()));
-  response.add("    \"route_table_dump\": ");
-  response.add(fmt::format("{}\n", provider.configAsJson()));
-  response.add("}\n");
-}
-
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
                                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   // If there are no query params, print out all the configured route tables.
   if (query_params.size() == 0) {
-    for (const auto& provider : rdsRouteConfigProviders()) {
-      addRouteInfo(*provider, response);
-    }
-    return Http::Code::OK;
+    return handlerRoutesLoop(response, rdsRouteConfigProviders());
   }
 
   // If there are query params, make sure it is only the route_config_name param.
   const auto it = query_params.find("route_config_name");
   if (query_params.size() == 1 && it != query_params.end()) {
+    // Create a vector with all the providers that have the queried route_config_name.
+    std::vector<RdsRouteConfigProviderSharedPtr> selected_providers;
     for (const auto& provider : rdsRouteConfigProviders()) {
       if (provider->routeConfigName() == it->second) {
-        addRouteInfo(*provider, response);
+        selected_providers.push_back(provider);
       }
     }
-    return Http::Code::OK;
+    return handlerRoutesLoop(response, selected_providers);
   }
   response.add("{\n");
   response.add("    \"general_usage\": \"/routes (dump all dynamic HTTP route tables).\",\n");
@@ -244,5 +231,26 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
   return Http::Code::NotFound;
 }
 
+Http::Code RouteConfigProviderManagerImpl::handlerRoutesLoop(
+    Buffer::Instance& response, const std::vector<RdsRouteConfigProviderSharedPtr> providers) {
+  bool first_item = true;
+  response.add("[\n");
+  for (const auto& provider : providers) {
+    if (!first_item) {
+      response.add(",");
+    } else {
+      first_item = false;
+    }
+    response.add("{\n");
+    response.add(fmt::format("\"version_info\": \"{}\",\n", provider->versionInfo()));
+    response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider->routeConfigName()));
+    response.add(fmt::format("\"cluster_name\": \"{}\",\n", provider->clusterName()));
+    response.add("\"route_table_dump\": ");
+    response.add(fmt::format("{}\n", provider->configAsJson()));
+    response.add("}\n");
+  }
+  response.add("]\n");
+  return Http::Code::OK;
+}
 } // namespace Router
 } // namespace Envoy

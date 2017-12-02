@@ -163,13 +163,6 @@ public:
 
 private:
   /**
-   * Add the RdsRouteConfigProvider information to the buffer.
-   * @param provider supplies the Provider to extract information from.
-   * @param response supplies the buffer to fill with information.
-   */
-  void addRouteInfo(const RdsRouteConfigProvider& provider, Buffer::Instance& response);
-
-  /**
    * The handler used in the Admin /routes endpoint. This handler is used to
    * populate the response Buffer::Instance with information about the currently
    * loaded dynamic HTTP Route Tables.
@@ -178,6 +171,16 @@ private:
    * @return Http::Code OK if the endpoint can parse and operate on the url, NotFound otherwise.
    */
   Http::Code handlerRoutes(const std::string& url, Buffer::Instance& response);
+
+  /**
+   * Helper function used by handlerRoutes. The function loops through the providers
+   * and adds them to the response.
+   * @param response supplies the buffer to fill with information.
+   * @param providers supplies the vector of providers to add to the response.
+   * @return Http::Code OK.
+   */
+  Http::Code handlerRoutesLoop(Buffer::Instance& response,
+                               const std::vector<RdsRouteConfigProviderSharedPtr> providers);
 
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
