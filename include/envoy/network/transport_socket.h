@@ -30,7 +30,7 @@ struct IoResult {
 };
 
 /**
- * Callbacks used by transport socket instances to communicate with connection
+ * Callbacks used by transport socket instances to communicate with connection.
  */
 class TransportSocketCallbacks {
 public:
