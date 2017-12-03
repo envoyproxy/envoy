@@ -21,6 +21,7 @@ public:
   GzipFilterConfig(const Json::Object& json_config)
       : Json::Validator(json_config, Json::Schema::GZIP_HTTP_FILTER_SCHEMA),
         compression_level_(json_config.getString("compression_level", "default")),
+        min_content_length_(json_config.getInteger("min_content_length", 32)),
         memory_level_(json_config.getInteger("memory_level", 8)),
         restricted_types_(json_config.getInteger("restricted_types", true)) {}
 
@@ -97,6 +98,7 @@ private:
   GzipFilterConfigSharedPtr config_{nullptr};
 
   const Http::HeaderEntry* accept_encoding_{nullptr};
+  Http::HeaderMap* response_headers_{nullptr};
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

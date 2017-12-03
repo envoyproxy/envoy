@@ -18,7 +18,11 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
   return FilterHeadersStatus::Continue;
 }
 
-FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
+FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
+  if (end_stream) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // TODO(gsagula): In order to fully implement RFC2616-14.3, more work is required here. The
   // current implementation only checks if `gzip` is found in `accept-encoding` header, but
   // it disregards the presence of qvalue or the order/priority of other encoding types.
@@ -33,13 +37,8 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Skip compression if content-type is not supported.
-  if (!isContentTypeAllowed(headers)) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  // Skip compression if content-length is bellow minimum.
-  if (!isMinimumContentLength(headers)) {
+  // Skip compression if content-type is not supported or content-length is bellow the treshold.
+  if (!isContentTypeAllowed(headers) || !isMinimumContentLength(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -90,17 +89,15 @@ bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
 
 bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {
   if (headers.ContentLength() == nullptr) {
-    return true;
+    return false;
   }
 
   uint64_t content_length;
-  StringUtil::atoul(headers.ContentLength()->value().c_str(), content_length);
-
-  if (content_length > config_->getMinimumLength()) {
-    return true;
+  if (!StringUtil::atoul(headers.ContentLength()->value().c_str(), content_length)) {
+    return false;
   }
 
-  return false;
+  return (content_length >= config_->getMinimumLength());
 }
 
 } // namespace Http
