@@ -202,12 +202,14 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
   // Test Admin /routes handler. There should be no route table to dump.
-  const std::string& routes_expected_output_no_routes = R"EOF({
-    "version_info": "",
-    "route_config_name": "foo_route_config",
-    "cluster_name": "foo_cluster",
-    "route_table_dump": {}
+  const std::string& routes_expected_output_no_routes = R"EOF([
+{
+"version_info": "",
+"route_config_name": "foo_route_config",
+"cluster_name": "foo_cluster",
+"route_table_dump": {}
 }
+]
 )EOF";
   EXPECT_EQ("", rds_->versionInfo());
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
@@ -232,12 +234,14 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
   // Test Admin /routes handler. Now we should have an empty route table, with exception of name.
-  const std::string routes_expected_output_only_name = R"EOF({
-    "version_info": "hash_15ed54077da94d8b",
-    "route_config_name": "foo_route_config",
-    "cluster_name": "foo_cluster",
-    "route_table_dump": {"name":"foo_route_config"}
+  const std::string routes_expected_output_only_name = R"EOF([
+{
+"version_info": "hash_15ed54077da94d8b",
+"route_config_name": "foo_route_config",
+"cluster_name": "foo_cluster",
+"route_table_dump": {"name":"foo_route_config"}
 }
+]
 )EOF";
 
   EXPECT_EQ("hash_15ed54077da94d8b", rds_->versionInfo());
@@ -309,12 +313,14 @@ TEST_F(RdsImplTest, Basic) {
 
   // Test Admin /routes handler. The route table should now have the information given in
   // response2_json.
-  const std::string routes_expected_output_full_table = R"EOF({
-    "version_info": "hash_7a3f97b327d08382",
-    "route_config_name": "foo_route_config",
-    "cluster_name": "foo_cluster",
-    "route_table_dump": {"name":"foo_route_config","virtual_hosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"cluster_header":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}
+  const std::string routes_expected_output_full_table = R"EOF([
+{
+"version_info": "hash_7a3f97b327d08382",
+"route_config_name": "foo_route_config",
+"cluster_name": "foo_cluster",
+"route_table_dump": {"name":"foo_route_config","virtual_hosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"cluster_header":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}
 }
+]
 )EOF";
 
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
@@ -329,7 +335,7 @@ TEST_F(RdsImplTest, Basic) {
 
   // Test that we get an emtpy response if the name does not match.
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes?route_config_name=does_not_exist", data));
-  EXPECT_EQ("", TestUtility::bufferToString(data));
+  EXPECT_EQ("[\n]\n", TestUtility::bufferToString(data));
   data.drain(data.length());
 
   const std::string routes_expected_output_usage = R"EOF({
@@ -403,6 +409,18 @@ TEST_F(RdsImplTest, FailureArray) {
 
 class RouteConfigProviderManagerImplTest : public testing::Test {
 public:
+  RouteConfigProviderManagerImplTest() {
+    EXPECT_CALL(admin_, addHandler("/routes",
+                                   "print out currently loaded dynamic HTTP route tables", _, true))
+        .WillOnce(DoAll(SaveArg<2>(&handler_callback_), Return(true)));
+    route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
+        runtime_, dispatcher_, random_, local_info_, tls_, admin_));
+  }
+  ~RouteConfigProviderManagerImplTest() {
+    EXPECT_CALL(admin_, removeHandler("/routes"));
+    tls_.shutdownThread();
+  }
+
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -412,11 +430,13 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  RouteConfigProviderManagerImpl route_config_provider_manager_{runtime_,    dispatcher_, random_,
-                                                                local_info_, tls_,        admin_};
+  Server::Admin::HandlerCb handler_callback_;
+  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
 };
 
 TEST_F(RouteConfigProviderManagerImplTest, Basic) {
+  Buffer::OwnedImpl data;
+
   init_manager_.initialize();
 
   std::string config_json = R"EOF(
@@ -432,11 +452,11 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
-  RouteConfigProviderSharedPtr provider = route_config_provider_manager_.getRouteConfigProvider(
+  RouteConfigProviderSharedPtr provider = route_config_provider_manager_->getRouteConfigProvider(
       rds, cm_, store_, "foo_prefix", init_manager_);
   // Because this get has the same cluster and route_config_name, the provider returned is just a
   // shared_ptr to the same provider as the one above.
-  RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_.getRouteConfigProvider(
+  RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_->getRouteConfigProvider(
       rds, cm_, store_, "foo_prefix", init_manager_);
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider, provider2);
@@ -454,17 +474,38 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   envoy::api::v2::filter::network::Rds rds2;
   Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
 
-  RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_.getRouteConfigProvider(
+  RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_->getRouteConfigProvider(
       rds2, cm_, store_, "foo_prefix", init_manager_);
   EXPECT_NE(provider3, provider);
   EXPECT_EQ(2UL, provider.use_count());
   EXPECT_EQ(1UL, provider3.use_count());
 
   std::vector<RdsRouteConfigProviderSharedPtr> configured_providers =
-      route_config_provider_manager_.rdsRouteConfigProviders();
+      route_config_provider_manager_->rdsRouteConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
   EXPECT_EQ(3UL, provider.use_count());
   EXPECT_EQ(2UL, provider3.use_count());
+
+  const std::string routes_expected_output = R"EOF([
+{
+"version_info": "",
+"route_config_name": "foo_route_config",
+"cluster_name": "bar_cluster",
+"route_table_dump": {}
+}
+,{
+"version_info": "",
+"route_config_name": "foo_route_config",
+"cluster_name": "foo_cluster",
+"route_table_dump": {}
+}
+]
+)EOF";
+
+  // Test Admin /routes handler.
+  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
+  EXPECT_EQ(routes_expected_output, TestUtility::bufferToString(data));
+  data.drain(data.length());
 
   provider.reset();
   provider2.reset();
@@ -472,14 +513,14 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
   // now we should only have the provider pointed at by provider3.
-  configured_providers = route_config_provider_manager_.rdsRouteConfigProviders();
+  configured_providers = route_config_provider_manager_->rdsRouteConfigProviders();
   EXPECT_EQ(1UL, configured_providers.size());
   EXPECT_EQ(provider3, configured_providers.front());
 
   provider3.reset();
   configured_providers.clear();
 
-  configured_providers = route_config_provider_manager_.rdsRouteConfigProviders();
+  configured_providers = route_config_provider_manager_->rdsRouteConfigProviders();
   EXPECT_EQ(0UL, configured_providers.size());
 }
 
@@ -497,7 +538,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
-  RouteConfigProviderSharedPtr provider = route_config_provider_manager_.getRouteConfigProvider(
+  RouteConfigProviderSharedPtr provider = route_config_provider_manager_->getRouteConfigProvider(
       rds, cm_, store_, "foo_prefix.", init_manager_);
   init_manager_.initialize();
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider.get());
@@ -520,7 +561,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   Envoy::Config::Utility::translateRdsConfig(*config, rds);
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
-  RouteConfigProviderSharedPtr provider = route_config_provider_manager_.getRouteConfigProvider(
+  RouteConfigProviderSharedPtr provider = route_config_provider_manager_->getRouteConfigProvider(
       rds, cm_, store_, "foo_prefix.", init_manager_);
   init_manager_.initialize();
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider.get());

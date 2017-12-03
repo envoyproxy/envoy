@@ -192,6 +192,7 @@ public:
 
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
+  MOCK_CONST_METHOD0(clusterNotFoundResponseCode, Http::Code());
   MOCK_CONST_METHOD2(finalizeRequestHeaders,
                      void(Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info));
   MOCK_CONST_METHOD1(finalizeResponseHeaders, void(Http::HeaderMap& headers));
