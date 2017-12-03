@@ -221,11 +221,16 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       throw EnvoyException("Redirect route entries must not have WebSockets set");
     }
   }
-  if (json_route.hasObject("cluster") || json_route.hasObject("cluster_header") ||
-      json_route.hasObject("weighted_clusters")) {
-    if (has_redirect) {
-      throw EnvoyException("routes must be either redirects or cluster targets");
-    }
+  const bool has_cluster = json_route.hasObject("cluster") ||
+                           json_route.hasObject("cluster_header") ||
+                           json_route.hasObject("weighted_clusters");
+
+  if (has_cluster && has_redirect) {
+    throw EnvoyException("routes must be either redirects or cluster targets");
+  } else if (!has_cluster && !has_redirect) {
+    throw EnvoyException(
+        "routes must have redirect or one of cluster/cluster_header/weighted_clusters");
+  } else if (has_cluster) {
     auto* action = route.mutable_route();
 
     if (json_route.hasObject("cluster")) {

@@ -2613,6 +2613,31 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
                             EnvoyException, "routes must specify one of prefix/path/regex");
 }
 
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoRedirectNoClusters) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/api"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
+      "routes must have redirect or one of cluster/cluster_header/weighted_clusters")
+}
+
 TEST(RouteMatcherTest, TestOpaqueConfig) {
   std::string json = R"EOF(
 {
