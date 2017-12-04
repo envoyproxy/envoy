@@ -532,18 +532,15 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 }
 
 // Negative test for protoc-gen-validate constraints.
-// TODO(htuch): Re-enable this test when PGV properly handles nested validation of repeated
-// messages.
-// TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
-//  setup();
-//  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
-//  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
-//  auto* route_config = route_configs.Add();
-//  route_config->set_name("foo_route_config");
-//  route_config->mutable_virtual_hosts()->Add();
-//  EXPECT_THROW(
-//      provider_impl.onConfigUpdate(route_configs), ProtoValidationException);
-//}
+TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
+  setup();
+  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
+  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
+  auto* route_config = route_configs.Add();
+  route_config->set_name("foo_route_config");
+  route_config->mutable_virtual_hosts()->Add();
+  EXPECT_THROW(provider_impl.onConfigUpdate(route_configs), ProtoValidationException);
+}
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   setup();
