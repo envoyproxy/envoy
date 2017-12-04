@@ -88,6 +88,7 @@ int main_common(OptionsImpl& options) {
                                 access_log_lock, component_factory, tls);
     server.run();
   } catch (const EnvoyException& e) {
+    ares_library_cleanup();
     return 1;
   }
   ares_library_cleanup();
