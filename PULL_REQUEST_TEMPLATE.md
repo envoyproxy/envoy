@@ -35,17 +35,20 @@ forms of testing, please use your best judgement or ask for guidance
 if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.
 
+*Docs Changes*:
+>Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
+if your PR involves documentation changes. Please write in N/A if there were no
+documentation changes.
+
+*Release Notes*:
+>If this change is user impacting you **must** add a release note to
+[RAW_RELEASE_NOTES.md](RAW_RELEASE_NOTES.md). Thank you! Please write in N/A if
+there are no release notes.
+
 [Optional Fixes #Issue]
 
 [Optional *API Changes*:]
 >Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
 
-[Optional *Docs Changes*:]
->Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
-
 [Optional *Deprecated*:]
 >Description of what is deprecated.
-
-[Optional *Release Notes*:]
->If this change is user impacting you **must** add a release note to
-[RAW_RELEASE_NOTES.md](RAW_RELEASE_NOTES.md). Thank you!
