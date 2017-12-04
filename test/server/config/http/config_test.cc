@@ -45,17 +45,22 @@ TEST(HttpFilterConfigTest, ValidateFail) {
 
   BufferFilterConfig buffer_factory;
   envoy::api::v2::filter::http::Buffer buffer_proto;
+  FaultFilterConfig fault_factory;
+  envoy::api::v2::filter::http::HTTPFault fault_proto;
+  fault_proto.mutable_abort();
   GrpcJsonTranscoderFilterConfig grpc_json_transcoder_factory;
   envoy::api::v2::filter::http::GrpcJsonTranscoder grpc_json_transcoder_proto;
   LuaFilterConfig lua_factory;
   envoy::api::v2::filter::http::Lua lua_proto;
+  RateLimitFilterConfig rate_limit_factory;
+  envoy::api::v2::filter::http::RateLimit rate_limit_proto;
   const std::vector<std::pair<NamedHttpFilterConfigFactory&, Protobuf::Message&>> filter_cases = {
       {buffer_factory, buffer_proto},
+      {fault_factory, fault_proto},
       {grpc_json_transcoder_factory, grpc_json_transcoder_proto},
       {lua_factory, lua_proto},
+      {rate_limit_factory, rate_limit_proto},
   };
-  // TODO(htuch): Plumb in other tests with validation once the repeated msg
-  // issue in PGV is fixed.
 
   for (const auto& filter_case : filter_cases) {
     EXPECT_THROW(

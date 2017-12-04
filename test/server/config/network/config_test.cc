@@ -32,28 +32,36 @@ namespace Configuration {
 TEST(NetworkFilterConfigTest, ValidateFail) {
   NiceMock<MockFactoryContext> context;
 
+  ClientSslAuthConfigFactory client_ssl_auth_factory;
+  envoy::api::v2::filter::network::ClientSSLAuth client_ssl_auth_proto;
   HttpConnectionManagerFilterConfigFactory hcm_factory;
   envoy::api::v2::filter::network::HttpConnectionManager hcm_proto;
   MongoProxyFilterConfigFactory mongo_factory;
   envoy::api::v2::filter::network::MongoProxy mongo_proto;
+  RateLimitConfigFactory rate_limit_factory;
+  envoy::api::v2::filter::network::RateLimit rate_limit_proto;
   RedisProxyFilterConfigFactory redis_factory;
   envoy::api::v2::filter::network::RedisProxy redis_proto;
   TcpProxyConfigFactory tcp_proxy_factory;
   envoy::api::v2::filter::network::TcpProxy tcp_proxy_proto;
   const std::vector<std::pair<NamedNetworkFilterConfigFactory&, Protobuf::Message&>> filter_cases =
       {
+          {client_ssl_auth_factory, client_ssl_auth_proto},
           {hcm_factory, hcm_proto},
           {mongo_factory, mongo_proto},
+          {rate_limit_factory, rate_limit_proto},
           {redis_factory, redis_proto},
           {tcp_proxy_factory, tcp_proxy_proto},
       };
-  // TODO(htuch): Plumb in other tests with validation once the repeated msg
-  // issue in PGV is fixed.
 
   for (const auto& filter_case : filter_cases) {
     EXPECT_THROW(filter_case.first.createFilterFactoryFromProto(filter_case.second, context),
                  ProtoValidationException);
   }
+
+  EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
+                   envoy::api::v2::filter::accesslog::FileAccessLog(), nullptr, context),
+               ProtoValidationException);
 }
 
 TEST(NetworkFilterConfigTest, RedisProxyCorrectJson) {

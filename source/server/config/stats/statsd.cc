@@ -9,6 +9,7 @@
 #include "common/stats/statsd.h"
 
 #include "api/bootstrap.pb.h"
+#include "api/bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -17,7 +18,8 @@ namespace Configuration {
 Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                   Server::Instance& server) {
 
-  const auto& statsd_sink = dynamic_cast<const envoy::api::v2::StatsdSink&>(config);
+  const auto& statsd_sink =
+      MessageUtil::downcastAndValidate<const envoy::api::v2::StatsdSink&>(config);
   switch (statsd_sink.statsd_specifier_case()) {
   case envoy::api::v2::StatsdSink::kAddress: {
     Network::Address::InstanceConstSharedPtr address =

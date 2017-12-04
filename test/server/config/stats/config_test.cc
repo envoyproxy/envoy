@@ -86,6 +86,13 @@ TEST(StatsConfigTest, EmptyConfig) {
       "No tcp_cluster_name or address provided for envoy.statsd Stats::Sink config");
 }
 
+// Negative test for protoc-gen-validate constraints for statsd.
+TEST(StatsdConfigTest, ValidateFail) {
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(StatsdSinkFactory().createStatsSink(envoy::api::v2::StatsdSink(), server),
+               ProtoValidationException);
+}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
