@@ -501,7 +501,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     // starting response, we treat this as an error. We only get non-5xx when
     // timeout_response_code_ is used for code above, where this member can
     // assume values such as 204 (NoContent).
-    if (!Http::CodeUtility::is5xx(enumToInt(code))) {
+    if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
     sendLocalReply(code, body, dropped);
