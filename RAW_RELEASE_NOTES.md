@@ -8,5 +8,3 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
-
-* Added `version info` string to the `/clusters` admin endpoint.
