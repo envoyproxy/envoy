@@ -126,6 +126,14 @@ public:
    * @return GrpcMux& ADS API provider referencee.
    */
   virtual Config::GrpcMux& adsMux() PURE;
+
+  /**
+   * Return the current version info string for dynamic clusters, if CDS is setup.
+   *
+   * @return std::string the current version info string for dynamic clusters,
+   *                     or "static" if CDS is not in use.
+   */
+  virtual const std::string versionInfo() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

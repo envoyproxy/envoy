@@ -143,6 +143,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 }
 
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
+  response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
+
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
                    response);
