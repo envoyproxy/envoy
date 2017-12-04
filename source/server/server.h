@@ -110,6 +110,9 @@ private:
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
+  /**
+   * @throw EnvoyException if initialization fails.
+   */
   InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
