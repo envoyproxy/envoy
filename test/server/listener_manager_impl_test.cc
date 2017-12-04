@@ -767,7 +767,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -800,7 +802,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -819,7 +823,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -853,7 +859,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -872,7 +880,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -906,7 +916,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -922,7 +934,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -952,7 +966,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -968,7 +984,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
           stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_bar }
   )EOF",
