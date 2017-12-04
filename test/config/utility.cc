@@ -183,16 +183,20 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
 }
 
 void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
-                            const std::string& cluster,
+                            const std::string& cluster, bool validate_clusters,
+                            envoy::api::v2::RouteAction::ClusterNotFoundResponseCode code,
                             envoy::api::v2::VirtualHost::TlsRequirementType type) {
   RELEASE_ASSERT(!finalized_);
   envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
 
-  auto* virtual_host = hcm_config.mutable_route_config()->add_virtual_hosts();
+  auto* route_config = hcm_config.mutable_route_config();
+  route_config->mutable_validate_clusters()->set_value(validate_clusters);
+  auto* virtual_host = route_config->add_virtual_hosts();
   virtual_host->add_domains(domains);
   virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
   virtual_host->mutable_routes(0)->mutable_route()->set_cluster(cluster);
+  virtual_host->mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(code);
   virtual_host->set_require_tls(type);
 
   storeHttpConnectionManager(hcm_config);

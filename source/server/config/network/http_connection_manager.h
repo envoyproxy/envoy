@@ -26,9 +26,9 @@ class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::co
                                                  public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
                                              FactoryContext& context) override;
-  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -36,6 +36,11 @@ public:
         new envoy::api::v2::filter::network::HttpConnectionManager());
   }
   std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
+
+private:
+  NetworkFilterFactoryCb
+  createFilter(const envoy::api::v2::filter::network::HttpConnectionManager& proto_config,
+               FactoryContext& context);
 };
 
 /**

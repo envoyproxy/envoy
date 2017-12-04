@@ -119,6 +119,7 @@ private:
                                 Buffer::Instance& response);
   static std::string sanitizePrometheusName(const std::string& name);
   static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
+  static std::string prometheusMetricName(const std::string& extractedName);
 
   /**
    * URL handlers.

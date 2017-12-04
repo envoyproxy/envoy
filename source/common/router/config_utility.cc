@@ -63,5 +63,17 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   }
 }
 
+Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
+    const envoy::api::v2::RouteAction::ClusterNotFoundResponseCode& code) {
+  switch (code) {
+  case envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE:
+    return Http::Code::ServiceUnavailable;
+  case envoy::api::v2::RouteAction::NOT_FOUND:
+    return Http::Code::NotFound;
+  default:
+    NOT_IMPLEMENTED;
+  }
+}
+
 } // namespace Router
 } // namespace Envoy
