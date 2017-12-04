@@ -9,9 +9,11 @@
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
 
+#include "api/rds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -104,6 +106,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources)
     throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
   }
   const auto& route_config = resources[0];
+  MessageUtil::validate(route_config);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(route_config.name() == route_config_name_)) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",

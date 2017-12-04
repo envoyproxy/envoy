@@ -11,6 +11,8 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
 
+#include "api/filter/network/redis_proxy.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -51,7 +53,9 @@ NetworkFilterFactoryCb
 RedisProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
   return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::network::RedisProxy&>(proto_config), context);
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::RedisProxy&>(
+          proto_config),
+      context);
 }
 
 /**

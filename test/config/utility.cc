@@ -24,6 +24,7 @@ static_resources:
       filters:
         name: envoy.http_connection_manager
         config:
+          stat_prefix: config_test
           http_filters:
             name: envoy.router
           codec_type: HTTP1
@@ -128,6 +129,11 @@ void ConfigHelper::setSourceAddress(const std::string& address_string) {
       ->mutable_upstream_bind_config()
       ->mutable_source_address()
       ->set_address(address_string);
+  // We don't have the ability to bind to specific ports yet.
+  bootstrap_.mutable_cluster_manager()
+      ->mutable_upstream_bind_config()
+      ->mutable_source_address()
+      ->set_port_value(0);
 }
 
 void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std::string& prefix) {
@@ -192,6 +198,7 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   auto* route_config = hcm_config.mutable_route_config();
   route_config->mutable_validate_clusters()->set_value(validate_clusters);
   auto* virtual_host = route_config->add_virtual_hosts();
+  virtual_host->set_name(domains);
   virtual_host->add_domains(domains);
   virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
   virtual_host->mutable_routes(0)->mutable_route()->set_cluster(cluster);
