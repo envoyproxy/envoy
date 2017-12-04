@@ -71,7 +71,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
               e.what());
     thread_local_.shutdownGlobalThreading();
     thread_local_.shutdownThread();
-    exit(1);
+    throw;
   }
 }
 

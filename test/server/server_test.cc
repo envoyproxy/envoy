@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Property;
 using testing::SaveArg;
@@ -107,9 +108,13 @@ protected:
   }
 
   void TearDown() override {
-    server_->threadLocal().shutdownGlobalThreading();
-    server_->clusterManager().shutdown();
-    server_->threadLocal().shutdownThread();
+    // If the config is bad, the InstanceImpl ctor threw an exception, so server_ wasn't set. For
+    // those tests, skip the shutdown steps.
+    if (server_ != nullptr) {
+      server_->threadLocal().shutdownGlobalThreading();
+      server_->clusterManager().shutdown();
+      server_->threadLocal().shutdownThread();
+    }
   }
 
   Network::Address::IpVersion version_;
@@ -123,21 +128,19 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
-class ServerInstanceImplDeathTest : public ServerInstanceImplTest {
-  void TearDown() override { thread_local_.shutdownGlobalThreading(); }
-};
-
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-INSTANTIATE_TEST_CASE_P(IpVersionsDeath, ServerInstanceImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
-
-TEST_P(ServerInstanceImplDeathTest, V2ConfigOnly) {
+TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.v2_config_only_ = true;
-  EXPECT_DEATH(initialize(std::string()), ".*Unable to parse JSON as proto.*");
+  try {
+    initialize(std::string());
+    FAIL();
+  } catch (const EnvoyException& e) {
+    EXPECT_THAT(e.what(), HasSubstr("Unable to parse JSON as proto"));
+  }
 }
 
 TEST_P(ServerInstanceImplTest, V1ConfigFallback) {
@@ -199,11 +202,16 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 
-TEST_P(ServerInstanceImplDeathTest, LogToFileError) {
+TEST_P(ServerInstanceImplTest, LogToFileError) {
   options_.log_path_ = "/this/path/does/not/exist";
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  EXPECT_DEATH(initialize(std::string()), ".*Failed to open log-file.*");
+  try {
+    initialize(std::string());
+    FAIL();
+  } catch (const EnvoyException& e) {
+    EXPECT_THAT(e.what(), HasSubstr("Failed to open log-file"));
+  }
 }
 } // namespace Server
 } // namespace Envoy
