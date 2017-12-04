@@ -7,17 +7,11 @@
 * router:add x-envoy-overloaded header
 * tls: add support for specifying TLS session ticket keys
 
-
 *Description*:
 >What does this PR do? What was the behavior before the PR?
 What is the behavior with the PR? If fixing a bug, please describe what
 the original issue is and how the change resolves it. How does this
 feature get enabled? By default, config change, etc...
-
-[Optional Fixes #Issue]
-
-[Optional *API Changes*:]
->Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
 
 *Risk Level*: Low | Medium | High
 >Low: Small bug fix or small optional feature.
@@ -41,8 +35,20 @@ forms of testing, please use your best judgement or ask for guidance
 if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.
 
-[optional *Deprecated*:]
-> Description of what is deprecated.
+*Docs Changes*:
+>Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
+if your PR involves documentation changes. Please write in N/A if there were no
+documentation changes.
 
-[optional *Release Notes*:] If this change is user impacting you **must** add a release note to
-[RAW_RELEASE_NOTES.md](RAW_RELEASE_NOTES.md). Thank you!
+*Release Notes*:
+>If this change is user impacting you **must** add a release note to
+[RAW_RELEASE_NOTES.md](RAW_RELEASE_NOTES.md). Thank you! Please write in N/A if
+there are no release notes.
+
+[Optional Fixes #Issue]
+
+[Optional *API Changes*:]
+>Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
+
+[Optional *Deprecated*:]
+>Description of what is deprecated.
