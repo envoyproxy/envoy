@@ -330,7 +330,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 }
 
-// Set up an EDS config with multiple priorities and localitie and make sure
+// Set up an EDS config with multiple priorities and localities and make sure
 // they are loaded and reloaded as expected.
 TEST_F(EdsTest, PriorityAndLocality) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;

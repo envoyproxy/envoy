@@ -231,8 +231,6 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 
 class PrioritySetImpl : public PrioritySet {
 public:
-  PrioritySetImpl();
-
   // From PrioritySet
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
@@ -244,12 +242,18 @@ public:
   // Get the host set for this priority level, creating it if necessary.
   HostSet& getOrCreateHostSet(uint32_t priority);
 
+protected:
+  // Allows subclasses of PrioritySetImpl to create their own type of HostSet.
+  virtual HostSetPtr createHostSet(uint32_t priority) {
+    return HostSetPtr{new HostSetImpl(priority)};
+  }
+
 private:
   virtual void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
                                   const std::vector<HostSharedPtr>& hosts_removed) {
     member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
-  // This vector will always have at lest one member, for priority level 0.
+  // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;

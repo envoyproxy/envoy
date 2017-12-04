@@ -17,23 +17,26 @@ namespace Envoy {
 namespace Upstream {
 
 SubsetLoadBalancer::SubsetLoadBalancer(
-    LoadBalancerType lb_type, HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
+    ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LoadBalancerSubsetInfo& subsets,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), stats_(stats),
       runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_(subsets.defaultSubset()), subset_keys_(subsets.subsetKeys()),
-      original_host_set_(host_set), original_local_host_set_(local_host_set) {
+      original_priority_set_(priority_set), original_local_priority_set_(local_priority_set) {
   ASSERT(subsets.isEnabled());
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
-  update(host_set.hosts(), {});
+  for (auto& host_set : priority_set.hostSetsPerPriority()) {
+    update(host_set->priority(), host_set->hosts(), {});
+  }
 
   // Configure future updates.
-  host_set.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
-                                    const std::vector<HostSharedPtr>& hosts_removed) {
-    update(hosts_added, hosts_removed);
+  priority_set.addMemberUpdateCb([this](uint32_t priority,
+                                        const std::vector<HostSharedPtr>& hosts_added,
+                                        const std::vector<HostSharedPtr>& hosts_removed) {
+    update(priority, hosts_added, hosts_removed);
   });
 }
 
@@ -118,7 +121,8 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
   return nullptr;
 }
 
-void SubsetLoadBalancer::updateFallbackSubset(const std::vector<HostSharedPtr>& hosts_added,
+void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority,
+                                              const std::vector<HostSharedPtr>& hosts_added,
                                               const std::vector<HostSharedPtr>& hosts_removed) {
   if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
     return;
@@ -139,7 +143,7 @@ void SubsetLoadBalancer::updateFallbackSubset(const std::vector<HostSharedPtr>& 
     fallback_subset_->initLoadBalancer(*this, predicate);
   } else {
     // Subsequent updates: add/remove hosts.
-    fallback_subset_->host_subset_->update(hosts_added, hosts_removed, predicate);
+    fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed, predicate);
   }
 }
 
@@ -181,17 +185,18 @@ void SubsetLoadBalancer::processSubsets(
   }
 }
 
-// Given the addition and/or removal of hosts, update all subsets, creating new subsets as
-// necessary.
-void SubsetLoadBalancer::update(const std::vector<HostSharedPtr>& hosts_added,
+// Given the addition and/or removal of hosts, update all subsets for this priority level, creating
+// new subsets as necessary.
+void SubsetLoadBalancer::update(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
                                 const std::vector<HostSharedPtr>& hosts_removed) {
-  updateFallbackSubset(hosts_added, hosts_removed);
+  updateFallbackSubset(priority, hosts_added, hosts_removed);
 
   processSubsets(hosts_added, hosts_removed,
                  [&](LbSubsetEntryPtr entry, HostPredicate predicate, bool adding_host) {
                    if (entry->initialized()) {
                      const bool active_before = entry->active();
-                     entry->host_subset_->update(hosts_added, hosts_removed, predicate);
+                     entry->priority_subset_->update(priority, hosts_added, hosts_removed,
+                                                     predicate);
 
                      if (active_before && !entry->active()) {
                        stats_.lb_subsets_active_.dec();
@@ -316,28 +321,31 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
 // with the given predicate.
 void SubsetLoadBalancer::LbSubsetEntry::initLoadBalancer(const SubsetLoadBalancer& subset_lb,
                                                          HostPredicate predicate) {
-  host_subset_.reset(new HostSubsetImpl(subset_lb.original_host_set_));
-  host_subset_->update(subset_lb.original_host_set_.hosts(), {}, predicate);
+  priority_subset_.reset(new PrioritySubsetImpl(subset_lb.original_priority_set_));
+  for (size_t i = 0; i < subset_lb.original_priority_set_.hostSetsPerPriority().size(); ++i) {
+    priority_subset_->update(i, subset_lb.original_priority_set_.hostSetsPerPriority()[i]->hosts(),
+                             {}, predicate);
+  }
 
   switch (subset_lb.lb_type_) {
   case LoadBalancerType::LeastRequest:
-    lb_.reset(new LeastRequestLoadBalancer(*host_subset_, subset_lb.original_local_host_set_,
-                                           subset_lb.stats_, subset_lb.runtime_,
-                                           subset_lb.random_));
+    lb_.reset(new LeastRequestLoadBalancer(*priority_subset_,
+                                           subset_lb.original_local_priority_set_, subset_lb.stats_,
+                                           subset_lb.runtime_, subset_lb.random_));
     break;
 
   case LoadBalancerType::Random:
-    lb_.reset(new RandomLoadBalancer(*host_subset_, subset_lb.original_local_host_set_,
+    lb_.reset(new RandomLoadBalancer(*priority_subset_, subset_lb.original_local_priority_set_,
                                      subset_lb.stats_, subset_lb.runtime_, subset_lb.random_));
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb_.reset(new RoundRobinLoadBalancer(*host_subset_, subset_lb.original_local_host_set_,
+    lb_.reset(new RoundRobinLoadBalancer(*priority_subset_, subset_lb.original_local_priority_set_,
                                          subset_lb.stats_, subset_lb.runtime_, subset_lb.random_));
     break;
 
   case LoadBalancerType::RingHash:
-    lb_.reset(new RingHashLoadBalancer(*host_subset_, subset_lb.stats_, subset_lb.runtime_,
+    lb_.reset(new RingHashLoadBalancer(*priority_subset_, subset_lb.stats_, subset_lb.runtime_,
                                        subset_lb.random_, subset_lb.lb_ring_hash_config_));
     break;
 
@@ -345,7 +353,7 @@ void SubsetLoadBalancer::LbSubsetEntry::initLoadBalancer(const SubsetLoadBalance
     NOT_REACHED;
   }
 
-  host_subset_->triggerCallbacks();
+  priority_subset_->triggerCallbacks();
 }
 
 // Given hosts_added and hosts_removed, update the underlying HostSet. The hosts_added Hosts must
@@ -404,6 +412,33 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const std::vector<HostSharedPtr>
 
   HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
                            filtered_added, filtered_removed);
+}
+
+SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const PrioritySet& original_priority_set)
+    : PrioritySetImpl(), original_priority_set_(original_priority_set) {
+  for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
+    empty_ &= getOrCreateHostSet(i).hosts().empty();
+  }
+}
+
+HostSetPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
+  RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size());
+  return HostSetPtr{new HostSubsetImpl(*original_priority_set_.hostSetsPerPriority()[priority])};
+}
+
+void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
+                                                    const std::vector<HostSharedPtr>& hosts_added,
+                                                    const std::vector<HostSharedPtr>& hosts_removed,
+                                                    std::function<bool(const Host&)> predicate) {
+  HostSubsetImpl* host_subset = getOrCreateHostSubset(priority);
+  host_subset->update(hosts_added, hosts_removed, predicate);
+
+  if (host_subset->hosts().empty() != empty_) {
+    empty_ = true;
+    for (auto& host_set : hostSetsPerPriority()) {
+      empty_ &= host_set->hosts().empty();
+    }
+  }
 }
 
 } // namespace Upstream
