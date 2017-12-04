@@ -25,20 +25,25 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
 
   // TODO(gsagula): In order to fully implement RFC2616-14.3, more work is required here. The
   // current implementation only checks if `gzip` is found in `accept-encoding` header, but
-  // it disregards the presence of qvalue or the order/priority of other encoding types.
+  // it disregards the presence of Qvalue (e.g. gzip;q=0) or the order/priority of other encoding
+  // types.
   if (accept_encoding_ == nullptr ||
       !(accept_encoding_->value().find(Headers::get().AcceptEncodingValues.Gzip.c_str()) ||
         accept_encoding_->value().find(Headers::get().AcceptEncodingValues.Wildcard.c_str()))) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Skip compression if upstream data is already encoded.
-  if (headers.ContentEncoding() != nullptr) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  // Skip compression if content-type is not supported or content-length is bellow the treshold.
-  if (!isContentTypeAllowed(headers) || !isMinimumContentLength(headers)) {
+  // Skip compression when:
+  //  upstream data is already encoded
+  //  content-type is not supported.
+  //  content-length is bellow the minimum treshold.
+  //  cache-control is not allowed
+  //  etag if disable_on_etag config
+  //  last-modified if disable_on_last_modified config
+  if (headers.ContentEncoding() != nullptr || !isContentTypeAllowed(headers) ||
+      !isMinimumContentLength(headers) || !isCacheControlAllowed(headers) ||
+      (config_->disableOnEtag() && headers.Etag() != nullptr) ||
+      (config_->disableOnLastModified() && headers.LastModified() != nullptr)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -75,7 +80,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
 }
 
 bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
-  if (!config_->isRestrictedTypes()) {
+  if (!config_->getContentTypeValues().size()) {
     return true;
   }
 
@@ -83,8 +88,27 @@ bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
     return false;
   }
 
-  return std::regex_search(headers.ContentType()->value().c_str(),
-                           std::regex{allowed_types_pattern_, std::regex::optimize});
+  for (auto const& value : config_->getContentTypeValues()) {
+    if (headers.ContentType()->value().find(value.c_str())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool GzipFilter::isCacheControlAllowed(const HeaderMap& headers) const {
+  if (headers.CacheControl() == nullptr || !config_->getCacheControlValues().size()) {
+    return true;
+  }
+
+  for (auto const& value : config_->getCacheControlValues()) {
+    if (headers.ContentType()->value().find(value.c_str())) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {

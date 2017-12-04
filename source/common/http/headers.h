@@ -55,6 +55,7 @@ public:
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
   const LowerCaseString EnvoyDecoratorOperation{"x-envoy-decorator-operation"};
+  const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
@@ -65,6 +66,7 @@ public:
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString KeepAlive{"keep-alive"};
+  const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
   const LowerCaseString Origin{"origin"};

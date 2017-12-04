@@ -1084,17 +1084,54 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "string",
         "enum" : ["best", "speed", "default"]
       },
-      "restricted_types" : {
+      "compression_strategy" : {
+        "type" : "string",
+        "enum" : ["filtered", "huffman", "rle", "default"]
+      },
+      "disable_on_etag" : {
         "type" : "boolean"
       },
-      "min_content_length" : {
-        "type" : "integer",
-        "minimum" : 32
+      "disable_on_last_modified" : {
+        "type" : "boolean"
       },
       "memory_level" : {
         "type" : "integer",
         "minimum" : 1,
         "maximum" : 9
+      },
+      "content_length" : {
+        "type" : "integer",
+        "minimum" : 30
+      },
+      "cache_control" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "string",
+          "enum": [ "no-cache", "no-store", "private" ]
+        }
+      },
+      "content_type" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "string",
+          "enum": [
+            "text/html",
+            "text/css",
+            "text/plain",
+            "text/xml",
+            "application/javascript",
+            "application/json",
+            "application/xml",
+            "font/eot",
+            "font/opentype",
+            "font/otf",
+            "image/svg+xml"
+          ]
+        }
       }
     },
     "additionalProperties" : false

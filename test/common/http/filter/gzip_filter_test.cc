@@ -64,15 +64,17 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   feedBuffer(1024);
-  Http::TestHeaderMapImpl response_headers{{":method", "get"},
-                                           {"content-type", "application/json"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  Http::TestHeaderMapImpl response_headers{
+      {":method", "get"}, {"content-length", "1024"}, {"content-type", "application/json"}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip,
             response_headers.get_("content-encoding"));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
 
   verifyCompressedData();
 }
+
+// TODO: add test for encode_header end_stream
 
 /**
  * Exercises gzip filter by compression on chunked data dispatched from the upstream.
@@ -83,17 +85,16 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncodingDataStatus) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  feedBuffer(1024);
-  Http::TestHeaderMapImpl response_headers{{":method", "get"},
-                                           {"content-type", "application/json"}};
+  feedBuffer(512);
+  Http::TestHeaderMapImpl response_headers{
+      {":method", "get"}, {"content-length", "1024"}, {"content-type", "application/json"}};
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip,
             response_headers.get_("content-encoding"));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data_, false));
 
   drainBuffer();
-  feedBuffer(768);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  feedBuffer(512);
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
 
   verifyCompressedData();

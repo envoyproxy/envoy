@@ -13,6 +13,8 @@
 namespace Envoy {
 namespace Http {
 
+using Compressor::ZlibCompressorImpl;
+
 /**
  * Configuration for the gzip fiter.
  */
@@ -20,32 +22,66 @@ class GzipFilterConfig : Json::Validator {
 public:
   GzipFilterConfig(const Json::Object& json_config)
       : Json::Validator(json_config, Json::Schema::GZIP_HTTP_FILTER_SCHEMA),
-        compression_level_(json_config.getString("compression_level", "default")),
-        min_content_length_(json_config.getInteger("min_content_length", 32)),
+        compression_level_(parseLevel(json_config.getString("compression_level", "default"))),
+        compression_strategy_(
+            parseStrategy(json_config.getString("compression_strategy", "default"))),
+        content_length_(json_config.getInteger("content_length", 32)),
         memory_level_(json_config.getInteger("memory_level", 8)),
-        restricted_types_(json_config.getInteger("restricted_types", true)) {}
+        content_type_values_(json_config.getStringArray("content_type", true)),
+        cache_control_values_(json_config.getStringArray("cache_control", true)),
+        etag_(json_config.getBoolean("disable_on_etag", false)),
+        last_modified_(json_config.getBoolean("disable_on_last_modified", false)) {}
 
-  uint64_t getMinimumLength() const { return min_content_length_; }
+  ZlibCompressorImpl::CompressionLevel getCompressionLevel() const { return compression_level_; }
+
+  ZlibCompressorImpl::CompressionStrategy getCompressionStrategy() const {
+    return compression_strategy_;
+  }
+
+  std::vector<std::string> getCacheControlValues() const { return cache_control_values_; }
+
+  std::vector<std::string> getContentTypeValues() const { return content_type_values_; }
+
+  uint64_t getMinimumLength() const { return content_length_; }
 
   uint64_t getMemoryLevel() const { return memory_level_; }
 
-  Compressor::ZlibCompressorImpl::CompressionLevel getCompressionLevel() const {
-    if (compression_level_ == "best") {
-      return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
-    }
-    if (compression_level_ == "speed") {
-      return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
-    }
-    return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
-  }
+  bool disableOnEtag() const { return etag_; }
 
-  bool isRestrictedTypes() const { return restricted_types_; }
+  bool disableOnLastModified() const { return last_modified_; }
 
 private:
-  const std::string compression_level_{};
-  const uint64_t min_content_length_{};
-  const uint64_t memory_level_{};
-  const bool restricted_types_{};
+  static ZlibCompressorImpl::CompressionLevel parseLevel(const std::string level) {
+    if (level == "best") {
+      return ZlibCompressorImpl::CompressionLevel::Best;
+    }
+    if (level == "speed") {
+      return ZlibCompressorImpl::CompressionLevel::Speed;
+    }
+    return ZlibCompressorImpl::CompressionLevel::Standard;
+  }
+
+  static ZlibCompressorImpl::CompressionStrategy parseStrategy(const std::string strategy) {
+    if (strategy == "rle") {
+      return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
+    }
+    if (strategy == "filtered") {
+      return ZlibCompressorImpl::CompressionStrategy::Filtered;
+    }
+    if (strategy == "huffman") {
+      return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+    }
+    return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
+  }
+
+  const ZlibCompressorImpl::CompressionLevel compression_level_;
+  const ZlibCompressorImpl::CompressionStrategy compression_strategy_;
+  const uint64_t content_length_;
+  const uint64_t memory_level_;
+  const std::vector<std::string> content_type_values_;
+  const std::vector<std::string> cache_control_values_;
+  const bool etag_;
+  const bool last_modified_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -85,6 +121,7 @@ public:
 private:
   bool isContentTypeAllowed(const HeaderMap& headers) const;
   bool isMinimumContentLength(const HeaderMap& headers) const;
+  bool isCacheControlAllowed(const HeaderMap& headers) const;
 
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;
@@ -98,7 +135,6 @@ private:
   GzipFilterConfigSharedPtr config_{nullptr};
 
   const Http::HeaderEntry* accept_encoding_{nullptr};
-  Http::HeaderMap* response_headers_{nullptr};
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
