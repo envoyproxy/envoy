@@ -71,19 +71,11 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   EXPECT_NE(dynamic_cast<Stats::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
 }
 
-TEST(StatsConfigTest, EmptyConfig) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
-  envoy::api::v2::StatsdSink sink_config;
-
-  StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
-  ASSERT_NE(factory, nullptr);
-
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+// Negative test for protoc-gen-validate constraints for statsd.
+TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory->createStatsSink(*message, server), EnvoyException,
-      "No tcp_cluster_name or address provided for envoy.statsd Stats::Sink config");
+  EXPECT_THROW(StatsdSinkFactory().createStatsSink(envoy::api::v2::StatsdSink(), server),
+               ProtoValidationException);
 }
 
 } // namespace Configuration

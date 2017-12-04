@@ -8,6 +8,7 @@
 #include "common/config/filter_json.h"
 #include "common/mongo/proxy.h"
 
+#include "api/filter/network/mongo_proxy.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -52,7 +53,9 @@ NetworkFilterFactoryCb
 MongoProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
   return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::network::MongoProxy&>(proto_config), context);
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::MongoProxy&>(
+          proto_config),
+      context);
 }
 
 /**

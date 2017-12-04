@@ -9,8 +9,10 @@
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/upstream/sds_subscription.h"
 
+#include "api/eds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -54,6 +56,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
   const auto& cluster_load_assignment = resources[0];
+  MessageUtil::validate(cluster_load_assignment);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,

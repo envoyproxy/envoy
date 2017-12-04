@@ -9,6 +9,8 @@
 #include "common/http/filter/ratelimit.h"
 #include "common/protobuf/utility.h"
 
+#include "api/filter/http/rate_limit.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -40,8 +42,10 @@ HttpFilterFactoryCb
 RateLimitFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                     const std::string& stats_prefix,
                                                     FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::RateLimit&>(proto_config),
-                      stats_prefix, context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::RateLimit&>(
+          proto_config),
+      stats_prefix, context);
 }
 
 /**
