@@ -131,12 +131,7 @@ public:
   template <class MessageType>
   static void loadFromFileAndValidate(const std::string& path, MessageType& message) {
     loadFromFile(path, message);
-    try {
-      validate(message);
-    } catch (const EnvoyException&) {
-      message.Clear();
-      throw;
-    }
+    validate(message);
   }
 
   /**
