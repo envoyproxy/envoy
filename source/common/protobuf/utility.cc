@@ -18,7 +18,7 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
                                                    const Protobuf::Message& message)
     : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
                                  message.DebugString())) {
-  ENVOY_LOG_MISC(debug, "Throwing {}", what());
+  ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
