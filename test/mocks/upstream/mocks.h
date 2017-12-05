@@ -36,8 +36,11 @@ public:
     member_update_cb_helper_.runCallbacks(0, added, removed);
   }
 
+  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::MemberUpdateCb callback) {
+    return member_update_cb_helper_.add(callback);
+  }
+
   // Upstream::HostSet
-  MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
   MOCK_CONST_METHOD0(hosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(hostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());

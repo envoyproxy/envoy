@@ -132,7 +132,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   InSequence s;
   setupRequest();
 
-  cluster_->prioritySet().hostSetsPerPriority()[0]->addMemberUpdateCb(
+  cluster_->prioritySet().addMemberUpdateCb(
       [&](uint32_t, const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
         membership_updated_.ready();
       });
