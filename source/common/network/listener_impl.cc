@@ -125,7 +125,7 @@ void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remo
                                     bool using_original_dst) {
   ConnectionPtr new_connection(new Ssl::ConnectionImpl(
       dispatcher_, fd, remote_address, local_address, Network::Address::InstanceConstSharedPtr(),
-      using_original_dst, true, ssl_ctx_, Ssl::ConnectionImpl::InitialState::Server));
+      using_original_dst, true, ssl_ctx_, Ssl::InitialState::Server));
   new_connection->setBufferLimits(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
