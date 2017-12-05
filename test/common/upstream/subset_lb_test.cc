@@ -95,21 +95,33 @@ public:
     });
   }
 
-  void init(const HostURLMetadataMap& host_metadata) {
-    EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
-
+  void configureHostSet(const HostURLMetadataMap& host_metadata, MockHostSet& host_set) {
     std::vector<HostSharedPtr> hosts;
     for (const auto& it : host_metadata) {
       hosts.emplace_back(makeHost(it.first, it.second));
     }
 
-    host_set_.hosts_ = hosts;
-    host_set_.hosts_per_locality_ = std::vector<std::vector<HostSharedPtr>>({hosts});
+    host_set.hosts_ = hosts;
+    host_set.hosts_per_locality_ = std::vector<std::vector<HostSharedPtr>>({hosts});
+    host_set.healthy_hosts_ = host_set.hosts_;
+    host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
+  }
 
-    host_set_.healthy_hosts_ = host_set_.hosts_;
-    host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
+  void init(const HostURLMetadataMap& host_metadata) {
+    HostURLMetadataMap failover;
+    init(host_metadata, failover);
+  }
 
-    lb_.reset(new SubsetLoadBalancer(lb_type_, host_set_, nullptr, stats_, runtime_, random_,
+  void init(const HostURLMetadataMap& host_metadata,
+            const HostURLMetadataMap& failover_host_metadata) {
+    EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+
+    configureHostSet(host_metadata, host_set_);
+    if (!failover_host_metadata.empty()) {
+      configureHostSet(failover_host_metadata, *priority_set_.getMockHostSet(1));
+    }
+
+    lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
                                      subset_info_, ring_hash_lb_config_));
   }
 
@@ -147,12 +159,11 @@ public:
       local_hosts_per_locality_->emplace_back(local_locality_hosts);
     }
 
-    local_host_set_.reset(new HostSetImpl(0));
-    local_host_set_->updateHosts(local_hosts_, local_hosts_, local_hosts_per_locality_,
-                                 local_hosts_per_locality_, {}, {});
+    local_priority_set_.getOrCreateHostSet(0).updateHosts(
+        local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {}, {});
 
-    lb_.reset(new SubsetLoadBalancer(lb_type_, host_set_, local_host_set_.get(), stats_, runtime_,
-                                     random_, subset_info_, ring_hash_lb_config_));
+    lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, &local_priority_set_, stats_,
+                                     runtime_, random_, subset_info_, ring_hash_lb_config_));
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -179,34 +190,35 @@ public:
   }
 
   void modifyHosts(std::vector<HostSharedPtr> add, std::vector<HostSharedPtr> remove,
-                   Optional<uint32_t> add_in_locality = {}) {
+                   Optional<uint32_t> add_in_locality = {}, uint32_t priority = 0) {
+    MockHostSet& host_set = *priority_set_.getMockHostSet(priority);
     for (const auto& host : remove) {
-      auto it = std::find(host_set_.hosts_.begin(), host_set_.hosts_.end(), host);
-      if (it != host_set_.hosts_.end()) {
-        host_set_.hosts_.erase(it);
+      auto it = std::find(host_set.hosts_.begin(), host_set.hosts_.end(), host);
+      if (it != host_set.hosts_.end()) {
+        host_set.hosts_.erase(it);
       }
-      host_set_.healthy_hosts_ = host_set_.hosts_;
+      host_set.healthy_hosts_ = host_set.hosts_;
 
-      for (auto& locality_hosts : host_set_.hosts_per_locality_) {
+      for (auto& locality_hosts : host_set.hosts_per_locality_) {
         auto it = std::find(locality_hosts.begin(), locality_hosts.end(), host);
         if (it != locality_hosts.end()) {
           locality_hosts.erase(it);
         }
       }
-      host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
+      host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
     }
 
     if (GetParam() == REMOVES_FIRST && !remove.empty()) {
-      host_set_.runCallbacks({}, remove);
+      host_set.runCallbacks({}, remove);
     }
 
     for (const auto& host : add) {
-      host_set_.hosts_.emplace_back(host);
-      host_set_.healthy_hosts_ = host_set_.hosts_;
+      host_set.hosts_.emplace_back(host);
+      host_set.healthy_hosts_ = host_set.hosts_;
 
       if (add_in_locality.valid()) {
-        host_set_.hosts_per_locality_[add_in_locality.value()].emplace_back(host);
-        host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
+        host_set.hosts_per_locality_[add_in_locality.value()].emplace_back(host);
+        host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
       }
     }
 
@@ -236,8 +248,9 @@ public:
     }
 
     if (GetParam() == REMOVES_FIRST && !remove.empty()) {
-      local_host_set_->updateHosts(local_hosts_, local_hosts_, local_hosts_per_locality_,
-                                   local_hosts_per_locality_, {}, remove);
+      local_priority_set_.getOrCreateHostSet(0).updateHosts(local_hosts_, local_hosts_,
+                                                            local_hosts_per_locality_,
+                                                            local_hosts_per_locality_, {}, remove);
     }
 
     for (const auto& host : add) {
@@ -247,17 +260,20 @@ public:
 
     if (GetParam() == REMOVES_FIRST) {
       if (!add.empty()) {
-        local_host_set_->updateHosts(local_hosts_, local_hosts_, local_hosts_per_locality_,
-                                     local_hosts_per_locality_, add, {});
+        local_priority_set_.getOrCreateHostSet(0).updateHosts(local_hosts_, local_hosts_,
+                                                              local_hosts_per_locality_,
+                                                              local_hosts_per_locality_, add, {});
       }
     } else if (!add.empty() || !remove.empty()) {
-      local_host_set_->updateHosts(local_hosts_, local_hosts_, local_hosts_per_locality_,
-                                   local_hosts_per_locality_, add, remove);
+      local_priority_set_.getOrCreateHostSet(0).updateHosts(local_hosts_, local_hosts_,
+                                                            local_hosts_per_locality_,
+                                                            local_hosts_per_locality_, add, remove);
     }
   }
 
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
-  NiceMock<MockHostSet> host_set_;
+  NiceMock<MockPrioritySet> priority_set_;
+  MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::api::v2::Cluster::RingHashLbConfig ring_hash_lb_config_;
@@ -265,10 +281,10 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  std::shared_ptr<HostSetImpl> local_host_set_;
+  PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
   HostListsSharedPtr local_hosts_per_locality_;
-  std::shared_ptr<LoadBalancer> lb_;
+  std::shared_ptr<SubsetLoadBalancer> lb_;
 };
 
 TEST_F(SubsetLoadBalancerTest, NoFallback) {
@@ -447,6 +463,33 @@ TEST_P(SubsetLoadBalancerTest, BalancesSubsetAfterUpdate) {
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_12));
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+}
+
+// Test that adding backends to a failover group causes no problems.
+TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+
+  // Start with an empty lb. Chosing a host should result in failure.
+  init({});
+  EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
+
+  // Add hosts to the group at priority 1. As no load balancer will select from
+  // failovers yet, this still results in being unable to choose a host.
+  modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
+               makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
+              {}, {}, 1);
+  EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
+
+  // Finally update the priority 0 hosts. The LB should now select hosts.
+  modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
+               makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
+              {}, {}, 0);
+  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
@@ -639,7 +682,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, host_set_, nullptr, stats_, runtime_, random_,
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
                                    subset_info_, ring_hash_lb_config_));
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});

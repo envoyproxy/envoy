@@ -17,11 +17,13 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
-LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local_host_set,
-                                   ClusterStats& stats, Runtime::Loader& runtime,
-                                   Runtime::RandomGenerator& random)
-    : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
-      local_host_set_(local_host_set) {
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
+                                   const PrioritySet* local_priority_set, ClusterStats& stats,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+    : stats_(stats), runtime_(runtime), random_(random),
+      host_set_(*priority_set.hostSetsPerPriority()[0]),
+      local_host_set_(local_priority_set ? local_priority_set->hostSetsPerPriority()[0].get()
+                                         : nullptr) {
   if (local_host_set_) {
     host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
                                        const std::vector<HostSharedPtr>&) -> void {
@@ -243,13 +245,13 @@ HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
   return hosts_to_use[rr_index_++ % hosts_to_use.size()];
 }
 
-LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
-                                                   const HostSet* local_host_set,
+LeastRequestLoadBalancer::LeastRequestLoadBalancer(const PrioritySet& priority_set,
+                                                   const PrioritySet* local_priority_set,
                                                    ClusterStats& stats, Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
-    : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {
-  host_set.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                    const std::vector<HostSharedPtr>& hosts_removed) -> void {
+    : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {
+  host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
     if (last_host_) {
       for (const HostSharedPtr& host : hosts_removed) {
         if (host == last_host_) {

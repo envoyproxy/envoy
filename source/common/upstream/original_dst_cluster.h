@@ -42,7 +42,7 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(HostSet& host_set, ClusterSharedPtr& parent);
+    LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent);
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -91,7 +91,7 @@ public:
       std::unordered_multimap<std::string, HostSharedPtr> map_;
     };
 
-    HostSet& host_set_;                        // Thread local host set.
+    PrioritySet& priority_set_;                // Thread local priority set.
     std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
     ClusterInfoConstSharedPtr info_;
     HostMap host_map_;

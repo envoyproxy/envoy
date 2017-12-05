@@ -22,29 +22,33 @@ using testing::Return;
 namespace Envoy {
 namespace Upstream {
 
-class RoundRobinLoadBalancerTest : public testing::Test {
-public:
-  RoundRobinLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
-
-  void init(bool need_local_cluster) {
-    if (need_local_cluster) {
-      local_host_set_.reset(new HostSetImpl(0));
-      lb_.reset(
-          new RoundRobinLoadBalancer(host_set_, local_host_set_.get(), stats_, runtime_, random_));
-    } else {
-      lb_.reset(new RoundRobinLoadBalancer(host_set_, nullptr, stats_, runtime_, random_));
-    }
-  }
-
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+class LoadBalancerTestBase : public testing::Test {
+protected:
+  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  NiceMock<MockHostSet> host_set_;
-  std::shared_ptr<HostSetImpl> local_host_set_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<MockPrioritySet> priority_set_;
+  MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+};
+
+class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
+public:
+  void init(bool need_local_cluster) {
+    if (need_local_cluster) {
+      local_priority_set_.reset(new PrioritySetImpl());
+      local_host_set_ = reinterpret_cast<HostSetImpl*>(&local_priority_set_->getOrCreateHostSet(0));
+    }
+    lb_.reset(new RoundRobinLoadBalancer(priority_set_, local_priority_set_.get(), stats_, runtime_,
+                                         random_));
+  }
+
+  std::shared_ptr<PrioritySetImpl> local_priority_set_;
+  HostSetImpl* local_host_set_{nullptr};
   std::shared_ptr<LoadBalancer> lb_;
   std::vector<HostSharedPtr> empty_host_vector_;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
 TEST_F(RoundRobinLoadBalancerTest, NoHosts) {
@@ -363,17 +367,9 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
-class LeastRequestLoadBalancerTest : public testing::Test {
+class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
-
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
-  Stats::IsolatedStoreImpl stats_store_;
-  ClusterStats stats_;
-  NiceMock<MockHostSet> host_set_;
-  LeastRequestLoadBalancer lb_{host_set_, nullptr, stats_, runtime_, random_};
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -522,17 +518,9 @@ TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   EXPECT_EQ(host_set_.healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
-class RandomLoadBalancerTest : public testing::Test {
+class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  RandomLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
-
-  NiceMock<MockHostSet> host_set_;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
-  Stats::IsolatedStoreImpl stats_store_;
-  ClusterStats stats_;
-  RandomLoadBalancer lb_{host_set_, nullptr, stats_, runtime_, random_};
+  RandomLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(RandomLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }

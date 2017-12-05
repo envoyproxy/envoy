@@ -143,8 +143,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   // No downstream connection => no host.
   {
     TestLoadBalancerContext lb_context(nullptr);
-    OriginalDstCluster::LoadBalancer lb(*cluster_->prioritySet().hostSetsPerPriority()[0],
-                                        cluster_);
+    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
@@ -159,8 +158,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     // First argument is normally the reference to the ThreadLocalCluster's HostSet, but in these
     // tests we do not have the thread local clusters, so we pass a reference to the HostSet of the
     // primary cluster. The implementation handles both cases the same.
-    OriginalDstCluster::LoadBalancer lb(*cluster_->prioritySet().hostSetsPerPriority()[0],
-                                        cluster_);
+    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
@@ -174,8 +172,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
     EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
-    OriginalDstCluster::LoadBalancer lb(*cluster_->prioritySet().hostSetsPerPriority()[0],
-                                        cluster_);
+    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
@@ -212,7 +209,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
   EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(*cluster_->prioritySet().hostSetsPerPriority()[0], cluster_);
+  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
@@ -306,7 +303,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   EXPECT_CALL(connection2, localAddress()).WillRepeatedly(ReturnRef(local_address2));
   EXPECT_CALL(connection2, usingOriginalDst()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(*cluster_->prioritySet().hostSetsPerPriority()[0], cluster_);
+  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
 
   EXPECT_CALL(membership_updated_, ready());
   Event::PostCb post_cb;
@@ -392,7 +389,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
   EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(*cluster_->prioritySet().hostSetsPerPriority()[0], cluster_);
+  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
@@ -419,7 +416,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   setup(json);
 
-  HostSetImpl second(0);
+  PrioritySetImpl second;
   cluster_->prioritySet().hostSetsPerPriority()[0]->addMemberUpdateCb(
       [&](uint32_t, const std::vector<HostSharedPtr>& added,
           const std::vector<HostSharedPtr>& removed) -> void {
@@ -431,8 +428,8 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
         const HostListsConstSharedPtr empty_host_lists{
             new std::vector<std::vector<HostSharedPtr>>()};
 
-        second.updateHosts(new_hosts, healthy_hosts, empty_host_lists, empty_host_lists, added,
-                           removed);
+        second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_host_lists,
+                                                 empty_host_lists, added, removed);
       });
 
   EXPECT_CALL(membership_updated_, ready());
@@ -444,7 +441,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
   EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb1(*cluster_->prioritySet().hostSetsPerPriority()[0], cluster_);
+  OriginalDstCluster::LoadBalancer lb1(cluster_->prioritySet(), cluster_);
   OriginalDstCluster::LoadBalancer lb2(second, cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
@@ -455,10 +452,10 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   // Check that lb2 also gets updated
-  EXPECT_EQ(1UL, second.hosts().size());
+  EXPECT_EQ(1UL, second.hostSetsPerPriority()[0]->hosts().size());
 
   EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(host, second.hosts()[0]);
+  EXPECT_EQ(host, second.hostSetsPerPriority()[0]->hosts()[0]);
 }
 
 } // namespace OriginalDstClusterTest
