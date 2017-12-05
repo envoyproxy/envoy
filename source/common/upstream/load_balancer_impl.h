@@ -31,8 +31,8 @@ public:
  */
 class LoadBalancerBase {
 protected:
-  LoadBalancerBase(const HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+  LoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                   ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random);
   ~LoadBalancerBase();
 
   /**
@@ -43,6 +43,10 @@ protected:
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+
+  // TODO(alyssawilk) make load balancers priority-aware and remove.
+protected:
+  const HostSet& host_set_;
 
 private:
   enum class LocalityRoutingState { NoLocalityRouting, LocalityDirect, LocalityResidual };
@@ -72,7 +76,6 @@ private:
    */
   void regenerateLocalityRoutingStructures();
 
-  const HostSet& host_set_;
   const HostSet* local_host_set_;
   uint64_t local_percent_to_route_{};
   LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
@@ -85,10 +88,10 @@ private:
  */
 class RoundRobinLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(const HostSet& host_set, const HostSet* local_host_set_,
+  RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random)
-      : LoadBalancerBase(host_set, local_host_set_, stats, runtime, random) {}
+      : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -112,7 +115,7 @@ private:
  */
 class LeastRequestLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  LeastRequestLoadBalancer(const HostSet& host_set, const HostSet* local_host_set_,
+  LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                            ClusterStats& stats, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random);
 
@@ -129,9 +132,10 @@ private:
  */
 class RandomLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  RandomLoadBalancer(const HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random)
-      : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {}
+  RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                     ClusterStats& stats, Runtime::Loader& runtime,
+                     Runtime::RandomGenerator& random)
+      : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;

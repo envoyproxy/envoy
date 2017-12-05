@@ -67,12 +67,10 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(128U, new_weight)); }
 
-PrioritySetImpl::PrioritySetImpl() { getOrCreateHostSet(0); }
-
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
-      host_sets_.push_back(HostSetPtr{new HostSetImpl(i)});
+      host_sets_.push_back(HostSetPtr{createHostSet(i)});
       host_sets_[i]->addMemberUpdateCb([this](uint32_t priority,
                                               const std::vector<HostSharedPtr>& hosts_added,
                                               const std::vector<HostSharedPtr>& hosts_removed) {
@@ -234,6 +232,9 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
                                                    ssl_context_manager, added_via_api)) {
+  // Create the default (empty) priority set before registering callbacks to
+  // avoid getting an update the first time it is accessed.
+  priority_set_.getOrCreateHostSet(0);
   priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
     if (!hosts_added.empty() || !hosts_removed.empty()) {

@@ -22,7 +22,7 @@ namespace Upstream {
  */
 class RingHashLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
-  RingHashLoadBalancer(HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+  RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
                        const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
 
