@@ -47,6 +47,8 @@ protected:
 private:
   enum class LocalityRoutingState { NoLocalityRouting, LocalityDirect, LocalityResidual };
 
+  void resizePerPriorityState(uint32_t size);
+
   /**
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
@@ -88,7 +90,8 @@ private:
     LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
     std::vector<uint64_t> residual_capacity_;
   };
-  std::vector<PerPriorityState> per_priority_state_;
+  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
 };
 

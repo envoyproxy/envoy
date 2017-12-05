@@ -33,7 +33,7 @@ public:
 
   void runCallbacks(const std::vector<HostSharedPtr> added,
                     const std::vector<HostSharedPtr> removed) {
-    member_update_cb_helper_.runCallbacks(0, added, removed);
+    member_update_cb_helper_.runCallbacks(priority(), added, removed);
   }
 
   Common::CallbackHandle* addMemberUpdateCb(PrioritySet::MemberUpdateCb callback) {

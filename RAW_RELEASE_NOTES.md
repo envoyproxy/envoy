@@ -8,3 +8,14 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+
+Added supporting the priority field in eds LocalityLbEndpoints for several types of
+load balancer (RoundRobinLoadBalancer, LeastRequestLoadBalancer, RandomLoadBalancer)
+
+This allows having LocalityLbEndpoints which will be unused until/if all higher
+priority LocalityLbEndpoints are sufficiently unhealthy.
+
+See :ref:`load balancer <arch_overview_load_balancing_priority_levels>` for details.
+
+
+

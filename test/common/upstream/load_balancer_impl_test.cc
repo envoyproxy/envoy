@@ -124,7 +124,7 @@ TEST_F(RoundRobinLoadBalancerTest, PriorityUpdatesWithLocalHostSet) {
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
   std::vector<HostSharedPtr> add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
-  host_set_.runCallbacks(add_hosts, {});
+  tertiary_host_set_.runCallbacks(add_hosts, {});
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 

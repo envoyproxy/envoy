@@ -39,16 +39,14 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
       local_priority_set_(local_priority_set),
       best_available_host_set_(bestAvailable(&priority_set)),
       best_available_local_host_set_(bestAvailable(local_priority_set)) {
-  per_priority_state_.resize(priority_set.hostSetsPerPriority().size());
+  resizePerPriorityState(priority_set.hostSetsPerPriority().size());
   priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
                                          const std::vector<HostSharedPtr>&) -> void {
     best_available_host_set_ = bestAvailable(&priority_set_);
     if (local_priority_set_) {
       regenerateLocalityRoutingStructures(priority);
     } else {
-      if (per_priority_state_.size() < priority + 1) {
-        per_priority_state_.resize(priority + 1);
-      }
+      resizePerPriorityState(priority_set_.hostSetsPerPriority().size());
     }
   });
   if (local_priority_set_) {
@@ -70,13 +68,11 @@ LoadBalancerBase::~LoadBalancerBase() {
 void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
-  if (per_priority_state_.size() < priority + 1) {
-    per_priority_state_.resize(priority + 1);
-  }
+  resizePerPriorityState(priority + 1);
 
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.
-  PerPriorityState& state = per_priority_state_[priority];
+  PerPriorityState& state = *per_priority_state_[priority];
   if (earlyExitNonLocalityRouting(priority)) {
     state.locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
     return;
@@ -140,6 +136,15 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   }
 };
 
+void LoadBalancerBase::resizePerPriorityState(uint32_t size) {
+  size = std::max<uint32_t>(size, priority_set_.hostSetsPerPriority().size());
+  if (per_priority_state_.size() < size) {
+    for (size_t i = 0; i < size - per_priority_state_.size() + 1; ++i) {
+      per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+    }
+  }
+}
+
 bool LoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
   if (priority_set_.hostSetsPerPriority().size() < priority + 1 ||
       local_priority_set_->hostSetsPerPriority().size() < priority + 1) {
@@ -201,7 +206,7 @@ void LoadBalancerBase::calculateLocalityPercentage(
 }
 
 const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts() {
-  PerPriorityState& state = per_priority_state_[best_available_priority()];
+  PerPriorityState& state = *per_priority_state_[best_available_priority()];
   ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
   // At this point it's guaranteed to be at least 2 localities.
@@ -263,7 +268,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
 
   // If we've latched that we can't do priority-based routing, return healthy
   // hosts for the best available priority.
-  if (per_priority_state_[best_available_priority()].locality_routing_state_ ==
+  if (per_priority_state_[best_available_priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
     return best_available_host_set_->healthyHosts();
   }
