@@ -6,7 +6,7 @@
 
 #include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
-#include "common/stats/dog_statsd.h"
+#include "common/stats/statsd.h"
 
 #include "api/bootstrap.pb.h"
 
@@ -21,7 +21,7 @@ Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& co
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   return Stats::SinkPtr(
-      new Stats::DogStatsd::UdpStatsdSink(server.threadLocal(), std::move(address)));
+      new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address), true));
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {

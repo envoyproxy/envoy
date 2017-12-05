@@ -33,18 +33,19 @@ Writer::~Writer() {
   }
 }
 
-void Writer::writeCounter(const std::string& name, uint64_t increment) {
-  std::string message(fmt::format("envoy.{}:{}|c", name, increment));
+void Writer::writeCounter(const std::string& name, const std::string& tag_str, uint64_t increment) {
+  std::string message(fmt::format("envoy.{}:{}|c{}\n", name, increment, tag_str));
   send(message);
 }
 
-void Writer::writeGauge(const std::string& name, uint64_t value) {
-  std::string message(fmt::format("envoy.{}:{}|g", name, value));
+void Writer::writeGauge(const std::string& name, const std::string& tag_str, uint64_t value) {
+  std::string message(fmt::format("envoy.{}:{}|g{}\n", name, value, tag_str));
   send(message);
 }
 
-void Writer::writeTimer(const std::string& name, const std::chrono::milliseconds& ms) {
-  std::string message(fmt::format("envoy.{}:{}|ms", name, ms.count()));
+void Writer::writeTimer(const std::string& name, const std::string& tag_str,
+                        const std::chrono::milliseconds& ms) {
+  std::string message(fmt::format("envoy.{}:{}|ms{}\n", name, ms.count(), tag_str));
   send(message);
 }
 
@@ -53,22 +54,51 @@ void Writer::send(const std::string& message) {
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
-                             Network::Address::InstanceConstSharedPtr address)
-    : tls_(tls.allocateSlot()), server_address_(address) {
-  setWriter<Writer>();
+                             Network::Address::InstanceConstSharedPtr address, bool useTag)
+    : tls_(tls.allocateSlot()), server_address_(address), useTag_(useTag) {
+  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<Writer>(this->server_address_);
+  });
 }
 
 void UdpStatsdSink::flushCounter(const Counter& counter, uint64_t delta) {
-  tls_->getTyped<Writer>().writeCounter(counter.name(), delta);
+  tls_->getTyped<Writer>().writeCounter(getName(counter), buildTagStr(counter.tags()), delta);
 }
 
 void UdpStatsdSink::flushGauge(const Gauge& gauge, uint64_t value) {
-  tls_->getTyped<Writer>().writeGauge(gauge.name(), value);
+  tls_->getTyped<Writer>().writeGauge(getName(gauge), buildTagStr(gauge.tags()), value);
 }
 
 void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
-  tls_->getTyped<Writer>().writeTimer(histogram.name(), std::chrono::milliseconds(value));
+  tls_->getTyped<Writer>().writeTimer(getName(histogram), buildTagStr(histogram.tags()),
+                                      std::chrono::milliseconds(value));
+}
+
+std::string UdpStatsdSink::getName(const Metric& metric) {
+  if (useTag_) {
+    return metric.tagExtractedName();
+  } else {
+    return metric.name();
+  }
+}
+
+const std::string buildTagStr(const std::vector<Tag>& tags) {
+  if (tags.empty()) {
+    return {};
+  }
+
+  std::string tagStr = "|#";
+  int i = 0;
+  for (const Tag& tag : tags) {
+    if (i == 0) {
+      tagStr.append(fmt::format("{}:{}", tag.name_, tag.value_));
+    } else {
+      tagStr.append(fmt::format(",{}:{}", tag.name_, tag.value_));
+    }
+    i++;
+  }
+  return tagStr;
 }
 
 char TcpStatsdSink::STAT_PREFIX[] = "envoy.";

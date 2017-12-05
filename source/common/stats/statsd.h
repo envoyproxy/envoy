@@ -24,17 +24,17 @@ public:
   Writer(Network::Address::InstanceConstSharedPtr address);
   ~Writer();
 
-  void writeCounter(const std::string& name, uint64_t increment);
-  void writeGauge(const std::string& name, uint64_t value);
-  void writeTimer(const std::string& name, const std::chrono::milliseconds& ms);
+  void writeCounter(const std::string& name, const std::string& tag_str, uint64_t increment);
+  void writeGauge(const std::string& name, const std::string& tag_str, uint64_t value);
+  void writeTimer(const std::string& name, const std::string& tag_str,
+                  const std::chrono::milliseconds& ms);
 
   // Called in unit test to validate address.
   int getFdForTests() const { return fd_; };
 
-protected:
+private:
   void send(const std::string& message);
 
-private:
   int fd_;
 };
 
@@ -43,7 +43,8 @@ private:
  */
 class UdpStatsdSink : public Sink {
 public:
-  UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address);
+  UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
+                bool useTag);
 
   // Stats::Sink
   void beginFlush() override {}
@@ -55,18 +56,15 @@ public:
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
 
-protected:
-  ThreadLocal::SlotPtr tls_;
-
-  template <class T> void setWriter() {
-    tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<T>(this->server_address_);
-    });
-  }
-
 private:
+  std::string getName(const Metric& metric);
+
+  ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
+  bool useTag_;
 };
+
+const std::string buildTagStr(const std::vector<Tag>& tags);
 
 /**
  * Per thread implementation of a TCP stats flusher for statsd.
