@@ -22,9 +22,21 @@ namespace Network {
  * Events that occur on a connection.
  */
 enum class ConnectionEvent {
+  // The connection was closed by the remote end.
   RemoteClose,
+
+  // The connection was closed locally, either because it failed to connect due to a
+  // local reason (such as failing to bind a socket to an address), or because close()
+  // was called and the operation is now complete (this happens immediately for close(NoFlush)
+  // and may be delayed for close(FlushWrite)).
   LocalClose,
+
+  // The outgoing connection has been established and is ready to send/receive data. For
+  // TLS connections, the TLS handshake has completed.
   Connected,
+
+  // Bytes were successfully written from the write-buffer to the underlying connection.
+  BytesSent,
 };
 
 /**

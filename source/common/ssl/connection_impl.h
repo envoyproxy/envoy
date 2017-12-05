@@ -53,7 +53,7 @@ private:
 // TODO(lizan): Remove Ssl::ConnectionImpl entirely when factory of TransportSocket is ready.
 class ConnectionImpl : public Network::ConnectionImpl {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                  Network::Address::InstanceConstSharedPtr remote_address,
                  Network::Address::InstanceConstSharedPtr local_address,
                  Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
@@ -70,7 +70,7 @@ public:
 
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
+  ClientConnectionImpl(Event::Dispatcher& dispatcher, Context& ctx,
                        Network::Address::InstanceConstSharedPtr address,
                        Network::Address::InstanceConstSharedPtr source_address);
 

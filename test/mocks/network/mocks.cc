@@ -22,7 +22,10 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 
-MockConnectionCallbacks::MockConnectionCallbacks() {}
+MockConnectionCallbacks::MockConnectionCallbacks() {
+  // EXPECT_CALL(*this, onEvent(ConnectionEvent::BytesSent)).WillRepeatedly(Return());
+}
+
 MockConnectionCallbacks::~MockConnectionCallbacks() {}
 
 uint64_t MockConnectionBase::next_id_;
@@ -146,6 +149,9 @@ MockListener::~MockListener() { onDestroy(); }
 
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
+
+MockTransportSocket::MockTransportSocket() {}
+MockTransportSocket::~MockTransportSocket() {}
 
 } // namespace Network
 } // namespace Envoy

@@ -7,6 +7,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/transport_socket.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/printers.h"
@@ -270,6 +271,20 @@ public:
 
   const std::string logical_;
   const std::string physical_;
+};
+
+class MockTransportSocket : public TransportSocket {
+public:
+  MockTransportSocket();
+  ~MockTransportSocket();
+
+  MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
+  MOCK_CONST_METHOD0(protocol, std::string());
+  MOCK_METHOD0(canFlushClose, bool());
+  MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
+  MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
+  MOCK_METHOD1(doWrite, IoResult(Buffer::Instance& buffer));
+  MOCK_METHOD0(onConnected, void());
 };
 
 } // namespace Network

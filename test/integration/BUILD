@@ -246,6 +246,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codec_client_lib",

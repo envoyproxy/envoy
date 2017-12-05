@@ -21,6 +21,7 @@
 
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::_;
 
 namespace Envoy {
@@ -38,6 +39,8 @@ public:
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
                                                Network::Address::InstanceConstSharedPtr());
     conn_->addConnectionCallbacks(connection_callbacks_);
+
+    EXPECT_CALL(connection_callbacks_, onEvent(_)).WillRepeatedly(Return());
   }
 
   void connect() {
@@ -297,6 +300,8 @@ public:
     conn_ = dispatcher_.createClientConnection(local_dst_address_,
                                                Network::Address::InstanceConstSharedPtr());
     conn_->addConnectionCallbacks(connection_callbacks_);
+
+    EXPECT_CALL(connection_callbacks_, onEvent(_)).WillRepeatedly(Return());
   }
 
   void connect() {

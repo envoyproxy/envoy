@@ -15,7 +15,6 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
-#include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
@@ -53,7 +52,7 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
-ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
@@ -61,7 +60,7 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
     : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
                      TransportSocketPtr{new RawBufferSocket}, using_original_dst, connected) {}
 
-ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                                Address::InstanceConstSharedPtr remote_address,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
@@ -468,6 +467,8 @@ void ConnectionImpl::onWriteReady() {
   } else if ((state_ & InternalState::CloseWithFlush) && new_buffer_size == 0) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
+  } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
+    raiseEvent(ConnectionEvent::BytesSent);
   }
 }
 
@@ -523,7 +524,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
-    Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address,
+    Event::Dispatcher& dispatcher, Address::InstanceConstSharedPtr address,
     const Network::Address::InstanceConstSharedPtr source_address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address, nullptr,
                      source_address, false, false) {}

@@ -9,12 +9,12 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"

@@ -7,12 +7,12 @@
 #include <string>
 
 #include "envoy/common/optional.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
-#include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 
@@ -47,13 +47,13 @@ class ConnectionImpl : public virtual Connection,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
   // TODO(lizan): Remove the old style constructor when factory is ready.
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected);
 
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address,
@@ -145,7 +145,7 @@ private:
 
   static std::atomic<uint64_t> next_global_id_;
 
-  Event::DispatcherImpl& dispatcher_;
+  Event::Dispatcher& dispatcher_;
   int fd_{-1};
   Event::FileEventPtr file_event_;
   const uint64_t id_;
@@ -169,7 +169,7 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
+  ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        Address::InstanceConstSharedPtr remote_address,
                        const Address::InstanceConstSharedPtr source_address);
 

@@ -13,6 +13,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -31,6 +32,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::SaveArg;
 using testing::Sequence;
 using testing::StrictMock;
 using testing::Test;
@@ -92,6 +94,7 @@ public:
     const Network::ClientConnection& const_connection = *client_connection_;
     EXPECT_EQ(nullptr, const_connection.ssl());
     EXPECT_FALSE(client_connection_->usingOriginalDst());
+    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::BytesSent)).WillRepeatedly(Return());
   }
 
   void connect() {
@@ -231,6 +234,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   EXPECT_CALL(*filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected)).InSequence(s1);
   EXPECT_CALL(client_connection_stats.tx_total_, add(4)).InSequence(s1);
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::BytesSent)).InSequence(s1);
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
   MockConnectionStats server_connection_stats;
@@ -573,6 +577,49 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+class ConnectionImplEventTest : public testing::TestWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplEventTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+// Test that ConnectionEvent::BytesSent is sent at the correct times
+TEST_P(ConnectionImplEventTest, BytesSentEvent) {
+  StrictMock<MockConnectionCallbacks> callbacks;
+  Event::MockDispatcher dispatcher;
+  EXPECT_CALL(dispatcher.buffer_factory_, create_(_, _))
+      .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                std::function<void()> above_high) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high);
+      }));
+
+  Event::FileReadyCb file_ready_cb;
+  EXPECT_CALL(dispatcher, createFileEvent_(0, _, _, _))
+      .WillOnce(DoAll(SaveArg<1>(&file_ready_cb), Return(new Event::MockFileEvent)));
+  NiceMock<MockTransportSocket>* transport_socket = new NiceMock<MockTransportSocket>;
+  TransportSocketPtr transport_socket_ptr(transport_socket);
+  ConnectionImpl connection(dispatcher, 0, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                            Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                            Network::Address::InstanceConstSharedPtr(),
+                            std::move(transport_socket_ptr), false, true);
+  connection.addConnectionCallbacks(callbacks);
+
+  // 1 byte was sent; expect BytesSent event
+  EXPECT_CALL(*transport_socket, doWrite(_)).WillOnce(Return(IoResult{PostIoAction::KeepOpen, 1}));
+  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::BytesSent)).Times(1);
+  file_ready_cb(Event::FileReadyType::Write);
+
+  // 0 bytes were sent; no event
+  EXPECT_CALL(*transport_socket, doWrite(_)).WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0}));
+  file_ready_cb(Event::FileReadyType::Write);
+
+  // Reading should not cause BytesSent
+  EXPECT_CALL(*transport_socket, doRead(_)).WillOnce(Return(IoResult{PostIoAction::KeepOpen, 1}));
+  file_ready_cb(Event::FileReadyType::Read);
+
+  // Closed event should not raise a BytesSent event (but does raise RemoteClose)
+  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::RemoteClose));
+  file_ready_cb(Event::FileReadyType::Closed);
+}
+
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
@@ -622,6 +669,8 @@ public:
           EXPECT_EQ(buffer_size, filter_seen);
           dispatcher_->exit();
         }));
+
+    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::BytesSent)).WillRepeatedly(Return());
 
     Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
     client_connection_->write(data);
