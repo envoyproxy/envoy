@@ -22,11 +22,11 @@ namespace Envoy {
 namespace Stats {
 namespace DogStatsd {
 
-class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
+class UdpDogStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, UdpDogStatsdSinkTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
+TEST_P(UdpDogStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
   // UDP statsd server address.
   Network::Address::InstanceConstSharedPtr server_address =
