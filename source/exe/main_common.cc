@@ -83,9 +83,14 @@ int main_common(OptionsImpl& options) {
   DefaultTestHooks default_test_hooks;
   ThreadLocal::InstanceImpl tls;
   Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
-  Server::InstanceImpl server(options, local_address, default_test_hooks, *restarter, stats_store,
-                              access_log_lock, component_factory, tls);
-  server.run();
+  try {
+    Server::InstanceImpl server(options, local_address, default_test_hooks, *restarter, stats_store,
+                                access_log_lock, component_factory, tls);
+    server.run();
+  } catch (const EnvoyException& e) {
+    ares_library_cleanup();
+    return 1;
+  }
   ares_library_cleanup();
   return 0;
 }
