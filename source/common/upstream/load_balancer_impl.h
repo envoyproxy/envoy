@@ -44,10 +44,6 @@ protected:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
-  // TODO(alyssawilk) make load balancers priority-aware and remove.
-protected:
-  const HostSet& host_set_;
-
 private:
   enum class LocalityRoutingState { NoLocalityRouting, LocalityDirect, LocalityResidual };
 
@@ -55,7 +51,7 @@ private:
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRouting();
+  bool earlyExitNonLocalityRouting(uint32_t priority);
 
   /**
    * Try to select upstream hosts from the same locality.
@@ -74,13 +70,26 @@ private:
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
-  void regenerateLocalityRoutingStructures();
+  void regenerateLocalityRoutingStructures(uint32_t priority);
 
-  const HostSet* local_host_set_;
-  uint64_t local_percent_to_route_{};
-  LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
-  std::vector<uint64_t> residual_capacity_;
-  Common::CallbackHandle* local_host_set_member_update_cb_handle_{};
+  uint32_t best_available_priority() { return best_available_host_set_->priority(); }
+
+  const PrioritySet& priority_set_;
+  const PrioritySet* local_priority_set_;
+  // The lowest priority host set from priority_set_ with healthy hosts, or the
+  // zero-priority host set if all host sets are fully unhealthy.
+  const HostSet* best_available_host_set_;
+  // The lowest priority host set from local_priority_set_ with healthy hosts.
+  // May be nullptr if local_priority_set_ is.
+  const HostSet* best_available_local_host_set_;
+
+  struct PerPriorityState {
+    uint64_t local_percent_to_route_{};
+    LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
+    std::vector<uint64_t> residual_capacity_;
+  };
+  std::vector<PerPriorityState> per_priority_state_;
+  Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
 };
 
 /**
