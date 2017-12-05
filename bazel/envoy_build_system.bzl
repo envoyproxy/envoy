@@ -39,9 +39,6 @@ def envoy_linkopts():
         # The file could should contain the current git SHA (or enough placeholder data to allow
         # it to be rewritten by tools/git_sha_rewriter.py).
         "@bazel_tools//tools/osx:darwin": [
-            # TODO(zuercher): should be able to remove this after the next gperftools release after
-            # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
-            "-Wl,-U,___lsan_ignore_object",
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000", "-image_base 100000000",
         ],
@@ -68,9 +65,6 @@ def envoy_linkopts():
 def envoy_test_linkopts():
     return select({
         "@bazel_tools//tools/osx:darwin": [
-            # TODO(zuercher): should be able to remove this after the next gperftools release after
-            # 2.6.1 (see discussion at https://github.com/gperftools/gperftools/issues/901)
-            "-Wl,-U,___lsan_ignore_object",
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000", "-image_base 100000000",
         ],
