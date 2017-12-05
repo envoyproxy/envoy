@@ -40,12 +40,18 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
       best_available_host_set_(bestAvailable(&priority_set)),
       best_available_local_host_set_(bestAvailable(local_priority_set)) {
   per_priority_state_.resize(priority_set.hostSetsPerPriority().size());
-  if (local_priority_set_) {
-    priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
-                                           const std::vector<HostSharedPtr>&) -> void {
-      best_available_host_set_ = bestAvailable(&priority_set_);
+  priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
+                                         const std::vector<HostSharedPtr>&) -> void {
+    best_available_host_set_ = bestAvailable(&priority_set_);
+    if (local_priority_set_) {
       regenerateLocalityRoutingStructures(priority);
-    });
+    } else {
+      if (per_priority_state_.size() < priority + 1) {
+        per_priority_state_.resize(priority + 1);
+      }
+    }
+  });
+  if (local_priority_set_) {
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
         [this](uint32_t priority, const std::vector<HostSharedPtr>&,
                const std::vector<HostSharedPtr>&) -> void {
@@ -249,22 +255,28 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(best_available_host_set_->healthyHosts().size() <=
          best_available_host_set_->hosts().size());
 
+  // If the best available priority has insufficient healthy hosts, return all hosts.
   if (LoadBalancerUtility::isGlobalPanic(*best_available_host_set_, runtime_)) {
     stats_.lb_healthy_panic_.inc();
     return best_available_host_set_->hosts();
   }
 
+  // If we've latched that we can't do priority-based routing, return healthy
+  // hosts for the best available priority.
   if (per_priority_state_[best_available_priority()].locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
     return best_available_host_set_->healthyHosts();
   }
 
+  // TODO(alyssawilk, mattklein123) why is this all or nothing?
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
     return best_available_host_set_->healthyHosts();
   }
 
   if (LoadBalancerUtility::isGlobalPanic(*best_available_local_host_set_, runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
+    // TODO(alyssawilk, mattklein123) comment why this is healthyHosts() where the first panic
+    // returns all hosts.
     return best_available_host_set_->healthyHosts();
   }
 

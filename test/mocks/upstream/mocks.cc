@@ -18,7 +18,8 @@ using testing::_;
 namespace Envoy {
 namespace Upstream {
 
-MockHostSet::MockHostSet() {
+MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
+  ON_CALL(*this, priority()).WillByDefault(Return(priority_));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
   ON_CALL(*this, hostsPerLocality()).WillByDefault(ReturnRef(hosts_per_locality_));
@@ -38,7 +39,7 @@ MockPrioritySet::MockPrioritySet() {
 HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
-      auto host_set = new NiceMock<MockHostSet>;
+      auto host_set = new NiceMock<MockHostSet>(i);
       host_sets_.push_back(HostSetPtr{host_set});
       host_set->addMemberUpdateCb([this](uint32_t priority,
                                          const std::vector<HostSharedPtr>& hosts_added,
@@ -54,6 +55,7 @@ void MockPrioritySet::runUpdateCallbacks(uint32_t priority,
                                          const std::vector<HostSharedPtr>& hosts_removed) {
   member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
+
 MockCluster::MockCluster() {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));

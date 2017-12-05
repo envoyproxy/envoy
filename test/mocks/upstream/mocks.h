@@ -29,7 +29,7 @@ namespace Upstream {
 
 class MockHostSet : public HostSet {
 public:
-  MockHostSet();
+  MockHostSet(uint32_t priority = 0);
 
   void runCallbacks(const std::vector<HostSharedPtr> added,
                     const std::vector<HostSharedPtr> removed) {
@@ -63,6 +63,7 @@ public:
   Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
                           const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;
+  uint32_t priority_{};
 };
 
 class MockPrioritySet : public PrioritySet {

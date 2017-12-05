@@ -31,6 +31,7 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
+  MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
@@ -48,6 +49,7 @@ public:
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
   HostSetImpl* local_host_set_{nullptr};
   std::shared_ptr<LoadBalancer> lb_;
+  std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> empty_locality_;
   std::vector<HostSharedPtr> empty_host_vector_;
 };
 
@@ -93,6 +95,89 @@ TEST_F(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
+}
+
+// Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
+TEST_F(RoundRobinLoadBalancerTest, BasicFailover) {
+  init(false);
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Test that extending the priority set with an existing LB causes the correct updates.
+TEST_F(RoundRobinLoadBalancerTest, PriorityUpdatesWithLocalHostSet) {
+  init(false);
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  // With both the primary and failover hosts unhealthy, we should select an
+  // unhealthy primary host.
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Update the priority set with a new priority level P=2 and ensure the host
+  // is chosen
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  tertiary_host_set_.hosts_ = *hosts;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  std::vector<HostSharedPtr> add_hosts;
+  add_hosts.push_back(tertiary_host_set_.hosts_[0]);
+  host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Test extending the priority set.
+TEST_F(RoundRobinLoadBalancerTest, ExtendPrioritiesUpdatingPrioritySet) {
+  init(true);
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  // With both the primary and failover hosts unhealthy, we should select an
+  // unhealthy primary host.
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Update the priority set with a new priority level P=2
+  // As it has healthy hosts, it should be selected.
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  tertiary_host_set_.hosts_ = *hosts;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  std::vector<HostSharedPtr> add_hosts;
+  add_hosts.push_back(tertiary_host_set_.hosts_[0]);
+  tertiary_host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Test extending the local priority set.
+TEST_F(RoundRobinLoadBalancerTest, ExtendPrioritiesUpdatingLocalPrioritySet) {
+  init(true);
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  // With both the primary and failover hosts unhealthy, we should select an
+  // unhealthy primary host.
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Update the priority set with a new priority level P=2
+  // As the primary priority set is still in global panic, the new hosts will not yet be selected.
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  local_priority_set_->getOrCreateHostSet(2).updateHosts(
+      hosts, hosts, empty_locality_, empty_locality_, empty_host_vector_, empty_host_vector_);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Now update the local priority set. As the main priority set is no longer in
+  // global panic, the local set is prefered.
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts2(
+      new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:84")}));
+  tertiary_host_set_.hosts_ = *hosts2;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  std::vector<HostSharedPtr> add_hosts;
+  add_hosts.push_back(tertiary_host_set_.hosts_[0]);
+  tertiary_host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {

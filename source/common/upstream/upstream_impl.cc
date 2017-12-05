@@ -77,7 +77,6 @@ HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
                                          const std::vector<HostSharedPtr>& hosts_removed) {
         runUpdateCallbacks(priority, hosts_added, hosts_removed);
       });
-      runUpdateCallbacks(i, {}, {});
     }
   }
   return *host_sets_[priority];
