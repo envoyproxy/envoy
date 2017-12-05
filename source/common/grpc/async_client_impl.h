@@ -262,14 +262,6 @@ private:
 
 class AsyncClientTracingConfig : public Tracing::EgressConfigImpl {
 public:
-  struct {
-    const std::string STATUS = "status";
-    const std::string GRPC_STATUS = "grpc.status_code";
-    const std::string CANCELED = "canceled";
-    const std::string ERROR = "error";
-    const std::string TRUE = "true";
-    const std::string UPSTREAM_CLUSTER_NAME = "upstream_cluster_name";
-  } TagStrings;
 };
 
 typedef ConstSingleton<AsyncClientTracingConfig> TracingConfig;
@@ -289,8 +281,8 @@ public:
     current_span_ = parent_span.spawnChild(TracingConfig::get(),
                                            "async " + parent.remote_cluster_name_ + " egress",
                                            ProdSystemTimeSource::instance_.currentTime());
-    current_span_->setTag(TracingConfig::get().TagStrings.UPSTREAM_CLUSTER_NAME,
-                          parent.remote_cluster_name_);
+    current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER_NAME, parent.remote_cluster_name_);
+    current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
   }
 
   void initialize(bool buffer_body_for_retry) override {
@@ -303,8 +295,7 @@ public:
 
   // Grpc::AsyncRequest
   void cancel() override {
-    current_span_->setTag(TracingConfig::get().TagStrings.STATUS,
-                          TracingConfig::get().TagStrings.CANCELED);
+    current_span_->setTag(Tracing::Tags::get().STATUS, Tracing::Tags::get().CANCELED);
     current_span_->finishSpan();
     this->resetStream();
   }
@@ -325,15 +316,13 @@ private:
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
 
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    current_span_->setTag(TracingConfig::get().TagStrings.GRPC_STATUS, std::to_string(status));
+    current_span_->setTag(Tracing::Tags::get().GRPC_STATUS_CODE, std::to_string(status));
 
     if (status != Grpc::Status::GrpcStatus::Ok) {
-      current_span_->setTag(TracingConfig::get().TagStrings.ERROR,
-                            TracingConfig::get().TagStrings.TRUE);
+      current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
       callbacks_.onFailure(status, message, *current_span_);
     } else if (response_ == nullptr) {
-      current_span_->setTag(TracingConfig::get().TagStrings.ERROR,
-                            TracingConfig::get().TagStrings.TRUE);
+      current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
       callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
     } else {
       callbacks_.onSuccess(std::move(response_), *current_span_);
