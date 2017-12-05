@@ -8,3 +8,7 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+
+* Added transport socket interface to allow custom implementation of transport socket. A transport socket
+  provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
+  refactored with the interface.
