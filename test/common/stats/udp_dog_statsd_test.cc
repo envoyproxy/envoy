@@ -69,6 +69,6 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   tls_.shutdownThread();
 }
 
-} // namespace Statsd
+} // namespace DogStatsd
 } // namespace Stats
 } // namespace Envoy
