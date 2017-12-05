@@ -8,3 +8,4 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+- stats: native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
