@@ -764,9 +764,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -796,9 +799,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -814,9 +820,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -847,9 +856,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -865,9 +877,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -898,9 +913,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -913,9 +931,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
   )EOF",
@@ -942,9 +963,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_foo }
     - filter_chain_match:
@@ -957,9 +981,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
       filters:
       - name: envoy.http_connection_manager
         config:
+          stat_prefix: sni_test
           route_config:
             virtual_hosts:
-            - routes:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
               - match: { prefix: "/" }
                 route: { cluster: service_bar }
   )EOF",

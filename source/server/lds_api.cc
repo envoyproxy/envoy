@@ -4,8 +4,11 @@
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
+#include "common/protobuf/utility.h"
 
 #include "server/lds_subscription.h"
+
+#include "api/lds.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -37,6 +40,9 @@ void LdsApi::initialize(std::function<void()> callback) {
 void LdsApi::onConfigUpdate(const ResourceVector& resources) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  for (const auto& listener : resources) {
+    MessageUtil::validate(listener);
+  }
   // We need to keep track of which listeners we might need to remove.
   std::unordered_map<std::string, std::reference_wrapper<Listener>> listeners_to_remove;
   for (const auto& listener : listener_manager_.listeners()) {

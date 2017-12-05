@@ -6,6 +6,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "api/eds.pb.h"
 #include "gmock/gmock.h"
@@ -49,6 +50,13 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
+
+// Negative test for protoc-gen-validate constraints.
+TEST_F(EdsTest, ValidateFail) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  resources.Add();
+  EXPECT_THROW(cluster_->onConfigUpdate(resources), ProtoValidationException);
+}
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
@@ -124,6 +132,7 @@ TEST_F(EdsTest, EndpointMetadata) {
 
   auto* endpoint = endpoints->add_lb_endpoints();
   endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
   Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
                                          Config::MetadataFilters::get().ENVOY_LB, "string_key")
       .set_string_value("string_value");
@@ -133,6 +142,7 @@ TEST_F(EdsTest, EndpointMetadata) {
 
   auto* canary = endpoints->add_lb_endpoints();
   canary->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("2.3.4.5");
+  canary->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
   Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
                                          Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -178,16 +188,22 @@ TEST_F(EdsTest, EndpointLocality) {
   locality->set_zone("hello");
   locality->set_sub_zone("world");
 
-  endpoints->add_lb_endpoints()
-      ->mutable_endpoint()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("1.2.3.4");
-  endpoints->add_lb_endpoints()
-      ->mutable_endpoint()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("2.3.4.5");
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("2.3.4.5");
+    endpoint_address->set_port_value(80);
+  }
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });

@@ -476,6 +476,13 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
   }
 }
 
+const std::string ClusterManagerImpl::versionInfo() const {
+  if (cds_api_) {
+    return cds_api_->versionInfo();
+  }
+  return "static";
+}
+
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
     const Optional<std::string>& local_cluster_name)

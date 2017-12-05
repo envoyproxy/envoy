@@ -10,6 +10,8 @@
 #include "common/http/filter/buffer_filter.h"
 #include "common/protobuf/utility.h"
 
+#include "api/filter/http/buffer.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -42,8 +44,9 @@ HttpFilterFactoryCb
 BufferFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                  const std::string& stats_prefix,
                                                  FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::Buffer&>(proto_config),
-                      stats_prefix, context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::Buffer&>(proto_config),
+      stats_prefix, context);
 }
 
 /**

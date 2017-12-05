@@ -66,11 +66,31 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   // Remove the line feed at the end
   StringUtil::rtrim(proxy_line);
 
-  // Parse proxy protocol line with format: PROXY TCP4/TCP6 SOURCE_ADDRESS DESTINATION_ADDRESS
-  // SOURCE_PORT DESTINATION_PORT.
+  // Parse proxy protocol line with format: PROXY TCP4/TCP6/UNKNOWN SOURCE_ADDRESS
+  // DESTINATION_ADDRESS SOURCE_PORT DESTINATION_PORT.
   const auto line_parts = StringUtil::split(proxy_line, " ", true);
 
-  if (line_parts.size() != 6 || line_parts[0] != "PROXY") {
+  if (line_parts.size() < 2 || line_parts[0] != "PROXY") {
+    throw EnvoyException("failed to read proxy protocol");
+  }
+
+  if (line_parts[1] == "UNKNOWN") {
+    // At this point we know it's a proxy protocol line, so we can remove it from the socket
+    // and continue.
+    Address::InstanceConstSharedPtr local_address = Envoy::Network::Address::addressFromFd(fd_);
+    Address::InstanceConstSharedPtr remote_address;
+    // The remote address not known.
+    if (local_address->ip()->version() == Address::IpVersion::v4) {
+      remote_address = std::make_shared<Address::Ipv4Instance>(Address::Ipv4Instance("0.0.0.0"));
+    } else {
+      remote_address = std::make_shared<Address::Ipv6Instance>(Address::Ipv6Instance("::"));
+    }
+    finishConnection(remote_address, local_address);
+    return;
+  }
+
+  // If protocol not UNKNOWN, src and dst adresses have to be present.
+  if (line_parts.size() != 6) {
     throw EnvoyException("failed to read proxy protocol");
   }
 
@@ -104,6 +124,13 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   if (!remote_address->ip()->isUnicastAddress() || !local_address->ip()->isUnicastAddress()) {
     throw EnvoyException("failed to read proxy protocol");
   }
+
+  finishConnection(remote_address, local_address);
+}
+
+void ProxyProtocol::ActiveConnection::finishConnection(
+    Address::InstanceConstSharedPtr remote_address, Address::InstanceConstSharedPtr local_address) {
+
   ListenerImpl& listener = listener_;
   int fd = fd_;
   fd_ = -1;

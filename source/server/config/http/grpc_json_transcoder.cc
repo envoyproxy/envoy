@@ -6,6 +6,8 @@
 #include "common/grpc/json_transcoder_filter.h"
 #include "common/json/config_schemas.h"
 
+#include "api/filter/http/transcoder.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -37,7 +39,8 @@ GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProto(const Protobuf::Mes
                                                              const std::string& stat_prefix,
                                                              FactoryContext& context) {
   return createFilter(
-      dynamic_cast<const envoy::api::v2::filter::http::GrpcJsonTranscoder&>(proto_config),
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::GrpcJsonTranscoder&>(
+          proto_config),
       stat_prefix, context);
 }
 

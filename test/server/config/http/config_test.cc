@@ -13,6 +13,7 @@
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
+#include "server/config/http/grpc_json_transcoder.h"
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
 #include "server/config/http/lua.h"
@@ -37,6 +38,36 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+// Negative test for protoc-gen-validate constraints.
+TEST(HttpFilterConfigTest, ValidateFail) {
+  NiceMock<MockFactoryContext> context;
+
+  BufferFilterConfig buffer_factory;
+  envoy::api::v2::filter::http::Buffer buffer_proto;
+  FaultFilterConfig fault_factory;
+  envoy::api::v2::filter::http::HTTPFault fault_proto;
+  fault_proto.mutable_abort();
+  GrpcJsonTranscoderFilterConfig grpc_json_transcoder_factory;
+  envoy::api::v2::filter::http::GrpcJsonTranscoder grpc_json_transcoder_proto;
+  LuaFilterConfig lua_factory;
+  envoy::api::v2::filter::http::Lua lua_proto;
+  RateLimitFilterConfig rate_limit_factory;
+  envoy::api::v2::filter::http::RateLimit rate_limit_proto;
+  const std::vector<std::pair<NamedHttpFilterConfigFactory&, Protobuf::Message&>> filter_cases = {
+      {buffer_factory, buffer_proto},
+      {fault_factory, fault_proto},
+      {grpc_json_transcoder_factory, grpc_json_transcoder_proto},
+      {lua_factory, lua_proto},
+      {rate_limit_factory, rate_limit_proto},
+  };
+
+  for (const auto& filter_case : filter_cases) {
+    EXPECT_THROW(
+        filter_case.first.createFilterFactoryFromProto(filter_case.second, "stats", context),
+        ProtoValidationException);
+  }
+}
 
 TEST(HttpFilterConfigTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(

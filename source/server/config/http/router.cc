@@ -9,6 +9,8 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
+#include "api/filter/http/router.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -38,8 +40,9 @@ HttpFilterFactoryCb
 RouterFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                  const std::string& stat_prefix,
                                                  FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::Router&>(proto_config),
-                      stat_prefix, context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::Router&>(proto_config),
+      stat_prefix, context);
 }
 
 /**
