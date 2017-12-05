@@ -89,7 +89,7 @@ public:
   virtual std::string protocol() const PURE;
 
   /**
-   * @return bool whether the socket can be flush closed.
+   * @return bool whether the socket can be flushed and closed.
    */
   virtual bool canFlushClose() PURE;
 
