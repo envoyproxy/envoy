@@ -8,8 +8,8 @@
 #include "common/network/resolver_impl.h"
 #include "common/stats/statsd.h"
 
-#include "api/bootstrap.pb.h"
-#include "api/bootstrap.pb.validate.h"
+#include "api/stats.pb.h"
+#include "api/stats.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

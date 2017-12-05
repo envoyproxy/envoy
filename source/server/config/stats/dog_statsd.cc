@@ -8,7 +8,8 @@
 #include "common/network/resolver_impl.h"
 #include "common/stats/statsd.h"
 
-#include "api/bootstrap.pb.h"
+#include "api/stats.pb.h"
+#include "api/stats.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -16,7 +17,8 @@ namespace Configuration {
 
 Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                      Server::Instance& server) {
-  const auto& sink_config = dynamic_cast<const envoy::api::v2::DogStatsdSink&>(config);
+  const auto& sink_config =
+      MessageUtil::downcastAndValidate<const envoy::api::v2::DogStatsdSink&>(config);
   Network::Address::InstanceConstSharedPtr address =
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
