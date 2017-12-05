@@ -10,6 +10,8 @@
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
+#include "fmt/format.h"
+
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
@@ -88,6 +90,11 @@ public:
   }
 };
 
+class ProtoValidationException : public EnvoyException {
+public:
+  ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
+};
+
 class MessageUtil {
 public:
   static std::size_t hash(const Protobuf::Message& message) {
@@ -108,6 +115,37 @@ public:
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
+
+  /**
+   * Validate protoc-gen-validate constraints on a given protobuf.
+   * @param message message to validate.
+   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   */
+  template <class MessageType> static void validate(const MessageType& message) {
+    std::string err;
+    if (!Validate(message, &err)) {
+      throw ProtoValidationException(err, message);
+    }
+  }
+
+  template <class MessageType>
+  static void loadFromFileAndValidate(const std::string& path, MessageType& message) {
+    loadFromFile(path, message);
+    validate(message);
+  }
+
+  /**
+   * Downcast and validate protoc-gen-validate constraints on a given protobuf.
+   * @param message const Protobuf::Message& to downcast and validate.
+   * @return const MessageType& the concrete message type downcasted to on success.
+   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   */
+  template <class MessageType>
+  static const MessageType& downcastAndValidate(const Protobuf::Message& config) {
+    const auto& typed_config = dynamic_cast<MessageType>(config);
+    validate(typed_config);
+    return typed_config;
+  }
 
   /**
    * Convert from google.protobuf.Any to a typed message.

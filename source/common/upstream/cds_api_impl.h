@@ -34,16 +34,16 @@ public:
   }
   const std::string versionInfo() const override { return subscription_->versionInfo(); }
 
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
+
 private:
   CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
              const Optional<envoy::api::v2::ConfigSource>& eds_config, ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
   void runInitializeCallbackIfAny();
-
-  // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
 
   ClusterManager& cm_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;

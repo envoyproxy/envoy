@@ -8,6 +8,8 @@
 #include "common/config/filter_json.h"
 #include "common/filter/tcp_proxy.h"
 
+#include "api/filter/network/tcp_proxy.pb.validate.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -37,8 +39,10 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Ob
 NetworkFilterFactoryCb
 TcpProxyConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                     FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::network::TcpProxy&>(proto_config),
-                      context);
+  return createFilter(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::TcpProxy&>(
+          proto_config),
+      context);
 }
 
 /**
