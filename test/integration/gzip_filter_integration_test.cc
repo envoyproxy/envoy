@@ -59,7 +59,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, GzipIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 /**
- * Exercises gzip compression with default filter's configuration
+ * Exercises gzip compression with default configuration
  */
 TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
   initializeFilter(R"EOF(
@@ -79,7 +79,7 @@ TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
 }
 
 /**
- * Exercises filter when client request contains unsupported 'accept-encoding' types
+ * Exercises filter when client request contains unsupported 'accept-encoding' type
  */
 TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
   initializeFilter(R"EOF(
@@ -96,26 +96,6 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
                             Http::TestHeaderMapImpl{{":status", "200"},
                                                     {"content-length", "1024"},
                                                     {"content-type", "text/plain"}});
-}
-
-/**
- * Exercises filter when upstream response contains unsupported 'content-type' type
- */
-TEST_P(GzipIntegrationTest, NotSupportedContentType) {
-  initializeFilter(R"EOF(
-      name: envoy.gzip
-      config:
-        deprecated_v1: true
-    )EOF");
-
-  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                    {":path", "/test/long/url"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"accept-encoding", "deflate, gzip"}},
-                            Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "1024"},
-                                                    {"content-type", "image/jpeg"}});
 }
 
 /**

@@ -46,9 +46,9 @@ public:
 
   uint64_t getMemoryLevel() const { return memory_level_; }
 
-  bool disableOnEtag() const { return etag_; }
+  bool isDisableOnEtag() const { return etag_; }
 
-  bool disableOnLastModified() const { return last_modified_; }
+  bool isDisableOnLastModified() const { return last_modified_; }
 
 private:
   static ZlibCompressorImpl::CompressionLevel parseLevel(const std::string level) {
@@ -119,22 +119,20 @@ public:
   }
 
 private:
+  bool isAcceptEncodingGzip(const HeaderMap& headers) const;
+  bool isCacheControlAllowed(const HeaderMap& headers) const;
   bool isContentTypeAllowed(const HeaderMap& headers) const;
   bool isMinimumContentLength(const HeaderMap& headers) const;
-  bool isCacheControlAllowed(const HeaderMap& headers) const;
+  bool isEtagAllowed(const HeaderMap& headers) const;
+  bool isLastModifiedAllowed(const HeaderMap& headers) const;
 
   bool skip_compression_;
+
   Buffer::OwnedImpl compressed_data_;
+
   Compressor::ZlibCompressorImpl compressor_;
 
-  const std::string allowed_types_pattern_{
-      ".*(text/html|text/css|text/plain|text/xml|"
-      "application/javascript|application/json|application/xml|"
-      "font/eot|font/opentype|font/otf|image/svg+xml).*"};
-
   GzipFilterConfigSharedPtr config_{nullptr};
-
-  const Http::HeaderEntry* accept_encoding_{nullptr};
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
