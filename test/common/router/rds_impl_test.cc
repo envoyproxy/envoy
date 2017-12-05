@@ -409,6 +409,23 @@ TEST_F(RdsImplTest, FailureArray) {
 
 class RouteConfigProviderManagerImplTest : public testing::Test {
 public:
+  void setup() {
+    std::string config_json = R"EOF(
+      {
+        "cluster": "foo_cluster",
+        "route_config_name": "foo_route_config",
+        "refresh_delay_ms": 1000
+      }
+      )EOF";
+
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+    Envoy::Config::Utility::translateRdsConfig(*config, rds_);
+
+    // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+    provider_ = route_config_provider_manager_->getRouteConfigProvider(
+        rds_, cm_, store_, "foo_prefix.", init_manager_);
+  }
+
   RouteConfigProviderManagerImplTest() {
     EXPECT_CALL(admin_, addHandler("/routes",
                                    "print out currently loaded dynamic HTTP route tables", _, true))
@@ -430,8 +447,10 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   NiceMock<Server::MockAdmin> admin_;
+  envoy::api::v2::filter::network::Rds rds_;
   Server::Admin::HandlerCb handler_callback_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderSharedPtr provider_;
 };
 
 TEST_F(RouteConfigProviderManagerImplTest, Basic) {
@@ -439,28 +458,16 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   init_manager_.initialize();
 
-  std::string config_json = R"EOF(
-    {
-      "cluster": "foo_cluster",
-      "route_config_name": "foo_route_config",
-      "refresh_delay_ms": 1000
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::filter::network::Rds rds;
-  Envoy::Config::Utility::translateRdsConfig(*config, rds);
-
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
-  RouteConfigProviderSharedPtr provider = route_config_provider_manager_->getRouteConfigProvider(
-      rds, cm_, store_, "foo_prefix", init_manager_);
+  setup();
+
   // Because this get has the same cluster and route_config_name, the provider returned is just a
   // shared_ptr to the same provider as the one above.
   RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_->getRouteConfigProvider(
-      rds, cm_, store_, "foo_prefix", init_manager_);
+      rds_, cm_, store_, "foo_prefix", init_manager_);
   // So this means that both shared_ptrs should be the same.
-  EXPECT_EQ(provider, provider2);
-  EXPECT_EQ(2UL, provider.use_count());
+  EXPECT_EQ(provider_, provider2);
+  EXPECT_EQ(2UL, provider_.use_count());
 
   std::string config_json2 = R"EOF(
     {
@@ -476,14 +483,14 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_->getRouteConfigProvider(
       rds2, cm_, store_, "foo_prefix", init_manager_);
-  EXPECT_NE(provider3, provider);
-  EXPECT_EQ(2UL, provider.use_count());
+  EXPECT_NE(provider3, provider_);
+  EXPECT_EQ(2UL, provider_.use_count());
   EXPECT_EQ(1UL, provider3.use_count());
 
   std::vector<RdsRouteConfigProviderSharedPtr> configured_providers =
       route_config_provider_manager_->rdsRouteConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
-  EXPECT_EQ(3UL, provider.use_count());
+  EXPECT_EQ(3UL, provider_.use_count());
   EXPECT_EQ(2UL, provider3.use_count());
 
   const std::string routes_expected_output = R"EOF([
@@ -507,7 +514,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(routes_expected_output, TestUtility::bufferToString(data));
   data.drain(data.length());
 
-  provider.reset();
+  provider_.reset();
   provider2.reset();
   configured_providers.clear();
 
@@ -524,47 +531,30 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(0UL, configured_providers.size());
 }
 
+// Negative test for protoc-gen-validate constraints.
+TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
+  setup();
+  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
+  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
+  auto* route_config = route_configs.Add();
+  route_config->set_name("foo_route_config");
+  route_config->mutable_virtual_hosts()->Add();
+  EXPECT_THROW(provider_impl.onConfigUpdate(route_configs), ProtoValidationException);
+}
+
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
-  std::string config_json = R"EOF(
-    {
-      "cluster": "foo_cluster",
-      "route_config_name": "foo_route_config",
-      "refresh_delay_ms": 1000
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::filter::network::Rds rds;
-  Envoy::Config::Utility::translateRdsConfig(*config, rds);
-
-  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
-  RouteConfigProviderSharedPtr provider = route_config_provider_manager_->getRouteConfigProvider(
-      rds, cm_, store_, "foo_prefix.", init_manager_);
+  setup();
   init_manager_.initialize();
-  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider.get());
+  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
   EXPECT_CALL(init_manager_.initialized_, ready());
   provider_impl.onConfigUpdate({});
   EXPECT_EQ(1UL, store_.counter("foo_prefix.rds.foo_route_config.update_empty").value());
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
-  std::string config_json = R"EOF(
-    {
-      "cluster": "foo_cluster",
-      "route_config_name": "foo_route_config",
-      "refresh_delay_ms": 1000
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::filter::network::Rds rds;
-  Envoy::Config::Utility::translateRdsConfig(*config, rds);
-
-  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
-  RouteConfigProviderSharedPtr provider = route_config_provider_manager_->getRouteConfigProvider(
-      rds, cm_, store_, "foo_prefix.", init_manager_);
+  setup();
   init_manager_.initialize();
-  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider.get());
+  auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
   route_configs.Add();
   route_configs.Add();

@@ -7,9 +7,17 @@
 #include "test/test_common/utility.h"
 
 #include "api/bootstrap.pb.h"
+#include "api/bootstrap.pb.validate.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+TEST(UtilityTest, DowncastAndValidate) {
+  envoy::api::v2::Bootstrap bootstrap;
+  EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
+  EXPECT_THROW(MessageUtil::downcastAndValidate<const envoy::api::v2::Bootstrap&>(bootstrap),
+               ProtoValidationException);
+}
 
 TEST(UtilityTest, LoadBinaryProtoFromFile) {
   envoy::api::v2::Bootstrap bootstrap;

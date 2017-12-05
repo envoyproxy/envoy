@@ -30,12 +30,12 @@ public:
   // Init::Target
   void initialize(std::function<void()> callback) override;
 
-private:
-  void runInitializeCallbackIfAny();
-
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
+
+private:
+  void runInitializeCallbackIfAny();
 
   std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
   ListenerManager& listener_manager_;

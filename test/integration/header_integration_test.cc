@@ -18,6 +18,7 @@ const std::string http_connection_mgr_config = R"EOF(
 http_filters:
   - name: envoy.router
 codec_type: HTTP1
+stat_prefix: header_test
 route_config:
   virtual_hosts:
     - name: no-headers

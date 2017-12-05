@@ -37,18 +37,24 @@ class RingHashLoadBalancerTest : public testing::Test {
 public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
-  NiceMock<MockHostSet> host_set_;
+  void init() {
+    lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_));
+  }
+
+  NiceMock<MockPrioritySet> priority_set_;
+  MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  std::unique_ptr<RingHashLoadBalancer> lb_;
 };
 
 TEST_F(RingHashLoadBalancerTest, NoHost) {
-  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
-  EXPECT_EQ(nullptr, lb.chooseHost(nullptr));
+  init();
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 };
 
 TEST_F(RingHashLoadBalancerTest, Basic) {
@@ -63,7 +69,7 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
   config_.value().mutable_minimum_ring_size()->set_value(12);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
 
-  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
+  init();
 
   // hash ring:
   // port | position
@@ -83,23 +89,23 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
 
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[4], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(host_set_.hosts_[4], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(3551244743356806947);
-    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(3551244743356806948);
-    EXPECT_EQ(host_set_.hosts_[3], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(16117243373044804880UL));
-    EXPECT_EQ(host_set_.hosts_[0], lb.chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
@@ -107,7 +113,7 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
   host_set_.runCallbacks({}, {});
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[4], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
@@ -127,7 +133,7 @@ TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
   // use_std_hash defaults to true so don't set it here.
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(12);
-  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
+  init();
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
   // ring hash: host=127.0.0.1:85 hash=1358027074129602068
@@ -144,23 +150,23 @@ TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
   // ring hash: host=127.0.0.1:80 hash=17613279263364193813
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602068);
-    EXPECT_EQ(host_set_.hosts_[5], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602069);
-    EXPECT_EQ(host_set_.hosts_[3], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
-    EXPECT_EQ(host_set_.hosts_[2], lb.chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
@@ -174,7 +180,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(3);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
-  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
+  init();
 
   // hash ring:
   // port | position
@@ -186,7 +192,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
 
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[0], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
   }
 
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -203,7 +209,7 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
 
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[0], lb.chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
   }
 }
 
@@ -249,11 +255,11 @@ TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
-  RingHashLoadBalancer lb{host_set_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer lb{priority_set_, stats_, runtime_, random_, config_};
 
   for (uint64_t i = 0; i < keys_to_simulate; i++) {
     TestLoadBalancerContext context(std::hash<std::string>()(fmt::format("{}", i)));
-    hit_counter[lb.chooseHost(&context)->address()->asString()] += 1;
+    hit_counter[lb_->chooseHost(&context)->address()->asString()] += 1;
   }
 
   std::cout << fmt::format("{:<9}  {:<4}  {:<20}", "hits", "%hit", "server") << std::endl;

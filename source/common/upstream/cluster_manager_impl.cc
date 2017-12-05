@@ -476,6 +476,13 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
   }
 }
 
+const std::string ClusterManagerImpl::versionInfo() const {
+  if (cds_api_) {
+    return cds_api_->versionInfo();
+  }
+  return "static";
+}
+
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
     const Optional<std::string>& local_cluster_name)
@@ -610,43 +617,40 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
-
-  // TODO(alyssawilk) make lb priority-set aware in a follow-up patch.
-  HostSet& host_set = priority_set_.getOrCreateHostSet(0);
-  HostSet* local_host_set = nullptr;
-  if (parent.local_priority_set_) {
-    local_host_set = parent.local_priority_set_->hostSetsPerPriority()[0].get();
-  }
+  priority_set_.getOrCreateHostSet(0);
 
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), host_set, local_host_set, cluster->stats(),
-                                     parent.parent_.runtime_, parent.parent_.random_,
-                                     cluster->lbSubsetInfo(), cluster->lbRingHashConfig()));
+    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), priority_set_, parent_.local_priority_set_,
+                                     cluster->stats(), parent.parent_.runtime_,
+                                     parent.parent_.random_, cluster->lbSubsetInfo(),
+                                     cluster->lbRingHashConfig()));
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
-      lb_.reset(new LeastRequestLoadBalancer(host_set, local_host_set, cluster->stats(),
-                                             parent.parent_.runtime_, parent.parent_.random_));
+      lb_.reset(new LeastRequestLoadBalancer(priority_set_, parent_.local_priority_set_,
+                                             cluster->stats(), parent.parent_.runtime_,
+                                             parent.parent_.random_));
       break;
     }
     case LoadBalancerType::Random: {
-      lb_.reset(new RandomLoadBalancer(host_set, local_host_set, cluster->stats(),
+      lb_.reset(new RandomLoadBalancer(priority_set_, parent_.local_priority_set_, cluster->stats(),
                                        parent.parent_.runtime_, parent.parent_.random_));
       break;
     }
     case LoadBalancerType::RoundRobin: {
-      lb_.reset(new RoundRobinLoadBalancer(host_set, local_host_set, cluster->stats(),
-                                           parent.parent_.runtime_, parent.parent_.random_));
+      lb_.reset(new RoundRobinLoadBalancer(priority_set_, parent_.local_priority_set_,
+                                           cluster->stats(), parent.parent_.runtime_,
+                                           parent.parent_.random_));
       break;
     }
     case LoadBalancerType::RingHash: {
-      lb_.reset(new RingHashLoadBalancer(host_set, cluster->stats(), parent.parent_.runtime_,
+      lb_.reset(new RingHashLoadBalancer(priority_set_, cluster->stats(), parent.parent_.runtime_,
                                          parent.parent_.random_, cluster->lbRingHashConfig()));
       break;
     }
     case LoadBalancerType::OriginalDst: {
       lb_.reset(new OriginalDstCluster::LoadBalancer(
-          host_set, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
+          priority_set_, parent.parent_.primary_clusters_.at(cluster->name()).cluster_));
       break;
     }
     }
