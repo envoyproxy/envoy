@@ -93,9 +93,9 @@ void LightStepDriver::LightStepMetricsObserver::OnSpansSent(int num_spans) {
 }
 
 LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
-    std::shared_ptr<lightstep::LightStepTracer>&& tracer, LightStepDriver& driver,
+    const std::shared_ptr<lightstep::LightStepTracer>& tracer, LightStepDriver& driver,
     Event::Dispatcher& dispatcher)
-    : tracer_(std::move(tracer)), driver_(driver) {
+    : tracer_{tracer}, driver_{driver} {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     tracer_->Flush();
@@ -148,7 +148,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
         lightstep::MakeLightStepTracer(std::move(tls_options));
 
     return ThreadLocal::ThreadLocalObjectSharedPtr{
-        new TlsLightStepTracer(std::move(tracer), *this, dispatcher)};
+        new TlsLightStepTracer{tracer, *this, dispatcher}};
   });
 }
 

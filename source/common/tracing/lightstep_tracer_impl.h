@@ -86,7 +86,7 @@ private:
 
   class TlsLightStepTracer : public ThreadLocal::ThreadLocalObject {
   public:
-    TlsLightStepTracer(std::shared_ptr<lightstep::LightStepTracer>&& tracer,
+    TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
                        LightStepDriver& driver, Event::Dispatcher& dispatcher);
 
     const opentracing::Tracer& tracer() const;
