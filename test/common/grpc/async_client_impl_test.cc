@@ -220,7 +220,7 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().UPSTREAM_CLUSTER_NAME, "test_cluster"));
+                setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
     EXPECT_CALL(*request->child_span_,
                 setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
     EXPECT_CALL(*request->child_span_, injectContext(_));
@@ -339,7 +339,7 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER_NAME, "test_cluster"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "14"));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
   EXPECT_CALL(*child_span, finishSpan());
@@ -403,7 +403,7 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER_NAME, "test_cluster"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
   EXPECT_CALL(*child_span, injectContext(_));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "13"));
   EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
