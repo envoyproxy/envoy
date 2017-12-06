@@ -43,10 +43,6 @@ public:
                   Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                   std::unique_ptr<lightstep::LightStepTracerOptions>&& options);
 
-  // Tracer::OpenTracingDriver
-  const opentracing::Tracer& tracer() const override;
-  PropagationMode propagationMode() const override { return propagation_mode_; }
-
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -54,6 +50,10 @@ public:
   void setPropagationMode(PropagationMode propagation_mode) {
     propagation_mode_ = propagation_mode;
   }
+
+  // Tracer::OpenTracingDriver
+  const opentracing::Tracer& tracer() const override;
+  PropagationMode propagationMode() const override { return propagation_mode_; }
 
 private:
   class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
