@@ -50,9 +50,8 @@ public:
       return opentracing::make_unexpected(opentracing::key_not_found_error);
     case Http::HeaderMap::Lookup::NotSupported:
       return opentracing::make_unexpected(opentracing::lookup_key_not_supported_error);
-    default:
-      NOT_REACHED;
     }
+    NOT_REACHED;
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
