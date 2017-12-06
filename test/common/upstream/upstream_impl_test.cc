@@ -659,6 +659,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
 
   uint32_t changes = 0;
   uint32_t last_priority = 0;

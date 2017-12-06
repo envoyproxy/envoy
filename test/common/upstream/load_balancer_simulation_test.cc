@@ -54,9 +54,9 @@ public:
    */
   void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
            std::vector<uint32_t> healthy_destination_cluster) {
-    local_host_set_ = new HostSetImpl(0);
+    local_priority_set_ = new PrioritySetImpl;
     // TODO(mattklein123): make load balancer per originating cluster host.
-    RandomLoadBalancer lb(host_set_, local_host_set_, stats_, runtime_, random_);
+    RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_);
 
     HostListsSharedPtr upstream_per_zone_hosts = generateHostsPerZone(healthy_destination_cluster);
     HostListsSharedPtr local_per_zone_hosts = generateHostsPerZone(originating_cluster);
@@ -95,8 +95,9 @@ public:
 
         per_zone_local->push_back((*local_per_zone_hosts)[zone]);
       }
-      local_host_set_->updateHosts(originating_hosts, originating_hosts, per_zone_local,
-                                   per_zone_local, empty_vector_, empty_vector_);
+      local_priority_set_->getOrCreateHostSet(0).updateHosts(originating_hosts, originating_hosts,
+                                                             per_zone_local, per_zone_local,
+                                                             empty_vector_, empty_vector_);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;
@@ -157,8 +158,9 @@ public:
   const uint32_t total_number_of_requests = 1000000;
   std::vector<HostSharedPtr> empty_vector_;
 
-  HostSetImpl* local_host_set_;
-  NiceMock<MockHostSet> host_set_;
+  PrioritySetImpl* local_priority_set_;
+  NiceMock<MockPrioritySet> priority_set_;
+  MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;

@@ -17,6 +17,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -57,6 +58,15 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                Address::InstanceConstSharedPtr local_address,
                                Address::InstanceConstSharedPtr bind_to_address,
                                bool using_original_dst, bool connected)
+    : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
+                     TransportSocketPtr{new RawBufferSocket}, using_original_dst, connected) {}
+
+ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                               Address::InstanceConstSharedPtr remote_address,
+                               Address::InstanceConstSharedPtr local_address,
+                               Address::InstanceConstSharedPtr bind_to_address,
+                               TransportSocketPtr&& transport_socket, bool using_original_dst,
+                               bool connected)
     : filter_manager_(*this, *this), remote_address_(remote_address),
       local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
                                                 : local_address),
@@ -64,8 +74,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
-      using_original_dst_(using_original_dst) {
+      transport_socket_(std::move(transport_socket)), dispatcher_(dispatcher), fd_(fd),
+      id_(++next_global_id_), using_original_dst_(using_original_dst) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -94,6 +104,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
+
+  transport_socket_->setTransportSocketCallbacks(*this);
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -125,11 +137,12 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush || !canFlushClose()) {
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
+      !transport_socket_->canFlushClose()) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      doWriteToSocket();
+      transport_socket_->doWrite(*write_buffer_);
     }
 
     closeSocket(ConnectionEvent::LocalClose);
@@ -158,6 +171,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
+  transport_socket_->closeSocket(close_type);
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -399,48 +413,12 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 }
 
-ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
-  PostIoAction action = PostIoAction::KeepOpen;
-  uint64_t bytes_read = 0;
-  do {
-    // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
-    // use an ioctl() before every read to figure out how much data there is to read.
-    //
-    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
-    // ioctl(). The extra syscall is not worth it.
-    int rc = read_buffer_.read(fd_, 16384);
-    ENVOY_CONN_LOG(trace, "read returns: {}", *this, rc);
-
-    // Remote close. Might need to raise data before raising close.
-    if (rc == 0) {
-      action = PostIoAction::Close;
-      break;
-    } else if (rc == -1) {
-      // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", *this, errno);
-      if (errno != EAGAIN) {
-        action = PostIoAction::Close;
-      }
-
-      break;
-    } else {
-      bytes_read += rc;
-      if (shouldDrainReadBuffer()) {
-        setReadBufferReady();
-        break;
-      }
-    }
-  } while (true);
-
-  return {action, bytes_read};
-}
-
 void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
   ASSERT(!(state_ & InternalState::Connecting));
 
-  IoResult result = doReadFromSocket();
+  IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
   onRead(new_buffer_size);
@@ -451,35 +429,6 @@ void ConnectionImpl::onReadReady() {
     closeSocket(ConnectionEvent::RemoteClose);
   }
 }
-
-ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
-  PostIoAction action;
-  uint64_t bytes_written = 0;
-  do {
-    if (write_buffer_->length() == 0) {
-      action = PostIoAction::KeepOpen;
-      break;
-    }
-    int rc = write_buffer_->write(fd_);
-    ENVOY_CONN_LOG(trace, "write returns: {}", *this, rc);
-    if (rc == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {}", *this, errno);
-      if (errno == EAGAIN) {
-        action = PostIoAction::KeepOpen;
-      } else {
-        action = PostIoAction::Close;
-      }
-
-      break;
-    } else {
-      bytes_written += rc;
-    }
-  } while (true);
-
-  return {action, bytes_written};
-}
-
-void ConnectionImpl::onConnected() { raiseEvent(ConnectionEvent::Connected); }
 
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
@@ -494,7 +443,7 @@ void ConnectionImpl::onWriteReady() {
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
       state_ &= ~InternalState::Connecting;
-      onConnected();
+      transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
         ENVOY_CONN_LOG(debug, "close during connected callback", *this);
@@ -507,7 +456,7 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  IoResult result = doWriteToSocket();
+  IoResult result = transport_socket_->doWrite(*write_buffer_);
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
