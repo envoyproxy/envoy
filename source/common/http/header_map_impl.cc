@@ -406,6 +406,9 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
     // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
     // even though we don't make any modifications, we need to cast_cast in order to use the
     // accessor.
+    //
+    // Making this work without const_cast would require managing an additional const accessor
+    // callback for each predefined inline header and add to the complexity of the code.
     StaticLookupResponse ref_lookup_response = cb(const_cast<HeaderMapImpl&>(*this));
     *entry = *ref_lookup_response.entry_;
     if (*entry) {
