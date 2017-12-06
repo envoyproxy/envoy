@@ -43,7 +43,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
                                          const std::vector<HostSharedPtr>&) -> void {
     // Update the host set to use for picking, based on the new state.
     best_available_host_set_ = bestAvailable(&priority_set_);
-    // If there's a local priority set, regenerate all routing.  If not, make
+    // If there's a local priority set, regenerate all routing. If not, make
     // sure per_priority_state_ is still large enough to not cause problems.
     if (local_priority_set_) {
       regenerateLocalityRoutingStructures(priority);
@@ -59,6 +59,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
         [this](uint32_t priority, const std::vector<HostSharedPtr>&,
                const std::vector<HostSharedPtr>&) -> void {
           ASSERT(priority == 0);
+          UNREFERENCED_PARAMETER(priority);
           regenerateLocalityRoutingStructures(best_available_priority());
         });
   }
