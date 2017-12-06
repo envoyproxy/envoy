@@ -2,7 +2,7 @@
 
 An original destination cluster forwards requests to the same destination
 the request was going to before being redirected to Envoy using an
-iptables REDIRECT rule.  `proxy_config.json` contains an example Envoy
+iptables REDIRECT rule. `proxy_config.json` contains an example Envoy
 configuration demonstrating the use of an original destination
 cluster. `netns_setup.sh` and `netns_cleanup.sh` are provided as
 examples for setting up and cleaning up, respectively, a network
@@ -21,7 +21,7 @@ the traffic matches `173.194.222.0/24` :
 
 ```
 sudo ./configs/original-dst-cluster/netns_setup.sh ns1 173.194.222.0/24
-``` 
+```
 
 # Building and running Envoy
 
@@ -71,6 +71,6 @@ the setup before:
 
 ```
 sudo ./configs/original-dst-cluster/netns_cleanup.sh ns1 173.194.222.0/24
-``` 
+```
 
 Finally, stop Envoy with `^C`.
