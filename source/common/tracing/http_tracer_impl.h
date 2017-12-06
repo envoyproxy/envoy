@@ -63,7 +63,6 @@ public:
   const std::string RESPONSE_SIZE = "response_size";
   const std::string STATUS = "status";
   const std::string UPSTREAM_CLUSTER = "upstream_cluster";
-  const std::string UPSTREAM_CLUSTER_NAME = "upstream_cluster_name";
   const std::string USER_AGENT = "user_agent";
   const std::string ZONE = "zone";
 
