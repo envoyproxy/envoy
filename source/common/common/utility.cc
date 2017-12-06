@@ -40,7 +40,7 @@ ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) 
   this->setg(ptr, ptr, ptr + size);
 }
 
-IMemoryStream::IMemoryStream(const char* data, size_t size)
+InputConstMemoryStream::InputConstMemoryStream(const char* data, size_t size)
     : ConstMemoryStreamBuffer{data, size}, std::istream{static_cast<std::streambuf*>(this)} {}
 
 bool DateUtil::timePointValid(SystemTime time_point) {

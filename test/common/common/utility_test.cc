@@ -38,9 +38,9 @@ TEST(ProdSystemTimeSourceTest, All) {
   source.currentTime();
 }
 
-TEST(IMemoryStream, All) {
+TEST(InputConstMemoryStream, All) {
   {
-    IMemoryStream istream{nullptr, 0};
+    InputConstMemoryStream istream{nullptr, 0};
     std::string s;
     istream >> s;
     EXPECT_TRUE(s.empty());
@@ -49,7 +49,7 @@ TEST(IMemoryStream, All) {
 
   {
     std::string data{"123"};
-    IMemoryStream istream{data.data(), data.size()};
+    InputConstMemoryStream istream{data.data(), data.size()};
     int x;
     istream >> x;
     EXPECT_EQ(123, x);
