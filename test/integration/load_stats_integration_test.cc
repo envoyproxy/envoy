@@ -290,6 +290,21 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   EXPECT_EQ(3, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
+  // Change to 50/50 for the failover clusters.
+  updateClusterLoadAssignment({}, {}, {3}, {4});
+  sendLoadStatsResponse({"cluster_0"}, 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+
+  for (uint32_t i = 0; i < 4; ++i) {
+    sendAndReceiveUpstream(i % 2 + 3);
+  }
+
+  waitForLoadStatsRequest(
+      {localityStats("winter", 2, 0, 0, 1), localityStats("dragon", 2, 0, 0, 1)});
+  EXPECT_EQ(3, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_EQ(4, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
   // 100% winter locality.
   updateClusterLoadAssignment({}, {}, {}, {});
   updateClusterLoadAssignment({1}, {}, {}, {});
@@ -301,24 +316,23 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   }
 
   waitForLoadStatsRequest({localityStats("winter", 1, 0, 0)});
-
-  EXPECT_EQ(3, test_server_->counter("load_reporter.requests")->value());
-  EXPECT_EQ(4, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(4, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_EQ(5, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   // A LoadStatsResponse arrives before the expiration of the reporting interval.
   sendLoadStatsResponse({"cluster_0"}, 1);
-  test_server_->waitForCounterGe("load_reporter.requests", 4);
+  test_server_->waitForCounterGe("load_reporter.requests", 5);
   sendAndReceiveUpstream(1);
   sendLoadStatsResponse({"cluster_0"}, 1);
-  test_server_->waitForCounterGe("load_reporter.requests", 5);
+  test_server_->waitForCounterGe("load_reporter.requests", 6);
   sendAndReceiveUpstream(1);
   sendAndReceiveUpstream(1);
 
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0)});
 
-  EXPECT_EQ(5, test_server_->counter("load_reporter.requests")->value());
-  EXPECT_EQ(5, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_EQ(6, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   cleanupLoadStatsConnection();

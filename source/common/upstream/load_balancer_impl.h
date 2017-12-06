@@ -47,6 +47,10 @@ protected:
 private:
   enum class LocalityRoutingState { NoLocalityRouting, LocalityDirect, LocalityResidual };
 
+  /**
+   * Increase per_priority_state_ to at leat |size|
+   *
+   */
   void resizePerPriorityState(uint32_t size);
 
   /**
@@ -76,14 +80,16 @@ private:
 
   uint32_t best_available_priority() { return best_available_host_set_->priority(); }
 
+  HostSet& local_host_set() { return *local_priority_set_->hostSetsPerPriority()[0]; }
+
+  // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
-  const PrioritySet* local_priority_set_;
   // The lowest priority host set from priority_set_ with healthy hosts, or the
   // zero-priority host set if all host sets are fully unhealthy.
   const HostSet* best_available_host_set_;
-  // The lowest priority host set from local_priority_set_ with healthy hosts.
-  // May be nullptr if local_priority_set_ is.
-  const HostSet* best_available_local_host_set_;
+
+  // The set of local Envoy instances which are load balancing across priority_set_
+  const PrioritySet* local_priority_set_;
 
   struct PerPriorityState {
     uint64_t local_percent_to_route_{};
@@ -91,6 +97,10 @@ private:
     std::vector<uint64_t> residual_capacity_;
   };
   typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  // Routing state broken out at a per-priority level.
+  // With the current implementation we could save some CPU and memory by only
+  // tracking this for best_available_host_set_ but as we support gentle
+  // failover it's useful to precompute it for all priority levels.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
 };

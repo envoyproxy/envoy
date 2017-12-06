@@ -9,6 +9,12 @@ final version.
 
 ## 1.6.0
 
+* Added transport socket interface to allow custom implementation of transport socket. A transport socket
+  provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
+  refactored with the interface.
+
+=============================================================
+
 Added supporting the priority field in eds LocalityLbEndpoints for several types of
 load balancer (RoundRobinLoadBalancer, LeastRequestLoadBalancer, RandomLoadBalancer)
 
@@ -17,7 +23,5 @@ priority LocalityLbEndpoints are sufficiently unhealthy.
 
 See :ref:`load balancer <arch_overview_load_balancing_priority_levels>` for details.
 
+=============================================================
 
-* Added transport socket interface to allow custom implementation of transport socket. A transport socket
-  provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
-  refactored with the interface.
