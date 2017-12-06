@@ -7,12 +7,10 @@
 namespace Envoy {
 namespace Http {
 
-namespace {
 static const std::regex& acceptEncodingRegex() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "(?!.*gzip;\\s*q=0(,|$))(?=(.*gzip)|(^\\*$))",
                          std::regex::optimize);
 }
-} // namespace
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
