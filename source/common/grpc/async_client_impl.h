@@ -260,12 +260,6 @@ private:
   friend class AsyncClientImpl<RequestType, ResponseType>;
 };
 
-class AsyncClientTracingConfig : public Tracing::EgressConfigImpl {
-public:
-};
-
-typedef ConstSingleton<AsyncClientTracingConfig> TracingConfig;
-
 template <class RequestType, class ResponseType>
 class AsyncRequestImpl : public AsyncRequest,
                          public AsyncStreamImpl<RequestType, ResponseType>,
@@ -278,7 +272,7 @@ public:
       : AsyncStreamImpl<RequestType, ResponseType>(parent, service_method, *this, timeout),
         request_(request), callbacks_(callbacks) {
 
-    current_span_ = parent_span.spawnChild(TracingConfig::get(),
+    current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                            "async " + parent.remote_cluster_name_ + " egress",
                                            ProdSystemTimeSource::instance_.currentTime());
     current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER_NAME, parent.remote_cluster_name_);

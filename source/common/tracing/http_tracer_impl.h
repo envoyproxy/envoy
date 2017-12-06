@@ -32,7 +32,7 @@ struct Decision {
  */
 class TracingTagValues {
 public:
-  /* OpenTracing standard tag names. */
+  // OpenTracing standard tag names.
   const std::string COMPONENT = "component";
   const std::string DB_INSTANCE = "db.instance";
   const std::string DB_STATEMENT = "db.statement";
@@ -51,7 +51,7 @@ public:
   const std::string PEER_SERVICE = "peer.service";
   const std::string SPAN_KIND = "span.kind";
 
-  /* Non-standard tag names. */
+  // Non-standard tag names.
   const std::string DOWNSTREAM_CLUSTER = "downstream_cluster";
   const std::string GRPC_STATUS_CODE = "grpc.status_code";
   const std::string GUID_X_CLIENT_TRACE_ID = "guid:x-client-trace-id";
@@ -67,7 +67,7 @@ public:
   const std::string USER_AGENT = "user_agent";
   const std::string ZONE = "zone";
 
-  /* Tag values. */
+  // Tag values.
   const std::string CANCELED = "canceled";
   const std::string PROXY = "proxy";
   const std::string TRUE = "true";
