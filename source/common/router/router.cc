@@ -750,6 +750,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         Tracing::EgressConfig::get(), "router " + parent.cluster_->name() + " egress",
         ProdSystemTimeSource::instance_.currentTime());
+    span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
   }
 
   request_info_.healthCheck(parent_.callbacks_->requestInfo().healthCheck());
