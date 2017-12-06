@@ -67,9 +67,9 @@ public:
 /**
  * Class used for creating non-copying std::istream's. See IMemoryStream below.
  */
-class MemoryStreamBuffer : public std::streambuf {
+class ConstMemoryStreamBuffer : public std::streambuf {
 public:
-  MemoryStreamBuffer(const char* data, size_t size);
+  ConstMemoryStreamBuffer(const char* data, size_t size);
 };
 
 /**
@@ -79,7 +79,7 @@ public:
  *
  * See https://stackoverflow.com/a/13059195/4447365.
  */
-class IMemoryStream : public virtual MemoryStreamBuffer, public std::istream {
+class IMemoryStream : public virtual ConstMemoryStreamBuffer, public std::istream {
 public:
   IMemoryStream(const char* data, size_t size);
 };
