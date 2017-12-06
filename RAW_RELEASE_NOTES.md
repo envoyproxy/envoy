@@ -18,4 +18,6 @@ priority LocalityLbEndpoints are sufficiently unhealthy.
 See :ref:`load balancer <arch_overview_load_balancing_priority_levels>` for details.
 
 
-
+* Added transport socket interface to allow custom implementation of transport socket. A transport socket
+  provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
+  refactored with the interface.
