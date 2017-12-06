@@ -125,6 +125,7 @@ private:
   bool isMinimumContentLength(const HeaderMap& headers) const;
   bool isEtagAllowed(const HeaderMap& headers) const;
   bool isLastModifiedAllowed(const HeaderMap& headers) const;
+  bool isTransferEncodingAllowed(const HeaderMap& headers) const;
 
   bool skip_compression_;
 

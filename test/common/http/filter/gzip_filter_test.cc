@@ -257,6 +257,22 @@ TEST_F(GzipFilterTest, EtagDefault) {
       {{":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}});
 }
 
+// Transfer-Encoding chunked.
+TEST_F(GzipFilterTest, TransferEncodingChunked) {
+  setUpTest(R"EOF({})EOF");
+  doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
+  doResponseCompression(
+      {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "chunked"}});
+}
+
+// Transfer-Encoding gzip.
+TEST_F(GzipFilterTest, TransferEncodingGzip) {
+  setUpTest(R"EOF({})EOF");
+  doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
+  doResponseNoCompression(
+      {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "gzip"}});
+}
+
 // Content-Encoding: encoded response from upstream.
 TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
   setUpTest(R"EOF({})EOF");

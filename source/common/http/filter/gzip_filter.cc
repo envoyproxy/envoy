@@ -2,8 +2,17 @@
 
 #include <regex>
 
+#include "common/common/macros.h"
+
 namespace Envoy {
 namespace Http {
+
+namespace {
+static const std::regex& acceptEncodingRegex() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "(?!.*gzip;\\s*q=0(,|$))(?=(.*gzip)|(^\\*$))",
+                         std::regex::optimize);
+}
+} // namespace
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
@@ -23,10 +32,9 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(gsagula): should also inspect transfer-encoding header.
-  if (headers.ContentEncoding() == nullptr && isContentTypeAllowed(headers) &&
-      isMinimumContentLength(headers) && isCacheControlAllowed(headers) && isEtagAllowed(headers) &&
-      isLastModifiedAllowed(headers)) {
+  if (isMinimumContentLength(headers) && isContentTypeAllowed(headers) &&
+      isCacheControlAllowed(headers) && isEtagAllowed(headers) && isLastModifiedAllowed(headers) &&
+      isTransferEncodingAllowed(headers) && headers.ContentEncoding() == nullptr) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->getCompressionLevel(), config_->getCompressionStrategy(), 31,
@@ -36,7 +44,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
   }
 
   return Http::FilterHeadersStatus::Continue;
-} // namespace Http
+}
 
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (skip_compression_) {
@@ -64,16 +72,14 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
 
 bool GzipFilter::isAcceptEncodingGzip(const HeaderMap& headers) const {
   if (headers.AcceptEncoding() != nullptr) {
-    return std::regex_search(
-        headers.AcceptEncoding()->value().c_str(),
-        std::regex{"(?!.*gzip;\\s*q=0(,|$))(?=(.*gzip)|(^\\*$))", std::regex::optimize});
+    return std::regex_search(headers.AcceptEncoding()->value().c_str(), acceptEncodingRegex());
   }
   return false;
 }
 
 bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
   if (config_->getContentTypeValues().size() > 0 && headers.ContentType() != nullptr) {
-    for (auto const& value : config_->getContentTypeValues()) {
+    for (const auto& value : config_->getContentTypeValues()) {
       if (headers.ContentType()->value().find(value.c_str())) {
         return true;
       }
@@ -85,7 +91,7 @@ bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
 
 bool GzipFilter::isCacheControlAllowed(const HeaderMap& headers) const {
   if (config_->getCacheControlValues().size() > 0 && headers.CacheControl() != nullptr) {
-    for (auto const& value : config_->getCacheControlValues()) {
+    for (const auto& value : config_->getCacheControlValues()) {
       if (headers.CacheControl()->value().find(value.c_str())) {
         return true;
       }
@@ -110,6 +116,13 @@ bool GzipFilter::isEtagAllowed(const HeaderMap& headers) const {
 
 bool GzipFilter::isLastModifiedAllowed(const HeaderMap& headers) const {
   return config_->isDisableOnLastModified() ? headers.LastModified() == nullptr : true;
+}
+
+bool GzipFilter::isTransferEncodingAllowed(const HeaderMap& headers) const {
+  return headers.TransferEncoding() != nullptr
+             ? !headers.TransferEncoding()->value().find(
+                   Http::Headers::get().TransferEncodingValues.Gzip.c_str())
+             : true;
 }
 
 } // namespace Http

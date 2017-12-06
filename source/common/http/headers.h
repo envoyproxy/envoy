@@ -160,6 +160,7 @@ public:
 
   struct {
     const std::string Chunked{"chunked"};
+    const std::string Gzip{"gzip"};
   } TransferEncodingValues;
 
   struct {
