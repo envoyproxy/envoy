@@ -25,7 +25,7 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2.  Install external dependencies libtool, cmake, and realpath libraries separately.
+2. Install external dependencies libtool, cmake, and realpath libraries separately.
 On Ubuntu, run the following commands:
 ```
  apt-get install libtool
@@ -52,7 +52,7 @@ brew install automake
 Envoy compiles and passes tests with the version of clang installed by XCode 8.3.3:
 Apple LLVM version 8.1.0 (clang-802.0.42).
 
-3.  Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
+3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 4. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
 5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
@@ -155,9 +155,9 @@ bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=stand
 # Stack trace symbol resolution
 
 Envoy can produce backtraces on demand and from assertions and other fatal
-actions like segfaults.  The stack traces written in the log or to stderr contain
-addresses rather than resolved symbols.  The `tools/stack_decode.py` script exists
-to process the output and do symbol resolution to make the stack traces useful.  Any
+actions like segfaults. The stack traces written in the log or to stderr contain
+addresses rather than resolved symbols. The `tools/stack_decode.py` script exists
+to process the output and do symbol resolution to make the stack traces useful. Any
 log lines not relevant to the backtrace capability are passed through the script unchanged
 (it acts like a filter).
 
@@ -178,9 +178,9 @@ You will need to use either a `dbg` build type or the `opt` build type to get sy
 information in the binaries.
 
 By default main.cc will install signal handlers to print backtraces at the
-location where a fatal signal occurred.  The signal handler will re-raise the
+location where a fatal signal occurred. The signal handler will re-raise the
 fatal signal with the default handler so a core file will still be dumped after
-the stack trace is logged.  To inhibit this behavior use
+the stack trace is logged. To inhibit this behavior use
 `--define=signal_trace=disabled` on the Bazel command line. No signal handlers will
 be installed.
 
@@ -254,7 +254,7 @@ The default maximum number of stats in shared memory, and the default
 maximum length of a cluster/route config/listener name, can be
 overriden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
 `ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`, respectively, to the desired
-value.  For example:
+value. For example:
 
 ```
 bazel build --copts=-DENVOY_DEFAULT_MAX_STATS=32768 --copts=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static

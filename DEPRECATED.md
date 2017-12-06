@@ -23,7 +23,7 @@ The following features have been DEPRECATED and will be removed in the specified
 * Config option `http_codec_options` has been deprecated and has been replaced with `http2_settings`.
 * The following log macros have been deprecated: `log_trace`, `log_debug`, `conn_log`,
   `conn_log_info`, `conn_log_debug`, `conn_log_trace`, `stream_log`, `stream_log_info`,
-  `stream_log_debug`, `stream_log_trace`.  For replacements, please see
+  `stream_log_debug`, `stream_log_trace`. For replacements, please see
   [logger.h](https://github.com/envoyproxy/envoy/blob/master/source/common/common/logger.h).
 * The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and
   replaced with a more general connection() callback, which, when not returning a nullptr, can be
