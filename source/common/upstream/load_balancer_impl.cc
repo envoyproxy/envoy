@@ -53,7 +53,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
   });
   if (local_priority_set_) {
     // Multiple priorities are unsupported for local priority sets.
-    // TODO(alysswilk) find the right place to reject config with this.
+    // TODO(alyssawilk) find the right place to reject config with this.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
         [this](uint32_t priority, const std::vector<HostSharedPtr>&,
