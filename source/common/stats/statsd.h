@@ -65,7 +65,6 @@ private:
   const bool use_tag_;
 };
 
-
 /**
  * Per thread implementation of a TCP stats flusher for statsd.
  */
