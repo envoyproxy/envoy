@@ -41,15 +41,13 @@ class LightStepDriver : public OpenTracingDriver {
 public:
   LightStepDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                   Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options);
+                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
+                  PropagationMode propagation_mode);
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
-  void setPropagationMode(PropagationMode propagation_mode) {
-    propagation_mode_ = propagation_mode;
-  }
 
   // Tracer::OpenTracingDriver
   const opentracing::Tracer& tracer() const override;
@@ -105,7 +103,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
-  PropagationMode propagation_mode_ = PropagationMode::TracerNative;
+  PropagationMode propagation_mode_;
 };
 
 } // Tracing

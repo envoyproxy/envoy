@@ -39,7 +39,9 @@ namespace Tracing {
 
 class LightStepDriverTest : public Test {
 public:
-  void setup(Json::Object& config, bool init_timer) {
+  void setup(Json::Object& config, bool init_timer,
+             OpenTracingDriver::PropagationMode propagation_mode =
+                 OpenTracingDriver::PropagationMode::TracerNative) {
     std::unique_ptr<lightstep::LightStepTracerOptions> opts(
         new lightstep::LightStepTracerOptions());
     opts->access_token = "sample_token";
@@ -53,10 +55,12 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
     }
 
-    driver_.reset(new LightStepDriver(config, cm_, stats_, tls_, runtime_, std::move(opts)));
+    driver_.reset(new LightStepDriver{config, cm_, stats_, tls_, runtime_, std::move(opts),
+                                      propagation_mode});
   }
 
-  void setupValidDriver() {
+  void setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
+                            OpenTracingDriver::PropagationMode::TracerNative) {
     EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
@@ -66,7 +70,7 @@ public:
     )EOF";
     Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
-    setup(*loader, true);
+    setup(*loader, true, propagation_mode);
   }
 
   const std::string operation_name_{"test"};
@@ -317,12 +321,10 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 }
 
 TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
-  setupValidDriver();
-
   for (OpenTracingDriver::PropagationMode propagation_mode :
        {OpenTracingDriver::PropagationMode::SingleHeader,
         OpenTracingDriver::PropagationMode::TracerNative}) {
-    driver_->setPropagationMode(propagation_mode);
+    setupValidDriver(propagation_mode);
 
     // Supply bogus context, that will be simply ignored.
     const std::string invalid_context = "notvalidcontext";

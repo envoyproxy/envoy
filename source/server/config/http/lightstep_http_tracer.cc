@@ -25,11 +25,11 @@ LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
   StringUtil::rtrim(opts->access_token);
   opts->component_name = server.localInfo().clusterName();
 
-  Tracing::DriverPtr lightstep_driver(
-      new Tracing::LightStepDriver(json_config, cluster_manager, server.stats(),
-                                   server.threadLocal(), server.runtime(), std::move(opts)));
-  return Tracing::HttpTracerPtr(
-      new Tracing::HttpTracerImpl(std::move(lightstep_driver), server.localInfo()));
+  Tracing::DriverPtr lightstep_driver{new Tracing::LightStepDriver{
+      json_config, cluster_manager, server.stats(), server.threadLocal(), server.runtime(),
+      std::move(opts), Tracing::OpenTracingDriver::PropagationMode::TracerNative}};
+  return Tracing::HttpTracerPtr{
+      new Tracing::HttpTracerImpl{std::move(lightstep_driver), server.localInfo()}};
 }
 
 std::string LightstepHttpTracerFactory::name() { return Config::HttpTracerNames::get().LIGHTSTEP; }
