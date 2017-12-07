@@ -88,17 +88,17 @@ const std::string buildTagStr(const std::vector<Tag>& tags) {
     return {};
   }
 
-  std::string tagStr = "|#";
+  std::string tag_str = "|#";
   int i = 0;
   for (const Tag& tag : tags) {
     if (i == 0) {
-      tagStr.append(fmt::format("{}:{}", tag.name_, tag.value_));
+      tag_str.append(fmt::format("{}:{}", tag.name_, tag.value_));
     } else {
-      tagStr.append(fmt::format(",{}:{}", tag.name_, tag.value_));
+      tag_str.append(fmt::format(",{}:{}", tag.name_, tag.value_));
     }
     i++;
   }
-  return tagStr;
+  return tag_str;
 }
 
 char TcpStatsdSink::STAT_PREFIX[] = "envoy.";
