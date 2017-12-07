@@ -62,7 +62,7 @@ private:
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
-  bool useTag_;
+  const bool use_tag_;
 };
 
 

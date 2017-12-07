@@ -54,8 +54,8 @@ void Writer::send(const std::string& message) {
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
-                             Network::Address::InstanceConstSharedPtr address, bool useTag)
-    : tls_(tls.allocateSlot()), server_address_(address), useTag_(useTag) {
+                             Network::Address::InstanceConstSharedPtr address, const bool use_tag)
+    : tls_(tls.allocateSlot()), server_address_(address), use_tag_(use_tag) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
@@ -76,7 +76,7 @@ void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t val
 }
 
 std::string UdpStatsdSink::getName(const Metric& metric) {
-  if (useTag_) {
+  if (use_tag_) {
     return metric.tagExtractedName();
   } else {
     return metric.name();
@@ -84,7 +84,7 @@ std::string UdpStatsdSink::getName(const Metric& metric) {
 }
 
 const std::string UdpStatsdSink::buildTagStr(const std::vector<Tag>& tags) {
-  if (!useTag_ || tags.empty()) {
+  if (!use_tag_ || tags.empty()) {
     return {};
   }
 
