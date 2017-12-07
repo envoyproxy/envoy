@@ -334,10 +334,11 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   headers.Host()->value(host_rewrite_);
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers) const {
-  response_headers_parser_->evaluateResponseHeaders(headers);
-  vhost_.responseHeaderParser().evaluateResponseHeaders(headers);
-  vhost_.globalRouteConfig().responseHeaderParser().evaluateResponseHeaders(headers);
+void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
+                                                 const AccessLog::RequestInfo& request_info) const {
+  response_headers_parser_->evaluateResponseHeaders(headers, request_info);
+  vhost_.responseHeaderParser().evaluateResponseHeaders(headers, request_info);
+  vhost_.globalRouteConfig().responseHeaderParser().evaluateResponseHeaders(headers, request_info);
 }
 
 Optional<RouteEntryImplBase::RuntimeData>

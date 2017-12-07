@@ -306,7 +306,8 @@ public:
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const AccessLog::RequestInfo& request_info) const override;
-  void finalizeResponseHeaders(Http::HeaderMap& headers) const override;
+  void finalizeResponseHeaders(Http::HeaderMap& headers,
+                               const AccessLog::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -369,8 +370,9 @@ private:
                                 const AccessLog::RequestInfo& request_info) const override {
       return parent_->finalizeRequestHeaders(headers, request_info);
     }
-    void finalizeResponseHeaders(Http::HeaderMap& headers) const override {
-      return parent_->finalizeResponseHeaders(headers);
+    void finalizeResponseHeaders(Http::HeaderMap& headers,
+                                 const AccessLog::RequestInfo& request_info) const override {
+      return parent_->finalizeResponseHeaders(headers, request_info);
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }

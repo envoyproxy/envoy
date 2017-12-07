@@ -1,7 +1,7 @@
 #pragma once
 
-#include <list>
 #include <string>
+#include <vector>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/header_map.h"
@@ -18,13 +18,12 @@ class RequestHeaderParser;
 typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
 
 /**
- * This class holds the parsing logic required during configuration build and
- * also perform evaluation for the variables at runtime.
+ * This class provides request-time generation of upstream request headers. Header configurations
+ * are pre-parsed to select between constant values and values based on the evaluation of
+ * AccessLog::RequestInfo fields.
  */
 class RequestHeaderParser {
 public:
-  virtual ~RequestHeaderParser() {}
-
   static RequestHeaderParserPtr
   parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
@@ -32,36 +31,28 @@ public:
                               const AccessLog::RequestInfo& request_info) const;
 
 private:
-  std::list<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
-
-  static HeaderFormatterPtr parseInternal(const std::string& format, const bool append);
+  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
 };
 
 class ResponseHeaderParser;
 typedef std::unique_ptr<ResponseHeaderParser> ResponseHeaderParserPtr;
 
 /**
- * This class holds the logic required to apply response headers additions and removals.
+ * This class provides request-time generation of response headers. Header configurations are
+ * assumed to reference constant values.
  */
 class ResponseHeaderParser {
 public:
-  virtual ~ResponseHeaderParser() {}
-
   static ResponseHeaderParserPtr
   parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add,
         const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove);
 
-  void evaluateResponseHeaders(Http::HeaderMap& headers) const;
+  void evaluateResponseHeaders(Http::HeaderMap& headers,
+                               const AccessLog::RequestInfo& request_info) const;
 
 private:
-  struct HeaderAddition {
-    const Http::LowerCaseString header_;
-    const std::string value_;
-    const bool append_;
-  };
-
-  std::list<HeaderAddition> headers_to_add_;
-  std::list<Http::LowerCaseString> headers_to_remove_;
+  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;
+  std::vector<Http::LowerCaseString> headers_to_remove_;
 };
 
 } // namespace Router

@@ -28,37 +28,37 @@ static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) 
   return route;
 }
 
-TEST(RequestHeaderFormatterTest, TestFormatWithClientIpVariable) {
+TEST(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "CLIENT_IP";
-  RequestHeaderFormatter requestHeaderFormatter(variable, false);
-  const std::string formatted_string = requestHeaderFormatter.format(request_info);
+  RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
+  const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
   EXPECT_EQ(downstream_addr, formatted_string);
 }
 
-TEST(RequestHeaderFormatterTest, TestFormatWithProtocolVariable) {
+TEST(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
   const std::string variable = "PROTOCOL";
-  RequestHeaderFormatter requestHeaderFormatter(variable, false);
-  const std::string formatted_string = requestHeaderFormatter.format(request_info);
+  RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
+  const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
   EXPECT_EQ("HTTP/1.1", formatted_string);
 }
 
-TEST(RequestHeaderFormatterTest, WrongVariableToFormat) {
+TEST(RequestInfoHeaderFormatterTest, WrongVariableToFormat) {
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "INVALID_VARIABLE";
-  EXPECT_THROW_WITH_MESSAGE(RequestHeaderFormatter requestHeaderFormatter(variable, false),
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false),
                             EnvoyException,
                             "field 'INVALID_VARIABLE' not supported as custom request header");
 }
 
-TEST(RequestHeaderFormatterTest, WrongFormatOnVariable) {
+TEST(RequestInfoHeaderFormatterTest, WrongFormatOnVariable) {
   const std::string json = R"EOF(
   {
     "prefix": "/new_endpoint",
