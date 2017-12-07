@@ -135,6 +135,11 @@ public:
   virtual Tracing::Span& activeSpan() PURE;
 
   /**
+   * @return tracing configuration.
+   */
+  virtual const Tracing::Config& tracingConfig() PURE;
+
+  /**
    * @return the trusted downstream address for the connection.
    */
   virtual const std::string& downstreamAddress() PURE;

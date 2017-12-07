@@ -210,6 +210,7 @@ private:
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
+  const Tracing::Config& tracingConfig() override { return tracing_config_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
@@ -229,6 +230,7 @@ private:
   Router::ProdFilter router_;
   AccessLog::RequestInfoImpl request_info_;
   Tracing::NullSpan active_span_;
+  const Tracing::Config& tracing_config_;
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};
