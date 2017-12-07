@@ -58,13 +58,13 @@ public:
 
 private:
   std::string getName(const Metric& metric);
+  const std::string buildTagStr(const std::vector<Tag>& tags);
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
   bool useTag_;
 };
 
-const std::string buildTagStr(const std::vector<Tag>& tags);
 
 /**
  * Per thread implementation of a TCP stats flusher for statsd.
