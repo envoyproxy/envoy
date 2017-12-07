@@ -3,7 +3,8 @@
 #include "envoy/http/protocol.h"
 
 #include "common/config/rds_json.h"
-#include "common/router/req_header_formatter.h"
+#include "common/router/header_formatter.h"
+#include "common/router/header_parser.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"

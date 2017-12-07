@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 
-#include "common/access_log/access_log_formatter.h"
+#include "envoy/access_log/access_log.h"
+
 #include "common/protobuf/protobuf.h"
 
 #include "api/rds.pb.h"
@@ -62,29 +62,6 @@ public:
 private:
   const std::string static_value_;
   const bool append_;
-};
-
-class RequestHeaderParser;
-typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
-
-/**
- * This class holds the parsing logic required during configuration build and
- * also perform evaluation for the variables at runtime.
- */
-class RequestHeaderParser {
-public:
-  virtual ~RequestHeaderParser() {}
-
-  static RequestHeaderParserPtr
-  parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
-
-  void evaluateRequestHeaders(Http::HeaderMap& headers,
-                              const AccessLog::RequestInfo& request_info) const;
-
-private:
-  std::list<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
-
-  static HeaderFormatterPtr parseInternal(const std::string& format, const bool append);
 };
 
 } // namespace Router

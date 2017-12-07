@@ -3,14 +3,39 @@
 #include <list>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/http/header_map.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/router/header_formatter.h"
 
 #include "api/base.pb.h"
 
 namespace Envoy {
 namespace Router {
+
+class RequestHeaderParser;
+typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
+
+/**
+ * This class holds the parsing logic required during configuration build and
+ * also perform evaluation for the variables at runtime.
+ */
+class RequestHeaderParser {
+public:
+  virtual ~RequestHeaderParser() {}
+
+  static RequestHeaderParserPtr
+  parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
+
+  void evaluateRequestHeaders(Http::HeaderMap& headers,
+                              const AccessLog::RequestInfo& request_info) const;
+
+private:
+  std::list<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
+
+  static HeaderFormatterPtr parseInternal(const std::string& format, const bool append);
+};
 
 class ResponseHeaderParser;
 typedef std::unique_ptr<ResponseHeaderParser> ResponseHeaderParserPtr;
