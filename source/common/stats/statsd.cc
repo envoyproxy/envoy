@@ -92,7 +92,8 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Tag>& tags) {
   int i = 0;
   for (const Tag& tag : tags) {
     if (i == 0) {
-      tag_str.append(fmt::format("{}:{}", tag.name_, tag.value_));
+      std::vector<std::string> v = {tag.name_, tag.value_};
+      tag_str.append(StringUtil::join(v, ":"));
     } else {
       tag_str.append(fmt::format(",{}:{}", tag.name_, tag.value_));
     }
