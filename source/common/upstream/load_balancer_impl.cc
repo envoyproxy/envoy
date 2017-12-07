@@ -62,7 +62,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
           UNREFERENCED_PARAMETER(priority);
           // If the set of local Envoys changes, regenerate routing based on potential changes to
           // the set of servers routing to priority_set_.
-          regenerateLocalityRoutingStructures(best_available_priority());
+          regenerateLocalityRoutingStructures(bestAvailablePriority());
         });
   }
 }
@@ -94,7 +94,7 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   ASSERT(num_localities > 0);
 
   uint64_t local_percentage[num_localities];
-  calculateLocalityPercentage(local_host_set().healthyHostsPerLocality(), local_percentage);
+  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage);
 
   uint64_t upstream_percentage[num_localities];
   calculateLocalityPercentage(host_set.healthyHostsPerLocality(), upstream_percentage);
@@ -169,7 +169,7 @@ bool LoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
 
   // Same number of localities should be for local and upstream cluster.
   if (host_set.healthyHostsPerLocality().size() !=
-      local_host_set().healthyHostsPerLocality().size()) {
+      localHostSet().healthyHostsPerLocality().size()) {
     stats_.lb_zone_number_differs_.inc();
     return true;
   }
@@ -213,7 +213,7 @@ void LoadBalancerBase::calculateLocalityPercentage(
 }
 
 const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts() {
-  PerPriorityState& state = *per_priority_state_[best_available_priority()];
+  PerPriorityState& state = *per_priority_state_[bestAvailablePriority()];
   ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
   // At this point it's guaranteed to be at least 2 localities.
@@ -273,7 +273,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
 
   // If we've latched that we can't do priority-based routing, return healthy
   // hosts for the best available priority.
-  if (per_priority_state_[best_available_priority()]->locality_routing_state_ ==
+  if (per_priority_state_[bestAvailablePriority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
     return best_available_host_set_->healthyHosts();
   }
@@ -283,7 +283,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
     return best_available_host_set_->healthyHosts();
   }
 
-  if (LoadBalancerUtility::isGlobalPanic(local_host_set(), runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(localHostSet(), runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.

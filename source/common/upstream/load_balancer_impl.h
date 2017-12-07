@@ -85,9 +85,9 @@ private:
    */
   void regenerateLocalityRoutingStructures(uint32_t priority);
 
-  uint32_t best_available_priority() const { return best_available_host_set_->priority(); }
+  uint32_t bestAvailablePriority() const { return best_available_host_set_->priority(); }
 
-  HostSet& local_host_set() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
+  HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
