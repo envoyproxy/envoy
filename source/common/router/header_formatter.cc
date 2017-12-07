@@ -20,8 +20,7 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_
       return request_info.getDownstreamAddress();
     };
   } else {
-    throw EnvoyException(
-        fmt::format("field '{}' not supported as custom request header", field_name));
+    throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }
 }
 

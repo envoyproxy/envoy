@@ -1,12 +1,10 @@
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-
-#include "common/protobuf/protobuf.h"
-
-#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Router {

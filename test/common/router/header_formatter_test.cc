@@ -55,7 +55,7 @@ TEST(RequestInfoHeaderFormatterTest, WrongVariableToFormat) {
   const std::string variable = "INVALID_VARIABLE";
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false),
                             EnvoyException,
-                            "field 'INVALID_VARIABLE' not supported as custom request header");
+                            "field 'INVALID_VARIABLE' not supported as custom header");
 }
 
 TEST(RequestInfoHeaderFormatterTest, WrongFormatOnVariable) {

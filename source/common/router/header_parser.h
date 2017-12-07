@@ -14,6 +14,16 @@
 namespace Envoy {
 namespace Router {
 
+class HeaderParserBase {
+protected:
+  void addHeaders(Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info) const;
+
+  void
+  setHeadersToAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
+
+  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
+};
+
 class RequestHeaderParser;
 typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
 
@@ -22,26 +32,24 @@ typedef std::unique_ptr<RequestHeaderParser> RequestHeaderParserPtr;
  * are pre-parsed to select between constant values and values based on the evaluation of
  * AccessLog::RequestInfo fields.
  */
-class RequestHeaderParser {
+class RequestHeaderParser : public HeaderParserBase {
 public:
   static RequestHeaderParserPtr
   parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers);
 
   void evaluateRequestHeaders(Http::HeaderMap& headers,
                               const AccessLog::RequestInfo& request_info) const;
-
-private:
-  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> header_formatters_;
 };
 
 class ResponseHeaderParser;
 typedef std::unique_ptr<ResponseHeaderParser> ResponseHeaderParserPtr;
 
 /**
- * This class provides request-time generation of response headers. Header configurations are
- * assumed to reference constant values.
+ * This class provides request-time manipulation of response headers. Header configurations are
+ * pre-parsed to select between constant values and values based on the evaluation of
+ * AccessLog::RequestInfo fields.
  */
-class ResponseHeaderParser {
+class ResponseHeaderParser : public HeaderParserBase {
 public:
   static ResponseHeaderParserPtr
   parse(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add,
@@ -51,7 +59,6 @@ public:
                                const AccessLog::RequestInfo& request_info) const;
 
 private:
-  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
 };
 
