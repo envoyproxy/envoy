@@ -282,7 +282,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
     sendAndReceiveUpstream((i + 1) % 3);
   }
 
-  // No locality for priotiy=1 since there's no "winter" endpoints.
+  // No locality for priority=1 since there's no "winter" endpoints.
   // The hosts for dragon were receiced because membership_total is accurate.
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 4, 0, 0)});
 
@@ -309,7 +309,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   updateClusterLoadAssignment({}, {}, {}, {});
   updateClusterLoadAssignment({1}, {}, {}, {});
   sendLoadStatsResponse({"cluster_0"}, 1);
-  test_server_->waitForCounterGe("load_reporter.requests", 3);
+  test_server_->waitForCounterGe("load_reporter.requests", 4);
 
   for (uint32_t i = 0; i < 1; ++i) {
     sendAndReceiveUpstream(1);
