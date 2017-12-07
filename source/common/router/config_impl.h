@@ -16,8 +16,8 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/router/config_utility.h"
-#include "common/router/req_header_formatter.h"
-#include "common/router/resp_header_parser.h"
+#include "common/router/header_formatter.h"
+#include "common/router/header_parser.h"
 #include "common/router/router_ratelimit.h"
 
 #include "api/rds.pb.h"
