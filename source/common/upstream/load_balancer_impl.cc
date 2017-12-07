@@ -38,17 +38,17 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
     : stats_(stats), runtime_(runtime), random_(random), priority_set_(priority_set),
       best_available_host_set_(bestAvailable(&priority_set)),
       local_priority_set_(local_priority_set) {
-  resizePerPriorityState(priority_set.hostSetsPerPriority().size());
+  resizePerPriorityState();
   priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
                                          const std::vector<HostSharedPtr>&) -> void {
     // Update the host set to use for picking, based on the new state.
     best_available_host_set_ = bestAvailable(&priority_set_);
-    // If there's a local priority set, regenerate all routing. If not, make
-    // sure per_priority_state_ is still large enough to not cause problems.
+    // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
+    resizePerPriorityState();
+    // If there's a local priority set, regenerate all routing based on a potential size change to
+    // the hosts routed to.
     if (local_priority_set_) {
       regenerateLocalityRoutingStructures(priority);
-    } else {
-      resizePerPriorityState(priority_set_.hostSetsPerPriority().size());
     }
   });
   if (local_priority_set_) {
@@ -60,6 +60,8 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
                const std::vector<HostSharedPtr>&) -> void {
           ASSERT(priority == 0);
           UNREFERENCED_PARAMETER(priority);
+          // If the set of local Envoys changes, regenerate routing based on potential changes to
+          // the set of servers routing to priority_set_.
           regenerateLocalityRoutingStructures(best_available_priority());
         });
   }
@@ -74,7 +76,11 @@ LoadBalancerBase::~LoadBalancerBase() {
 void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
-  resizePerPriorityState(priority + 1);
+  // This should never happen unless someone uses unsupported priorities for local priority sets.
+  // Do error handling until such config is rejected, then it will change to an ASSERT
+  if (priority > priority_set_.hostSetsPerPriority().size() - 1) {
+    return;
+  }
 
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.
@@ -140,12 +146,10 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   }
 };
 
-void LoadBalancerBase::resizePerPriorityState(uint32_t size) {
-  size = std::max<uint32_t>(size, priority_set_.hostSetsPerPriority().size());
-  if (per_priority_state_.size() < size) {
-    for (size_t i = 0; i < size - per_priority_state_.size() + 1; ++i) {
-      per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
-    }
+void LoadBalancerBase::resizePerPriorityState() {
+  uint32_t size = priority_set_.hostSetsPerPriority().size();
+  while (per_priority_state_.size() < size) {
+    per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
   }
 }
 
