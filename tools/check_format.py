@@ -9,7 +9,8 @@ import sys
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-", "./bazel/external")
-SUFFIXES = (".cc", ".h", "BUILD")
+SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst")
+DOCS_SUFFIX = (".md", ".rst")
 
 # Files in these paths can make reference to protobuf stuff directly
 GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf')
@@ -104,6 +105,9 @@ def checkFilePath(file_path):
     checkProtobufExternalDepsBuild(file_path)
     return
   checkFileContents(file_path)
+
+  if file_path.endswith(DOCS_SUFFIX):
+    return
   checkNamespace(file_path)
   checkProtobufExternalDeps(file_path)
   command = ("%s %s | diff -q %s - > /dev/null" % (HEADER_ORDER_PATH, file_path,
@@ -124,6 +128,8 @@ def fixFilePath(file_path):
       printError("buildifier rewrite failed for file: %s" % file_path)
     return
   fixFileContents(file_path)
+  if file_path.endswith(DOCS_SUFFIX):
+    return
   if not checkNamespace(file_path) or not checkProtobufExternalDepsBuild(
       file_path) or not checkProtobufExternalDeps(file_path):
     printError("This cannot be automatically corrected. Please fix by hand.")
