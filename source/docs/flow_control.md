@@ -1,10 +1,10 @@
 ### Overview
 
-Flow control in Envoy is done by having limits on each buffer, and watermark callbacks.  When a
+Flow control in Envoy is done by having limits on each buffer, and watermark callbacks. When a
 buffer contains more data than the configured limit, the high watermark callback will fire, kicking
-off a chain of events which eventually informs the data source to stop sending data.  This back-off
+off a chain of events which eventually informs the data source to stop sending data. This back-off
 may be immediate (stop reading from a socket) or gradual (stop HTTP/2 window updates) so all
-buffer limits in Envoy are considered soft limits.  When the buffer eventually drains (generally to
+buffer limits in Envoy are considered soft limits. When the buffer eventually drains (generally to
 half of of the high watermark to avoid thrashing back and forth) the low watermark callback will
 fire, informing the sender it can resume sending data.
 
@@ -17,7 +17,7 @@ filter.
 The downstream flow control goes as follows.
 
  * The downstream `Network::ConnectionImpl::write_buffer_` buffers too much
-   data.  It calls
+   data. It calls
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * The `Network::TcpProxy::DownstreamCallbacks` receives
    `onAboveWriteBufferHighWatermark()` and calls `readDisable(true)` on the upstream
@@ -31,7 +31,7 @@ The downstream flow control goes as follows.
 Flow control for the upstream path is much the same.
 
  * The upstream `Network::ConnectionImpl::write_buffer_` buffers too much
-   data.  It calls
+   data. It calls
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * The Network::TcpProxy::UpstreamCallbacks receives
    `onAboveWriteBufferHighWatermark()` and calls `readDisable(true)` on the downstream
@@ -50,60 +50,60 @@ going over the watermark limit to disabling data from the data source is documen
 ![HTTP2 data flow diagram](h2_buffers.png)
 
 For HTTP/2, when filters, streams, or connections back up, the end result is `readDisable(true)`
-being called on the source stream.  This results in the stream ceasing to consume window, and so
-not sending further flow control window updates to the peer.  This will result in the peer
+being called on the source stream. This results in the stream ceasing to consume window, and so
+not sending further flow control window updates to the peer. This will result in the peer
 eventually stopping sending data when the available window is consumed (or nghttp2 closing the
 connection if the peer violates the flow control limit) and so limiting the amount of data Envoy
-will buffer for each stream.  When `readDisable(false)` is called, any outstanding unconsumed data
+will buffer for each stream. When `readDisable(false)` is called, any outstanding unconsumed data
 is immediately consumed, which results in resuming window updates to the peer and the resumption of
 data.
 
-Note that `readDisable(true)` on a stream may be called by multiple entities.  It is called when any
+Note that `readDisable(true)` on a stream may be called by multiple entities. It is called when any
 filter buffers too much, when the stream backs up and has too much data buffered, or the
-connection has too much data buffered.  Because of this, `readDisable()` maintains a count of
+connection has too much data buffered. Because of this, `readDisable()` maintains a count of
 the number of times it has been called to both enable and disable the stream,  resuming reads when
-each caller has called the equivalent low watermark callback.  For example, if
+each caller has called the equivalent low watermark callback. For example, if
 the TCP window upstream fills up and results in the network buffer backing up,
 all the streams associated with that connection will `readDisable(true)` their
-downstream data sources.   When the HTTP/2 flow control window fills up an
+downstream data sources. When the HTTP/2 flow control window fills up an
 individual stream may use all of the window available and call a second
-`readDisable(true)` on its downstream data source.  When the upstream TCP socket drains,
+`readDisable(true)` on its downstream data source. When the upstream TCP socket drains,
 the connection will go below its low watermark and each stream will call
-`readDisable(false)` to resume the flow of data.   The stream which had both a
+`readDisable(false)` to resume the flow of data. The stream which had both a
 network level block and a H2 flow control block will still not be fully enabled.
 Once the upstream peer sends window updates, the stream buffer will drain and
 the second `readDisable(false)` will be called on the downstream data source,
 which will finally result in data flowing from downstream again.
 
 The two main parties involved in flow control are the router filter (`Envoy::Router::Filter`) and
-the connection manager (`Envoy::Http::ConnectionManagerImpl`).  The router is
+the connection manager (`Envoy::Http::ConnectionManagerImpl`). The router is
 responsible for intercepting watermark events for its own buffers, the individual upstream streams
-(if codec buffers fill up) and the upstream connection (if the network buffer fills up).  It passes
+(if codec buffers fill up) and the upstream connection (if the network buffer fills up). It passes
 any events to the connection manager, which has the ability to call `readDisable()` to enable and
-disable further data from downstream.  On the reverse path, when the downstream connection
+disable further data from downstream. On the reverse path, when the downstream connection
 backs up, the connection manager collects events for the downstream streams and
-the downstream conection.  It passes events to the router filter via
+the downstream conection. It passes events to the router filter via
 `Envoy::Http::DownstreamWatermarkCallbacks` and the router can then call `readDisable()` on the
-upstream stream.  Filters opt into subscribing to `DownstreamWatermarkCallbacks` as a performance
+upstream stream. Filters opt into subscribing to `DownstreamWatermarkCallbacks` as a performance
 optimization to avoid each watermark event on a downstream HTTP/2 connection resulting in
-"number of streams * number of filters" callbacks.  Instead, only the router
-filter is notified and only the "number of streams" multiplier applies.  Because
+"number of streams * number of filters" callbacks. Instead, only the router
+filter is notified and only the "number of streams" multiplier applies. Because
 the router filter only subscribes to notifications when it has an upstream
 connection, the connection manager tracks how many outstanding high watermark
 events have occurred and passes any on to the router filter when it subscribes.
 
 It is worth noting that the router does not unwind`readDisable(true)` calls on
-destruction.  Each codec must ensure that any necessary readDisable calls are
-unwound.  In the case of HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume
+destruction. Each codec must ensure that any necessary readDisable calls are
+unwound. In the case of HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume
 any outstanding flow control window on stream deletion to avoid leaking the connection-level
-window.  In the case of HTTP, the Envoy::Http::ConnectionManagerImpl unwinds any readDisable()
+window. In the case of HTTP, the Envoy::Http::ConnectionManagerImpl unwinds any readDisable()
 calls to ensure that pipelined requests will be read.
 
 ## HTTP/2 codec recv buffer
 
 Given the HTTP/2 `Envoy::Http::Http2::ConnectionImpl::StreamImpl::pending_recv_data_` is processed immediately
 there's no real need for buffer limits, but for consistency and to future-proof the implementation,
-it is a WatermarkBuffer.   The high watermark path goes as follows:
+it is a WatermarkBuffer. The high watermark path goes as follows:
 
  * When `pending_recv_data_` has too much data it calls
  `ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark()`.
@@ -118,12 +118,12 @@ The low watermark path is similar
 ## HTTP/1 and HTTP/2 filters
 
 Each HTTP and HTTP/2 filter has an opportunity to call `decoderBufferLimit()` or
-`encoderBufferLimit()` on creation.  No filter should buffer more than the
+`encoderBufferLimit()` on creation. No filter should buffer more than the
 configured bytes without calling the appropriate watermark callbacks or sending
 an error response.
 
 Filters may override the default limit with calls to `setDecoderBufferLimit()`
-and `setEncoderBufferLimit()`.  These limits are applied as filters are creaeted
+and `setEncoderBufferLimit()`. These limits are applied as filters are creaeted
 so filters later in the chain can override the limits set by prior filters.
 
 Most filters do not buffer internally, but instead push back on data by
@@ -131,7 +131,7 @@ returning a FilterDataStatus on `encodeData()`/`decodeData()` calls.
 If a buffer is a streaming buffer, i.e. the buffered data will resolve over
 time, it should return `FilterDataStatus::StopIterationAndWatermark` to pause
 further data processing, which will cause the `ConnectionManagerImpl` to trigger
-watermark callbacks on behalf of the filter.  If a filter can not make forward progress without the
+watermark callbacks on behalf of the filter. If a filter can not make forward progress without the
 complete body, it should return `FilterDataStatus::StopIterationAndBuffer`.
 in this case if the `ConnectionManagerImpl` buffers more than the allowed data
 it will return an error downstream: a 413 on the request path, 500 or `resetStream()` on the
@@ -141,9 +141,9 @@ response path.
 
 For filters which do their own internal buffering, filters buffering more than the buffer limit
 should call `onDecoderFilterAboveWriteBufferHighWatermark` if they are streaming filters, i.e.
-filters which can process more bytes as the underlying buffer is drained.   This causes the
+filters which can process more bytes as the underlying buffer is drained. This causes the
 downstream stream to be readDisabled and the flow of downstream data to be
-halted.  The filter is then responsible for calling `onDecoderFilterBelowWriteBufferLowWatermark`
+halted. The filter is then responsible for calling `onDecoderFilterBelowWriteBufferLowWatermark`
 when the buffer is drained to resume the flow of data.
 
 Decoder filters which must buffer the full response should respond with a 413 (Payload Too Large)
@@ -170,9 +170,9 @@ And the low watermark path:
 
 Encoder filters buffering more than the buffer limit should call
 `onEncoderFilterAboveWriteBufferHighWatermark` if they are streaming filters, i.e. filters which can
-process more bytes as the underlying buffer is drained.   The high watermark
+process more bytes as the underlying buffer is drained. The high watermark
 call will be passed from the `Envoy::Http::ConnectionManagerImpl` to the `Envoy::Router::Filter`
-which will `readDisable(true)` to stop the flow of upstream data.  Streaming filters which
+which will `readDisable(true)` to stop the flow of upstream data. Streaming filters which
 call `onEncoderFilterAboveWriteBufferHighWatermark` should call
 `onEncoderFilterBelowWriteBufferLowWatermark` when the underlying buffer drains.
 
@@ -208,9 +208,9 @@ The encoder low watermark path for streaming filters is as follows:
 # HTTP and HTTP/2 codec upstream send buffer
 
 The upstream send buffer `Envoy::Http::Http2::ConnectionImpl::StreamImpl::pending_send_data_` is
-H2 stream data destined for an Envoy backend.   Data is added to this buffer after each filter in
+H2 stream data destined for an Envoy backend. Data is added to this buffer after each filter in
 the chain is done processing, and it backs up if there is insufficient connection or stream window
-to send the data.  The high watermark path goes as follows:
+to send the data. The high watermark path goes as follows:
 
  * When `pending_send_data_` has too much data it calls
    `ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark()`.
@@ -238,7 +238,7 @@ For the low watermark path:
 # HTTP and HTTP/2 network upstream network buffer
 
 The upstream network buffer is HTTP/2 data for all streams destined for the
-Envoy backend.   If the network buffer fills up, all streams associated with the
+Envoy backend. If the network buffer fills up, all streams associated with the
 underlying TCP connection will be informed of the back-up, and the data sources
 (HTTP/2 streams or HTTP connections) feeding into those streams will be
 readDisabled.
@@ -276,7 +276,7 @@ The low watermark path is as follows:
 
 As with the downstream network buffer, it is important that as new upstream
 streams are associated with an existing upstream connection over its buffer
-limits that the new streams are created in the correct state.  To handle this,
+limits that the new streams are created in the correct state. To handle this,
 the `Envoy::Http::Http2::ClientConnectionImpl` tracks the state of the
 underlying `Network::Connection` in `underlying_connection_above_watermark_`.
 If a new stream is created when the connection is above the high watermark the
@@ -287,15 +287,15 @@ new stream has `runHighWatermarkCallbacks()` called on it immediately.
 
 On filter creation, all filters have the opportunity to subscribe to downstream
 watermark events sent by the connection manager, and the router filter takes
-advantage of this.  When a particular downstream stream gets backed up, the router filter
-gets notified and can then `readDisable()` the upstream data source.  The high
+advantage of this. When a particular downstream stream gets backed up, the router filter
+gets notified and can then `readDisable()` the upstream data source. The high
 watermark path is as follows:
 
  * When `ConnectionImpl::StreamImpl::pending_send_data_` has too much data, it calls
    `ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark()`
  * `pendingSendBufferHighWatermark()` calls `StreamCallbackHelper::runHighWatermarkCallbacks()`
  * `runHighWatermarkCallbacks()` results in all subscribers of `Envoy::Http::StreamCallbacks`
-   receiving an `onAboveWriteBufferHighWatermark()` callback.  Currently,
+   receiving an `onAboveWriteBufferHighWatermark()` callback. Currently,
    ConnectionManagerImpl::ActiveStream is the only subscriber.
  * `ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark()` calls
    `ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks()`
@@ -324,13 +324,13 @@ The low watermark path is as follows:
 
 When a downstream network connection buffers too much data, it informs the
 connection manager which passes theh high watermark event to all of the streams
-on the connection.  They pass the watermark event to the router, which calls
+on the connection. They pass the watermark event to the router, which calls
 `readDisable()` on the upstream streams.
 
 The high watermark path is as follows:
 
  * The downstream `Network::ConnectionImpl::write_buffer_` buffers too much
-   data.  It calls
+   data. It calls
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
  * `Envoy::Http::Http2::ConnectionManagerImpl::onAboveWriteBufferHighWatermark()`
    calls `ConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark()`
@@ -344,7 +344,7 @@ goes over its high watermark.
 
 The low watermark path is as follows:
 
- * The downstream `Network::ConnectionImpl::write_buffer_` drains.  It calls
+ * The downstream `Network::ConnectionImpl::write_buffer_` drains. It calls
    `Network::ConnectionCallbacks::onBelowWriteBufferLowWatermark()`.
  * `Envoy::Http::Http2::ConnectionManagerImpl::onBelowWriteBufferLowWatermark()`
    calls `ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark()`
@@ -367,21 +367,21 @@ called on creation.
 
 HTTP flow control is extremely similar to HTTP/2 flow control, with the main exception being that
 the method used to halt the flow of downstream/upstream data is to disable reads on the underlying
-Network::Connection.  As the TCP data stops being consumed the peer will eventually fill their
+Network::Connection. As the TCP data stops being consumed the peer will eventually fill their
 congestion window and stop sending.
 
 As with HTTP/2, a given stream may end in a state where the connection has had
-`readDisable(true)` called.   When a new stream is created on that connection
+`readDisable(true)` called. When a new stream is created on that connection
 for a subsequent request, any outstanding `readDisable(true)` calls are unwound
 in `Http::Http1::ConnectionImpl::newStream()`.
 
 Filter and network backups are identical in the HTTP and HTTP/2 cases and are
-documented above.  Codec backup is slightly different and is documented below.
+documented above. Codec backup is slightly different and is documented below.
 
 # HTTP codec downstream send buffer
 
 As with the HTTP/2 codec recv buffer, the HTTP codec send buffer is only expected to have data pass
-through it.  It should never back up.  Still, in the event it does, the high
+through it. It should never back up. Still, in the event it does, the high
 watermark path is as follows:
 
  * When `Http::Http1::ConnectionImpl::output_buffer_` has too much data buffered
@@ -403,7 +403,7 @@ HTTP/2 codec downstream send buffer.
 # HTTP codec upstream send buffer
 
 As with the HTTP downstream send buffer, the HTTP codec send buffer is only expected to have data
-pass through it.  It should never back up.  Still, in the event it does, the high
+pass through it. It should never back up. Still, in the event it does, the high
 watermark path is as follows:
 
  * When `Http::Http1::ConnectionImpl::output_buffer_` has too much data buffered

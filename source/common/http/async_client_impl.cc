@@ -69,6 +69,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                                  bool buffer_body_for_retry)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), request_info_(Protocol::Http11),
+      tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
   if (buffer_body_for_retry) {
     buffered_body_.reset(new Buffer::OwnedImpl());

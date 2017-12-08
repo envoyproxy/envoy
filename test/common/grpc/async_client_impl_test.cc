@@ -26,12 +26,6 @@ template class AsyncStreamImpl<helloworld::HelloRequest, helloworld::HelloReply>
 
 namespace {
 
-TEST(AsyncClientTracingConfigTest, All) {
-  AsyncClientTracingConfig config;
-  EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
-  EXPECT_TRUE(config.requestHeadersForTags().empty());
-}
-
 const std::string HELLO_REQUEST = "ABC";
 // We expect the 5 byte header to only have a length of 5 indicating the size of the protobuf. The
 // protobuf begins with 0x0a, indicating this is the first field of type string. This is followed
@@ -152,7 +146,7 @@ public:
     http_callbacks_->onData(reply_buffer, false);
 
     Http::HeaderMapPtr reply_trailers{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}};
-    EXPECT_CALL(*child_span_, setTag("grpc.status_code", "0"));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "0"));
     EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _));
     EXPECT_CALL(*child_span_, finishSpan());
     EXPECT_CALL(*http_stream_, reset());
@@ -225,7 +219,10 @@ public:
 
     EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
         .WillOnce(Return(request->child_span_));
-    EXPECT_CALL(*request->child_span_, setTag("upstream_cluster_name", "test_cluster"));
+    EXPECT_CALL(*request->child_span_,
+                setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
+    EXPECT_CALL(*request->child_span_,
+                setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
@@ -341,9 +338,10 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpStartFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag("upstream_cluster_name", "test_cluster"));
-  EXPECT_CALL(*child_span, setTag("grpc.status_code", "14"));
-  EXPECT_CALL(*child_span, setTag("error", "true"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "14"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
   EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(*child_span, injectContext(_)).Times(0);
 
@@ -404,10 +402,11 @@ TEST_F(GrpcAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag("upstream_cluster_name", "test_cluster"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
   EXPECT_CALL(*child_span, injectContext(_));
-  EXPECT_CALL(*child_span, setTag("grpc.status_code", "13"));
-  EXPECT_CALL(*child_span, setTag("error", "true"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "13"));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
   EXPECT_CALL(*child_span, finishSpan());
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
@@ -573,8 +572,8 @@ TEST_F(GrpcAsyncClientImplTest, RequestTrailersOnly) {
   auto request = createRequest(empty_metadata);
   Http::HeaderMapPtr reply_headers{
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}}};
-  EXPECT_CALL(*request->child_span_, setTag("grpc.status_code", "0"));
-  EXPECT_CALL(*request->child_span_, setTag("error", "true"));
+  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "0"));
+  EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
   EXPECT_CALL(*request, onFailure(Status::Internal, "", _));
   EXPECT_CALL(*request->child_span_, finishSpan());
   EXPECT_CALL(*request->http_stream_, reset());
@@ -638,7 +637,8 @@ TEST_F(GrpcAsyncClientImplTest, ResetAfterCloseRemote) {
 TEST_F(GrpcAsyncClientImplTest, CancelRequest) {
   TestMetadata empty_metadata;
   auto request = createRequest(empty_metadata);
-  EXPECT_CALL(*request->child_span_, setTag("status", "canceled"));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Tracing::Tags::get().STATUS, Tracing::Tags::get().CANCELED));
   EXPECT_CALL(*request->child_span_, finishSpan());
   EXPECT_CALL(*request->http_stream_, reset());
   request->grpc_request_->cancel();

@@ -11,4 +11,5 @@ final version.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
   refactored with the interface.
-* stats: native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
+* Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
+* Added native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
