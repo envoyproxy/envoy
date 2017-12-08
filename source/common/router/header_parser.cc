@@ -5,8 +5,12 @@
 namespace Envoy {
 namespace Router {
 
-HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format,
-                                                      const bool append) {
+namespace {
+
+HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header_value_option) {
+  const std::string& format = header_value_option.header().value();
+  const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
+
   if (format.find("%") == 0) {
     const size_t last_occ_pos = format.rfind("%");
     if (last_occ_pos == std::string::npos || last_occ_pos <= 1) {
@@ -15,63 +19,47 @@ HeaderFormatterPtr RequestHeaderParser::parseInternal(const std::string& format,
                                        format));
     }
     return HeaderFormatterPtr{
-        new RequestHeaderFormatter(format.substr(1, last_occ_pos - 1), append)};
+        new RequestInfoHeaderFormatter(format.substr(1, last_occ_pos - 1), append)};
   } else {
     return HeaderFormatterPtr{new PlainHeaderFormatter(format, append)};
   }
 }
 
-RequestHeaderParserPtr RequestHeaderParser::parse(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers) {
-  RequestHeaderParserPtr request_header_parser(new RequestHeaderParser());
-  for (const auto& header_value_option : headers) {
-    HeaderFormatterPtr header_formatter = RequestHeaderParser::parseInternal(
-        header_value_option.header().value(),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true));
-    request_header_parser->header_formatters_.push_back(
-        {Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter)});
+} // namespace
+
+HeaderParserPtr HeaderParser::configure(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add) {
+  HeaderParserPtr header_parser(new HeaderParser());
+
+  for (const auto& header_value_option : headers_to_add) {
+    HeaderFormatterPtr header_formatter = parseInternal(header_value_option);
+
+    header_parser->headers_to_add_.emplace_back(
+        Http::LowerCaseString(header_value_option.header().key()), std::move(header_formatter));
   }
-  return request_header_parser;
+
+  return header_parser;
 }
 
-void RequestHeaderParser::evaluateRequestHeaders(Http::HeaderMap& headers,
-                                                 const AccessLog::RequestInfo& request_info) const {
-  for (const auto& formatter : header_formatters_) {
+HeaderParserPtr HeaderParser::configure(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add,
+    const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove) {
+  HeaderParserPtr header_parser = configure(headers_to_add);
+
+  for (const std::string& header : headers_to_remove) {
+    header_parser->headers_to_remove_.emplace_back(header);
+  }
+
+  return header_parser;
+}
+
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
+                                   const AccessLog::RequestInfo& request_info) const {
+  for (const auto& formatter : headers_to_add_) {
     if (formatter.second->append()) {
       headers.addReferenceKey(formatter.first, formatter.second->format(request_info));
     } else {
       headers.setReferenceKey(formatter.first, formatter.second->format(request_info));
-    }
-  }
-}
-
-ResponseHeaderParserPtr ResponseHeaderParser::parse(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add,
-    const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove) {
-  ResponseHeaderParserPtr response_header_parser(new ResponseHeaderParser());
-
-  for (const auto& header_value_option : headers_to_add) {
-    response_header_parser->headers_to_add_.emplace_back(
-        HeaderAddition{Http::LowerCaseString(header_value_option.header().key()),
-                       header_value_option.header().value(),
-                       PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true)});
-  }
-
-  for (const std::string& header : headers_to_remove) {
-    response_header_parser->headers_to_remove_.emplace_back(Http::LowerCaseString(header));
-  }
-
-  return response_header_parser;
-}
-
-// TODO(zuercher): If modifying this function to perform header substitutions, consider refactoring
-// this class and RequestHeaderParser to share overlapping code.
-void ResponseHeaderParser::evaluateResponseHeaders(Http::HeaderMap& headers) const {
-  for (const auto& header_value : headers_to_add_) {
-    if (header_value.append_) {
-      headers.addReferenceKey(header_value.header_, header_value.value_);
-    } else {
-      headers.setReferenceKey(header_value.header_, header_value.value_);
     }
   }
 

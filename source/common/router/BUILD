@@ -211,7 +211,5 @@ envoy_cc_library(
     hdrs = ["header_formatter.h"],
     deps = [
         "//source/common/access_log:access_log_formatter_lib",
-        "//source/common/config:rds_json_lib",
-        "//source/common/protobuf:utility_lib",
     ],
 )

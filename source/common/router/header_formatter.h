@@ -1,12 +1,10 @@
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-
-#include "common/protobuf/protobuf.h"
-
-#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -32,9 +30,9 @@ typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
 /**
  * A formatter that expands the request header variable to a value based on info in RequestInfo.
  */
-class RequestHeaderFormatter : public HeaderFormatter {
+class RequestInfoHeaderFormatter : public HeaderFormatter {
 public:
-  RequestHeaderFormatter(const std::string& field_name, bool append);
+  RequestInfoHeaderFormatter(const std::string& field_name, bool append);
 
   // HeaderFormatter::format
   const std::string format(const Envoy::AccessLog::RequestInfo& request_info) const override;
