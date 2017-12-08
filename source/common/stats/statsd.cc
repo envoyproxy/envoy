@@ -33,23 +33,7 @@ Writer::~Writer() {
   }
 }
 
-void Writer::writeCounter(const std::string& name, const std::string& tag_str, uint64_t increment) {
-  std::string message(fmt::format("envoy.{}:{}|c{}", name, increment, tag_str));
-  send(message);
-}
-
-void Writer::writeGauge(const std::string& name, const std::string& tag_str, uint64_t value) {
-  std::string message(fmt::format("envoy.{}:{}|g{}", name, value, tag_str));
-  send(message);
-}
-
-void Writer::writeTimer(const std::string& name, const std::string& tag_str,
-                        const std::chrono::milliseconds& ms) {
-  std::string message(fmt::format("envoy.{}:{}|ms{}", name, ms.count(), tag_str));
-  send(message);
-}
-
-void Writer::send(const std::string& message) {
+void Writer::write(const std::string& message) {
   ::send(fd_, message.c_str(), message.size(), MSG_DONTWAIT);
 }
 
@@ -62,17 +46,23 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
 }
 
 void UdpStatsdSink::flushCounter(const Counter& counter, uint64_t delta) {
-  tls_->getTyped<Writer>().writeCounter(getName(counter), buildTagStr(counter.tags()), delta);
+  std::string message(
+      fmt::format("envoy.{}:{}|c{}", getName(counter), delta, buildTagStr(counter.tags())));
+  tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::flushGauge(const Gauge& gauge, uint64_t value) {
-  tls_->getTyped<Writer>().writeGauge(getName(gauge), buildTagStr(gauge.tags()), value);
+  std::string message(
+      fmt::format("envoy.{}:{}|g{}", getName(gauge), value, buildTagStr(gauge.tags())));
+  tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
-  tls_->getTyped<Writer>().writeTimer(getName(histogram), buildTagStr(histogram.tags()),
-                                      std::chrono::milliseconds(value));
+  std::string message(fmt::format("envoy.{}:{}|ms{}", getName(histogram),
+                                  std::chrono::milliseconds(value).count(),
+                                  buildTagStr(histogram.tags())));
+  tls_->getTyped<Writer>().write(message);
 }
 
 std::string UdpStatsdSink::getName(const Metric& metric) {

@@ -22,19 +22,15 @@ namespace Statsd {
 class Writer : public ThreadLocal::ThreadLocalObject {
 public:
   Writer(Network::Address::InstanceConstSharedPtr address);
-  ~Writer();
+  // For testing.
+  Writer() : fd_(-1){};
+  virtual ~Writer();
 
-  void writeCounter(const std::string& name, const std::string& tag_str, uint64_t increment);
-  void writeGauge(const std::string& name, const std::string& tag_str, uint64_t value);
-  void writeTimer(const std::string& name, const std::string& tag_str,
-                  const std::chrono::milliseconds& ms);
-
+  virtual void write(const std::string& message);
   // Called in unit test to validate address.
   int getFdForTests() const { return fd_; };
 
 private:
-  void send(const std::string& message);
-
   int fd_;
 };
 
@@ -45,6 +41,10 @@ class UdpStatsdSink : public Sink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 bool useTag);
+  UdpStatsdSink(ThreadLocal::SlotAllocator& tls, std::shared_ptr<Writer> w, bool use_tag)
+      : tls_(tls.allocateSlot()), use_tag_(use_tag) {
+    tls_->set([w](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return w; });
+  }
 
   // Stats::Sink
   void beginFlush() override {}
