@@ -12,3 +12,5 @@ final version.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
   refactored with the interface.
+
+* Added idle timeout to TCP proxy.
