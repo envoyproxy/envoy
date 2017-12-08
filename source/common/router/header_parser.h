@@ -42,6 +42,9 @@ public:
 
   void evaluateHeaders(Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info) const;
 
+protected:
+  HeaderParser() {}
+
 private:
   std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
