@@ -28,6 +28,12 @@ static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) 
   return route;
 }
 
+static envoy::api::v2::Route parseRouteFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::Route route;
+  MessageUtil::loadFromYaml(yaml, route);
+  return route;
+}
+
 TEST(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
@@ -72,14 +78,14 @@ TEST(RequestInfoHeaderFormatterTest, WrongFormatOnVariable) {
     ]
   }
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(Envoy::Router::RequestHeaderParser::parse(
+  EXPECT_THROW_WITH_MESSAGE(Envoy::Router::HeaderParser::configure(
                                 parseRouteFromJson(json).route().request_headers_to_add()),
                             EnvoyException,
                             "Incorrect header configuration. Expected variable format "
                             "%<variable_name>%, actual format %CLIENT_IP");
 }
 
-TEST(RequestHeaderParserTest, EvaluateHeaders) {
+TEST(HeaderParserTest, EvaluateHeaders) {
   const std::string json = R"EOF(
   {
     "prefix": "/new_endpoint",
@@ -93,17 +99,17 @@ TEST(RequestHeaderParserTest, EvaluateHeaders) {
     ]
   }
   )EOF";
-  RequestHeaderParserPtr req_header_parser = Envoy::Router::RequestHeaderParser::parse(
+  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
       parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
-  req_header_parser->evaluateRequestHeaders(headerMap, request_info);
+  req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
 }
 
-TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
+TEST(HeaderParserTest, EvaluateStaticHeaders) {
   const std::string json = R"EOF(
   {
     "prefix": "/new_endpoint",
@@ -117,16 +123,16 @@ TEST(RequestHeaderParserTest, EvaluateStaticHeaders) {
     ]
   }
   )EOF";
-  RequestHeaderParserPtr req_header_parser = Envoy::Router::RequestHeaderParser::parse(
+  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
       parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
-  req_header_parser->evaluateRequestHeaders(headerMap, request_info);
+  req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
 }
 
-TEST(RequestHeaderParserTest, EvaluateHeadersWithAppendFalse) {
+TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   const std::string json = R"EOF(
   {
     "prefix": "/new_endpoint",
@@ -150,8 +156,8 @@ TEST(RequestHeaderParserTest, EvaluateHeadersWithAppendFalse) {
   route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
 
-  RequestHeaderParserPtr req_header_parser =
-      Router::RequestHeaderParser::parse(route_action.request_headers_to_add());
+  HeaderParserPtr req_header_parser =
+      Router::HeaderParser::configure(route_action.request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
@@ -159,7 +165,7 @@ TEST(RequestHeaderParserTest, EvaluateHeadersWithAppendFalse) {
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
 
-  req_header_parser->evaluateRequestHeaders(headerMap, request_info);
+  req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
   EXPECT_TRUE(headerMap.has("x-client-ip"));
@@ -183,6 +189,32 @@ TEST(RequestHeaderParserTest, EvaluateHeadersWithAppendFalse) {
 
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);
+}
+
+TEST(HeaderParserTest, EvaluateResponseHeaders) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+  response_headers_to_add:
+    - header:
+        key: "x-client-ip"
+        value: "%CLIENT_IP%"
+      append: true
+  response_headers_to_remove: ["x-nope"]
+)EOF";
+
+  const auto route = parseRouteFromV2Yaml(yaml).route();
+  HeaderParserPtr resp_header_parser = Envoy::Router::HeaderParser::configure(
+      route.response_headers_to_add(), route.response_headers_to_remove());
+  Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  const std::string downstream_addr = "127.0.0.1";
+  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
+  resp_header_parser->evaluateHeaders(headerMap, request_info);
+  EXPECT_TRUE(headerMap.has("x-client-ip"));
+  EXPECT_TRUE(headerMap.has("x-safe"));
+  EXPECT_FALSE(headerMap.has("x-nope"));
 }
 
 } // namespace Router
