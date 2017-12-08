@@ -433,8 +433,6 @@ public:
     return config;
   }
 
-  void setupAndExpectUpstreamConnect() {}
-
   void setup(uint32_t connections, const envoy::api::v2::filter::network::TcpProxy& config) {
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
@@ -739,6 +737,36 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UO");
+}
+
+// Tests that the idle timer closes both connections, and gets updated when either
+// connection has activity
+TEST_F(TcpProxyTest, IdleTimeout) {
+  envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
+  config.mutable_downstream_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  filter_->onData(buffer);
+
+  buffer.add("hello2");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_read_filter_->onData(buffer);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::BytesSent);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::BytesSent);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  idle_timer->callback_();
 }
 
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged.
