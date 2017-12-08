@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Router {
 
-RequestHeaderFormatter::RequestHeaderFormatter(const std::string& field_name, bool append)
+RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_name, bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::AccessLog::RequestInfo& request_info) {
@@ -20,13 +20,12 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& field_name, bo
       return request_info.getDownstreamAddress();
     };
   } else {
-    throw EnvoyException(
-        fmt::format("field '{}' not supported as custom request header", field_name));
+    throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }
 }
 
 const std::string
-RequestHeaderFormatter::format(const Envoy::AccessLog::RequestInfo& request_info) const {
+RequestInfoHeaderFormatter::format(const Envoy::AccessLog::RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }
 
