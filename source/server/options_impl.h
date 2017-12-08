@@ -75,7 +75,7 @@ private:
  */
 class NoServingException : public EnvoyException {
 public:
-  NoServingException() : EnvoyException("") {}
+  NoServingException() : EnvoyException("NoServingException") {}
 };
 
 /**
