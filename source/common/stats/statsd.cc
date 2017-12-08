@@ -34,18 +34,18 @@ Writer::~Writer() {
 }
 
 void Writer::writeCounter(const std::string& name, const std::string& tag_str, uint64_t increment) {
-  std::string message(fmt::format("envoy.{}:{}|c{}\n", name, increment, tag_str));
+  std::string message(fmt::format("envoy.{}:{}|c{}", name, increment, tag_str));
   send(message);
 }
 
 void Writer::writeGauge(const std::string& name, const std::string& tag_str, uint64_t value) {
-  std::string message(fmt::format("envoy.{}:{}|g{}\n", name, value, tag_str));
+  std::string message(fmt::format("envoy.{}:{}|g{}", name, value, tag_str));
   send(message);
 }
 
 void Writer::writeTimer(const std::string& name, const std::string& tag_str,
                         const std::chrono::milliseconds& ms) {
-  std::string message(fmt::format("envoy.{}:{}|ms{}\n", name, ms.count(), tag_str));
+  std::string message(fmt::format("envoy.{}:{}|ms{}", name, ms.count(), tag_str));
   send(message);
 }
 
