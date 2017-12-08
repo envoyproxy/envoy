@@ -41,6 +41,7 @@ class UdpStatsdSink : public Sink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag);
+  // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, std::shared_ptr<Writer> w, const bool use_tag)
       : tls_(tls.allocateSlot()), use_tag_(use_tag) {
     tls_->set([w](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return w; });
