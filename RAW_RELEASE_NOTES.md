@@ -13,4 +13,5 @@ final version.
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
   refactored with the interface.
 * Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
-* Added support for dynamic headers generated from upstream host endpoint metadata.
+* Added support for dynamic headers generated from upstream host endpoint metadata
+  (`UPSTREAM_METADATA(...)`).
