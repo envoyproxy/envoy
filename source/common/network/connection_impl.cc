@@ -297,7 +297,9 @@ bool ConnectionImpl::readEnabled() const { return state_ & InternalState::ReadEn
 
 void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
 
-void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) { bytes_sent_callbacks_.push_back(cb); }
+void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
+  bytes_sent_callbacks_.emplace_back(cb);
+}
 
 void ConnectionImpl::write(Buffer::Instance& data) {
   // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
