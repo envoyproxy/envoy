@@ -29,7 +29,6 @@
 #include "openssl/ssl.h"
 
 using testing::Invoke;
-using testing::Return;
 using testing::StrictMock;
 using testing::_;
 
@@ -1596,9 +1595,6 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
-
-    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::BytesSent))
-        .WillRepeatedly(Return());
   }
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,

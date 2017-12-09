@@ -52,6 +52,7 @@ public:
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
+  MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
   MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
   MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
   MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
@@ -88,6 +89,7 @@ public:
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
+  MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
   MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
   MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
   MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));

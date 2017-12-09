@@ -69,6 +69,7 @@ public:
 
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
+  void addBytesSentCallback(BytesSentCb cb) override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
@@ -150,6 +151,7 @@ private:
   Event::FileEventPtr file_event_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
+  std::list<BytesSentCb> bytes_sent_callbacks_;
   uint32_t state_{InternalState::ReadEnabled};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};

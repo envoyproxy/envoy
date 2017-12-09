@@ -284,19 +284,19 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       drain_timer_->disableTimer();
       drain_timer_.reset();
     }
+  }
 
-    if (!streams_.empty()) {
-      if (event == Network::ConnectionEvent::LocalClose) {
-        stats_.named_.downstream_cx_destroy_local_active_rq_.inc();
-      }
-      if (event == Network::ConnectionEvent::RemoteClose) {
-        stats_.named_.downstream_cx_destroy_remote_active_rq_.inc();
-      }
-
-      stats_.named_.downstream_cx_destroy_active_rq_.inc();
-      user_agent_.onConnectionDestroy(event, true);
-      resetAllStreams();
+  if (!streams_.empty()) {
+    if (event == Network::ConnectionEvent::LocalClose) {
+      stats_.named_.downstream_cx_destroy_local_active_rq_.inc();
     }
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      stats_.named_.downstream_cx_destroy_remote_active_rq_.inc();
+    }
+
+    stats_.named_.downstream_cx_destroy_active_rq_.inc();
+    user_agent_.onConnectionDestroy(event, true);
+    resetAllStreams();
   }
 }
 

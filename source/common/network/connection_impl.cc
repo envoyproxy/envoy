@@ -297,6 +297,8 @@ bool ConnectionImpl::readEnabled() const { return state_ & InternalState::ReadEn
 
 void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
 
+void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) { bytes_sent_callbacks_.push_back(cb); }
+
 void ConnectionImpl::write(Buffer::Instance& data) {
   // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
   //       path, so we just pass around the buffer passed to us in this function. If we ever support
@@ -468,7 +470,14 @@ void ConnectionImpl::onWriteReady() {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
-    raiseEvent(ConnectionEvent::BytesSent);
+    for (BytesSentCb& cb : bytes_sent_callbacks_) {
+      cb(result.bytes_processed_);
+
+      // If a callback closes the socket, stop iterating.
+      if (fd_ == -1) {
+        return;
+      }
+    }
   }
 }
 

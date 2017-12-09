@@ -22,9 +22,7 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 
-MockConnectionCallbacks::MockConnectionCallbacks() {
-  // EXPECT_CALL(*this, onEvent(ConnectionEvent::BytesSent)).WillRepeatedly(Return());
-}
+MockConnectionCallbacks::MockConnectionCallbacks() {}
 
 MockConnectionCallbacks::~MockConnectionCallbacks() {}
 

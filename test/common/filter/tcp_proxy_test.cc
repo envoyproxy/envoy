@@ -746,6 +746,13 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   config.mutable_downstream_idle_timeout()->set_seconds(1);
   setup(1, config);
 
+  Network::BytesSentCb downstream_bytes_sent_cb;
+  Network::BytesSentCb upstream_bytes_sent_cb;
+  EXPECT_CALL(filter_callbacks_.connection_, addBytesSentCallback(_))
+      .WillOnce(SaveArg<0>(&downstream_bytes_sent_cb));
+  EXPECT_CALL(*upstream_connections_.at(0), addBytesSentCallback(_))
+      .WillOnce(SaveArg<0>(&upstream_bytes_sent_cb));
+
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
   raiseEventUpstreamConnected(0);
@@ -759,10 +766,10 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   upstream_read_filter_->onData(buffer);
 
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::BytesSent);
+  downstream_bytes_sent_cb(1);
 
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::BytesSent);
+  upstream_bytes_sent_cb(2);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));

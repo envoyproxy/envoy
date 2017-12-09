@@ -333,10 +333,6 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
     upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
     idle_timer_.reset();
   }
-
-  if (event == Network::ConnectionEvent::BytesSent) {
-    resetIdleTimer();
-  }
 }
 
 void TcpProxy::onUpstreamData(Buffer::Instance& data) {
@@ -393,9 +389,10 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
       idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
           [this]() -> void { onIdleTimeout(); });
       resetIdleTimer();
+      Network::BytesSentCb cb = [this](uint64_t) { resetIdleTimer(); };
+      read_callbacks_->connection().addBytesSentCallback(cb);
+      upstream_connection_->addBytesSentCallback(cb);
     }
-  } else if (event == Network::ConnectionEvent::BytesSent) {
-    resetIdleTimer();
   }
 }
 

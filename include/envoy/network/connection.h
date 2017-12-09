@@ -22,27 +22,21 @@ namespace Network {
  * Events that occur on a connection.
  */
 enum class ConnectionEvent {
-  // The connection was closed by the remote end.
   RemoteClose,
-
-  // The connection was closed locally, either because it failed to connect due to a
-  // local reason (such as failing to bind a socket to an address), or because close()
-  // was called and the operation is now complete (this happens immediately for close(NoFlush)
-  // and may be delayed for close(FlushWrite)).
   LocalClose,
-
-  // The outgoing connection has been established and is ready to send/receive data. For
-  // TLS connections, the TLS handshake has completed.
   Connected,
-
-  // Bytes were successfully written from the write-buffer to the underlying connection.
-  BytesSent,
 };
 
 /**
  * Connections have both a read and write buffer.
  */
 enum class ConnectionBufferType { Read, Write };
+
+/**
+ * Callback function for when bytes have been sent by a connection.
+ * @param bytes_sent supplies the number of bytes written to the connection.
+ */
+typedef std::function<void(uint64_t bytes_sent)> BytesSentCb;
 
 /**
  * Network level callbacks that happen on a connection.
@@ -99,6 +93,11 @@ public:
    * Register callbacks that fire when connection events occur.
    */
   virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
+
+  /**
+   * Register for callback everytime bytes are written to the underlying TransportSocket.
+   */
+  virtual void addBytesSentCallback(BytesSentCb cb) PURE;
 
   /**
    * Close the connection.
