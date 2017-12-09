@@ -41,10 +41,9 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
     : stats_(generateStats(config.stat_prefix(), context.scope())),
       max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)) {
 
-  // TODO: use has_idle_timeout()
-  if (config.has_downstream_idle_timeout()) {
+  if (config.has_idle_timeout()) {
     idle_timeout_.value(std::chrono::milliseconds(
-        Protobuf::util::TimeUtil::DurationToMilliseconds(config.downstream_idle_timeout())));
+        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
   }
 
   if (config.has_deprecated_v1()) {

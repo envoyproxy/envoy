@@ -743,7 +743,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 // connection has activity
 TEST_F(TcpProxyTest, IdleTimeout) {
   envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
-  config.mutable_downstream_idle_timeout()->set_seconds(1);
+  config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
   Network::BytesSentCb downstream_bytes_sent_cb;
