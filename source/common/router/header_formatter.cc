@@ -1,5 +1,6 @@
 #include "common/router/header_formatter.h"
 
+#include <cctype>
 #include <string>
 
 #include "common/access_log/access_log_formatter.h"
@@ -13,15 +14,20 @@ namespace Router {
 
 namespace {
 
-// Parse UPSTREAM_METADATA(a, b, ...) to return a vector of [a, b, ...]. Supports backslash
-// escaping.
+// Parse list of namespace and keys into a vector. Supports backslash escaping.
 std::vector<std::string> parseUpstreamMetadataParams(const std::string& field) {
   std::string field_params(field);
 
   std::vector<std::string> params;
-  size_t start = 0;
-  size_t pos;
-  for (pos = 0; pos < field_params.size();) {
+  size_t pos = 0;
+
+  // Skip leading spaces.
+  while (std::isspace(field_params[pos])) {
+    pos++;
+  }
+
+  size_t start = pos;
+  while (pos < field_params.size()) {
     switch (field_params[pos]) {
     case ',': {
       std::string param = StringUtil::subspan(field_params, start, pos);
@@ -31,8 +37,10 @@ std::vector<std::string> parseUpstreamMetadataParams(const std::string& field) {
       }
 
       // Move to next char, skipping leading spaces.
-      while (field_params[++pos] == ' ')
-        ;
+      do {
+        pos++;
+      } while (std::isspace(field_params[pos]));
+
       start = pos;
       break;
     }
@@ -61,14 +69,13 @@ std::vector<std::string> parseUpstreamMetadataParams(const std::string& field) {
 }
 
 std::function<std::string(const Envoy::AccessLog::RequestInfo&)>
-parseUpstreamMetadataField(const std::string& field) {
-  // Minimum length valid field is "UPSTREAM_METADATA(a,b)" (22 characters).
-  if (field.size() >= 22 && StringUtil::startsWith(field.c_str(), "UPSTREAM_METADATA(") &&
-      StringUtil::endsWith(field.c_str(), ")")) {
+parseUpstreamMetadataField(const std::string& params_str) {
+  // Minimum length of valid params is "(a,b)" (5 characters).
+  if (params_str.size() >= 5 && params_str[0] == '(' && params_str[params_str.size() - 1] == ')') {
     const std::vector<std::string> params =
-        parseUpstreamMetadataParams(StringUtil::subspan(field, 18, field.size() - 1));
+        parseUpstreamMetadataParams(StringUtil::subspan(params_str, 1, params_str.size() - 1));
 
-    // Minimum parameter are a metadata namespace (e.g. "envoy.lb") and a metadata name.
+    // Minimum parameters are a metadata namespace (e.g. "envoy.lb") and a metadata key.
     if (params.size() >= 2) {
       return [params](const Envoy::AccessLog::RequestInfo& request_info) -> std::string {
         Upstream::HostDescriptionConstSharedPtr host = request_info.upstreamHost();
@@ -123,8 +130,9 @@ parseUpstreamMetadataField(const std::string& field) {
   }
 
   throw EnvoyException(fmt::format("Incorrect header configuration. Expected format "
-                                   "UPSTREAM_METADATA(namespace, k, ...), actual format {}",
-                                   field));
+                                   "UPSTREAM_METADATA(namespace, k, ...), actual format "
+                                   "UPSTREAM_METADATA{}",
+                                   params_str));
 }
 
 } // namespace
@@ -140,7 +148,7 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_
       return request_info.getDownstreamAddress();
     };
   } else if (StringUtil::startsWith(field_name.c_str(), "UPSTREAM_METADATA")) {
-    field_extractor_ = parseUpstreamMetadataField(field_name);
+    field_extractor_ = parseUpstreamMetadataField(field_name.substr(17));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

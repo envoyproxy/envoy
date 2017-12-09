@@ -89,6 +89,14 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
     EXPECT_EQ("value", formatted_string);
   }
 
+  // Extra spaces are ignored.
+  {
+    const std::string variable = "UPSTREAM_METADATA( namespace , key )";
+    RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
+    const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
+    EXPECT_EQ("value", formatted_string);
+  }
+
   // Nested string value.
   {
     const std::string variable = "UPSTREAM_METADATA(namespace, nested, str_key)";
@@ -286,6 +294,33 @@ TEST(HeaderParserTest, EvaluateHeaders) {
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
+}
+
+TEST(HeaderParserTest, EvaluateEmptyHeaders) {
+  const std::string json = R"EOF(
+  {
+    "prefix": "/new_endpoint",
+    "prefix_rewrite": "/api/new_endpoint",
+    "cluster": "www2",
+    "request_headers_to_add": [
+      {
+        "key": "x-key",
+        "value": "%UPSTREAM_METADATA(namespace, key)%"
+      }
+    ]
+  }
+  )EOF";
+  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
+      parseRouteFromJson(json).route().request_headers_to_add());
+  Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  envoy::api::v2::Metadata metadata;
+  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+  req_header_parser->evaluateHeaders(headerMap, request_info);
+  EXPECT_FALSE(headerMap.has("x-client-ip"));
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {
