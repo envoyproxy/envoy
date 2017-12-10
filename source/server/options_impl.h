@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/exception.h"
 #include "envoy/server/options.h"
 
 #include "spdlog/spdlog.h"
@@ -16,6 +17,13 @@ class OptionsImpl : public Server::Options {
 public:
   typedef std::function<std::string(uint64_t, uint64_t)> HotRestartVersionCb;
 
+  /**
+   * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
+   *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
+   *        caller should exit(0) after any necessary cleanup.
+   * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
+   *        value). The caller should call exit(1) after any necessary cleanup.
+   */
   OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
@@ -59,4 +67,23 @@ private:
   uint64_t max_stats_;
   uint64_t max_obj_name_length_;
 };
+
+/**
+ * Thrown when an OptionsImpl was not constructed because all of Envoy's work is done (for example,
+ * it was started with --help and it's already printed a help message) so all that's left to do is
+ * exit successfully.
+ */
+class NoServingException : public EnvoyException {
+public:
+  NoServingException() : EnvoyException("NoServingException") {}
+};
+
+/**
+ * Thrown when an OptionsImpl was not constructed because the argv was invalid.
+ */
+class MalformedArgvException : public EnvoyException {
+public:
+  MalformedArgvException(const std::string& what) : EnvoyException(what) {}
+};
+
 } // namespace Envoy
