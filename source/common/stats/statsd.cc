@@ -46,26 +46,26 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
 }
 
 void UdpStatsdSink::flushCounter(const Counter& counter, uint64_t delta) {
-  std::string message(
+  const std::string message(
       fmt::format("envoy.{}:{}|c{}", getName(counter), delta, buildTagStr(counter.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::flushGauge(const Gauge& gauge, uint64_t value) {
-  std::string message(
+  const std::string message(
       fmt::format("envoy.{}:{}|g{}", getName(gauge), value, buildTagStr(gauge.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
-  std::string message(fmt::format("envoy.{}:{}|ms{}", getName(histogram),
+  const std::string message(fmt::format("envoy.{}:{}|ms{}", getName(histogram),
                                   std::chrono::milliseconds(value).count(),
                                   buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
-std::string UdpStatsdSink::getName(const Metric& metric) {
+const std::string UdpStatsdSink::getName(const Metric& metric) {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {

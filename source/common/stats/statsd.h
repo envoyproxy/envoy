@@ -58,7 +58,7 @@ public:
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
 
 private:
-  std::string getName(const Metric& metric);
+  const std::string getName(const Metric& metric);
   const std::string buildTagStr(const std::vector<Tag>& tags);
 
   ThreadLocal::SlotPtr tls_;
