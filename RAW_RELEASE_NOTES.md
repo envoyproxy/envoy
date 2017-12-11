@@ -8,6 +8,7 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added gRPC access logging.
 * Added DOWNSTREAM_REMOTE_ADDRESS, DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT, and
   DOWNSTREAM_LOCAL_ADDRESS access log formatters. DOWNSTREAM_ADDRESS access log formatter has been
   deprecated.
