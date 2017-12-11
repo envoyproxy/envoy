@@ -26,6 +26,7 @@ public:
   AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override {
+    initialized_ = true;
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     registerPort("endpoint", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
@@ -150,7 +151,7 @@ public:
   }
 
   void initialize() override {
-    BaseIntegrationTest::initialize();
+    initialized_ = true;
     ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();

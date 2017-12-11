@@ -12,7 +12,35 @@
 
 namespace Envoy {
 
-const std::string basic_config = R"EOF(
+const std::string ConfigHelper::TCP_PROXY_CONFIG = R"EOF(
+static_resources:
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: envoy.tcp_proxy
+        config:
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+  clusters:
+    name: cluster_0
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF";
+
+const std::string ConfigHelper::HTTP_PROXY_CONFIG = R"EOF(
 static_resources:
   listeners:
     name: listener_0
@@ -68,10 +96,9 @@ config:
     endpoint: /healthcheck
 )EOF";
 
-ConfigHelper::ConfigHelper(const Network::Address::IpVersion version) {
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
   RELEASE_ASSERT(!finalized_);
-  std::string filename =
-      TestEnvironment::writeStringToFileForTest("basic_config.yaml", basic_config);
+  std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
   MessageUtil::loadFromFile(filename, bootstrap_);
 
   // Fix up all the socket addresses with the correct version.
@@ -161,14 +188,17 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     cluster->mutable_per_connection_buffer_limit_bytes()->set_value(upstream_buffer_limit);
   }
 
-  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
-  loadHttpConnectionManager(hcm_config);
-  if (hcm_config.codec_type() == envoy::api::v2::filter::network::HttpConnectionManager::HTTP2) {
-    const uint32_t size =
-        std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
-    auto* options = hcm_config.mutable_http2_protocol_options();
-    options->mutable_initial_stream_window_size()->set_value(size);
-    storeHttpConnectionManager(hcm_config);
+  auto filter = getFilterFromListener();
+  if (filter->name() == "envoy.http_connection_manager") {
+    envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    if (hcm_config.codec_type() == envoy::api::v2::filter::network::HttpConnectionManager::HTTP2) {
+      const uint32_t size =
+          std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      auto* options = hcm_config.mutable_http2_protocol_options();
+      options->mutable_initial_stream_window_size()->set_value(size);
+      storeHttpConnectionManager(hcm_config);
+    }
   }
 }
 
@@ -258,21 +288,24 @@ void ConfigHelper::addSslConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 }
 
-void ConfigHelper::loadHttpConnectionManager(
-    envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+envoy::api::v2::Filter* ConfigHelper::getFilterFromListener() {
   RELEASE_ASSERT(!finalized_);
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_chain = listener->mutable_filter_chains(0);
-  auto* hcm_config_struct = filter_chain->mutable_filters(0)->mutable_config();
+  return filter_chain->mutable_filters(0);
+}
+
+void ConfigHelper::loadHttpConnectionManager(
+    envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+  RELEASE_ASSERT(!finalized_);
+  auto* hcm_config_struct = getFilterFromListener()->mutable_config();
   MessageUtil::jsonConvert(*hcm_config_struct, hcm);
 }
 
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
-  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
-  auto* filter_chain = listener->mutable_filter_chains(0);
-  auto* hcm_config_struct = filter_chain->mutable_filters(0)->mutable_config();
+  auto* hcm_config_struct = getFilterFromListener()->mutable_config();
 
   MessageUtil::jsonConvert(hcm, *hcm_config_struct);
 }

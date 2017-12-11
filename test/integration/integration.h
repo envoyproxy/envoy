@@ -110,13 +110,27 @@ struct ApiFilesystemConfig {
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  BaseIntegrationTest(Network::Address::IpVersion version);
+  BaseIntegrationTest(Network::Address::IpVersion version,
+                      Http::CodecClient::Type downstream_protocol = Http::CodecClient::Type::HTTP1,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~BaseIntegrationTest() {}
 
-  virtual void initialize() {
-    RELEASE_ASSERT(!initialized_);
-    initialized_ = true;
-  }
+  void SetUp();
+
+  // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
+  virtual void initialize();
+  // Set up the fake upstream connections. This is called by initialize() and
+  // is virtual to allow subclass overrides.
+  virtual void createUpstreams();
+  // Finalize the config and spin up an Envoy instance.
+  virtual void createEnvoy();
+  // sets downstream_protocol_ and alters the client protocol in the config_helper_
+  void setDownstreamProtocol(Http::CodecClient::Type type);
+  // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
+  void setUpstreamProtocol(FakeHttpConnection::Type type);
+
+  Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
+  FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
@@ -142,13 +156,26 @@ protected:
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
   // The config for envoy start-up.
-  ConfigHelper config_helper_{version_};
+  ConfigHelper config_helper_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
   bool initialized_{}; // True if initialized() has been called.
+
+  // The named ports for createGeneratedApiTestServer
+  std::vector<std::string> named_ports_{{"http"}};
+  // The ports from upstreams created in createUpstreams()
+  std::vector<uint32_t> ports_;
+  // If true, use AutonomousUpstream for fake upstreams.
+  bool autonomous_upstream_{false};
+
+private:
+  // The codec type for the client-to-Envoy connection
+  Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
+  // The type for the Envoy-to-backend connection
+  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
 };
 
 } // namespace Envoy
