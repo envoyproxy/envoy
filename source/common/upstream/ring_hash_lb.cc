@@ -18,9 +18,8 @@ RingHashLoadBalancer::RingHashLoadBalancer(
       random_(random), config_(config) {
   priority_set.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
                                         const std::vector<HostSharedPtr>&) -> void {
-    if (priority != 0) {
-      return; // TODO(alyssawilk) make ring hash LB priority-aware.
-    }
+    // priority!=0 will be blocked by EDS validation.
+    ASSERT(priority == 0); // TODO(alyssawilk) make ring hash LB priority-aware.
     refresh();
   });
 

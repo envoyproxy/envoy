@@ -53,9 +53,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
     }
   });
   if (local_priority_set_) {
-    ASSERT(local_priority_set->hostSetsPerPriority().size() > 0);
     // Multiple priorities are unsupported for local priority sets.
-    // TODO(alyssawilk) find the right place to reject config with this.
     // In order to support priorities correctly, one would have to make some assumptions about
     // routing (all local Envoys fail over at the same time) and use all priorities when computing
     // the locality routing structure.

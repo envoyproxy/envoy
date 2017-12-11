@@ -166,6 +166,7 @@ public:
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
+  MOCK_CONST_METHOD0(localClusterName, const std::string());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

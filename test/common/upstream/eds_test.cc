@@ -12,12 +12,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Upstream {
 
 class EdsTest : public testing::Test {
 protected:
-  EdsTest() {
+  EdsTest() { resetCluster(); }
+
+  void resetCluster() {
     resetCluster(R"EOF(
     {
       "name": "name",
@@ -344,6 +348,43 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
   EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
   EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
+}
+
+// Make sure config updates with P!=0 are rejected for the local cluster.
+TEST_F(EdsTest, NoPriorityForLocalCluster) {
+  std::string name = "fare";
+  EXPECT_CALL(cm_, localClusterName()).WillOnce(Return(name));
+  resetCluster();
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  uint32_t port = 1000;
+  auto add_hosts_to_priority = [cluster_load_assignment, &port](uint32_t priority, uint32_t n) {
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+    endpoints->set_priority(priority);
+
+    for (uint32_t i = 0; i < n; ++i) {
+      auto* socket_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+      socket_address->set_address("1.2.3.4");
+      socket_address->set_port_value(port++);
+    }
+  };
+
+  // Set up the priority levels so 0 has two hosts and 1 has one host. Update
+  // should fail.
+  add_hosts_to_priority(0, 2);
+  add_hosts_to_priority(1, 1);
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+
+  // Try an update which only has endpoints with P=0. This should go through.
+  cluster_load_assignment->clear_endpoints();
+  add_hosts_to_priority(0, 2);
+  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 }
 
 // Set up an EDS config with multiple priorities and localities and make sure
