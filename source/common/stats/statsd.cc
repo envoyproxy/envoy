@@ -78,11 +78,11 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Tag>& tags) {
     return "";
   }
 
-  std::vector<std::string> tag_strs;
+  std::vector<std::string> tag_strings;
   for (const Tag& tag : tags) {
-    tag_strs.emplace_back(tag.name_ + ":" + tag.value_);
+    tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
-  return "|#" + StringUtil::join(tag_strs, ",");
+  return "|#" + StringUtil::join(tag_strings, ",");
 }
 
 char TcpStatsdSink::STAT_PREFIX[] = "envoy.";
