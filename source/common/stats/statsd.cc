@@ -60,8 +60,8 @@ void UdpStatsdSink::flushGauge(const Gauge& gauge, uint64_t value) {
 void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
   const std::string message(fmt::format("envoy.{}:{}|ms{}", getName(histogram),
-                                  std::chrono::milliseconds(value).count(),
-                                  buildTagStr(histogram.tags())));
+                                        std::chrono::milliseconds(value).count(),
+                                        buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 

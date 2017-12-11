@@ -23,7 +23,7 @@ class Writer : public ThreadLocal::ThreadLocalObject {
 public:
   Writer(Network::Address::InstanceConstSharedPtr address);
   // For testing.
-  Writer() : fd_(-1){}
+  Writer() : fd_(-1) {}
   virtual ~Writer();
 
   virtual void write(const std::string& message);
