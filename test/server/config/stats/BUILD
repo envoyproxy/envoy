@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:statsd_lib",
+        "//source/server/config/stats:dog_statsd_lib",
         "//source/server/config/stats:statsd_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
