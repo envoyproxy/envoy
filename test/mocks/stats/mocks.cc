@@ -11,10 +11,18 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-MockCounter::MockCounter() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
+MockCounter::MockCounter() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
+}
 MockCounter::~MockCounter() {}
 
-MockGauge::MockGauge() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
+MockGauge::MockGauge() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
+}
 MockGauge::~MockGauge() {}
 
 MockHistogram::MockHistogram() {
@@ -23,6 +31,8 @@ MockHistogram::MockHistogram() {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
+  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
 }
 MockHistogram::~MockHistogram() {}
 
