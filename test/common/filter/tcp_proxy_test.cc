@@ -771,9 +771,38 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
   upstream_bytes_sent_cb(2);
 
+  EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   idle_timer->callback_();
+}
+
+// Tests that the idle timer is disabled when the downstream connection is closed
+TEST_F(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
+  envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*idle_timer, disableTimer());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Tests that the idle timer is disabled when the upstream connection is closed
+TEST_F(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
+  envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*idle_timer, disableTimer());
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged.

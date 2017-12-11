@@ -330,7 +330,7 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
     // downstream connection to stick around, or, we need to be able to pass this connection to a
     // flush worker which will attempt to flush the remaining data with a timeout.
     upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
-    idle_timer_.reset();
+    disableIdleTimer();
   }
 }
 
@@ -355,7 +355,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    idle_timer_.reset();
+    disableIdleTimer();
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -405,6 +405,13 @@ void TcpProxy::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
     ASSERT(config_->idleTimeout().valid());
     idle_timer_->enableTimer(config_->idleTimeout().value());
+  }
+}
+
+void TcpProxy::disableIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    idle_timer_->disableTimer();
+    idle_timer_.reset();
   }
 }
 

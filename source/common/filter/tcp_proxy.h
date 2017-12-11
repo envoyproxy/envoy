@@ -182,6 +182,7 @@ protected:
   void closeUpstreamConnection();
   void onIdleTimeout();
   void resetIdleTimer();
+  void disableIdleTimer();
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
