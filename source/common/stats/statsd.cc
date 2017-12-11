@@ -75,7 +75,7 @@ const std::string UdpStatsdSink::getName(const Metric& metric) {
 
 const std::string UdpStatsdSink::buildTagStr(const std::vector<Tag>& tags) {
   if (!use_tag_ || tags.empty()) {
-    return {};
+    return "";
   }
 
   std::vector<std::string> tag_strs;
