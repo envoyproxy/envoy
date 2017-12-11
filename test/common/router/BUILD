@@ -134,11 +134,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "req_header_formatter_test",
-    srcs = ["req_header_formatter_test.cc"],
+    name = "header_formatter_test",
+    srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:rds_json_lib",
-        "//source/common/router:req_header_formatter_lib",
+        "//source/common/router:header_formatter_lib",
+        "//source/common/router:header_parser_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

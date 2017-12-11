@@ -72,7 +72,7 @@ public:
 
   // Based on MessageUtil::hash() defined below.
   template <class ProtoType>
-  static std::size_t hash(const google::protobuf::RepeatedPtrField<ProtoType>& source) {
+  static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
     ProtobufTypes::String text;

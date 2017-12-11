@@ -761,7 +761,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers);
+      route->finalizeResponseHeaders(headers, request_info);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
@@ -772,7 +772,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers);
+      route->finalizeResponseHeaders(headers, request_info);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
@@ -783,7 +783,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers);
+      route->finalizeResponseHeaders(headers, request_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
@@ -794,7 +794,7 @@ response_headers_to_remove: ["x-global-remove"]
       Http::TestHeaderMapImpl req_headers = genHeaders("api.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers);
+      route->finalizeResponseHeaders(headers, request_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
     }
   }

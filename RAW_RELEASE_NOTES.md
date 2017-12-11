@@ -13,7 +13,7 @@ final version.
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
   refactored with the interface.
 
+* Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
+
 * Added support for priorities for several types of load balancer (RoundRobinLoadBalancer,
   LeastRequestLoadBalancer, RandomLoadBalancer)
-
-
