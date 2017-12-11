@@ -164,8 +164,8 @@ protected:
   TestEnvironment::PortMap port_map_;
   bool initialized_{}; // True if initialized() has been called.
 
-  // The named ports for createGeneratedApiTestServer
-  std::vector<std::string> named_ports_{{"http"}};
+  // The named ports for createGeneratedApiTestServer. Used mostly for lookupPort.
+  std::vector<std::string> named_ports_{{"default_port"}};
   // The ports from upstreams created in createUpstreams()
   std::vector<uint32_t> ports_;
   // If true, use AutonomousUpstream for fake upstreams.

@@ -143,7 +143,9 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version)
-    : BaseIntegrationTest(version, downstream_protocol) {}
+    : BaseIntegrationTest(version, downstream_protocol) {
+  named_ports_ = {{"http"}};
+}
 
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
