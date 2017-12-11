@@ -210,8 +210,10 @@ envoy_cc_library(
     srcs = ["header_formatter.cc"],
     hdrs = ["header_formatter.h"],
     deps = [
+        "//include/envoy/common:optional",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/json:json_loader_lib",
     ],
 )

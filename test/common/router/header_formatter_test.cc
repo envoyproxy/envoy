@@ -83,15 +83,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Top-level value.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, key)";
-    RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
-    const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
-    EXPECT_EQ("value", formatted_string);
-  }
-
-  // Extra spaces are ignored.
-  {
-    const std::string variable = "UPSTREAM_METADATA( namespace , key )";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("value", formatted_string);
@@ -99,30 +91,22 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Nested string value.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, str_key)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"str_key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("str_value", formatted_string);
   }
 
-  // Escaped key.
-  {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, escaped\\,key)";
-    RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
-    const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
-    EXPECT_EQ("escaped_key_value", formatted_string);
-  }
-
   // Boolean values.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, bool_key1)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key1\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("true", formatted_string);
   }
 
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, bool_key2)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key2\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("false", formatted_string);
@@ -130,14 +114,14 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Number values.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, num_key1)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key1\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("1", formatted_string);
   }
 
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, num_key2)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key2\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("3.14", formatted_string);
@@ -145,7 +129,8 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Deeply nested value.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, struct_key, deep_key)";
+    const std::string variable =
+        "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\", \"deep_key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("deep_value", formatted_string);
@@ -153,21 +138,21 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Initial metadata lookup fails.
   {
-    const std::string variable = "UPSTREAM_METADATA(wrong_namespace, key)";
+    const std::string variable = "UPSTREAM_METADATA([\"wrong_namespace\", \"key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
   }
 
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, not_found)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"not_found\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
   }
 
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, not_found, key)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"not_found\", \"key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
@@ -175,7 +160,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Nested metadata lookup fails.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, not_found)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"not_found\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
@@ -183,7 +168,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Nested metadata lookup returns non-struct intermediate value.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, key, invalid)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"key\", \"invalid\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
@@ -191,7 +176,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Struct values are not rendered.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, struct_key)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
@@ -199,7 +184,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // List values are not rendered.
   {
-    const std::string variable = "UPSTREAM_METADATA(namespace, nested, list_key)";
+    const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])";
     RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
     const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
     EXPECT_EQ("", formatted_string);
@@ -211,7 +196,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
-  const std::string variable = "UPSTREAM_METADATA(namespace, key)";
+  const std::string variable = "UPSTREAM_METADATA([\"namespace\", \"key\"])";
   RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
   const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
   EXPECT_EQ("", formatted_string);
@@ -249,12 +234,14 @@ TEST(RequestInfoHeaderFormatterTest, WrongFormatOnVariable) {
 }
 
 TEST(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
-  // Too few parameters.
+  // Invalid JSON.
   EXPECT_THROW_WITH_MESSAGE(
       RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
       EnvoyException,
-      "Incorrect header configuration. Expected format UPSTREAM_METADATA(namespace, k, ...), "
-      "actual format UPSTREAM_METADATA(abcd)");
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA(abcd), because JSON supplied is not valid. Error(offset 0, line 1): "
+      "Invalid value.\n");
 
   // No parameters.
   EXPECT_THROW(RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA", false),
@@ -262,6 +249,14 @@ TEST(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   EXPECT_THROW(RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA()", false),
                EnvoyException);
+
+  // One parameter.
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
   EXPECT_THROW(RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA(", false),
@@ -305,7 +300,7 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
     "request_headers_to_add": [
       {
         "key": "x-key",
-        "value": "%UPSTREAM_METADATA(namespace, key)%"
+        "value": "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
       }
     ]
   }
