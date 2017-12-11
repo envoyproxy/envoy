@@ -95,6 +95,11 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  host_set_.healthy_hosts_ = {};
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
 // Test extending the priority set.

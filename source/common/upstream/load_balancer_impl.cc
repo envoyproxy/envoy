@@ -38,6 +38,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
     : stats_(stats), runtime_(runtime), random_(random), priority_set_(priority_set),
       best_available_host_set_(bestAvailable(&priority_set)),
       local_priority_set_(local_priority_set) {
+  ASSERT(priority_set.hostSetsPerPriority().size() > 0);
   resizePerPriorityState();
   priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
                                          const std::vector<HostSharedPtr>&) -> void {
@@ -52,6 +53,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
     }
   });
   if (local_priority_set_) {
+    ASSERT(local_priority_set->hostSetsPerPriority().size() > 0);
     // Multiple priorities are unsupported for local priority sets.
     // TODO(alyssawilk) find the right place to reject config with this.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
