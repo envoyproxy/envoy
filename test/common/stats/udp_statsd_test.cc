@@ -125,7 +125,6 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   ON_CALL(counter, tags()).WillByDefault(ReturnRef(tags));
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c"));
-  ;
   sink.flushCounter(counter, 1);
 
   NiceMock<MockGauge> gauge;
@@ -133,7 +132,6 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   ON_CALL(gauge, tags()).WillByDefault(ReturnRef(tags));
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g"));
-  ;
   sink.flushGauge(gauge, 1);
 
   NiceMock<MockHistogram> timer;
@@ -141,7 +139,6 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   ON_CALL(timer, tags()).WillByDefault(ReturnRef(tags));
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms"));
-  ;
   sink.onHistogramComplete(timer, 5);
 
   tls_.shutdownThread();
@@ -160,7 +157,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   ON_CALL(counter, tags()).WillByDefault(ReturnRef(tags));
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c|#key1:value1,key2:value2"));
-  ;
   sink.flushCounter(counter, 1);
 
   NiceMock<MockGauge> gauge;
@@ -170,7 +166,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   ON_CALL(gauge, tags()).WillByDefault(ReturnRef(tags));
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g|#key1:value1,key2:value2"));
-  ;
   sink.flushGauge(gauge, 1);
 
   NiceMock<MockHistogram> timer;
@@ -180,7 +175,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   ON_CALL(timer, tags()).WillByDefault(ReturnRef(tags));
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms|#key1:value1,key2:value2"));
-  ;
   sink.onHistogramComplete(timer, 5);
 
   tls_.shutdownThread();
