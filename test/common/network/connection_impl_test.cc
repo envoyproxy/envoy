@@ -670,7 +670,7 @@ TEST_P(ConnectionImplBytesSentTest, CloseInCallback) {
   // Order is not defined, so register two callbacks that both close the connection. Only
   // one of them should be called.
   uint64_t cb_called = 0;
-  BytesSentCb cb = [&](uint64_t) {
+  Connection::BytesSentCb cb = [&](uint64_t) {
     cb_called++;
     connection_->close(ConnectionCloseType::NoFlush);
   };

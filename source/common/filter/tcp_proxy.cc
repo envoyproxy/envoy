@@ -388,7 +388,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
       idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
           [this]() -> void { onIdleTimeout(); });
       resetIdleTimer();
-      Network::BytesSentCb cb = [this](uint64_t) { resetIdleTimer(); };
+      Network::Connection::BytesSentCb cb = [this](uint64_t) { resetIdleTimer(); };
       read_callbacks_->connection().addBytesSentCallback(cb);
       upstream_connection_->addBytesSentCallback(cb);
     }

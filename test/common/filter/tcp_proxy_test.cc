@@ -746,8 +746,8 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
-  Network::BytesSentCb downstream_bytes_sent_cb;
-  Network::BytesSentCb upstream_bytes_sent_cb;
+  Network::Connection::BytesSentCb downstream_bytes_sent_cb;
+  Network::Connection::BytesSentCb upstream_bytes_sent_cb;
   EXPECT_CALL(filter_callbacks_.connection_, addBytesSentCallback(_))
       .WillOnce(SaveArg<0>(&downstream_bytes_sent_cb));
   EXPECT_CALL(*upstream_connections_.at(0), addBytesSentCallback(_))

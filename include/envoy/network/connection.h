@@ -33,12 +33,6 @@ enum class ConnectionEvent {
 enum class ConnectionBufferType { Read, Write };
 
 /**
- * Callback function for when bytes have been sent by a connection.
- * @param bytes_sent supplies the number of bytes written to the connection.
- */
-typedef std::function<void(uint64_t bytes_sent)> BytesSentCb;
-
-/**
  * Network level callbacks that happen on a connection.
  */
 class ConnectionCallbacks {
@@ -77,6 +71,12 @@ enum class ConnectionCloseType {
 class Connection : public Event::DeferredDeletable, public FilterManager {
 public:
   enum class State { Open, Closing, Closed };
+
+  /**
+   * Callback function for when bytes have been sent by a connection.
+   * @param bytes_sent supplies the number of bytes written to the connection.
+   */
+  typedef std::function<void(uint64_t bytes_sent)> BytesSentCb;
 
   struct ConnectionStats {
     Stats::Counter& read_total_;
