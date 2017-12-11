@@ -103,7 +103,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
-  PropagationMode propagation_mode_;
+  const PropagationMode propagation_mode_;
 };
 
 } // Tracing
