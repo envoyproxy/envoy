@@ -22,7 +22,7 @@ namespace Statsd {
 
 class MockWriter : public Writer {
 public:
-  MOCK_METHOD1(write, void(const std::string& m));
+  MOCK_METHOD1(write, void(const std::string& message));
 };
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
