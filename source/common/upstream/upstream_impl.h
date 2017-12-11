@@ -253,8 +253,9 @@ public:
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
-  // Passes ownership to the caller.
-  virtual HostSetImpl* createHostSet(uint32_t priority) { return new HostSetImpl(priority); }
+  virtual HostSetImplPtr createHostSet(uint32_t priority) {
+    return HostSetImplPtr{new HostSetImpl(priority)};
+  }
 
 private:
   virtual void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,

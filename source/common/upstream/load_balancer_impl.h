@@ -57,7 +57,7 @@ private:
   };
 
   /**
-   * Increase per_priority_state_ to at least priority_set;.hostSetsPerPriority().size()
+   * Increase per_priority_state_ to at least priority_set.hostSetsPerPriority().size()
    */
   void resizePerPriorityState();
 
@@ -96,7 +96,7 @@ private:
   // zero-priority host set if all host sets are fully unhealthy.
   const HostSet* best_available_host_set_;
 
-  // The set of local Envoy instances which are load balancing across priority_set_
+  // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
   struct PerPriorityState {

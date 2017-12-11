@@ -421,9 +421,10 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const PrioritySet& or
   }
 }
 
-HostSetImpl* SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
+HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size());
-  return new HostSubsetImpl(*original_priority_set_.hostSetsPerPriority()[priority]);
+  return HostSetImplPtr{
+      new HostSubsetImpl(*original_priority_set_.hostSetsPerPriority()[priority])};
 }
 
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,

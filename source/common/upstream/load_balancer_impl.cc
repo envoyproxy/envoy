@@ -56,6 +56,9 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
     ASSERT(local_priority_set->hostSetsPerPriority().size() > 0);
     // Multiple priorities are unsupported for local priority sets.
     // TODO(alyssawilk) find the right place to reject config with this.
+    // In order to support priorities correctly, one would have to make some assumptions about
+    // routing (all local Envoys fail over at the same time) and use all priorities when computing
+    // the locality routing structure.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
         [this](uint32_t priority, const std::vector<HostSharedPtr>&,
@@ -149,7 +152,7 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
 };
 
 void LoadBalancerBase::resizePerPriorityState() {
-  uint32_t size = priority_set_.hostSetsPerPriority().size();
+  const uint32_t size = priority_set_.hostSetsPerPriority().size();
   while (per_priority_state_.size() < size) {
     per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
   }
