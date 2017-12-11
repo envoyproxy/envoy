@@ -38,9 +38,9 @@ public:
     return compression_strategy_;
   }
 
-  std::vector<std::string> getCacheControlValues() const { return cache_control_values_; }
+  const std::vector<std::string>& getCacheControlValues() const { return cache_control_values_; }
 
-  std::vector<std::string> getContentTypeValues() const { return content_type_values_; }
+  const std::vector<std::string>& getContentTypeValues() const { return content_type_values_; }
 
   uint64_t getMinimumLength() const { return content_length_; }
 
@@ -74,14 +74,14 @@ private:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
   }
 
-  const ZlibCompressorImpl::CompressionLevel compression_level_;
-  const ZlibCompressorImpl::CompressionStrategy compression_strategy_;
-  const uint64_t content_length_;
-  const uint64_t memory_level_;
-  const std::vector<std::string> content_type_values_;
-  const std::vector<std::string> cache_control_values_;
-  const bool etag_;
-  const bool last_modified_;
+  ZlibCompressorImpl::CompressionLevel compression_level_;
+  ZlibCompressorImpl::CompressionStrategy compression_strategy_;
+  uint64_t content_length_;
+  uint64_t memory_level_;
+  std::vector<std::string> content_type_values_;
+  std::vector<std::string> cache_control_values_;
+  bool etag_;
+  bool last_modified_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;

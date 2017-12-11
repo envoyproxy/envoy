@@ -1108,8 +1108,7 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         "minItems" : 1,
         "uniqueItems" : true,
         "items" : {
-          "type": "string",
-          "enum": [ "no-cache", "no-store", "private" ]
+          "type": "string"
         }
       },
       "content_type" : {
@@ -1117,20 +1116,7 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         "minItems" : 1,
         "uniqueItems" : true,
         "items" : {
-          "type": "string",
-          "enum": [
-            "text/html",
-            "text/css",
-            "text/plain",
-            "text/xml",
-            "application/javascript",
-            "application/json",
-            "application/xml",
-            "font/eot",
-            "font/opentype",
-            "font/otf",
-            "image/svg+xml"
-          ]
+          "type": "string"
         }
       }
     },
