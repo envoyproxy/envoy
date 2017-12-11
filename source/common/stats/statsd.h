@@ -57,6 +57,7 @@ public:
 
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
+  bool getUseTagForTest() { return use_tag_; }
 
 private:
   const std::string getName(const Metric& metric);
