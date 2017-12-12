@@ -148,6 +148,8 @@ class StatsSinkNameValues {
 public:
   // Statsd sink
   const std::string STATSD = "envoy.statsd";
+  // DogStatsD compatible stastsd sink
+  const std::string DOG_STATSD = "envoy.dog_statsd";
 };
 
 typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;

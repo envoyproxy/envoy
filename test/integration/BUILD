@@ -57,18 +57,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "proto_integration_test",
-    srcs = ["proto_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/protobuf:utility_lib",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_sh_test(
     name = "hotrestart_test",
     srcs = envoy_select_hot_restart(["hotrestart_test.sh"]),
@@ -265,6 +253,7 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
+        "//source/server/config/access_log:file_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:dynamo_lib",
@@ -279,7 +268,6 @@ envoy_cc_test_library(
         "//source/server/config/http:zipkin_lib",
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:echo_lib",
-        "//source/server/config/network:file_access_log_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:mongo_proxy_lib",
         "//source/server/config/network:ratelimit_lib",

@@ -33,6 +33,7 @@ public:
   MOCK_CONST_METHOD0(value, uint64_t());
 
   std::string name_;
+  std::vector<Tag> tags_;
 };
 
 class MockGauge : public Gauge {
@@ -52,6 +53,7 @@ public:
   MOCK_CONST_METHOD0(value, uint64_t());
 
   std::string name_;
+  std::vector<Tag> tags_;
 };
 
 class MockHistogram : public Histogram {
@@ -68,6 +70,7 @@ public:
   MOCK_METHOD1(recordValue, void(uint64_t value));
 
   std::string name_;
+  std::vector<Tag> tags_;
   Store* store_;
 };
 

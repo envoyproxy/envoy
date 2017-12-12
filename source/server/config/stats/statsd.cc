@@ -8,8 +8,8 @@
 #include "common/network/resolver_impl.h"
 #include "common/stats/statsd.h"
 
-#include "api/bootstrap.pb.h"
-#include "api/bootstrap.pb.validate.h"
+#include "api/stats.pb.h"
+#include "api/stats.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -26,7 +26,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
     return Stats::SinkPtr(
-        new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address)));
+        new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address), false));
     break;
   }
   case envoy::api::v2::StatsdSink::kTcpClusterName:

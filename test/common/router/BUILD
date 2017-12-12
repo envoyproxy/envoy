@@ -106,7 +106,7 @@ envoy_cc_test(
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/server/config/network:file_access_log_lib",
+        "//source/server/config/access_log:file_access_log_lib",
         "//test/common/http:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
@@ -134,11 +134,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "req_header_formatter_test",
-    srcs = ["req_header_formatter_test.cc"],
+    name = "header_formatter_test",
+    srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:rds_json_lib",
-        "//source/common/router:req_header_formatter_lib",
+        "//source/common/router:header_formatter_lib",
+        "//source/common/router:header_parser_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
