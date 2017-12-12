@@ -12,9 +12,7 @@ namespace {
 class TcpProxyIntegrationTest : public BaseIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  TcpProxyIntegrationTest()
-      : BaseIntegrationTest(GetParam(), Http::CodecClient::Type::HTTP1,
-                            ConfigHelper::TCP_PROXY_CONFIG) {}
+  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {}
 
   void initialize() override {
     named_ports_ = {{"tcp_proxy"}};

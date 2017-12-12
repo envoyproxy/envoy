@@ -33,19 +33,6 @@ using testing::NiceMock;
 using testing::_;
 
 namespace Envoy {
-namespace {
-envoy::api::v2::filter::network::HttpConnectionManager::CodecType
-typeToCodecType(Http::CodecClient::Type type) {
-  switch (type) {
-  case Http::CodecClient::Type::HTTP1:
-    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP1;
-  case Http::CodecClient::Type::HTTP2:
-    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP2;
-  default:
-    RELEASE_ASSERT(0);
-  }
-}
-} // namespace
 
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
@@ -183,14 +170,12 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         Http::CodecClient::Type downstream_protocol,
                                          const std::string& config)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), config_helper_(version, config),
-      default_log_level_(TestEnvironment::getOptions().logLevel()),
-      downstream_protocol_(downstream_protocol) {
+      default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -210,10 +195,6 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr());
-}
-
-void BaseIntegrationTest::SetUp() {
-  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
 void BaseIntegrationTest::initialize() {
@@ -243,11 +224,6 @@ void BaseIntegrationTest::createEnvoy() {
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   createGeneratedApiTestServer(bootstrap_path, named_ports_);
-}
-
-void BaseIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
-  downstream_protocol_ = downstream_protocol;
-  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {

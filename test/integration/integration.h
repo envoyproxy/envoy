@@ -111,7 +111,6 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   BaseIntegrationTest(Network::Address::IpVersion version,
-                      Http::CodecClient::Type downstream_protocol = Http::CodecClient::Type::HTTP1,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~BaseIntegrationTest() {}
 
@@ -124,12 +123,9 @@ public:
   virtual void createUpstreams();
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
-  // sets downstream_protocol_ and alters the client protocol in the config_helper_
-  void setDownstreamProtocol(Http::CodecClient::Type type);
   // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
   void setUpstreamProtocol(FakeHttpConnection::Type type);
 
-  Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);

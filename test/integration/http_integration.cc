@@ -45,6 +45,18 @@ void setAllowAbsoluteUrl(envoy::api::v2::filter::network::HttpConnectionManager&
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
 
+envoy::api::v2::filter::network::HttpConnectionManager::CodecType
+typeToCodecType(Http::CodecClient::Type type) {
+  switch (type) {
+  case Http::CodecClient::Type::HTTP1:
+    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP1;
+  case Http::CodecClient::Type::HTTP2:
+    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP2;
+  default:
+    RELEASE_ASSERT(0);
+  }
+}
+
 } // namespace
 
 IntegrationCodecClient::IntegrationCodecClient(
@@ -138,19 +150,25 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return IntegrationCodecClientPtr{new IntegrationCodecClient(
-      *dispatcher_, std::move(conn), host_description, downstreamProtocol())};
+      *dispatcher_, std::move(conn), host_description, downstream_protocol_)};
 }
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version)
-    : BaseIntegrationTest(version, downstream_protocol) {
+    : BaseIntegrationTest(version), downstream_protocol_(downstream_protocol) {
   named_ports_ = {{"http"}};
+  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
   test_server_.reset();
   fake_upstreams_.clear();
+}
+
+void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
+  downstream_protocol_ = downstream_protocol;
+  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
 void HttpIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
@@ -255,7 +273,7 @@ void HttpIntegrationTest::testRouterNotFound() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", downstreamProtocol(), version_);
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
@@ -266,7 +284,7 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/notfound", "foo", downstreamProtocol(), version_);
+      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
@@ -279,7 +297,7 @@ void HttpIntegrationTest::testRouterClusterNotFound404() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstreamProtocol(), version_, "foo.com");
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
@@ -292,7 +310,7 @@ void HttpIntegrationTest::testRouterClusterNotFound503() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstreamProtocol(), version_, "foo.com");
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 }
@@ -305,7 +323,7 @@ void HttpIntegrationTest::testRouterRedirect() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/foo", "", downstreamProtocol(), version_, "www.redirect.com");
+      lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, "www.redirect.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("301", response->headers().Status()->value().c_str());
   EXPECT_STREQ("https://www.redirect.com/foo",
@@ -329,7 +347,7 @@ void HttpIntegrationTest::testDrainClose() {
 
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
 
@@ -354,7 +372,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   fake_upstream_connection_->waitForDisconnect();
   response_->waitForEndStream();
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     codec_client_->close();
@@ -383,7 +401,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   fake_upstream_connection_->close();
   fake_upstream_connection_->waitForDisconnect();
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     response_->waitForReset();
@@ -483,7 +501,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
     fake_upstream_connection_->waitForDisconnect();
   }
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     codec_client_->close();
@@ -921,14 +939,14 @@ void HttpIntegrationTest::testInvalidContentLength() {
                                                       {"content-length", "-1"}},
                               *response_);
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     response_->waitForReset();
     codec_client_->close();
   }
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
   } else {
@@ -946,14 +964,14 @@ void HttpIntegrationTest::testMultipleContentLengths() {
                                                       {"content-length", "3,2"}},
                               *response_);
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
     response_->waitForReset();
     codec_client_->close();
   }
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
   } else {
