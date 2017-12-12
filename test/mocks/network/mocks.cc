@@ -23,7 +23,6 @@ namespace Envoy {
 namespace Network {
 
 MockConnectionCallbacks::MockConnectionCallbacks() {}
-
 MockConnectionCallbacks::~MockConnectionCallbacks() {}
 
 uint64_t MockConnectionBase::next_id_;

@@ -317,7 +317,7 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
   request_info_.bytes_received_ += data.length();
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
-  resetIdleTimer();
+  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
 }
 
@@ -338,7 +338,7 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   request_info_.bytes_sent_ += data.length();
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
-  resetIdleTimer();
+  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
 void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
