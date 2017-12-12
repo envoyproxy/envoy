@@ -40,7 +40,7 @@ void TlsContextJson::translateCommonTlsContext(
   translateTlsCertificate(json_tls_context, *common_tls_context.mutable_tls_certificates()->Add());
 
   auto* validation_context = common_tls_context.mutable_validation_context();
-  if (validation_context->has_trusted_ca()) {
+  if (json_tls_context.hasObject("ca_cert_file")) {
     validation_context->mutable_trusted_ca()->set_filename(
         json_tls_context.getString("ca_cert_file", ""));
   }
