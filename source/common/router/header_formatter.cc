@@ -1,6 +1,5 @@
 #include "common/router/header_formatter.h"
 
-#include <cctype>
 #include <string>
 
 #include "envoy/common/optional.h"
