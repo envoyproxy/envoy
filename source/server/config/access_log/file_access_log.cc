@@ -1,4 +1,4 @@
-#include "server/config/network/file_access_log.h"
+#include "server/config/access_log/file_access_log.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"

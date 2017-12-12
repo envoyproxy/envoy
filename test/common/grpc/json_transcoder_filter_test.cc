@@ -42,14 +42,12 @@ namespace Grpc {
 
 class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
-  GrpcJsonTranscoderConfigTest() {}
-
   const envoy::api::v2::filter::http::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
-    envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
+    envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
     return proto_config;
   }
@@ -107,6 +105,14 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore")));
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
+  envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
+  proto_config.set_proto_descriptor_bin(
+      Filesystem::fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  proto_config.add_services("bookstore.Bookstore");
+  EXPECT_NO_THROW(JsonTranscoderConfig config(proto_config));
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, UnknownService) {
   EXPECT_THROW_WITH_MESSAGE(
       JsonTranscoderConfig config(
@@ -130,6 +136,14 @@ TEST_F(GrpcJsonTranscoderConfigTest, NonProto) {
                                 TestEnvironment::runfilesPath("test/proto/bookstore.proto"),
                                 "grpc.service.UnknownService")),
                             EnvoyException, "transcoding_filter: Unable to parse proto descriptor");
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, NonBinaryProto) {
+  envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
+  proto_config.set_proto_descriptor_bin("This is invalid proto");
+  proto_config.add_services("bookstore.Bookstore");
+  EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(proto_config), EnvoyException,
+                            "transcoding_filter: Unable to parse proto descriptor");
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, InvalidHttpTemplate) {
