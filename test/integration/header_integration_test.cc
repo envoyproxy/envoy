@@ -104,35 +104,47 @@ public:
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 
-      auto* cluster0 = static_resources->mutable_clusters(0);
-      cluster0->clear_hosts();
-      cluster0->set_type(envoy::api::v2::Cluster_DiscoveryType_EDS);
-      auto* eds_config =
-          cluster0->mutable_eds_cluster_config()->mutable_eds_config()->mutable_api_config_source();
-      eds_config->set_api_type(envoy::api::v2::ApiConfigSource_ApiType_GRPC);
-      eds_config->add_cluster_name("eds-cluster");
+      static_resources->mutable_clusters(0)->CopyFrom(
+          TestUtility::parseYaml<envoy::api::v2::Cluster>(
+              R"EOF(
+                  name: cluster_0
+                  type: EDS
+                  eds_cluster_config:
+                    eds_config:
+                      api_config_source:
+                        cluster_name: "eds-cluster"
+                        api_type: GRPC
+              )EOF"));
 
       // Give the config utility a place to stuff the upstream host's port (must come before
       // the eds-cluster to keep the upstreams and ports in the same order).)
-      auto* unused_cluster = static_resources->add_clusters();
-      unused_cluster->set_name("unused-cluster");
-      unused_cluster->set_type(envoy::api::v2::Cluster_DiscoveryType_STATIC);
-      unused_cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_ROUND_ROBIN);
-      auto* host = unused_cluster->add_hosts();
-      auto* sock_addr = host->mutable_socket_address();
-      sock_addr->set_address(Network::Test::getLoopbackAddressString(version_));
-      sock_addr->set_port_value(0);
+      static_resources->add_clusters()->CopyFrom(
+          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+              R"EOF(
+                      name: unused-cluster
+                      type: STATIC
+                      lb_policy: ROUND_ROBIN
+                      hosts:
+                        - socket_address:
+                            address: {}
+                            port_value: 0
+                  )EOF",
+              Network::Test::getLoopbackAddressString(version_))));
 
-      auto* eds_cluster = static_resources->add_clusters();
-      eds_cluster->set_name("eds-cluster");
-      eds_cluster->set_type(envoy::api::v2::Cluster_DiscoveryType_STATIC);
-      eds_cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_ROUND_ROBIN);
-      eds_cluster->mutable_http2_protocol_options();
-      eds_cluster->mutable_connect_timeout()->set_seconds(5);
-      auto* eds_host = eds_cluster->add_hosts();
-      sock_addr = eds_host->mutable_socket_address();
-      sock_addr->set_address(Network::Test::getLoopbackAddressString(version_));
-      sock_addr->set_port_value(0);
+      static_resources->add_clusters()->CopyFrom(
+          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+              R"EOF(
+                      name: eds-cluster
+                      type: STATIC
+                      lb_policy: ROUND_ROBIN
+                      http2_protocol_options: {{}}
+                      connect_timeout: 5s
+                      hosts:
+                        - socket_address:
+                            address: {}
+                            port_value: 0
+                  )EOF",
+              Network::Test::getLoopbackAddressString(version_))));
     });
 
     use_eds_ = true;
@@ -223,15 +235,24 @@ public:
       discovery_response.set_version_info("1");
       discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-      envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
-      cluster_load_assignment.set_cluster_name("cluster_0");
-      auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints();
-      auto* sock_addr = endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
-      sock_addr->set_protocol(envoy::api::v2::SocketAddress_Protocol_TCP);
-      sock_addr->set_address(Network::Test::getLoopbackAddressString(GetParam()));
-      sock_addr->set_port_value(fake_upstreams_[0]->localAddress()->ip()->port());
-      Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(), "test.namespace", "key")
-          .set_string_value("metadata-value");
+      envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
+          TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+              R"EOF(
+                cluster_name: cluster_0
+                endpoints:
+                - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {}
+                          port_value: {}
+                    metadata:
+                      filter_metadata:
+                        test.namespace:
+                          key: metadata-value
+              )EOF",
+              Network::Test::getLoopbackAddressString(GetParam()),
+              fake_upstreams_[0]->localAddress()->ip()->port()));
 
       discovery_response.add_resources()->PackFrom(cluster_load_assignment);
       eds_stream_->sendGrpcMessage(discovery_response);
