@@ -575,7 +575,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-class ConnectionImplBytesSentTest : public testing::TestWithParam<Address::IpVersion> {
+class ConnectionImplBytesSentTest : public testing::Test {
 public:
   ConnectionImplBytesSentTest() {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
@@ -587,11 +587,11 @@ public:
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(new Event::MockFileEvent)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
-    connection_.reset(new ConnectionImpl(dispatcher_, 0,
-                                         Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                         Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                         Network::Address::InstanceConstSharedPtr(),
-                                         TransportSocketPtr(transport_socket_), false, true));
+    connection_.reset(new ConnectionImpl(
+        dispatcher_, 0, Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4),
+        Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4),
+        Network::Address::InstanceConstSharedPtr(), TransportSocketPtr(transport_socket_), false,
+        true));
     connection_->addConnectionCallbacks(callbacks_);
   }
 
@@ -603,11 +603,9 @@ public:
   NiceMock<MockTransportSocket>* transport_socket_;
   Event::FileReadyCb file_ready_cb_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplBytesSentTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Test that BytesSentCb is invoked at the correct times
-TEST_P(ConnectionImplBytesSentTest, BytesSentCallback) {
+TEST_F(ConnectionImplBytesSentTest, BytesSentCallback) {
   uint64_t bytes_sent = 0;
   uint64_t cb_called = 0;
   connection_->addBytesSentCallback([&](uint64_t arg) {
@@ -641,7 +639,7 @@ TEST_P(ConnectionImplBytesSentTest, BytesSentCallback) {
 }
 
 // Make sure that multiple registered callbacks all get called
-TEST_P(ConnectionImplBytesSentTest, BytesSentMultiple) {
+TEST_F(ConnectionImplBytesSentTest, BytesSentMultiple) {
   uint64_t cb_called1 = 0;
   uint64_t cb_called2 = 0;
   uint64_t bytes_sent1 = 0;
@@ -666,7 +664,7 @@ TEST_P(ConnectionImplBytesSentTest, BytesSentMultiple) {
 }
 
 // Test that if a callback closes the connection, further callbacks are not called.
-TEST_P(ConnectionImplBytesSentTest, CloseInCallback) {
+TEST_F(ConnectionImplBytesSentTest, CloseInCallback) {
   // Order is not defined, so register two callbacks that both close the connection. Only
   // one of them should be called.
   uint64_t cb_called = 0;

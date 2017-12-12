@@ -31,6 +31,7 @@ public:
 class MockConnectionBase {
 public:
   void raiseEvent(Network::ConnectionEvent event);
+  void raiseBytesSentCallbacks(uint64_t num_bytes);
   void runHighWatermarkCallbacks();
   void runLowWatermarkCallbacks();
 
@@ -38,6 +39,7 @@ public:
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
+  std::list<Network::Connection::BytesSentCb> bytes_sent_callbacks_;
   uint64_t id_{next_id_++};
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
