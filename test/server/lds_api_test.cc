@@ -217,7 +217,7 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_EQ(18068408981723255507U, store_.gauge("listener_manager.lds.version").value());
 }
 
-// Regression test issue #2188 where an empty ca_cert_file field was created and caused and the LDS
+// Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
 // update to fail validation.
 TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   InSequence s;
