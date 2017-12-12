@@ -20,6 +20,7 @@ RingHashLoadBalancer::RingHashLoadBalancer(
                                         const std::vector<HostSharedPtr>&) -> void {
     // priority!=0 will be blocked by EDS validation.
     ASSERT(priority == 0); // TODO(alyssawilk) make ring hash LB priority-aware.
+    UNREFERENCED_PARAMETER(priority);
     refresh();
   });
 
