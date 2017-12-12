@@ -60,23 +60,35 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
-  envoy::api::v2::Metadata metadata;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata, "namespace", "key")
-      .set_string_value("value");
-  auto& struct_fields =
-      *(Envoy::Config::Metadata::mutableMetadataValue(metadata, "namespace", "nested")
-            .mutable_struct_value()
-            ->mutable_fields());
-  struct_fields["str_key"].set_string_value("str_value");
-  struct_fields["bool_key1"].set_bool_value(true);
-  struct_fields["bool_key2"].set_bool_value(false);
-  struct_fields["num_key1"].set_number_value(1);
-  struct_fields["num_key2"].set_number_value(3.14);
-  struct_fields["null_key"].set_null_value(ProtobufWkt::NullValue::NULL_VALUE);
-  struct_fields["list_key"].mutable_list_value()->add_values()->set_string_value("list_element");
-  struct_fields["escaped,key"].set_string_value("escaped_key_value");
-  auto& substruct_fields = *(struct_fields["struct_key"].mutable_struct_value()->mutable_fields());
-  substruct_fields["deep_key"].set_string_value("deep_value");
+  envoy::api::v2::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::Metadata>(
+      R"EOF(
+        filter_metadata:
+          namespace:
+            key: value
+            nested:
+              str_key: str_value
+              "escaped,key": escaped_key_value
+              bool_key1: true
+              bool_key2: false
+              num_key1: 1
+              num_key2: 3.14
+              null_key: null
+              list_key: [ list_element ]
+              struct_key:
+                deep_key: deep_value
+      )EOF");
+
+  // Prove we're testing the expected types.
+  const auto& nested_struct =
+      Envoy::Config::Metadata::metadataValue(metadata, "namespace", "nested").struct_value();
+  EXPECT_EQ(nested_struct.fields().at("str_key").kind_case(), ProtobufWkt::Value::kStringValue);
+  EXPECT_EQ(nested_struct.fields().at("bool_key1").kind_case(), ProtobufWkt::Value::kBoolValue);
+  EXPECT_EQ(nested_struct.fields().at("bool_key2").kind_case(), ProtobufWkt::Value::kBoolValue);
+  EXPECT_EQ(nested_struct.fields().at("num_key1").kind_case(), ProtobufWkt::Value::kNumberValue);
+  EXPECT_EQ(nested_struct.fields().at("num_key1").kind_case(), ProtobufWkt::Value::kNumberValue);
+  EXPECT_EQ(nested_struct.fields().at("null_key").kind_case(), ProtobufWkt::Value::kNullValue);
+  EXPECT_EQ(nested_struct.fields().at("list_key").kind_case(), ProtobufWkt::Value::kListValue);
+  EXPECT_EQ(nested_struct.fields().at("struct_key").kind_case(), ProtobufWkt::Value::kStructValue);
 
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
@@ -315,7 +327,7 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
   req_header_parser->evaluateHeaders(headerMap, request_info);
-  EXPECT_FALSE(headerMap.has("x-client-ip"));
+  EXPECT_FALSE(headerMap.has("x-key"));
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {
