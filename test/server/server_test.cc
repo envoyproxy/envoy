@@ -224,5 +224,17 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
     EXPECT_THAT(e.what(), HasSubstr("Failed to open log-file"));
   }
 }
+
+TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
+  try {
+    server_.reset(new InstanceImpl(
+        options_,
+        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+        hooks_, restart_, stats_store_, fakelock_, component_factory_, thread_local_));
+    FAIL();
+  } catch (const EnvoyException& e) {
+    EXPECT_THAT(e.what(), HasSubstr("unable to read file:"));
+  }
+}
 } // namespace Server
 } // namespace Envoy
