@@ -18,6 +18,10 @@ const HostSet* bestAvailable(const PrioritySet* priority_set) {
   if (priority_set == nullptr) {
     return nullptr;
   }
+  // This is used for LoadBalancerBase priority_set_ and local_priority_set_
+  // which are guaranteed to have at least one host set.
+  ASSERT(priority_set->hostSetsPerPriority().size() > 0);
+
   for (auto& host_set : priority_set->hostSetsPerPriority()) {
     if (!host_set->healthyHosts().empty()) {
       return host_set.get();
@@ -79,11 +83,11 @@ LoadBalancerBase::~LoadBalancerBase() {
 void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
-  // This should never happen unless someone uses unsupported priorities for local priority sets.
-  // Do error handling until such config is rejected, then it will change to an ASSERT
-  if (priority > priority_set_.hostSetsPerPriority().size() - 1) {
-    return;
-  }
+  // We are updating based on a change for a priority level in priority_set_, or the latched
+  // bestAvailablePriority() which is a latched priority for priority_set_.
+  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
+  // resizePerPriorityState should ensure these stay in sync.
+  ASSERT(per_priority_state_.size() == priority_set_.hostSetsPerPriority().size());
 
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.

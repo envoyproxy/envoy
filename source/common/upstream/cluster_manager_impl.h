@@ -266,7 +266,7 @@ private:
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
-  // The name of the local cluster of Envoy instances if defined, else the empty string.
+  // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
 };
 
