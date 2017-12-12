@@ -59,10 +59,9 @@ public:
   void startGrpcStream();
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
-    std::string message_debug_string = message.DebugString();
     auto serialized_response = Grpc::Common::serializeBody(message);
     encodeData(*serialized_response, false);
-    ENVOY_LOG(debug, "Sent gRPC message: {}", message_debug_string);
+    ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
   }
   template <class T> void decodeGrpcFrame(T& message) {
     EXPECT_GE(decoded_grpc_frames_.size(), 1);
