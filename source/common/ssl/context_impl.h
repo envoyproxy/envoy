@@ -76,7 +76,7 @@ public:
   std::string getCertChainInformation() const override;
 
 protected:
-  ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
+  ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, const ContextConfig& config);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -125,7 +125,8 @@ protected:
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ClientContextConfig& config);
+  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
+                    const ClientContextConfig& config);
   ~ClientContextImpl() { parent_.releaseClientContext(this); }
 
   bssl::UniquePtr<SSL> newSsl() const override;
@@ -138,7 +139,7 @@ class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
   ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
                     const std::vector<std::string>& server_names, Stats::Scope& scope,
-                    ServerContextConfig& config, bool skip_context_update,
+                    const ServerContextConfig& config, bool skip_context_update,
                     Runtime::Loader& runtime);
   ~ServerContextImpl() { parent_.releaseServerContext(this, listener_name_, server_names_); }
 

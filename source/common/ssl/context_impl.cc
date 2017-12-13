@@ -27,7 +27,8 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
+ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
+                         const ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
       min_protocol_version_(config.minProtocolVersion()),
       max_protocol_version_(config.maxProtocolVersion()), ecdh_curves_(config.ecdhCurves()) {
@@ -336,7 +337,7 @@ bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
 };
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     ClientContextConfig& config)
+                                     const ClientContextConfig& config)
     : ContextImpl(parent, scope, config) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
@@ -362,7 +363,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
 ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
                                      const std::vector<std::string>& server_names,
-                                     Stats::Scope& scope, ServerContextConfig& config,
+                                     Stats::Scope& scope, const ServerContextConfig& config,
                                      bool skip_context_update, Runtime::Loader& runtime)
     : ContextImpl(parent, scope, config), listener_name_(listener_name),
       server_names_(server_names), skip_context_update_(skip_context_update), runtime_(runtime),
