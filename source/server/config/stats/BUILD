@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["statsd.cc"],
     hdrs = ["statsd.h"],
     external_deps = [
-        "envoy_bootstrap",
+        "envoy_stats",
     ],
     deps = [
         "//include/envoy/registry",
@@ -30,7 +30,7 @@ envoy_cc_library(
     srcs = ["dog_statsd.cc"],
     hdrs = ["dog_statsd.h"],
     external_deps = [
-        "envoy_bootstrap",
+        "envoy_stats",
     ],
     deps = [
         "//include/envoy/registry",
