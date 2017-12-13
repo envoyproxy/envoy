@@ -53,7 +53,7 @@ public:
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
-  MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
@@ -65,6 +65,7 @@ public:
   uint64_t max_requests_per_connection_{};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
   NiceMock<Runtime::MockLoader> runtime_;

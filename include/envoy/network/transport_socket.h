@@ -120,5 +120,25 @@ public:
 
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;
 
+/**
+ * A factory for creating transport socket. It will be associated to filter chains and clusters.
+ */
+class TransportSocketFactory {
+public:
+  virtual ~TransportSocketFactory() {}
+
+  /**
+   * @return std::string the value to be used as :scheme header in a HTTP request
+   */
+  virtual const std::string& httpScheme() const PURE;
+
+  /**
+   * @return Network::TransportSocketPtr a transport socket to be passed to connection.
+   */
+  virtual TransportSocketPtr createTransportSocket() const PURE;
+};
+
+typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;
+
 } // namespace Network
 } // namespace Envoy

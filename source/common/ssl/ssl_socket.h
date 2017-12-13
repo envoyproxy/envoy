@@ -50,5 +50,16 @@ private:
   bool handshake_complete_{};
 };
 
+class ClientSslSocketFactory : public Network::TransportSocketFactory {
+public:
+  ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
+                         Stats::Scope& stats_scope);
+  Network::TransportSocketPtr createTransportSocket() const override;
+  const std::string& httpScheme() const override;
+
+private:
+  ClientContextPtr ssl_ctx_;
+};
+
 } // namespace Ssl
 } // namespace Envoy

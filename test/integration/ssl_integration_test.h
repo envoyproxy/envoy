@@ -33,10 +33,11 @@ private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<ContextManager> context_manager_;
   ServerContextPtr upstream_ssl_ctx_;
-  ClientContextPtr client_ssl_ctx_plain_;
-  ClientContextPtr client_ssl_ctx_alpn_;
-  ClientContextPtr client_ssl_ctx_san_;
-  ClientContextPtr client_ssl_ctx_alpn_san_;
+
+  Network::TransportSocketFactoryPtr client_ssl_ctx_plain_;
+  Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_;
+  Network::TransportSocketFactoryPtr client_ssl_ctx_san_;
+  Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_san_;
 };
 
 } // namespace Ssl

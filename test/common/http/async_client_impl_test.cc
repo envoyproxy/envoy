@@ -1,3 +1,5 @@
+#include <common/network/raw_buffer_socket.h>
+
 #include <chrono>
 #include <cstdint>
 #include <string>

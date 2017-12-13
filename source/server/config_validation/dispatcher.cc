@@ -7,14 +7,8 @@ namespace Event {
 
 Network::ClientConnectionPtr
 ValidationDispatcher::createClientConnection(Network::Address::InstanceConstSharedPtr,
-                                             Network::Address::InstanceConstSharedPtr) {
-  NOT_IMPLEMENTED;
-}
-
-Network::ClientConnectionPtr
-ValidationDispatcher::createSslClientConnection(Ssl::ClientContext&,
-                                                Network::Address::InstanceConstSharedPtr,
-                                                Network::Address::InstanceConstSharedPtr) {
+                                             Network::Address::InstanceConstSharedPtr,
+                                             Network::TransportSocketPtr&&) {
   NOT_IMPLEMENTED;
 }
 

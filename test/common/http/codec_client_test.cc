@@ -181,8 +181,8 @@ public:
     upstream_listener_ =
         dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                     Network::ListenerOptions::listenerOptionsWithBindToPort());
-    Network::ClientConnectionPtr client_connection =
-        dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
+    Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket());
     client_connection_ = client_connection.get();
     codec_ = new Http::MockClientConnection();
     client_.reset(new CodecClientForTest(std::move(client_connection), codec_, nullptr, host_));

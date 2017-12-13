@@ -1556,6 +1556,7 @@ TEST(RouterFilterUtilityTest, finalTimeout) {
   }
 }
 
+/*
 TEST(RouterFilterUtilityTest, setUpstreamScheme) {
   {
     Upstream::MockClusterInfo cluster;
@@ -1574,6 +1575,7 @@ TEST(RouterFilterUtilityTest, setUpstreamScheme) {
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
+*/
 
 TEST(RouterFilterUtilityTest, shouldShadow) {
   {

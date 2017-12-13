@@ -478,9 +478,9 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   )EOF";
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(
-      factory_.dispatcher_,
-      createClientConnection_(PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _))
+  EXPECT_CALL(factory_.dispatcher_,
+              createClientConnection_(
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
@@ -509,9 +509,9 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   )EOF";
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(
-      factory_.dispatcher_,
-      createClientConnection_(PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _))
+  EXPECT_CALL(factory_.dispatcher_,
+              createClientConnection_(
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
@@ -551,7 +551,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   create(parseBootstrapFromJson(json));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _))
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _))
       .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());

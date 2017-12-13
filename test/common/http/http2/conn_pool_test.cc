@@ -80,7 +80,7 @@ public:
         new CodecClientForTest(std::move(connection), test_client.codec_,
                                [this](CodecClient*) -> void { onClientDestroy(); }, nullptr);
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(pool_, createCodecClient_(_))
         .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
