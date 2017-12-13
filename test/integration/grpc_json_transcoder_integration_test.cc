@@ -28,9 +28,17 @@ public:
    * Global initializer for all integration tests.
    */
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_grpc_json_transcoder.json", {"http"});
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    const std::string filter =
+        R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+            )EOF";
+    config_helper_.addFilter(
+        fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+    HttpIntegrationTest::initialize();
   }
 
   /**

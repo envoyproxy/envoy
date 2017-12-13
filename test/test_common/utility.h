@@ -233,6 +233,17 @@ public:
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
 
+  friend std::ostream& operator<<(std::ostream& os, const TestHeaderMapImpl& p) {
+    p.iterate(
+        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+          std::ostream* local_os = static_cast<std::ostream*>(context);
+          *local_os << header.key().c_str() << " " << header.value().c_str() << std::endl;
+          return HeaderMap::Iterate::Continue;
+        },
+        &os);
+    return os;
+  }
+
   using HeaderMapImpl::addCopy;
   void addCopy(const std::string& key, const std::string& value);
   std::string get_(const std::string& key);
