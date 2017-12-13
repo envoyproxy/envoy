@@ -153,4 +153,23 @@ do
   TEST_INDEX=$((TEST_INDEX+1))
 done
 
+# set -e forces the script to exit on non-zero exit codes. Set +e makes it easier to
+# catch the non-zero exit code.
+set +e
+# The heapchecker outputs some data to stderr on every execution.  This gets intermingled
+# with the output from --hot-restart-version, so disable the heap-checker for these runs.
+SAVED_HEAPCHECK=${HEAPCHECK}
+unset HEAPCHECK
+
+echo "Launching envoy with no parameters. Check the exit value is 1"
+${ENVOY_BIN}
+EXIT_CODE=$?
+# The test should fail if the Envoy binary exits with anything other than 1.
+if [[ $EXIT_CODE -ne 1 ]]; then
+    echo "Envoy exited with code: ${EXIT_CODE}"
+    exit 1
+fi
+HEAPCHECK=${SAVED_HEAPCHECK}
+set -e
+
 echo "PASS"

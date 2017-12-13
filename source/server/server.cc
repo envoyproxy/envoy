@@ -71,8 +71,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     thread_local_.shutdownGlobalThreading();
-    thread_local_.shutdownThread();
     stats_store_.shutdownThreading();
+    thread_local_.shutdownThread();
     throw;
   }
 }
