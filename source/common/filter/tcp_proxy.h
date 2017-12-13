@@ -40,10 +40,9 @@ namespace Filter {
   COUNTER(downstream_cx_no_route)                                                                  \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(idle_timeout)                                                                            \
   COUNTER(upstream_flush_total)                                                                    \
-  GAUGE  (upstream_flush_active)                                                                   \
-  COUNTER(closes_upstream_flush_timeout)                                                           \
-  COUNTER(idle_timeout)
+  GAUGE  (upstream_flush_active)
 // clang-format on
 
 /**
@@ -148,6 +147,8 @@ public:
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override;
 
+    void onBytesSent();
+    void onIdleTimeout();
     void drain(TcpProxyDrainer& drainer);
 
     TcpProxy* parent_{};
@@ -220,10 +221,11 @@ class TcpProxyDrainer : public Event::DeferredDeletable {
 public:
   TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent, TcpProxyConfigSharedPtr config,
                   std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
-                  Network::ClientConnectionPtr connection);
+                  Network::ClientConnectionPtr connection, Event::TimerPtr idle_timer);
 
   void onEvent(Network::ConnectionEvent event);
-  void onTimeout();
+  void onIdleTimeout();
+  void onBytesSent();
   void cancelDrain();
 
 private:
@@ -240,7 +242,7 @@ class TcpProxyUpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
   ~TcpProxyUpstreamDrainManager();
   void add(TcpProxyConfigSharedPtr config, Network::ClientConnectionPtr upstream_connection,
-           std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks);
+           std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks, Event::TimerPtr idle_timer);
   void remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher);
 
 private:
