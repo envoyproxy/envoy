@@ -20,6 +20,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "api/lds.pb.h"
+#include "api/trace.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
