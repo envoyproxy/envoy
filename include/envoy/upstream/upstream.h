@@ -129,25 +129,6 @@ public:
 
   virtual ~HostSet() {}
 
-  // TODO(alyssawilk) remove this once LBs use PrioritySet.
-  // It is generally incorrect to subscribe to updates to individual HostSet
-  // as one misses the addition of new HostSet to a PrioritySet.
-  /**
-   * Called when cluster host membership is about to change.
-   * @param hosts_added supplies the newly added hosts, if any.
-   * @param hosts_removed supplies the removed hosts, if any.
-   */
-  typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed)>
-      MemberUpdateCb;
-
-  /**
-   * Install a callback that will be invoked when the cluster membership changes.
-   * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* the callback handle.
-   */
-  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
-
   /**
    * @return all hosts that make up the set at the current time.
    */

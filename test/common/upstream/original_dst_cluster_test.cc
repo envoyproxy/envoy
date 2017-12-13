@@ -55,7 +55,7 @@ public:
     NiceMock<MockClusterManager> cm;
     cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
                                           ssl_context_manager_, cm, dispatcher_, false));
-    cluster_->prioritySet().hostSetsPerPriority()[0]->addMemberUpdateCb(
+    cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const std::vector<HostSharedPtr>&,
             const std::vector<HostSharedPtr>&) -> void { membership_updated_.ready(); });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
@@ -417,20 +417,18 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setup(json);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().hostSetsPerPriority()[0]->addMemberUpdateCb(
-      [&](uint32_t, const std::vector<HostSharedPtr>& added,
-          const std::vector<HostSharedPtr>& removed) -> void {
-        // Update second hostset accordingly;
-        HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>(
-            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-        HostVectorSharedPtr healthy_hosts(new std::vector<HostSharedPtr>(
-            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-        const HostListsConstSharedPtr empty_host_lists{
-            new std::vector<std::vector<HostSharedPtr>>()};
+  cluster_->prioritySet().addMemberUpdateCb([&](uint32_t, const std::vector<HostSharedPtr>& added,
+                                                const std::vector<HostSharedPtr>& removed) -> void {
+    // Update second hostset accordingly;
+    HostVectorSharedPtr new_hosts(
+        new std::vector<HostSharedPtr>(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+    HostVectorSharedPtr healthy_hosts(
+        new std::vector<HostSharedPtr>(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+    const HostListsConstSharedPtr empty_host_lists{new std::vector<std::vector<HostSharedPtr>>()};
 
-        second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_host_lists,
-                                                 empty_host_lists, added, removed);
-      });
+    second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_host_lists,
+                                             empty_host_lists, added, removed);
+  });
 
   EXPECT_CALL(membership_updated_, ready());
 
