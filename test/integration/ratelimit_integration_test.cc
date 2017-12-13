@@ -16,10 +16,7 @@ class RatelimitIntegrationTest : public HttpIntegrationTest,
 public:
   RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  void SetUp() override {
-    HttpIntegrationTest::SetUp();
-    initialize();
-  }
+  void SetUp() override { initialize(); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();

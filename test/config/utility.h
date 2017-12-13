@@ -20,11 +20,20 @@ class ConfigHelper {
 public:
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
-  ConfigHelper(const Network::Address::IpVersion version);
+  //
+  // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
+  // to test L4 proxying.
+  ConfigHelper(const Network::Address::IpVersion version,
+               const std::string& config = HTTP_PROXY_CONFIG);
 
   typedef std::function<void(envoy::api::v2::Bootstrap&)> ConfigModifierFunction;
   typedef std::function<void(envoy::api::v2::filter::network::HttpConnectionManager&)>
       HttpModifierFunction;
+
+  // A basic configuration for L4 proxying.
+  static const std::string TCP_PROXY_CONFIG;
+  // A basic configuration for L7 proxying.
+  static const std::string HTTP_PROXY_CONFIG;
 
   // A string for a basic buffer filter, which can be used with addFilter()
   static const std::string DEFAULT_BUFFER_FILTER;
@@ -82,6 +91,9 @@ private:
   // struct of the first listener.
   void
   storeHttpConnectionManager(const envoy::api::v2::filter::network::HttpConnectionManager& hcm);
+
+  // Snags the first filter from the first filter chain from the first listener.
+  envoy::api::v2::Filter* getFilterFromListener();
 
   // The bootstrap proto Envoy will start up with.
   envoy::api::v2::Bootstrap bootstrap_;
