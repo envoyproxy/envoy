@@ -103,7 +103,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
 
     default:
       // Unsupported type or null value.
-      ENVOY_LOG_MISC(info, "unsupported value type for metadata [{}]",
+      ENVOY_LOG_MISC(debug, "unsupported value type for metadata [{}]",
                      StringUtil::join(params, ", "));
       return std::string();
     }
