@@ -40,8 +40,10 @@ void TlsContextJson::translateCommonTlsContext(
   translateTlsCertificate(json_tls_context, *common_tls_context.mutable_tls_certificates()->Add());
 
   auto* validation_context = common_tls_context.mutable_validation_context();
-  validation_context->mutable_trusted_ca()->set_filename(
-      json_tls_context.getString("ca_cert_file", ""));
+  if (json_tls_context.hasObject("ca_cert_file")) {
+    validation_context->mutable_trusted_ca()->set_filename(
+        json_tls_context.getString("ca_cert_file", ""));
+  }
   if (json_tls_context.hasObject("verify_certificate_hash")) {
     validation_context->add_verify_certificate_hash(
         json_tls_context.getString("verify_certificate_hash"));

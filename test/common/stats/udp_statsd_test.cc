@@ -14,7 +14,6 @@
 #include "spdlog/spdlog.h"
 
 using testing::NiceMock;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Stats {

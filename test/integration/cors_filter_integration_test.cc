@@ -11,10 +11,52 @@ public:
   CorsFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
-    BaseIntegrationTest::initialize();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_cors_filter.json", {"http"});
+    config_helper_.addFilter("name: envoy.cors");
+    config_helper_.addConfigModifier(
+        [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          {
+            auto* cors = virtual_host->mutable_cors();
+            cors->add_allow_origin("*");
+            cors->set_allow_headers("content-type,x-grpc-web");
+            cors->set_allow_methods("GET,POST");
+          }
+
+          {
+            auto* route = virtual_host->mutable_routes(0);
+            route->mutable_match()->set_prefix("/cors-vhost-config");
+          }
+
+          {
+            auto* route = virtual_host->add_routes();
+            route->mutable_match()->set_prefix("/no-cors");
+            route->mutable_route()->set_cluster("cluster_0");
+            route->mutable_route()->mutable_cors()->mutable_enabled()->set_value(false);
+          }
+
+          {
+            auto* route = virtual_host->add_routes();
+            route->mutable_match()->set_prefix("/cors-route-config");
+            route->mutable_route()->set_cluster("cluster_0");
+            auto* cors = route->mutable_route()->mutable_cors();
+            cors->add_allow_origin("test-origin-1");
+            cors->add_allow_origin("test-host-2");
+            cors->set_allow_headers("content-type");
+            cors->set_allow_methods("POST");
+            cors->set_expose_headers("content-type");
+            cors->set_max_age("100");
+          }
+          {
+            auto* route = virtual_host->add_routes();
+            route->mutable_match()->set_prefix("/cors-credentials-allowed");
+            route->mutable_route()->set_cluster("cluster_0");
+            auto* cors = route->mutable_route()->mutable_cors();
+            cors->add_allow_origin("test-origin-1");
+            cors->mutable_allow_credentials()->set_value(true);
+          }
+        });
+    HttpIntegrationTest::initialize();
   }
 
 protected:

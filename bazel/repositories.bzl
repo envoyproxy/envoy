@@ -143,6 +143,8 @@ def _envoy_api_deps():
         "protocol",
         "rds",
         "sds",
+        "stats",
+        "trace",
     ]
     for t in api_bind_targets:
         native.bind(
