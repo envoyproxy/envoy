@@ -20,7 +20,8 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len) {
+Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
+                                                    bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || ss_len >= sizeof(sa_family_t));
   switch (ss.ss_family) {
   case AF_INET: {
@@ -33,7 +34,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
     RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in6));
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
-    return std::make_shared<Address::Ipv6Instance>(*sin6);
+    return std::make_shared<Address::Ipv6Instance>(*sin6, v6only);
   }
   case AF_UNIX: {
     const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
@@ -47,14 +48,14 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   NOT_REACHED;
 }
 
-InstanceConstSharedPtr addressFromFd(int fd) {
+InstanceConstSharedPtr addressFromFd(int fd, bool v6only) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   const int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (rc != 0) {
     throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(errno)));
   }
-  return addressFromSockAddr(ss, ss_len);
+  return addressFromSockAddr(ss, ss_len, v6only);
 }
 
 InstanceConstSharedPtr peerAddressFromFd(int fd) {
@@ -179,9 +180,10 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
   return ptr;
 }
 
-Ipv6Instance::Ipv6Instance(const sockaddr_in6& address) : InstanceBase(Type::Ip) {
+Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only) : InstanceBase(Type::Ip) {
   ip_.ipv6_.address_ = address;
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
+  ip_.v6only_ = v6only;
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
 }
 
@@ -219,7 +221,7 @@ int Ipv6Instance::socket(SocketType type) const {
   const int fd = socketFromSocketType(type);
 
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
-  const int v6only = 1;
+  const int v6only = ip_.v6only_;
   RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1);
   return fd;
 }

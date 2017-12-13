@@ -26,8 +26,8 @@ public:
     case envoy::api::v2::SocketAddress::kPortValue:
     // Default to port 0 if no port value is specified.
     case envoy::api::v2::SocketAddress::PORT_SPECIFIER_NOT_SET:
-      return Network::Utility::parseInternetAddress(socket_address.address(),
-                                                    socket_address.port_value());
+      return Network::Utility::parseInternetAddress(
+          socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat());
 
     default:
       throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",

@@ -76,7 +76,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       // TODO(htuch): Validate not pipe when doing v2.
       address_(
           Network::Utility::parseInternetAddress(config.address().socket_address().address(),
-                                                 config.address().socket_address().port_value())),
+                                                 config.address().socket_address().port_value(),
+                                                 !config.address().socket_address().ipv4_compat())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),

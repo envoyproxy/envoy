@@ -21,16 +21,19 @@ namespace Address {
  * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
  * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
  *        it is used to validate the structure contents; else if len == 0, it is ignored.
+ * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len);
+Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                                    bool v6only = true);
 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
  * @param fd file descriptor.
+ * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr for bound address.
  */
-InstanceConstSharedPtr addressFromFd(int fd);
+InstanceConstSharedPtr addressFromFd(int fd, bool v6only = true);
 
 /**
  * Obtain the address of the peer of the socket with the specified file descriptor.
@@ -113,6 +116,7 @@ private:
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
     IpVersion version() const override { return IpVersion::v4; }
+    bool v6only() const override { return false; }
 
     Ipv4Helper ipv4_;
     std::string friendly_address_;
@@ -129,7 +133,7 @@ public:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    */
-  explicit Ipv6Instance(const sockaddr_in6& address);
+  Ipv6Instance(const sockaddr_in6& address, bool v6only = true);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
@@ -175,9 +179,14 @@ private:
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
     IpVersion version() const override { return IpVersion::v6; }
+    bool v6only() const override { return v6only_; }
 
     Ipv6Helper ipv6_;
     std::string friendly_address_;
+    // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?
+    // Default initialized to true to preserve extant Envoy behavior where we don't explicitly set
+    // this in the constructor.
+    bool v6only_{true};
   };
 
   IpHelper ip_;

@@ -85,6 +85,11 @@ public:
    * @return the version of IP address.
    */
   virtual IpVersion version() const PURE;
+
+  /**
+   * @return IPv4-IPv6 mapping disabled for IPv6 addresses?
+   */
+  virtual bool v6only() const PURE;
 };
 
 enum class Type { Ip, Pipe };

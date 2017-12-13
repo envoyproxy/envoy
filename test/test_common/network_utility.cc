@@ -65,7 +65,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
   // any), and we need to find out the port number that the OS picked so we can return it.
   if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(fd);
+    return Address::addressFromFd(fd, addr_port->ip()->v6only());
   }
   return addr_port;
 }
