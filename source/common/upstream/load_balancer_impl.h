@@ -14,36 +14,48 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * Utilities common to all load balancers.
+ * Base class for all LB implementations.
  */
-class LoadBalancerUtility {
-public:
+class LoadBalancerBase {
+protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
   static bool isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime);
-};
 
-/**
- * Base class for all LB implementations.
- */
-class LoadBalancerBase {
-protected:
-  // Both priority_set and local_priority_set if non-null must have at least one host set.
-  LoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                   ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random);
-  ~LoadBalancerBase();
+  LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+                   Runtime::RandomGenerator& random);
+  ~LoadBalancerBase() {}
 
-  /**
-   * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
-   */
-  const std::vector<HostSharedPtr>& hostsToUse();
+  uint32_t bestAvailablePriority() const { return best_available_host_set_->priority(); }
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  // The priority-ordered set of hosts to use for load balancing.
+  const PrioritySet& priority_set_;
+  // The lowest priority host set from priority_set_ with healthy hosts, or the
+  // zero-priority host set if all host sets are fully unhealthy.
+  const HostSet* best_available_host_set_;
+};
+
+/**
+ * Base class for zone aware load balancers
+ */
+class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
+protected:
+  // Both priority_set and local_priority_set if non-null must have at least one host set.
+  ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                            ClusterStats& stats, Runtime::Loader& runtime,
+                            Runtime::RandomGenerator& random);
+  ~ZoneAwareLoadBalancerBase();
+
+  /**
+   * Pick the host list to use, doing zone aware routing when the hosts are sufficiently healthy.
+   */
+  const std::vector<HostSharedPtr>& hostsToUse();
 
 private:
   enum class LocalityRoutingState {
@@ -86,15 +98,7 @@ private:
    */
   void regenerateLocalityRoutingStructures(uint32_t priority);
 
-  uint32_t bestAvailablePriority() const { return best_available_host_set_->priority(); }
-
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
-
-  // The priority-ordered set of hosts to use for load balancing.
-  const PrioritySet& priority_set_;
-  // The lowest priority host set from priority_set_ with healthy hosts, or the
-  // zero-priority host set if all host sets are fully unhealthy.
-  const HostSet* best_available_host_set_;
 
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
@@ -121,12 +125,12 @@ private:
 /**
  * Implementation of LoadBalancer that performs RR selection across the hosts in the cluster.
  */
-class RoundRobinLoadBalancer : public LoadBalancer, LoadBalancerBase {
+class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random)
-      : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
+      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -148,7 +152,7 @@ private:
  * will not work well in situations where requests take a long time.
  * In that case a different algorithm using a full scan will be required.
  */
-class LeastRequestLoadBalancer : public LoadBalancer, LoadBalancerBase {
+class LeastRequestLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                            ClusterStats& stats, Runtime::Loader& runtime,
@@ -165,12 +169,12 @@ private:
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public LoadBalancer, LoadBalancerBase {
+class RandomLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random)
-      : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
+      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
