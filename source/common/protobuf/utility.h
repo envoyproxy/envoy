@@ -118,6 +118,8 @@ public:
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
+   * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
+   * of caller.
    * @param message message to validate.
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
@@ -136,6 +138,8 @@ public:
 
   /**
    * Downcast and validate protoc-gen-validate constraints on a given protobuf.
+   * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
+   * of caller.
    * @param message const Protobuf::Message& to downcast and validate.
    * @return const MessageType& the concrete message type downcasted to on success.
    * @throw ProtoValidationException if the message does not satisfy its type constraints.

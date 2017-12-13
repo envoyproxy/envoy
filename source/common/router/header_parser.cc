@@ -46,7 +46,7 @@ HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 
-  for (const std::string& header : headers_to_remove) {
+  for (const auto& header : headers_to_remove) {
     header_parser->headers_to_remove_.emplace_back(header);
   }
 
