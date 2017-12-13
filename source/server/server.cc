@@ -76,7 +76,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
     stats_store_.shutdownThreading();
     thread_local_.shutdownThread();
 
-    // Invoke the shutdown method called in the deconstructor.
+    // Invoke the shutdown method called in the destructor.
     restarter_.shutdown();
     throw;
   }
