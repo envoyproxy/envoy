@@ -116,8 +116,11 @@ public:
                         api_type: GRPC
               )EOF"));
 
-      // Give the config utility a place to stuff the upstream host's port (must come before
-      // the eds-cluster to keep the upstreams and ports in the same order).
+      // TODO(zuercher): Make ConfigHelper EDS-aware and get rid of this hack:
+      // ConfigHelper expects the number of ports assigned to upstreams to match the number of
+      // static hosts assigned ports. So give it a place to put the port for our EDS host. This
+      // host must come before the eds-cluster's host to keep the upstreams and ports in the same
+      // order.
       static_resources->add_clusters()->CopyFrom(
           TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
               R"EOF(
