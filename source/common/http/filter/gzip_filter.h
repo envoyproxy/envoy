@@ -10,6 +10,8 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_validator.h"
 
+#include "api/filter/http/gzip.pb.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -18,19 +20,14 @@ using Compressor::ZlibCompressorImpl;
 /**
  * Configuration for the gzip fiter.
  */
-class GzipFilterConfig : Json::Validator {
+class GzipFilterConfig {
 public:
-  GzipFilterConfig(const Json::Object& json_config)
-      : Json::Validator(json_config, Json::Schema::GZIP_HTTP_FILTER_SCHEMA),
-        compression_level_(parseLevel(json_config.getString("compression_level", "default"))),
-        compression_strategy_(
-            parseStrategy(json_config.getString("compression_strategy", "default"))),
-        content_length_(json_config.getInteger("content_length", 32)),
-        memory_level_(json_config.getInteger("memory_level", 8)),
-        content_type_values_(json_config.getStringArray("content_type", true)),
-        cache_control_values_(json_config.getStringArray("cache_control", true)),
-        etag_(json_config.getBoolean("disable_on_etag", false)),
-        last_modified_(json_config.getBoolean("disable_on_last_modified", false)) {}
+  GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
+      : compression_level_(getCompressionLevel_(gzip.compression_level())),
+        compression_strategy_(getCompressionStrategy_(gzip.compression_strategy())),
+        content_length_(30), memory_level_(1),
+        content_type_values_(), cache_control_values_(),
+        etag_(false), last_modified_(false) {}
 
   ZlibCompressorImpl::CompressionLevel getCompressionLevel() const { return compression_level_; }
 
@@ -42,33 +39,34 @@ public:
 
   const std::vector<std::string>& getContentTypeValues() const { return content_type_values_; }
 
-  uint64_t getMinimumLength() const { return content_length_; }
+  uint32_t getMinimumLength() const { return content_length_; }
 
-  uint64_t getMemoryLevel() const { return memory_level_; }
+  uint32_t getMemoryLevel() const { return memory_level_; }
 
   bool isDisableOnEtag() const { return etag_; }
 
   bool isDisableOnLastModified() const { return last_modified_; }
 
 private:
-  static ZlibCompressorImpl::CompressionLevel parseLevel(const std::string level) {
-    if (level == "best") {
+  static ZlibCompressorImpl::CompressionLevel getCompressionLevel_(const auto& compression_level) {
+    if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST) {
       return ZlibCompressorImpl::CompressionLevel::Best;
     }
-    if (level == "speed") {
+    if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED) {
       return ZlibCompressorImpl::CompressionLevel::Speed;
     }
     return ZlibCompressorImpl::CompressionLevel::Standard;
   }
 
-  static ZlibCompressorImpl::CompressionStrategy parseStrategy(const std::string strategy) {
-    if (strategy == "rle") {
+  static ZlibCompressorImpl::CompressionStrategy
+  getCompressionStrategy_(const auto& compression_strategy) {
+    if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE) {
       return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
     }
-    if (strategy == "filtered") {
+    if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED) {
       return ZlibCompressorImpl::CompressionStrategy::Filtered;
     }
-    if (strategy == "huffman") {
+    if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN) {
       return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
     }
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
@@ -76,8 +74,8 @@ private:
 
   ZlibCompressorImpl::CompressionLevel compression_level_;
   ZlibCompressorImpl::CompressionStrategy compression_strategy_;
-  uint64_t content_length_;
-  uint64_t memory_level_;
+  int32_t content_length_;
+  int32_t memory_level_;
   std::vector<std::string> content_type_values_;
   std::vector<std::string> cache_control_values_;
   bool etag_;

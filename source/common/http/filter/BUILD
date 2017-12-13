@@ -71,6 +71,7 @@ envoy_cc_library(
     name = "gzip_filter_lib",
     srcs = ["gzip_filter.cc"],
     hdrs = ["gzip_filter.h"],
+    external_deps = ["envoy_filter_http_gzip"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/json:json_object_interface",

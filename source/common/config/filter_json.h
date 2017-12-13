@@ -2,6 +2,7 @@
 
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
+#include "envoy/config/filter/http/fault/v2/gzip.pb.h"
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
@@ -179,6 +180,14 @@ public:
    */
   static void translateSquashConfig(const Json::Object& json_config,
                                     envoy::config::filter::http::squash::v2::Squash& proto_config);
+
+  /**                                 
+   * Translate a v1 JSON Gzip filter object to v2 envoy::config::filter::http::squash::v2::Gzip.
+   * @param json_config source v1 JSON HTTP Gzip Filter object.
+   * @param proto_config destination v2 envoy::config::filter::http::squash::v2::Gzip.
+   */
+  static void translateGzipFilter(const Json::Object& json_config,
+                                  envoy::config::filter::http::squash::v2::Gzip& proto_config);
 };
 
 } // namespace Config

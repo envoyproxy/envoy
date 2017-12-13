@@ -430,5 +430,53 @@ void FilterJson::translateClientSslAuthFilter(
                                       *proto_config.mutable_ip_white_list());
 }
 
+void FilterJson::translateGzipFilter(const Json::Object& json_config,
+                                     envoy::api::v2::filter::http::Gzip& proto_config) {
+  json_config.validateSchema(Json::Schema::GZIP_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_etag);
+  JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_last_modified);
+
+  JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);
+  JSON_UTIL_SET_INTEGER(json_config, proto_config, content_length);
+
+  for (const auto& json_content_type : json_config.getStringArray("content_type", true)) {
+    auto* content_type = proto_config.mutable_content_type()->Add();
+    *content_type = json_content_type;
+  }
+
+  for (const auto& json_cache_control : json_config.getStringArray("cache_control", true)) {
+    auto* cache_control = proto_config.mutable_cache_control()->Add();
+    *cache_control = json_cache_control;
+  }
+
+  const auto& json_compression_level = json_config.getString("compression_level", "default");
+  if (json_compression_level == "default") {
+    proto_config.set_compression_level(
+        envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_DEFAULT);
+  } else if (json_compression_level == "best") {
+    proto_config.set_compression_level(
+        envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST);
+  } else if (json_compression_level == "speed") {
+    proto_config.set_compression_level(
+        envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED);
+  }
+
+  const auto& json_compression_strategy = json_config.getString("compression_strategy", "default");
+  if (json_compression_strategy == "default") {
+    proto_config.set_compression_strategy(
+        envoy::api::v2::filter::http::Gzip_CompressionStrategy_DEFAULT);
+  } else if (json_compression_strategy == "filtered") {
+    proto_config.set_compression_strategy(
+        envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED);
+  } else if (json_compression_strategy == "huffman") {
+    proto_config.set_compression_strategy(
+        envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN);
+  } else if (json_compression_strategy == "rle") {
+    proto_config.set_compression_strategy(
+        envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE);
+  }
+}
+
 } // namespace Config
 } // namespace Envoy
