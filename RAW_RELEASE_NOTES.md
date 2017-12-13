@@ -15,3 +15,4 @@ final version.
 * Added native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
 * grpc-json: Added support inline descriptor in config.
 * Added support for priorities for several types of load balancer.
+* Added idle timeout to TCP proxy.

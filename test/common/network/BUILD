@@ -43,6 +43,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
