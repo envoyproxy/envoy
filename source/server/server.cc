@@ -70,9 +70,14 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
+
+    // Invoke shutdown methods called in run().
     thread_local_.shutdownGlobalThreading();
     stats_store_.shutdownThreading();
     thread_local_.shutdownThread();
+
+    // Invoke the shutdown method called in the deconstructor.
+    restarter_.shutdown();
     throw;
   }
 }
