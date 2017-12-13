@@ -57,7 +57,7 @@ void ContextManagerImpl::releaseServerContext(ServerContext* context,
 }
 
 ClientContextPtr ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
-                                                            ClientContextConfig& config) {
+                                                            const ClientContextConfig& config) {
   ClientContextPtr context(new ClientContextImpl(*this, scope, config));
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
   contexts_.emplace_back(context.get());
@@ -70,7 +70,7 @@ bool ContextManagerImpl::isWildcardServerName(const std::string& name) {
 
 ServerContextPtr ContextManagerImpl::createSslServerContext(
     const std::string& listener_name, const std::vector<std::string>& server_names,
-    Stats::Scope& scope, ServerContextConfig& config, bool skip_context_update) {
+    Stats::Scope& scope, const ServerContextConfig& config, bool skip_context_update) {
   ServerContextPtr context(new ServerContextImpl(*this, listener_name, server_names, scope, config,
                                                  skip_context_update, runtime_));
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);

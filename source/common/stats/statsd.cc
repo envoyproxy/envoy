@@ -39,7 +39,7 @@ void Writer::write(const std::string& message) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag)
-    : tls_(tls.allocateSlot()), server_address_(address), use_tag_(use_tag) {
+    : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
@@ -79,6 +79,7 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Tag>& tags) {
   }
 
   std::vector<std::string> tag_strings;
+  tag_strings.reserve(tags.size());
   for (const Tag& tag : tags) {
     tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
