@@ -9,10 +9,10 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "connection_impl_test",
+    name = "ssl_socket_test",
     srcs = [
-        "connection_impl_test.cc",
         "ssl_certs_test.h",
+        "ssl_socket_test.cc",
     ],
     data = [
         "gen_unittest_certs.sh",
@@ -27,9 +27,9 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:connection_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
+        "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",

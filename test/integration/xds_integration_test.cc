@@ -13,7 +13,7 @@ public:
   XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void initialize() override {
-    BaseIntegrationTest::initialize();
+    initialized_ = true;
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createApiTestServer(
