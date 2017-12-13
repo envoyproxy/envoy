@@ -16,7 +16,7 @@ public:
   ProxyProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
-    BaseIntegrationTest::initialize();
+    initialized_ = true;
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createTestServer("test/config/integration/server_proxy_proto.json", {"http"});

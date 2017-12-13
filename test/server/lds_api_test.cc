@@ -4,6 +4,7 @@
 #include "server/lds_api.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -149,7 +150,7 @@ TEST_F(LdsApiTest, Basic) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  const std::string response1_json = R"EOF(
   {
     "listeners": [
     {
@@ -182,7 +183,7 @@ TEST_F(LdsApiTest, Basic) {
   expectRequest();
   interval_timer_->callback_();
 
-  std::string response2_json = R"EOF(
+  const std::string response2_json = R"EOF(
   {
     "listeners": [
     {
@@ -216,12 +217,87 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_EQ(18068408981723255507U, store_.gauge("listener_manager.lds.version").value());
 }
 
+// Regression test issue #2188 where an empty ca_cert_file field was created and caused the LDS
+// update to fail validation.
+TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
+  InSequence s;
+
+  setup();
+
+  std::string response1_json = R"EOF(
+  {
+    "listeners": [
+    ]
+  }
+  )EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body().reset(new Buffer::OwnedImpl(response1_json));
+
+  makeListenersAndExpectCall({});
+  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
+  expectRequest();
+  interval_timer_->callback_();
+
+  std::string response2_basic = R"EOF(
+  {{
+   "listeners" : [
+         {{
+         "ssl_context" : {{
+            "cipher_suites" : "[ECDHE-RSA-AES256-GCM-SHA384|ECDHE-RSA-AES128-GCM-SHA256]",
+            "cert_chain_file" : "{}",
+            "private_key_file" : "{}"
+         }},
+         "address" : "tcp://0.0.0.0:61001",
+         "name" : "listener-8080",
+         "filters" : [
+            {{
+               "config" : {{
+                  "stat_prefix" : "ingress_tcp-9534127d-306e-49b5-5158-9688cf1cd33b",
+                  "route_config" : {{
+                     "routes" : [
+                        {{
+                           "cluster" : "0-service-cluster"
+                        }}
+                     ]
+                  }}
+               }},
+               "type" : "read",
+               "name" : "tcp_proxy"
+            }}
+         ]
+      }}
+   ]
+  }}
+  )EOF";
+  std::string response2_json =
+      fmt::format(response2_basic,
+                  TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+
+  message.reset(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body().reset(new Buffer::OwnedImpl(response2_json));
+  makeListenersAndExpectCall({
+      "listener-8080",
+  });
+  expectAdd("listener-8080", true);
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_NO_THROW(callbacks_->onSuccess(std::move(message)));
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
+}
+
 TEST_F(LdsApiTest, Failure) {
   InSequence s;
 
   setup();
 
-  std::string response_json = R"EOF(
+  const std::string response_json = R"EOF(
   {
     "listeners" : {}
   }

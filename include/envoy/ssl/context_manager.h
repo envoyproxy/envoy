@@ -20,7 +20,7 @@ public:
    * Builds a ClientContext from a ClientContextConfig.
    */
   virtual ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                                  ClientContextConfig& config) PURE;
+                                                  const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
@@ -29,7 +29,8 @@ public:
    */
   virtual ServerContextPtr createSslServerContext(const std::string& listener_name,
                                                   const std::vector<std::string>& server_names,
-                                                  Stats::Scope& scope, ServerContextConfig& config,
+                                                  Stats::Scope& scope,
+                                                  const ServerContextConfig& config,
                                                   bool skip_context_update) PURE;
 
   /**

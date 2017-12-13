@@ -34,10 +34,11 @@ public:
 
   // Ssl::ContextManager
   Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                               ClientContextConfig& config) override;
+                                               const ClientContextConfig& config) override;
   Ssl::ServerContextPtr createSslServerContext(const std::string& listener_name,
                                                const std::vector<std::string>& server_names,
-                                               Stats::Scope& scope, ServerContextConfig& config,
+                                               Stats::Scope& scope,
+                                               const ServerContextConfig& config,
                                                bool skip_context_update) override;
   Ssl::ServerContext* findSslServerContext(const std::string& listener_name,
                                            const std::string& server_name) const override;

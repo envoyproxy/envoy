@@ -54,8 +54,8 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config);
-  ClientContextConfigImpl(const Json::Object& config);
+  explicit ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config);
+  explicit ClientContextConfigImpl(const Json::Object& config);
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
@@ -66,8 +66,8 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config);
-  ServerContextConfigImpl(const Json::Object& config);
+  explicit ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config);
+  explicit ServerContextConfigImpl(const Json::Object& config);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
