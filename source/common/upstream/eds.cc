@@ -65,11 +65,11 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
-    if (priority > 0 && info()->lbType() == LoadBalancerType::RingHash) {
+    if (false && priority > 0 && info()->lbType() == LoadBalancerType::RingHash) {
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for RingHash cluster '{}'.", cluster_name_));
     }
-    if (priority > 0 && cluster_name_ == cm_.localClusterName()) {
+    if (priority > 0 && !cluster_name_.empty() && cluster_name_ == cm_.localClusterName()) {
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
     }

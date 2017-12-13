@@ -104,7 +104,7 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   cluster_load_assignment->set_cluster_name("fare");
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 }
 
@@ -123,7 +123,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   cluster_load_assignment->set_cluster_name("name");
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 }
 
@@ -154,7 +154,7 @@ TEST_F(EdsTest, EndpointMetadata) {
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -211,7 +211,7 @@ TEST_F(EdsTest, EndpointLocality) {
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -254,7 +254,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
   {
@@ -272,7 +272,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
   add_hosts_to_locality("oceania", "koala", "eucalyptus", 3);
   add_hosts_to_locality("general", "koala", "ingsoc", 5);
 
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
   {
     auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
@@ -317,7 +317,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
   ASSERT_EQ(2, cluster_->prioritySet().hostSetsPerPriority().size());
@@ -330,7 +330,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   add_hosts_to_priority(0, 2);
   add_hosts_to_priority(3, 5);
 
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
   ASSERT_EQ(4, cluster_->prioritySet().hostSetsPerPriority().size());
   EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -342,7 +342,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   // levels are affected.
   cluster_load_assignment->clear_endpoints();
   add_hosts_to_priority(3, 4);
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   ASSERT_EQ(4, cluster_->prioritySet().hostSetsPerPriority().size());
   EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
@@ -352,9 +352,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 
 // Make sure config updates with P!=0 are rejected for the local cluster.
 TEST_F(EdsTest, NoPriorityForLocalCluster) {
-  std::string name = "fare";
-  EXPECT_CALL(cm_, localClusterName()).WillOnce(ReturnRef(name));
-  resetCluster();
+  cm_.local_cluster_name_ = "fare";
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
@@ -385,7 +383,7 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   // Try an update which only has endpoints with P=0. This should go through.
   cluster_load_assignment->clear_endpoints();
   add_hosts_to_priority(0, 2);
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 }
 
 // Set up an EDS config with multiple priorities and localities and make sure
@@ -423,7 +421,7 @@ TEST_F(EdsTest, PriorityAndLocality) {
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
 
   {
@@ -449,7 +447,7 @@ TEST_F(EdsTest, PriorityAndLocality) {
   add_hosts_to_locality_and_priority("oceania", "koala", "eucalyptus", 0, 3);
   add_hosts_to_locality_and_priority("general", "koala", "ingsoc", 1, 5);
 
-  EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
   {
     auto& first_hosts_per_locality =

@@ -173,6 +173,7 @@ public:
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   Network::Address::InstanceConstSharedPtr source_address_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
+  std::string local_cluster_name_;
 };
 
 class MockHealthChecker : public HealthChecker {

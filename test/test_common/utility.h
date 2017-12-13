@@ -35,6 +35,12 @@ namespace Envoy {
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
 
+#define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
+  try {                                                                                            \
+    statement;                                                                                     \
+  } catch (EnvoyException & e) {                                                                   \
+    ADD_FAILURE() << "Unexpected exception: " << std::string(e.what());                            \
+  }
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {
