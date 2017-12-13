@@ -116,6 +116,7 @@ public:
 
   void SetUp();
 
+  // TODO(alyssawilk) port the rest of the tests to v2 and make this non-virtual.
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
   // Set up the fake upstream connections. This is called by initialize() and
