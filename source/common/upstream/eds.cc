@@ -65,7 +65,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
-    if (false && priority > 0 && info()->lbType() == LoadBalancerType::RingHash) {
+    if (priority > 0 && info()->lbType() == LoadBalancerType::RingHash) {
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for RingHash cluster '{}'.", cluster_name_));
     }
