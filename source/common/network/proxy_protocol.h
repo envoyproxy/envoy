@@ -55,6 +55,12 @@ public:
     bool readLine(int fd, std::string& s);
     void close();
 
+    /**
+     * Helper function that replaces the current connection with the specified one.
+     */
+    void finishConnection(Address::InstanceConstSharedPtr remote_address,
+                          Address::InstanceConstSharedPtr local_address);
+
     ProxyProtocol& parent_;
     int fd_;
     ListenerImpl& listener_;

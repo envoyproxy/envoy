@@ -62,6 +62,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "transport_socket_interface",
+    hdrs = ["transport_socket.h"],
+    deps = [
+        ":connection_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
 )

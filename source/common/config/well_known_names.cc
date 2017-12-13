@@ -25,11 +25,11 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
   // enclosed in <>.
   // - Typical * notation will be used to denote an arbitrary set of characters.
 
-  // *_rq(_<response_code>
+  // *_rq(_<response_code>)
   name_regex_pairs.push_back({RESPONSE_CODE, "_rq(_(\\d{3}))$"});
 
-  // *_rq(_<response_code_class>xx)
-  name_regex_pairs.push_back({RESPONSE_CODE_CLASS, "_rq(_(\\dxx))$"});
+  // *_rq_(<response_code_class>)xx
+  name_regex_pairs.push_back({RESPONSE_CODE_CLASS, "_rq_(\\d)xx$"});
 
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
   name_regex_pairs.push_back({DYNAMO_PARTITION_ID, "^http(?=\\.).*?\\.dynamodb\\.table(?=\\.).*?\\."

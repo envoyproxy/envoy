@@ -125,12 +125,12 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_THAT(response->body(),
               testing::HasSubstr(
-                  "envoy_http_downstream_rq{envoy_response_code_class=\"4xx\",envoy_http_conn_"
+                  "envoy_http_downstream_rq_xx{envoy_response_code_class=\"4\",envoy_http_conn_"
                   "manager_prefix=\"admin\"} 2\n"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("# TYPE envoy_http_downstream_rq counter\n"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("# TYPE envoy_http_downstream_rq_xx counter\n"));
   EXPECT_THAT(response->body(),
               testing::HasSubstr(
-                  "envoy_listener_admin_http_downstream_rq{envoy_response_code_class=\"4xx\","
+                  "envoy_listener_admin_http_downstream_rq_xx{envoy_response_code_class=\"4\","
                   "envoy_http_conn_manager_prefix=\"admin\"} 2\n"));
   EXPECT_THAT(response->body(),
               testing::HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
@@ -142,6 +142,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("version_info::\n"));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);

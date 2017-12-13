@@ -357,6 +357,7 @@ private:
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;
+    Tracing::Config& tracingConfig() override;
     const std::string& downstreamAddress() override;
 
     ActiveStream& parent_;

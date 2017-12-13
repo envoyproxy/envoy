@@ -142,9 +142,12 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    Http::Code clusterNotFoundResponseCode() const override {
+      return Http::Code::InternalServerError;
+    }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     void finalizeRequestHeaders(Http::HeaderMap&, const AccessLog::RequestInfo&) const override {}
-    void finalizeResponseHeaders(Http::HeaderMap&) const override {}
+    void finalizeResponseHeaders(Http::HeaderMap&, const AccessLog::RequestInfo&) const override {}
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -207,6 +210,7 @@ private:
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
+  const Tracing::Config& tracingConfig() override { return tracing_config_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
@@ -226,6 +230,7 @@ private:
   Router::ProdFilter router_;
   AccessLog::RequestInfoImpl request_info_;
   Tracing::NullSpan active_span_;
+  const Tracing::Config& tracing_config_;
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};

@@ -33,4 +33,26 @@ TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBufferV6) {
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
+TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownRequestAndResponseWithBodyNoBuffer) {
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    auto conn = makeClientConnection(lookupPort("http"));
+    Buffer::OwnedImpl buf("PROXY UNKNOWN\r\n");
+    conn->write(buf);
+    return conn;
+  };
+
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+}
+
+TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownLongRequestAndResponseWithBodyNoBuffer) {
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    auto conn = makeClientConnection(lookupPort("http"));
+    Buffer::OwnedImpl buf("PROXY UNKNOWN 1:2:3::4 FE00:: 65535 1234\r\n");
+    conn->write(buf);
+    return conn;
+  };
+
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+}
+
 } // namespace Envoy

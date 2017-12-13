@@ -18,9 +18,9 @@ namespace Configuration {
 class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
+  NetworkFilterFactoryCb createFilterFactory(const Json::Object& proto_config,
                                              FactoryContext& context) override;
-  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -31,8 +31,8 @@ public:
 
 private:
   NetworkFilterFactoryCb
-  createMongoProxyFactory(const envoy::api::v2::filter::network::MongoProxy& config,
-                          FactoryContext& context);
+  createFilter(const envoy::api::v2::filter::network::MongoProxy& proto_config,
+               FactoryContext& context);
 };
 
 } // namespace Configuration

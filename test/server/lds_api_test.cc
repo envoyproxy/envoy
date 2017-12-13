@@ -20,7 +20,8 @@ class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() : request_(&cluster_manager_.async_client_) {}
 
-  void setup() {
+  void setup(bool v2_rest = false) {
+    v2_rest_ = v2_rest;
     const std::string config_json = R"EOF(
     {
       "cluster": "foo_cluster",
@@ -31,6 +32,9 @@ public:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::ConfigSource lds_config;
     Config::Utility::translateLdsConfig(*config, lds_config);
+    if (v2_rest) {
+      lds_config.mutable_api_config_source()->set_api_type(envoy::api::v2::ApiConfigSource::REST);
+    }
     EXPECT_CALL(init_, registerTarget(_));
     lds_.reset(new LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_,
                           store_, listener_manager_));
@@ -53,9 +57,11 @@ public:
         .WillOnce(
             Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                        const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ((Http::TestHeaderMapImpl{{":method", "GET"},
-                                                 {":path", "/v1/listeners/cluster_name/node_name"},
-                                                 {":authority", "foo_cluster"}}),
+              EXPECT_EQ((Http::TestHeaderMapImpl{
+                            {":method", v2_rest_ ? "POST" : "GET"},
+                            {":path", v2_rest_ ? "/v2/discovery:listeners"
+                                               : "/v1/listeners/cluster_name/node_name"},
+                            {":authority", "foo_cluster"}}),
                         request->headers());
               callbacks_ = &callbacks;
               return &request_;
@@ -73,6 +79,7 @@ public:
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
   }
 
+  bool v2_rest_{};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -88,6 +95,19 @@ public:
 private:
   std::list<NiceMock<MockListener>> listeners_;
 };
+
+// Negative test for protoc-gen-validate constraints.
+TEST_F(LdsApiTest, ValidateFail) {
+  InSequence s;
+
+  setup(true);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  listeners.Add();
+
+  EXPECT_THROW(lds_->onConfigUpdate(listeners), ProtoValidationException);
+  EXPECT_CALL(request_, cancel());
+}
 
 TEST_F(LdsApiTest, UnknownCluster) {
   const std::string config_json = R"EOF(

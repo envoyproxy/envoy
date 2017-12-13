@@ -226,7 +226,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
     callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::NoRouteFound);
     Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-        {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}}};
+        {Http::Headers::get().Status,
+         std::to_string(enumToInt(route_entry_->clusterNotFoundResponseCode()))}}};
     callbacks_->encodeHeaders(std::move(response_headers), true);
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -500,7 +501,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     // starting response, we treat this as an error. We only get non-5xx when
     // timeout_response_code_ is used for code above, where this member can
     // assume values such as 204 (NoContent).
-    if (!Http::CodeUtility::is5xx(enumToInt(code))) {
+    if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
     sendLocalReply(code, body, dropped);
@@ -605,7 +606,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
   // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
-  route_entry_->finalizeResponseHeaders(*headers);
+  route_entry_->finalizeResponseHeaders(*headers, callbacks_->requestInfo());
 
   downstream_response_started_ = true;
   if (end_stream) {
@@ -747,8 +748,9 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
-        Tracing::EgressConfig::get(), "router " + parent.cluster_->name() + " egress",
+        parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         ProdSystemTimeSource::instance_.currentTime());
+    span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
   }
 
   request_info_.healthCheck(parent_.callbacks_->requestInfo().healthCheck());

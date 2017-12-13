@@ -217,6 +217,7 @@ public:
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, AccessLog::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
+  MOCK_METHOD0(tracingConfig, Tracing::Config&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
@@ -241,6 +242,7 @@ public:
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
+  testing::NiceMock<Tracing::MockConfig> tracing_config_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,
@@ -258,6 +260,7 @@ public:
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, AccessLog::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
+  MOCK_METHOD0(tracingConfig, Tracing::Config&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
@@ -271,6 +274,7 @@ public:
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
+  testing::NiceMock<Tracing::MockConfig> tracing_config_;
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {

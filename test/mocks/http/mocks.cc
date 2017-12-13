@@ -92,6 +92,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
       }));
 
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
+  ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
@@ -100,6 +101,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
   ON_CALL(*this, encodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
+  ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}

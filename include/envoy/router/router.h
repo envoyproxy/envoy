@@ -291,6 +291,12 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
+   * Returns the HTTP status code to use when configured cluster is not found.
+   * @return Http::Code to use when configured cluster is not found.
+   */
+  virtual Http::Code clusterNotFoundResponseCode() const PURE;
+
+  /**
    * @return const CorsPolicy* the CORS policy for this virtual host.
    */
   virtual const CorsPolicy* corsPolicy() const PURE;
@@ -310,8 +316,10 @@ public:
    * adding or removing headers. This should only be called ONCE immediately after receiving an
    * upstream's headers.
    * @param headers supplies the response headers, which may be modified during this call.
+   * @param request_info holds additional information about the request.
    */
-  virtual void finalizeResponseHeaders(Http::HeaderMap& headers) const PURE;
+  virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
+                                       const AccessLog::RequestInfo& request_info) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

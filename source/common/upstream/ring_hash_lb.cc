@@ -11,10 +11,11 @@ namespace Envoy {
 namespace Upstream {
 
 RingHashLoadBalancer::RingHashLoadBalancer(
-    HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+    PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
-    : host_set_(host_set), stats_(stats), runtime_(runtime), random_(random), config_(config) {
+    : host_set_(*priority_set.hostSetsPerPriority()[0]), stats_(stats), runtime_(runtime),
+      random_(random), config_(config) {
   host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
                                      const std::vector<HostSharedPtr>&) -> void { refresh(); });
 
