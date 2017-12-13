@@ -29,15 +29,18 @@ namespace Upstream {
 
 class MockHostSet : public HostSet {
 public:
-  MockHostSet();
+  MockHostSet(uint32_t priority = 0);
 
   void runCallbacks(const std::vector<HostSharedPtr> added,
                     const std::vector<HostSharedPtr> removed) {
-    member_update_cb_helper_.runCallbacks(0, added, removed);
+    member_update_cb_helper_.runCallbacks(priority(), added, removed);
+  }
+
+  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::MemberUpdateCb callback) {
+    return member_update_cb_helper_.add(callback);
   }
 
   // Upstream::HostSet
-  MOCK_CONST_METHOD1(addMemberUpdateCb, Common::CallbackHandle*(MemberUpdateCb callback));
   MOCK_CONST_METHOD0(hosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostSharedPtr>&());
   MOCK_CONST_METHOD0(hostsPerLocality, const std::vector<std::vector<HostSharedPtr>>&());
@@ -60,6 +63,7 @@ public:
   Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
                           const std::vector<HostSharedPtr>&>
       member_update_cb_helper_;
+  uint32_t priority_{};
 };
 
 class MockPrioritySet : public PrioritySet {
@@ -162,12 +166,14 @@ public:
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
+  MOCK_CONST_METHOD0(localClusterName, const std::string&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   Network::Address::InstanceConstSharedPtr source_address_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
+  std::string local_cluster_name_;
 };
 
 class MockHealthChecker : public HealthChecker {

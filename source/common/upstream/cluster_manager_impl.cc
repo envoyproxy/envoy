@@ -220,6 +220,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   Optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
+    local_cluster_name_ = cm_config.local_cluster_name();
     local_cluster_name.value(cm_config.local_cluster_name());
     if (primary_clusters_.find(local_cluster_name.value()) == primary_clusters_.end()) {
       throw EnvoyException(

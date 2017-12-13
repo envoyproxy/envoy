@@ -68,7 +68,7 @@ private:
     }
 
   protected:
-    HostSetPtr createHostSet(uint32_t priority) override;
+    HostSetImplPtr createHostSet(uint32_t priority) override;
 
   private:
     const PrioritySet& original_priority_set_;

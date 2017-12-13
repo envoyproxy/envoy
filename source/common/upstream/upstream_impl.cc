@@ -70,13 +70,13 @@ void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(128
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
-      host_sets_.push_back(HostSetPtr{createHostSet(i)});
-      host_sets_[i]->addMemberUpdateCb([this](uint32_t priority,
-                                              const std::vector<HostSharedPtr>& hosts_added,
-                                              const std::vector<HostSharedPtr>& hosts_removed) {
+      HostSetImplPtr host_set = createHostSet(i);
+      host_set->addMemberUpdateCb([this](uint32_t priority,
+                                         const std::vector<HostSharedPtr>& hosts_added,
+                                         const std::vector<HostSharedPtr>& hosts_removed) {
         runUpdateCallbacks(priority, hosts_added, hosts_removed);
       });
-      runUpdateCallbacks(i, {}, {});
+      host_sets_.push_back(std::move(host_set));
     }
   }
   return *host_sets_[priority];

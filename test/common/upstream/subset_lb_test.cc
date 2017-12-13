@@ -478,12 +478,12 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
   init({});
   EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
 
-  // Add hosts to the group at priority 1. As no load balancer will select from
-  // failovers yet, this still results in being unable to choose a host.
+  // Add hosts to the group at priority 1.
+  // These hosts should be selected as there are no healthy hosts with priority 0
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
                makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
               {}, {}, 1);
-  EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
+  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
 
   // Finally update the priority 0 hosts. The LB should now select hosts.
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),

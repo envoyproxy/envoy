@@ -216,6 +216,12 @@ public:
     }
   }
 
+  void waitForGaugeEq(const std::string& name, uint64_t value) {
+    while (gauge(name)->value() != value) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+
   Stats::CounterSharedPtr counter(const std::string& name) {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
