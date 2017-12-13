@@ -24,6 +24,7 @@
 #include "server/lds_api.h"
 
 #include "api/bootstrap.pb.h"
+#include "api/trace.pb.h"
 
 namespace Envoy {
 namespace Server {

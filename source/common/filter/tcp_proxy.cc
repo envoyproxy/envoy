@@ -48,6 +48,11 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
     return ThreadLocal::ThreadLocalObjectSharedPtr(new TcpProxyUpstreamDrainManager());
   });
 
+  if (config.has_idle_timeout()) {
+    idle_timeout_.value(std::chrono::milliseconds(
+        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
+  }
+
   if (config.has_deprecated_v1()) {
     for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
          config.deprecated_v1().routes()) {
@@ -358,6 +363,7 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
   request_info_.bytes_received_ += data.length();
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
+  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
 }
 
@@ -367,6 +373,7 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
       upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+      disableIdleTimer();
     }
   }
 }
@@ -375,6 +382,7 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   request_info_.bytes_sent_ += data.length();
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
+  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
 void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
@@ -387,6 +395,11 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     connecting = true;
     connect_timeout_timer_->disableTimer();
     connect_timeout_timer_.reset();
+  }
+
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    disableIdleTimer();
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -414,6 +427,35 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
+
+    if (config_ != nullptr && config_->idleTimeout().valid()) {
+      idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+          [this]() -> void { onIdleTimeout(); });
+      resetIdleTimer();
+      Network::Connection::BytesSentCb cb = [this](uint64_t) { resetIdleTimer(); };
+      read_callbacks_->connection().addBytesSentCallback(cb);
+      upstream_connection_->addBytesSentCallback(cb);
+    }
+  }
+}
+
+void TcpProxy::onIdleTimeout() {
+  config_->stats().idle_timeout_.inc();
+  closeUpstreamConnection();
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void TcpProxy::resetIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    ASSERT(config_->idleTimeout().valid());
+    idle_timer_->enableTimer(config_->idleTimeout().value());
+  }
+}
+
+void TcpProxy::disableIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    idle_timer_->disableTimer();
+    idle_timer_.reset();
   }
 }
 

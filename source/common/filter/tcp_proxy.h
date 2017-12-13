@@ -42,7 +42,8 @@ namespace Filter {
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(upstream_flush_total)                                                                    \
   GAUGE  (upstream_flush_active)                                                                   \
-  COUNTER(closes_upstream_flush_timeout)
+  COUNTER(closes_upstream_flush_timeout)                                                           \
+  COUNTER(idle_timeout)
 // clang-format on
 
 /**
@@ -76,7 +77,7 @@ public:
   const TcpProxyStats& stats() { return stats_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  std::chrono::milliseconds upstreamFlushTimeout() { return upstream_flush_timeout_; }
+  const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
   TcpProxyUpstreamDrainManager& drainManager();
 
 private:
@@ -100,7 +101,7 @@ private:
   const TcpProxyStats stats_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
-  const std::chrono::milliseconds upstream_flush_timeout_;
+  Optional<std::chrono::milliseconds> idle_timeout_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
 };
 
@@ -192,6 +193,9 @@ protected:
   void onUpstreamEvent(Network::ConnectionEvent event);
   void finalizeUpstreamConnectionStats();
   void closeUpstreamConnection();
+  void onIdleTimeout();
+  void resetIdleTimer();
+  void disableIdleTimer();
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -199,6 +203,7 @@ protected:
   Network::ClientConnectionPtr upstream_connection_;
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr connect_timeout_timer_;
+  Event::TimerPtr idle_timer_;
   Stats::TimespanPtr connect_timespan_;
   Stats::TimespanPtr connected_timespan_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
