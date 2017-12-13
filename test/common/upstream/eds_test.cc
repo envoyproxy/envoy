@@ -12,7 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -353,7 +353,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 // Make sure config updates with P!=0 are rejected for the local cluster.
 TEST_F(EdsTest, NoPriorityForLocalCluster) {
   std::string name = "fare";
-  EXPECT_CALL(cm_, localClusterName()).WillOnce(Return(name));
+  EXPECT_CALL(cm_, localClusterName()).WillOnce(ReturnRef(name));
   resetCluster();
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
@@ -379,7 +379,8 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   add_hosts_to_priority(1, 1);
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  EXPECT_THROW(cluster_->onConfigUpdate(resources), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(cluster_->onConfigUpdate(resources), EnvoyException,
+                            "Unexpected non-zero priority for local cluster 'fare'.");
 
   // Try an update which only has endpoints with P=0. This should go through.
   cluster_load_assignment->clear_endpoints();

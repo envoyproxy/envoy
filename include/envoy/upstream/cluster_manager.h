@@ -140,7 +140,7 @@ public:
    *
    * @return std::string the local cluster name, or "" if no local cluster was configured.
    */
-  virtual const std::string localClusterName() const PURE;
+  virtual const std::string& localClusterName() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
