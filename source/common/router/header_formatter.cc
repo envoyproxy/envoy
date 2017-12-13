@@ -5,6 +5,7 @@
 #include "envoy/common/optional.h"
 
 #include "common/access_log/access_log_formatter.h"
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/json/json_loader.h"
@@ -29,9 +30,13 @@ std::string formatUpstreamMetadataParseException(const std::string& params,
                      params, reason);
 }
 
+// Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
+// specified metadata from an AccessLog::RequestInfo. Expects a string formatted as:
+//   (["a", "b", "c"])
+// There must be at least 2 array elements (a metadata namespace and at least 1 key).
 std::function<std::string(const Envoy::AccessLog::RequestInfo&)>
 parseUpstreamMetadataField(const std::string& params_str) {
-  if (params_str.empty() || params_str[0] != '(' || params_str[params_str.size() - 1] != ')') {
+  if (params_str.empty() || params_str.front() != '(' || params_str.back() != ')') {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
   }
 
@@ -55,7 +60,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
   return [params](const Envoy::AccessLog::RequestInfo& request_info) -> std::string {
     Upstream::HostDescriptionConstSharedPtr host = request_info.upstreamHost();
     if (!host) {
-      return "";
+      return std::string();
     }
 
     const ProtobufWkt::Value* value =
@@ -63,7 +68,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
     if (value->kind_case() == ProtobufWkt::Value::KIND_NOT_SET) {
       // No kind indicates default ProtobufWkt::Value which means namespace or key not
       // found.
-      return "";
+      return std::string();
     }
 
     size_t i = 2;
@@ -74,7 +79,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
 
       const auto field_it = value->struct_value().fields().find(params[i]);
       if (field_it == value->struct_value().fields().end()) {
-        return "";
+        return std::string();
       }
 
       value = &field_it->second;
@@ -83,7 +88,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
 
     if (i < params.size()) {
       // Didn't find all the keys.
-      return "";
+      return std::string();
     }
 
     switch (value->kind_case()) {
@@ -98,7 +103,9 @@ parseUpstreamMetadataField(const std::string& params_str) {
 
     default:
       // Unsupported type or null value.
-      return "";
+      ENVOY_LOG_MISC(info, "unsupported value type for metadata [{}]",
+                     StringUtil::join(params, ", "));
+      return std::string();
     }
   };
 }
