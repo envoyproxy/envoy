@@ -117,7 +117,7 @@ public:
               )EOF"));
 
       // Give the config utility a place to stuff the upstream host's port (must come before
-      // the eds-cluster to keep the upstreams and ports in the same order).)
+      // the eds-cluster to keep the upstreams and ports in the same order).
       static_resources->add_clusters()->CopyFrom(
           TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
               R"EOF(
@@ -292,7 +292,7 @@ protected:
     EXPECT_EQ(expected_headers, headers);
   }
 
-  bool use_eds_{0};
+  bool use_eds_{false};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
 };

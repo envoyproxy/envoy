@@ -256,11 +256,20 @@ TEST(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "Invalid value.\n");
 
   // No parameters.
-  EXPECT_THROW(RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA", false),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA");
 
-  EXPECT_THROW(RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA()", false),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA()", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA(), because JSON supplied is not valid. Error(offset 0, line 1): "
+      "The document is empty.\n");
 
   // One parameter.
   EXPECT_THROW_WITH_MESSAGE(
@@ -271,12 +280,37 @@ TEST(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
-  EXPECT_THROW(RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA(", false),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA(", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA(");
 
-  EXPECT_THROW(
-      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA(a,b,c,d", false),
-      EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([a,b,c,d]");
+
+  // Non-string elements.
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([\"a\", 1]), because JSON field from line 1 accessed with type 'String' "
+      "does not match actual type 'Integer'.");
+
+  // Non-array parameters.
+  EXPECT_THROW_WITH_MESSAGE(
+      RequestInfoHeaderFormatter requestInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false),
+      EnvoyException,
+      "Incorrect header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
+      "does not match actual type 'Object'.");
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {

@@ -116,7 +116,8 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_
       return request_info.getDownstreamAddress();
     };
   } else if (StringUtil::startsWith(field_name.c_str(), "UPSTREAM_METADATA")) {
-    field_extractor_ = parseUpstreamMetadataField(field_name.substr(17));
+    field_extractor_ =
+        parseUpstreamMetadataField(field_name.substr(sizeof("UPSTREAM_METADATA") - 1));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }
