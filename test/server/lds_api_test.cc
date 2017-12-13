@@ -149,7 +149,7 @@ TEST_F(LdsApiTest, Basic) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  const std::string response1_json = R"EOF(
   {
     "listeners": [
     {
@@ -182,7 +182,7 @@ TEST_F(LdsApiTest, Basic) {
   expectRequest();
   interval_timer_->callback_();
 
-  std::string response2_json = R"EOF(
+  const std::string response2_json = R"EOF(
   {
     "listeners": [
     {
@@ -221,7 +221,7 @@ TEST_F(LdsApiTest, Failure) {
 
   setup();
 
-  std::string response_json = R"EOF(
+  const std::string response_json = R"EOF(
   {
     "listeners" : {}
   }
