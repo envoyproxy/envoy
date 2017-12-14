@@ -433,8 +433,7 @@ public:
             .WillByDefault(ReturnPointee(
                 factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
         ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
-        ON_CALL(*upstream_connections_.at(i), localAddress())
-            .WillByDefault(ReturnRef(upstream_local_address_));
+        upstream_connections_.at(i)->local_address_ = upstream_local_address_;
         EXPECT_CALL(*upstream_connections_.at(i), addReadFilter(_))
             .WillOnce(SaveArg<0>(&upstream_read_filter_));
         EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
@@ -789,10 +788,8 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
 
 // Test that access log field %DOWNSTREAM_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
-  Network::Address::InstanceConstSharedPtr downstream_address =
+  filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
-  ON_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillByDefault(ReturnRef(downstream_address));
   setup(1, accessLogConfig("%DOWNSTREAM_ADDRESS%"));
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1:40000");
