@@ -49,10 +49,10 @@ void ConnectionManagerUtility::mutateRequestHeaders(
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   if (config.useRemoteAddress()) {
-    if (Network::Utility::isLoopbackAddress(connection.remoteAddress())) {
+    if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
-      Utility::appendXff(request_headers, connection.remoteAddress());
+      Utility::appendXff(request_headers, *connection.remoteAddress());
     }
     request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
@@ -115,9 +115,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(
 
   // If we are an external request, AND we are "using remote address" (see above), we set
   // x-envoy-external-address since this is our first ingress point into the trusted network.
-  if (edge_request && connection.remoteAddress().type() == Network::Address::Type::Ip) {
+  if (edge_request && connection.remoteAddress()->type() == Network::Address::Type::Ip) {
     request_headers.insertEnvoyExternalAddress().value(
-        connection.remoteAddress().ip()->addressAsString());
+        connection.remoteAddress()->ip()->addressAsString());
   }
 
   // Generate x-request-id for all edge requests, or if there is none.

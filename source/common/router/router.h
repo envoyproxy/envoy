@@ -183,8 +183,8 @@ public:
     // connections can receive different cookies if they race on requests.
     std::string value;
     const Network::Connection* conn = downstreamConnection();
-    // need to check for null conn if this is ever used by Http::AsyncClient in the fiture
-    value = conn->remoteAddress().asString() + conn->localAddress().asString();
+    // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
+    value = conn->remoteAddress()->asString() + conn->localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(

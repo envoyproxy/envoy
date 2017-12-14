@@ -71,22 +71,23 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
 const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& connection) {
   for (const TcpProxyConfig::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.remoteAddress(), route.source_port_ranges_)) {
+        !Network::Utility::portInRangeList(*connection.remoteAddress(),
+                                           route.source_port_ranges_)) {
       continue;
     }
 
-    if (!route.source_ips_.empty() && !route.source_ips_.contains(connection.remoteAddress())) {
+    if (!route.source_ips_.empty() && !route.source_ips_.contains(*connection.remoteAddress())) {
       continue;
     }
 
     if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.localAddress(),
+        !Network::Utility::portInRangeList(*connection.localAddress(),
                                            route.destination_port_ranges_)) {
       continue;
     }
 
     if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(connection.localAddress())) {
+        !route.destination_ips_.contains(*connection.localAddress())) {
       continue;
     }
 
@@ -144,7 +145,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
+  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress()->asString();
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -283,7 +284,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
   request_info_.onUpstreamHostSelected(conn_info.host_description_);
-  request_info_.upstream_local_address_ = upstream_connection_->localAddress().asString();
+  request_info_.upstream_local_address_ = upstream_connection_->localAddress()->asString();
 
   ASSERT(connect_timeout_timer_ == nullptr);
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(

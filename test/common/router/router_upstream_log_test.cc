@@ -96,10 +96,9 @@ public:
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(upstream_locality_));
-    ON_CALL(router_->downstream_connection_, localAddress())
-        .WillByDefault(ReturnRef(*host_address_));
-    ON_CALL(router_->downstream_connection_, remoteAddress())
-        .WillByDefault(ReturnRef(*remote_address_));
+    router_->downstream_connection_.local_address_ = host_address_;
+    router_->downstream_connection_.remote_address_ =
+        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
   }
 
   void expectResponseTimerCreate() {
@@ -200,8 +199,6 @@ public:
   envoy::api::v2::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
-  Network::Address::InstanceConstSharedPtr remote_address_{
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:80")};
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
 
