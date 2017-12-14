@@ -49,25 +49,25 @@ public:
 };
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
-  Network::Address::Ipv4Instance not_local_host_remote_address("12.12.12.12");
+  auto not_local_host_remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-  EXPECT_CALL(connection_, remoteAddress())
-      .WillRepeatedly(ReturnRef(not_local_host_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(not_local_host_remote_address));
 
   TestHeaderMapImpl headers{};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
                                                  route_config_, random_, runtime_, local_info_);
 
   EXPECT_TRUE(headers.has(Headers::get().ForwardedFor));
-  EXPECT_EQ(not_local_host_remote_address.ip()->addressAsString(),
+  EXPECT_EQ(not_local_host_remote_address->ip()->addressAsString(),
             headers.get_(Headers::get().ForwardedFor));
 }
 
 TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) {
-  Network::Address::Ipv4Instance local_host_remote_address("127.0.0.1");
+  auto local_host_remote_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   Network::Address::Ipv4Instance local_address("10.3.2.1");
 
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(local_host_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(local_host_remote_address));
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(config_, localAddress()).WillRepeatedly(ReturnRef(local_address));
 
@@ -80,10 +80,10 @@ TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) 
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
-  Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
+  auto internal_remote_address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(internal_remote_address));
 
   TestHeaderMapImpl headers{{"user-agent", "foo"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, Protocol::Http2, connection_, config_,
@@ -96,10 +96,10 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
-  Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
+  auto internal_remote_address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(internal_remote_address));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
@@ -147,10 +147,10 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
-  Network::Address::Ipv4Instance external_remote_address("34.0.0.1");
+  auto external_remote_address = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
+  ON_CALL(connection_, remoteAddress()).WillByDefault(Return(external_remote_address));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
 
@@ -222,10 +222,10 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
-  Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
+  auto internal_remote_address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(internal_remote_address));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
@@ -240,10 +240,10 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
-  Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
+  auto internal_remote_address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(internal_remote_address));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{};
@@ -281,9 +281,9 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternalRequest) {
-  Network::Address::Ipv4Instance local_remote_address("10.0.0.1");
+  auto local_remote_address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   EXPECT_CALL(config_, useRemoteAddress()).WillOnce(Return(true));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(local_remote_address));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(local_remote_address));
 
   TestHeaderMapImpl headers{{"x-request-id", "original_request_id"}};
   EXPECT_CALL(random_, uuid()).Times(0);
@@ -294,8 +294,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
 }
 
 TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
-  Network::Address::Ipv4Instance external_ip("134.2.2.11");
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(external_ip));
+  auto external_ip = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(Return(external_ip));
   TestHeaderMapImpl headers{{"x-request-id", "original"}};
 
   EXPECT_CALL(random_, uuid()).WillOnce(Return("override"));
@@ -307,8 +307,8 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
-  Network::Address::Ipv4Instance external_ip("50.0.0.1");
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_ip));
+  auto external_ip = std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1");
+  ON_CALL(connection_, remoteAddress()).WillByDefault(Return(external_ip));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
@@ -340,8 +340,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote) {
-  Network::Address::Ipv4Instance external_ip("60.0.0.1");
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_ip));
+  auto external_ip = std::make_shared<Network::Address::Ipv4Instance>("60.0.0.1");
+  ON_CALL(connection_, remoteAddress()).WillByDefault(Return(external_ip));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
 
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
@@ -354,8 +354,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
-  Network::Address::Ipv4Instance local_remote_address("10.0.0.1");
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(local_remote_address));
+  auto local_remote_address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  ON_CALL(connection_, remoteAddress()).WillByDefault(Return(local_remote_address));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},

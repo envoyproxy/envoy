@@ -7,14 +7,14 @@
 #
 # NOTE: This implementation is far from perfect and will need to be refined to cover all cases.
 
-set -e
-
 $* 2>&1 |
   while IFS= read -r LINE
   do
     if [[ "${LINE}" =~ [[:space:]]*([^:[:space:]]+):[[:digit:]]+:[[:digit:]]+: ]]; then
       REAL_PATH=$(readlink -f "${BASH_REMATCH[1]}")
-      LINE=${LINE//${BASH_REMATCH[1]}/${REAL_PATH}}
+      if [[ $? == 0 ]]; then
+        LINE=${LINE//${BASH_REMATCH[1]}/${REAL_PATH}}
+      fi
     fi
     echo "${LINE}"
   done

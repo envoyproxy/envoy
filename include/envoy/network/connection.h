@@ -151,7 +151,7 @@ public:
   /**
    * @return The address of the remote client.
    */
-  virtual const Address::Instance& remoteAddress() const PURE;
+  virtual Network::Address::InstanceConstSharedPtr remoteAddress() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
@@ -159,7 +159,7 @@ public:
    * it can be different from the proxy address if the downstream connection has been redirected or
    * the proxy is operating in transparent mode.
    */
-  virtual const Address::Instance& localAddress() const PURE;
+  virtual Network::Address::InstanceConstSharedPtr localAddress() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons

@@ -95,8 +95,7 @@ public:
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(Const(filter_callbacks_.connection_), ssl())
         .WillByDefault(Return(ssl_connection_.get()));
-    ON_CALL(filter_callbacks_.connection_, remoteAddress())
-        .WillByDefault(ReturnRef(remote_address_));
+    ON_CALL(filter_callbacks_.connection_, remoteAddress()).WillByDefault(Return(remote_address_));
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
                                                   local_info_, cluster_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -257,7 +256,8 @@ public:
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
-  Network::Address::Ipv4Instance remote_address_{"0.0.0.0"};
+  Network::Address::InstanceConstSharedPtr remote_address_{
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0")};
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;

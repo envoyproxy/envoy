@@ -67,8 +67,8 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
   MOCK_CONST_METHOD0(readEnabled, bool());
-  MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
-  MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
+  MOCK_CONST_METHOD0(remoteAddress, Address::InstanceConstSharedPtr());
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
@@ -104,8 +104,8 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
   MOCK_CONST_METHOD0(readEnabled, bool());
-  MOCK_CONST_METHOD0(remoteAddress, const Address::Instance&());
-  MOCK_CONST_METHOD0(localAddress, const Address::Instance&());
+  MOCK_CONST_METHOD0(remoteAddress, Address::InstanceConstSharedPtr());
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
