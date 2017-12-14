@@ -16,8 +16,13 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
     : host_set_(*priority_set.hostSetsPerPriority()[0]), stats_(stats), runtime_(runtime),
       random_(random), config_(config) {
-  host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                     const std::vector<HostSharedPtr>&) -> void { refresh(); });
+  priority_set.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
+                                        const std::vector<HostSharedPtr>&) -> void {
+    // priority!=0 will be blocked by EDS validation.
+    ASSERT(priority == 0); // TODO(alyssawilk) make ring hash LB priority-aware.
+    UNREFERENCED_PARAMETER(priority);
+    refresh();
+  });
 
   refresh();
 }
