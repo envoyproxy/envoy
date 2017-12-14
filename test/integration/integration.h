@@ -116,7 +116,6 @@ public:
 
   void SetUp();
 
-  // TODO(alyssawilk) port the rest of the tests to v2 and make this non-virtual.
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
   // Set up the fake upstream connections. This is called by initialize() and
@@ -138,7 +137,6 @@ public:
   Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
-  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,

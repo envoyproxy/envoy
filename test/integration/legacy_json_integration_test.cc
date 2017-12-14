@@ -13,6 +13,12 @@ class LegacyJsonIntegrationTest : public BaseIntegrationTest,
 public:
   LegacyJsonIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
+  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names) {
+    test_server_ = IntegrationTestServer::create(
+        TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
+    registerTestServerPorts(port_names);
+  }
+
   void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());

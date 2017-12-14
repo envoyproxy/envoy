@@ -154,8 +154,9 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 }
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                                         Network::Address::IpVersion version)
-    : BaseIntegrationTest(version), downstream_protocol_(downstream_protocol) {
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
   named_ports_ = {{"http"}};
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
