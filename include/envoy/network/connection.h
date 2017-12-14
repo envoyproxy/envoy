@@ -149,17 +149,17 @@ public:
   virtual bool readEnabled() const PURE;
 
   /**
-   * @return The address of the remote client.
+   * @return The address of the remote client. Note that this method will never return nullptr.
    */
-  virtual Network::Address::InstanceConstSharedPtr remoteAddress() const PURE;
+  virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
    * address. For server connections, this is the local destination address. For server connections
    * it can be different from the proxy address if the downstream connection has been redirected or
-   * the proxy is operating in transparent mode.
+   * the proxy is operating in transparent mode. Note that this method will never return nullptr.
    */
-  virtual Network::Address::InstanceConstSharedPtr localAddress() const PURE;
+  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons
