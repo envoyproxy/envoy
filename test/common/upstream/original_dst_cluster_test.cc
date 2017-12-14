@@ -24,7 +24,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 using testing::_;
 
@@ -169,9 +168,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    EXPECT_CALL(connection, localAddress())
-        .WillRepeatedly(
-            ReturnRefOfCopy(std::make_shared<Network::Address::PipeInstance>("unix://foo")));
+    connection.local_address_ = std::make_shared<Network::Address::PipeInstance>("unix://foo");
     EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
     OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
@@ -207,8 +204,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  auto local_address = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-  EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+  connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
   EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
   OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
@@ -219,7 +215,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
 
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*local_address, *host->address());
+  EXPECT_EQ(*connection.local_address_, *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -228,7 +224,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
 
   EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(*local_address,
+  EXPECT_EQ(*connection.local_address_,
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   // Same host is returned on the 2nd call
@@ -295,14 +291,12 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   NiceMock<Network::MockConnection> connection1;
   TestLoadBalancerContext lb_context1(&connection1);
-  auto local_address1 = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-  EXPECT_CALL(connection1, localAddress()).WillRepeatedly(ReturnRef(local_address1));
+  connection1.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
   EXPECT_CALL(connection1, usingOriginalDst()).WillRepeatedly(Return(true));
 
   NiceMock<Network::MockConnection> connection2;
   TestLoadBalancerContext lb_context2(&connection2);
-  auto local_address2 = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12");
-  EXPECT_CALL(connection2, localAddress()).WillRepeatedly(ReturnRef(local_address2));
+  connection2.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12");
   EXPECT_CALL(connection2, usingOriginalDst()).WillRepeatedly(Return(true));
 
   OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
@@ -313,14 +307,14 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
-  EXPECT_EQ(*local_address1, *host1->address());
+  EXPECT_EQ(*connection1.local_address_, *host1->address());
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
-  EXPECT_EQ(*local_address2, *host2->address());
+  EXPECT_EQ(*connection2.local_address_, *host2->address());
 
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -329,11 +323,11 @@ TEST_F(OriginalDstClusterTest, Membership2) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
 
   EXPECT_EQ(host1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(*local_address1,
+  EXPECT_EQ(*connection1.local_address_,
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   EXPECT_EQ(host2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]);
-  EXPECT_EQ(*local_address2,
+  EXPECT_EQ(*connection2.local_address_,
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->address());
 
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -387,8 +381,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  auto local_address = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
-  EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+  connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
   EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
   OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
@@ -397,9 +390,9 @@ TEST_F(OriginalDstClusterTest, Connection) {
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*local_address, *host->address());
+  EXPECT_EQ(*connection.local_address_, *host->address());
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(local_address), _))
+  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(connection.local_address_), _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   host->createConnection(dispatcher_);
 }
@@ -437,8 +430,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  auto local_address = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
-  EXPECT_CALL(connection, localAddress()).WillRepeatedly(ReturnRef(local_address));
+  connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
   EXPECT_CALL(connection, usingOriginalDst()).WillRepeatedly(Return(true));
 
   OriginalDstCluster::LoadBalancer lb1(cluster_->prioritySet(), cluster_);
@@ -448,7 +440,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   HostConstSharedPtr host = lb1.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*local_address, *host->address());
+  EXPECT_EQ(*connection.local_address_, *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   // Check that lb2 also gets updated
