@@ -358,7 +358,6 @@ private:
     RequestInfo::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
-    const std::string& downstreamAddress() override;
 
     ActiveStream& parent_;
     bool headers_continued_ : 1;

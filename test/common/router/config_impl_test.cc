@@ -2962,12 +2962,10 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-  const std::string downstream_addr = "127.0.0.1";
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   route->finalizeRequestHeaders(headers, request_info);
-  EXPECT_EQ(downstream_addr, headers.get_("x-client-ip"));
+  EXPECT_EQ("127.0.0.1", headers.get_("x-client-ip"));
 }
 
 TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {

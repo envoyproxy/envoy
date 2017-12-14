@@ -34,5 +34,17 @@ private:
   const static std::string RATE_LIMITED;
 };
 
+/**
+ * Utility class for RequestInfo.
+ */
+class Utility {
+public:
+  /**
+   * @param address supplies the downstream address.
+   * @return a properly formatted address for logs, header expansion, etc.
+   */
+  static const std::string& formatDownstreamAddress(const Network::Address::Instance& address);
+};
+
 } // namespace RequestInfo
 } // namespace Envoy

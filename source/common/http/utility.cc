@@ -17,6 +17,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -173,16 +174,6 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   return response_code;
 }
 
-bool Utility::isInternalRequest(const HeaderMap& headers) {
-  // The current header
-  const HeaderEntry* forwarded_for = headers.ForwardedFor();
-  if (!forwarded_for) {
-    return false;
-  }
-
-  return Network::Utility::isInternalAddress(forwarded_for->value().c_str());
-}
-
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
@@ -253,18 +244,30 @@ void Utility::sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::s
   callbacks.encodeHeaders(std::move(response_headers), true);
 }
 
-std::string Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
-  if (!request_headers.ForwardedFor()) {
-    return EMPTY_STRING;
+Network::Address::InstanceConstSharedPtr
+Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
+  const auto xff_header = request_headers.ForwardedFor();
+  if (xff_header == nullptr) {
+    return nullptr;
   }
 
-  std::vector<std::string> xff_address_list =
-      StringUtil::split(request_headers.ForwardedFor()->value().c_str(), ", ");
-
-  if (xff_address_list.empty()) {
-    return EMPTY_STRING;
+  absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
+  static const std::string seperator(", ");
+  std::string::size_type last_comma = xff_string.rfind(seperator);
+  if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
+    xff_string = xff_string.substr(last_comma + seperator.size());
   }
-  return xff_address_list.back();
+
+  try {
+    // This technically requires a copy because inet_pton takes a null terminated string. In
+    // practice, we are working with a view at the end of the owning string, and could pass the
+    // raw pointer.
+    // TODO(mattklein123 PERF: Avoid the copy here.
+    return Network::Utility::parseInternetAddress(
+        std::string(xff_string.data(), xff_string.size()));
+  } catch (const EnvoyException&) {
+    return nullptr;
+  }
 }
 
 } // namespace Http

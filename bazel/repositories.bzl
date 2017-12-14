@@ -363,6 +363,10 @@ def _com_google_absl():
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
+    native.bind(
+        name = "abseil_strings",
+        actual = "@com_google_absl//absl/strings:strings",
+    )
 
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")

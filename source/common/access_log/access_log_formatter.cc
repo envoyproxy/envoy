@@ -228,14 +228,22 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      const Optional<std::string>& upstream_local_address = request_info.upstreamLocalAddress();
-      return upstream_local_address.valid() ? upstream_local_address.value()
-                                            : UnspecifiedValueString;
+      return request_info.upstreamLocalAddress() != nullptr
+                 ? request_info.upstreamLocalAddress()->asString()
+                 : UnspecifiedValueString;
+    };
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return request_info.downstreamLocalAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_ADDRESS") {
+    // NOTE: It would be nice if this was called DOWNSTREAM_REMOTE_ADDRESS, but we cannot change it
+    //       for legacy reasons.
+    // TODO(mattklein123): Consider adding DOWNSTREAM_REMOTE_ADDRESS and deprecating
+    //                     DOWNSTREAM_ADDRESS. When we do that we could also have a variant both
+    //                     with and without port.
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      const std::string& downstream_address = request_info.getDownstreamAddress();
-      return downstream_address.empty() ? UnspecifiedValueString : downstream_address;
+      return RequestInfo::Utility::formatDownstreamAddress(*request_info.downstreamRemoteAddress());
     };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));

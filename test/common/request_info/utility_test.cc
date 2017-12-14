@@ -1,3 +1,4 @@
+#include "common/network/address_impl.h"
 #include "common/request_info/utility.h"
 
 #include "test/mocks/request_info/mocks.h"
@@ -50,6 +51,11 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
         .WillByDefault(Return(true));
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(request_info));
   }
+}
+
+TEST(UtilityTest, formatDownstreamAddress) {
+  EXPECT_EQ("1.2.3.4", Utility::formatDownstreamAddress(Network::Address::Ipv4Instance("1.2.3.4")));
+  EXPECT_EQ("/hello", Utility::formatDownstreamAddress(Network::Address::PipeInstance("/hello")));
 }
 
 } // namespace RequestInfo

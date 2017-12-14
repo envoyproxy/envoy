@@ -501,10 +501,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  ConnectionManagerUtility::mutateRequestHeaders(
+  request_info_.downstream_local_address_ =
+      connection_manager_.read_callbacks_->connection().localAddress();
+  request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_);
+  ASSERT(request_info_.downstream_remote_address_ != nullptr);
 
   ASSERT(!cached_route_.valid());
   cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
@@ -543,8 +546,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     traceRequest();
   }
 
-  // Set the trusted address for the connection by taking the last address in XFF.
-  request_info_.downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 
@@ -1305,10 +1306,6 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
 }
 
 uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() { return parent_.stream_id_; }
-
-const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddress() {
-  return parent_.request_info_.getDownstreamAddress();
-}
 
 } // namespace Http
 } // namespace Envoy
