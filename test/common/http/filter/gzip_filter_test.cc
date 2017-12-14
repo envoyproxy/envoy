@@ -1,3 +1,5 @@
+#include "common/compressor/zlib_compressor_impl.h"
+#include "common/config/filter_json.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/http/filter/gzip_filter.h"
 
@@ -16,7 +18,10 @@ public:
 
   void setUpTest(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new GzipFilterConfig(*config));
+    envoy::api::v2::filter::http::Gzip gzip;
+
+    Config::FilterJson::translateGzipFilter(*config, gzip);
+    config_.reset(new GzipFilterConfig(gzip));
     filter_.reset(new GzipFilter(config_));
   }
 
@@ -71,6 +76,23 @@ protected:
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
 };
+
+// Default config values.
+TEST_F(GzipFilterTest, DefaultConfigValues) {
+  setUpTest(R"EOF({})EOF");
+  EXPECT_EQ(8, config_->memoryLevel());
+  EXPECT_EQ(30, config_->minimumLength());
+  EXPECT_EQ(false, config_->disableOnEtag());
+  EXPECT_EQ(false, config_->disableOnLastModified());
+  EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+            config_->compressionStrategy());
+  EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+            config_->compressionLevel());
+  EXPECT_EQ(0, config_->cacheControlValues().size());
+  EXPECT_EQ(0, config_->contentTypeValues().size());
+}
+
+// Bad config testing ??
 
 // Acceptance Testing with minimum configuration.
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {

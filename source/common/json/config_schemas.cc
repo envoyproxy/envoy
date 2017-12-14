@@ -1105,7 +1105,8 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
       },
       "cache_control" : {
         "type" : "array",
-        "minItems" : 1,
+        "minItems" : 0,
+        "maxItems" : 10,
         "uniqueItems" : true,
         "items" : {
           "type": "string"
@@ -1113,8 +1114,8 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
       },
       "content_type" : {
         "type" : "array",
-        "minItems" : 1,
-        "uniqueItems" : true,
+        "minItems" : 0,
+        "maxItems" : 30,
         "items" : {
           "type": "string"
         }

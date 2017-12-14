@@ -35,8 +35,8 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
       isTransferEncodingAllowed(headers) && headers.ContentEncoding() == nullptr) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
-    compressor_.init(config_->getCompressionLevel(), config_->getCompressionStrategy(), 31,
-                     config_->getMemoryLevel());
+    compressor_.init(config_->compressionLevel(), config_->compressionStrategy(), 31,
+                     config_->memoryLevel());
   } else {
     skip_compression_ = true;
   }
@@ -76,8 +76,8 @@ bool GzipFilter::isAcceptEncodingGzip(const HeaderMap& headers) const {
 }
 
 bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
-  if (config_->getContentTypeValues().size() > 0 && headers.ContentType() != nullptr) {
-    for (const auto& value : config_->getContentTypeValues()) {
+  if (config_->contentTypeValues().size() > 0 && headers.ContentType() != nullptr) {
+    for (const auto& value : config_->contentTypeValues()) {
       if (headers.ContentType()->value().find(value.c_str())) {
         return true;
       }
@@ -88,8 +88,8 @@ bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
 }
 
 bool GzipFilter::isCacheControlAllowed(const HeaderMap& headers) const {
-  if (config_->getCacheControlValues().size() > 0 && headers.CacheControl() != nullptr) {
-    for (const auto& value : config_->getCacheControlValues()) {
+  if (config_->cacheControlValues().size() > 0 && headers.CacheControl() != nullptr) {
+    for (const auto& value : config_->cacheControlValues()) {
       if (headers.CacheControl()->value().find(value.c_str())) {
         return true;
       }
@@ -103,17 +103,17 @@ bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {
   uint64_t content_length;
   if (headers.ContentLength() != nullptr &&
       StringUtil::atoul(headers.ContentLength()->value().c_str(), content_length)) {
-    return content_length >= config_->getMinimumLength();
+    return content_length >= config_->minimumLength();
   }
   return false;
 }
 
 bool GzipFilter::isEtagAllowed(const HeaderMap& headers) const {
-  return config_->isDisableOnEtag() ? headers.Etag() == nullptr : true;
+  return config_->disableOnEtag() ? headers.Etag() == nullptr : true;
 }
 
 bool GzipFilter::isLastModifiedAllowed(const HeaderMap& headers) const {
-  return config_->isDisableOnLastModified() ? headers.LastModified() == nullptr : true;
+  return config_->disableOnLastModified() ? headers.LastModified() == nullptr : true;
 }
 
 bool GzipFilter::isTransferEncodingAllowed(const HeaderMap& headers) const {

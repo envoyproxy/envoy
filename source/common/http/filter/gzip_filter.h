@@ -23,32 +23,42 @@ using Compressor::ZlibCompressorImpl;
 class GzipFilterConfig {
 public:
   GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
-      : compression_level_(getCompressionLevel_(gzip.compression_level())),
-        compression_strategy_(getCompressionStrategy_(gzip.compression_strategy())),
-        content_length_(30), memory_level_(1),
-        content_type_values_(), cache_control_values_(),
-        etag_(false), last_modified_(false) {}
+      : compression_level_(compressionLevelEnum(gzip.compression_level())),
+        compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
+        content_length_(static_cast<uint64_t>(gzip.content_length().value())),
+        memory_level_(static_cast<uint64_t>(gzip.memory_level().value())),
+        etag_(gzip.disable_on_etag().value()),
+        last_modified_(gzip.disable_on_last_modified().value()) {
+    for (const auto& value : gzip.cache_control()) {
+      cache_control_values_.insert(value);
+    }
+    for (const auto& value : gzip.content_type()) {
+      content_type_values_.insert(value);
+    }
+  }
 
-  ZlibCompressorImpl::CompressionLevel getCompressionLevel() const { return compression_level_; }
+  ZlibCompressorImpl::CompressionLevel compressionLevel() const { return compression_level_; }
 
-  ZlibCompressorImpl::CompressionStrategy getCompressionStrategy() const {
+  ZlibCompressorImpl::CompressionStrategy compressionStrategy() const {
     return compression_strategy_;
   }
 
-  const std::vector<std::string>& getCacheControlValues() const { return cache_control_values_; }
+  const std::unordered_set<std::string>& cacheControlValues() const {
+    return cache_control_values_;
+  }
 
-  const std::vector<std::string>& getContentTypeValues() const { return content_type_values_; }
+  const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
 
-  uint32_t getMinimumLength() const { return content_length_; }
+  uint64_t minimumLength() const { return content_length_ > 29 ? content_length_ : 30; }
 
-  uint32_t getMemoryLevel() const { return memory_level_; }
+  uint64_t memoryLevel() const { return memory_level_ > 0 ? memory_level_ : 8; }
 
-  bool isDisableOnEtag() const { return etag_; }
+  bool disableOnEtag() const { return etag_; }
 
-  bool isDisableOnLastModified() const { return last_modified_; }
+  bool disableOnLastModified() const { return last_modified_; }
 
 private:
-  static ZlibCompressorImpl::CompressionLevel getCompressionLevel_(const auto& compression_level) {
+  static ZlibCompressorImpl::CompressionLevel compressionLevelEnum(const auto& compression_level) {
     if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST) {
       return ZlibCompressorImpl::CompressionLevel::Best;
     }
@@ -59,7 +69,7 @@ private:
   }
 
   static ZlibCompressorImpl::CompressionStrategy
-  getCompressionStrategy_(const auto& compression_strategy) {
+  compressionStrategyEnum(const auto& compression_strategy) {
     if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE) {
       return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
     }
@@ -76,8 +86,8 @@ private:
   ZlibCompressorImpl::CompressionStrategy compression_strategy_;
   int32_t content_length_;
   int32_t memory_level_;
-  std::vector<std::string> content_type_values_;
-  std::vector<std::string> cache_control_values_;
+  std::unordered_set<std::string> content_type_values_;
+  std::unordered_set<std::string> cache_control_values_;
   bool etag_;
   bool last_modified_;
 };
