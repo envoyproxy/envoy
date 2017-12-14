@@ -138,6 +138,7 @@ public:
   Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
+  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
                                     const std::vector<std::string>& port_names);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,

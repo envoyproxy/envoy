@@ -249,7 +249,6 @@ void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
 }
 
 uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
-  ASSERT(initialized_);
   auto it = port_map_.find(key);
   if (it != port_map_.end()) {
     return it->second;
@@ -293,6 +292,13 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                    {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
                                    port_map_, version_),
                                port_names);
+}
+
+void BaseIntegrationTest::createTestServer(const std::string& json_path,
+                                           const std::vector<std::string>& port_names) {
+  test_server_ = IntegrationTestServer::create(
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
+  registerTestServerPorts(port_names);
 }
 
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(const char* raw_http,
