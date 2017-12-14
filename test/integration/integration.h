@@ -117,6 +117,7 @@ public:
   void SetUp();
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
+  // // TODO(alyssawilk) port the rest of the tests to v2 and make initialized_ private.
   virtual void initialize();
   // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
