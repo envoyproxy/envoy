@@ -68,8 +68,9 @@ public:
 
     ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
     ON_CALL(*cm_.conn_pool_.host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
-    ON_CALL(router_.downstream_connection_, localAddress()).WillByDefault(Return(host_address_));
-    ON_CALL(router_.downstream_connection_, remoteAddress()).WillByDefault(Return(remote_address_));
+    ON_CALL(router_.downstream_connection_, localAddress()).WillByDefault(ReturnRef(host_address_));
+    ON_CALL(router_.downstream_connection_, remoteAddress())
+        .WillByDefault(ReturnRef(remote_address_));
   }
 
   void expectResponseTimerCreate() {

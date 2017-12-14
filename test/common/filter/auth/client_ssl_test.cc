@@ -25,6 +25,7 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::WithArg;
 using testing::_;
 
@@ -156,7 +157,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   createAuthFilter();
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(&ssl_));
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(Return(std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1")));
+      .WillOnce(ReturnRefOfCopy(std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1")));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(Return("digest"));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
@@ -175,7 +176,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(Return(std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1")));
+      .WillOnce(ReturnRefOfCopy(std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1")));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest())
       .WillOnce(Return("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
@@ -188,7 +189,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // White list case.
   createAuthFilter();
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(Return(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4")));
+      .WillOnce(ReturnRefOfCopy(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4")));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -199,7 +200,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // IPv6 White list case.
   createAuthFilter();
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(Return(std::make_shared<Network::Address::Ipv6Instance>("2001:abcd::1")));
+      .WillOnce(ReturnRefOfCopy(std::make_shared<Network::Address::Ipv6Instance>("2001:abcd::1")));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
