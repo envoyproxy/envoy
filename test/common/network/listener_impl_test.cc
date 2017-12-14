@@ -126,7 +126,7 @@ TEST_P(ListenerImplTest, NormalRedirect) {
   EXPECT_CALL(listenerDst, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(*alt_address_, conn->localAddress());
+        EXPECT_EQ(*alt_address_, *conn->localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -167,8 +167,8 @@ TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   EXPECT_CALL(listenerDst, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(*alt_address_, conn->localAddress());
-        EXPECT_FALSE(*socketDst.localAddress() == conn->localAddress());
+        EXPECT_EQ(*alt_address_, *conn->localAddress());
+        EXPECT_FALSE(*socketDst.localAddress() == *conn->localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -205,7 +205,7 @@ TEST_P(ListenerImplTest, WildcardListenerWithOriginalDst) {
   EXPECT_CALL(listener, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(conn->localAddress(), *alt_address_);
+        EXPECT_EQ(*conn->localAddress(), *alt_address_);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -242,7 +242,7 @@ TEST_P(ListenerImplTest, WildcardListenerNoOriginalDst) {
   EXPECT_CALL(listener, newConnection(_, _, _, _));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(conn->localAddress(), *local_dst_address);
+        EXPECT_EQ(*conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -282,7 +282,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
   EXPECT_CALL(listenerDst, newConnection(_, _, _, _)).Times(0);
   EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(conn->localAddress(), *socket.localAddress());
+        EXPECT_EQ(*conn->localAddress(), *socket.localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -318,7 +318,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   EXPECT_CALL(listener, newConnection(_, _, _, _)).Times(1);
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(conn->localAddress(), *local_dst_address);
+        EXPECT_EQ(*conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
