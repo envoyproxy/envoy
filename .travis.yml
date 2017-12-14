@@ -6,6 +6,9 @@ group: deprecated-2017Q4
 services:
   - docker
 before_install:
+  - ip addr show
+  - ls /proc/net
+  - cat /proc/net/if_inet6
   - sudo apt-get -qq update
   - sudo apt-get install -y awscli
   - gem install travis --no-rdoc --no-ri
