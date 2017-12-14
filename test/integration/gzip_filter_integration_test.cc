@@ -22,8 +22,10 @@ public:
 
   void doRequestAndCompression(Http::TestHeaderMapImpl&& request_headers,
                                Http::TestHeaderMapImpl&& response_headers) {
-    const Buffer::OwnedImpl expected_response{std::string(1024, 'a')};
-    sendRequestAndWaitForResponse(request_headers, 0, response_headers, expected_response.length());
+    uint64_t content_length;
+    ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
+    const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
+    sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response_->complete());
@@ -38,18 +40,22 @@ public:
     Buffer::OwnedImpl decompressed_response{};
     const Buffer::OwnedImpl compressed_response{response_->body()};
     decompressor_.decompress(compressed_response, decompressed_response);
+    ASSERT_EQ(content_length, decompressed_response.length());
     EXPECT_TRUE(TestUtility::buffersEqual(expected_response, decompressed_response));
   }
 
   void doRequestAndNoCompression(Http::TestHeaderMapImpl&& request_headers,
                                  Http::TestHeaderMapImpl&& response_headers) {
-    sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
+    uint64_t content_length;
+    ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
+    sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response_->complete());
     EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
     ASSERT_TRUE(response_->headers().ContentEncoding() == nullptr);
-    EXPECT_EQ(1024U, response_->body().size());
+    ASSERT_EQ(content_length, response_->body().size());
+    EXPECT_EQ(response_->body(), std::string(content_length, 'a'));
   }
 
   Decompressor::ZlibDecompressorImpl decompressor_{};
@@ -65,7 +71,6 @@ TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
   initializeFilter(R"EOF(
       name: envoy.gzip
       config:
-        deprecated_v1: true
     )EOF");
 
   doRequestAndCompression(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -74,7 +79,7 @@ TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
                                                   {":authority", "host"},
                                                   {"accept-encoding", "deflate, gzip"}},
                           Http::TestHeaderMapImpl{{":status", "200"},
-                                                  {"content-length", "1024"},
+                                                  {"content-length", "4400"},
                                                   {"content-type", "text/xml"}});
 }
 
@@ -85,7 +90,6 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
   initializeFilter(R"EOF(
       name: envoy.gzip
       config:
-        deprecated_v1: true
     )EOF");
 
   doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -94,7 +98,7 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
                                                     {":authority", "host"},
                                                     {"accept-encoding", "deflate, br"}},
                             Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "1024"},
+                                                    {"content-length", "4400"},
                                                     {"content-type", "text/plain"}});
 }
 
@@ -105,7 +109,6 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
   initializeFilter(R"EOF(
       name: envoy.gzip
       config:
-        deprecated_v1: true
     )EOF");
 
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -116,17 +119,17 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"},
                                            {"content-encoding", "br"},
-                                           {"content-length", "1024"},
+                                           {"content-length", "4400"},
                                            {"content-type", "application/json"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
+  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 4400);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   ASSERT_STREQ("br", response_->headers().ContentEncoding()->value().c_str());
-  EXPECT_EQ(1024U, response_->body().size());
+  EXPECT_EQ(4400U, response_->body().size());
 }
 
 /**
@@ -136,7 +139,6 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
   initializeFilter(R"EOF(
       name: envoy.gzip
       config:
-        deprecated_v1: true
     )EOF");
 
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -156,6 +158,27 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   ASSERT_TRUE(response_->headers().ContentEncoding() == nullptr);
   EXPECT_EQ(10U, response_->body().size());
+}
+
+/**
+ * Exercises filter when upstream responds with not supportted content type
+ */
+TEST_P(GzipIntegrationTest, NotSupportedContentType) {
+  initializeFilter(R"EOF(
+    name: envoy.gzip
+    config:
+      content_type:
+        - application/json
+    )EOF");
+
+  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                    {":path", "/test/long/url"},
+                                                    {":scheme", "http"},
+                                                    {":authority", "host"},
+                                                    {"accept-encoding", "deflate, gzip"}},
+                            Http::TestHeaderMapImpl{{":status", "200"},
+                                                    {"content-length", "1024"},
+                                                    {"content-type", "application/xml"}});
 }
 
 } // namespace Envoy
