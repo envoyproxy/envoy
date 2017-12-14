@@ -38,6 +38,8 @@ protected:
   const PrioritySet& priority_set_;
   // The lowest priority host set from priority_set_ with healthy hosts, or the
   // zero-priority host set if all host sets are fully unhealthy.
+  // This is updated as the hosts and healthy hosts in priority_set_ are updated
+  // but will never be null.
   const HostSet* best_available_host_set_;
 };
 
