@@ -15,7 +15,11 @@
 namespace Envoy {
 namespace Http {
 
-using Compressor::ZlibCompressorImpl;
+using ZlibCompressionLevelEnum = Compressor::ZlibCompressorImpl::CompressionLevel;
+using ZlibCompressionStrategyEnum = Compressor::ZlibCompressorImpl::CompressionStrategy;
+
+using GzipV2CompressionLevelEnum = envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum;
+using GzipV2CompressionStrategyEnum = envoy::api::v2::filter::http::Gzip_CompressionStrategy;
 
 /**
  * Configuration for the gzip filter.
@@ -24,26 +28,25 @@ class GzipFilterConfig {
 public:
   GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip);
 
-  ZlibCompressorImpl::CompressionLevel compressionLevel() const { return compression_level_; }
-  ZlibCompressorImpl::CompressionStrategy compressionStrategy() const {
-    return compression_strategy_;
-  }
+  ZlibCompressionLevelEnum compressionLevel() const { return compression_level_; }
+  ZlibCompressionStrategyEnum compressionStrategy() const { return compression_strategy_; }
+  const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
   const std::unordered_set<std::string>& cacheControlValues() const {
     return cache_control_values_;
   }
-  const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
   uint64_t minimumLength() const { return content_length_ > 29 ? content_length_ : 30; }
   uint64_t memoryLevel() const { return memory_level_ > 0 ? memory_level_ : 8; }
   bool disableOnEtag() const { return etag_; }
   bool disableOnLastModified() const { return last_modified_; }
 
 private:
-  static ZlibCompressorImpl::CompressionLevel compressionLevelEnum(const auto& compression_level);
-  static ZlibCompressorImpl::CompressionStrategy
-  compressionStrategyEnum(const auto& compression_strategy);
+  static ZlibCompressionLevelEnum
+  compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level);
+  static ZlibCompressionStrategyEnum
+  compressionStrategyEnum(const GzipV2CompressionStrategyEnum& compression_strategy);
 
-  ZlibCompressorImpl::CompressionLevel compression_level_;
-  ZlibCompressorImpl::CompressionStrategy compression_strategy_;
+  ZlibCompressionLevelEnum compression_level_;
+  ZlibCompressionStrategyEnum compression_strategy_;
   int32_t content_length_;
   int32_t memory_level_;
   std::unordered_set<std::string> content_type_values_;

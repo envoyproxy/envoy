@@ -7,8 +7,6 @@
 namespace Envoy {
 namespace Http {
 
-const uint64_t GzipFilter::WINDOW_BITS = 15 | 16;
-
 static const std::regex& acceptEncodingRegex() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "(?!.*gzip;\\s*q=0(,|$))(?=(.*gzip)|(^\\*$))",
                          std::regex::optimize);
@@ -31,30 +29,32 @@ GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzi
   }
 }
 
-ZlibCompressorImpl::CompressionLevel
-GzipFilterConfig::compressionLevelEnum(const auto& compression_level) {
-  if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST) {
-    return ZlibCompressorImpl::CompressionLevel::Best;
+ZlibCompressionLevelEnum
+GzipFilterConfig::compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level) {
+  if (compression_level == GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_BEST) {
+    return ZlibCompressionLevelEnum::Best;
   }
-  if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED) {
-    return ZlibCompressorImpl::CompressionLevel::Speed;
+  if (compression_level == GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_SPEED) {
+    return ZlibCompressionLevelEnum::Speed;
   }
-  return ZlibCompressorImpl::CompressionLevel::Standard;
+  return ZlibCompressionLevelEnum::Standard;
 }
 
-ZlibCompressorImpl::CompressionStrategy
-GzipFilterConfig::compressionStrategyEnum(const auto& compression_strategy) {
-  if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE) {
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
+ZlibCompressionStrategyEnum GzipFilterConfig::compressionStrategyEnum(
+    const GzipV2CompressionStrategyEnum& compression_strategy) {
+  if (compression_strategy == GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_RLE) {
+    return ZlibCompressionStrategyEnum::Rle;
   }
-  if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED) {
-    return ZlibCompressorImpl::CompressionStrategy::Filtered;
+  if (compression_strategy == GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_FILTERED) {
+    return ZlibCompressionStrategyEnum::Filtered;
   }
-  if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN) {
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+  if (compression_strategy == GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_HUFFMAN) {
+    return ZlibCompressionStrategyEnum::Huffman;
   }
-  return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
+  return ZlibCompressionStrategyEnum::Standard;
 }
+
+const uint64_t GzipFilter::WINDOW_BITS = 15 | 16;
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
