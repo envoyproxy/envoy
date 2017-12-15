@@ -13,7 +13,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 MockRequestInfo::MockRequestInfo()
-    : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
+    : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_));
   ON_CALL(*this, startTime()).WillByDefault(Return(start_time_));

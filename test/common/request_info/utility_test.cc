@@ -53,9 +53,11 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   }
 }
 
-TEST(UtilityTest, formatDownstreamAddress) {
-  EXPECT_EQ("1.2.3.4", Utility::formatDownstreamAddress(Network::Address::Ipv4Instance("1.2.3.4")));
-  EXPECT_EQ("/hello", Utility::formatDownstreamAddress(Network::Address::PipeInstance("/hello")));
+TEST(UtilityTest, formatDownstreamAddressNoPort) {
+  EXPECT_EQ("1.2.3.4",
+            Utility::formatDownstreamAddressNoPort(Network::Address::Ipv4Instance("1.2.3.4")));
+  EXPECT_EQ("/hello",
+            Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
 }
 
 } // namespace RequestInfo

@@ -41,6 +41,14 @@ TEST(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
   EXPECT_EQ("127.0.0.1", formatted_string);
 }
 
+TEST(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  const std::string variable = "DOWNSTREAM_REMOTE_ADDRESS";
+  RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
+  const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
+  EXPECT_EQ("127.0.0.1", formatted_string);
+}
+
 TEST(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;

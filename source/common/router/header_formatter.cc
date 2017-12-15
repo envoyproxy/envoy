@@ -119,9 +119,11 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_
     field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol());
     };
-  } else if (field_name == "CLIENT_IP") {
+  } else if (field_name == "CLIENT_IP" || field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    // DEPRECATED: "CLIENT_IP" will be removed post 1.6.0.
     field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
-      return RequestInfo::Utility::formatDownstreamAddress(*request_info.downstreamRemoteAddress());
+      return RequestInfo::Utility::formatDownstreamAddressNoPort(
+          *request_info.downstreamRemoteAddress());
     };
   } else if (StringUtil::startsWith(field_name.c_str(), "UPSTREAM_METADATA")) {
     field_extractor_ =

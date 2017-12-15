@@ -83,9 +83,8 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
   return result.empty() ? NONE : result;
 }
 
-const std::string& Utility::formatDownstreamAddress(const Network::Address::Instance& address) {
-  // For legacy reasons we exclude port from printing downstream addresses. In the future we can
-  // consider adding formatting variants that include this if people desire it.
+const std::string&
+Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {
     return address.ip()->addressAsString();
   } else {

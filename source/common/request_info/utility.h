@@ -43,7 +43,8 @@ public:
    * @param address supplies the downstream address.
    * @return a properly formatted address for logs, header expansion, etc.
    */
-  static const std::string& formatDownstreamAddress(const Network::Address::Instance& address);
+  static const std::string&
+  formatDownstreamAddressNoPort(const Network::Address::Instance& address);
 };
 
 } // namespace RequestInfo
