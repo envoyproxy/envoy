@@ -126,7 +126,7 @@ public:
    * @return requestInfo for logging purposes. Individual filter may add specific information to be
    * put into the access log.
    */
-  virtual AccessLog::RequestInfo& requestInfo() PURE;
+  virtual RequestInfo::RequestInfo& requestInfo() PURE;
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify

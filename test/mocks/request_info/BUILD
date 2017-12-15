@@ -9,12 +9,12 @@ load(
 envoy_package()
 
 envoy_cc_mock(
-    name = "access_log_mocks",
+    name = "request_info_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/access_log:access_log_interface",
         "//include/envoy/request_info:request_info_interface",
-        "//test/mocks/filesystem:filesystem_mocks",
+        "//include/envoy/upstream:upstream_interface",
+        "//test/mocks/upstream:host_mocks",
     ],
 )

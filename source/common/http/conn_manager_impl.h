@@ -23,12 +23,12 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/request_info_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/http/date_provider.h"
 #include "common/http/user_agent.h"
 #include "common/http/websocket/ws_handler_impl.h"
+#include "common/request_info/request_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -355,7 +355,7 @@ private:
     Router::RouteConstSharedPtr route() override;
     void clearRouteCache() override;
     uint64_t streamId() override;
-    AccessLog::RequestInfo& requestInfo() override;
+    RequestInfo::RequestInfo& requestInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
     const std::string& downstreamAddress() override;
@@ -587,7 +587,7 @@ private:
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
     State state_;
-    AccessLog::RequestInfoImpl request_info_;
+    RequestInfo::RequestInfoImpl request_info_;
     Optional<Router::RouteConstSharedPtr> cached_route_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
