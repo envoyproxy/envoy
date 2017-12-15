@@ -309,7 +309,7 @@ public:
    * @param request_info holds additional information about the request.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const AccessLog::RequestInfo& request_info) const PURE;
+                                      const RequestInfo::RequestInfo& request_info) const PURE;
 
   /**
    * Do potentially destructive header transforms on response headers prior to forwarding. For
@@ -319,7 +319,7 @@ public:
    * @param request_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                       const AccessLog::RequestInfo& request_info) const PURE;
+                                       const RequestInfo::RequestInfo& request_info) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

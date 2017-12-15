@@ -51,7 +51,7 @@ parseAccessLogFromJson(const std::string& json_string) {
   return access_log;
 }
 
-class TestRequestInfo : public RequestInfo {
+class TestRequestInfo : public RequestInfo::RequestInfo {
 public:
   TestRequestInfo() {
     tm fake_time;
@@ -78,10 +78,12 @@ public:
   std::chrono::microseconds duration() const override {
     return std::chrono::microseconds(duration_);
   }
-  bool getResponseFlag(ResponseFlag response_flag) const override {
+  bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
-  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
+  void setResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) override {
+    response_flags_ |= response_flag;
+  }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -136,7 +138,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_));
-  request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
+  request_info_.response_flags_ = RequestInfo::ResponseFlag::UpstreamConnectionFailure;
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addCopy(Http::Headers::get().Host, "host");

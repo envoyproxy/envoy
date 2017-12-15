@@ -382,7 +382,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
@@ -448,7 +448,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
@@ -509,7 +509,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
@@ -575,7 +575,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
         return span;
@@ -641,7 +641,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
         return span;
@@ -707,7 +707,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _))
       .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const AccessLog::RequestInfo& request_info) {
+          [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
             EXPECT_TRUE(request_info.responseCode().valid());
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
           }));

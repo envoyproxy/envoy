@@ -146,7 +146,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
-        "//source/common/access_log:request_info_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -161,6 +160,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/request_info:request_info_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )

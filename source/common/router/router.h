@@ -16,12 +16,12 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/access_log/access_log_impl.h"
-#include "common/access_log/request_info_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
 #include "common/http/utility.h"
+#include "common/request_info/request_info_impl.h"
 
 #include "api/filter/http/router.pb.h"
 
@@ -266,7 +266,7 @@ private:
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
-    AccessLog::RequestInfoImpl request_info_;
+    RequestInfo::RequestInfoImpl request_info_;
     Http::HeaderMap* upstream_headers_{};
 
     bool calling_encode_headers_ : 1;
@@ -279,7 +279,7 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  AccessLog::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
+  RequestInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,

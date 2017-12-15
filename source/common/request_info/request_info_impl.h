@@ -3,10 +3,10 @@
 #include <chrono>
 #include <cstdint>
 
-#include "envoy/access_log/access_log.h"
+#include "envoy/request_info/request_info.h"
 
 namespace Envoy {
-namespace AccessLog {
+namespace RequestInfo {
 
 struct RequestInfoImpl : public RequestInfo {
   RequestInfoImpl()
@@ -15,7 +15,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   RequestInfoImpl(Http::Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
 
-  // AccessLog::RequestInfo
+  // RequestInfo::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
   const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
@@ -48,9 +48,7 @@ struct RequestInfoImpl : public RequestInfo {
                                                                  start_time_monotonic_);
   }
 
-  void setResponseFlag(AccessLog::ResponseFlag response_flag) override {
-    response_flags_ |= response_flag;
-  }
+  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
   bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
@@ -85,5 +83,5 @@ struct RequestInfoImpl : public RequestInfo {
   std::string downstream_address_;
 };
 
-} // namespace AccessLog
+} // namespace RequestInfo
 } // namespace Envoy
