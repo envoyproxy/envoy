@@ -123,11 +123,6 @@ TEST_F(DispatcherImplTest, Timer) {
     std::lock_guard<std::mutex> lock(mu_);
     reached_value = work_id_ == 1;
   }
-
-  {
-    std::lock_guard<std::mutex> lock(mu_);
-    EXPECT_TRUE(timer);
-  }
 }
 
 } // namespace Event
