@@ -54,7 +54,7 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const AccessLog::RequestInfo& request_info) const {
+                                   const RequestInfo::RequestInfo& request_info) const {
   for (const auto& formatter : headers_to_add_) {
     const std::string value = formatter.second->format(request_info);
     if (!value.empty()) {

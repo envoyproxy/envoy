@@ -321,8 +321,8 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                const AccessLog::RequestInfo& request_info) const {
+void RouteEntryImplBase::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
   request_headers_parser_->evaluateHeaders(headers, request_info);
@@ -334,8 +334,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   headers.Host()->value(host_rewrite_);
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
-                                                 const AccessLog::RequestInfo& request_info) const {
+void RouteEntryImplBase::finalizeResponseHeaders(
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   response_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.responseHeaderParser().evaluateHeaders(headers, request_info);
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
@@ -510,7 +510,7 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
 
 void PrefixRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info) const {
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, prefix_);
@@ -529,8 +529,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                const AccessLog::RequestInfo& request_info) const {
+void PathRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   finalizePathHeader(headers, path_);
@@ -570,8 +570,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, loader),
       regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
 
-void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                 const AccessLog::RequestInfo& request_info) const {
+void RegexRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
   const Http::HeaderString& path = headers.Path()->value();

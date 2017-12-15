@@ -158,7 +158,7 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
 }
 
 TEST(HttpTracerUtilityTest, IsTracing) {
-  NiceMock<AccessLog::MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
   NiceMock<Stats::MockStore> stats;
   Runtime::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
@@ -244,7 +244,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
                                           {"x-envoy-original-path", path},
                                           {":method", "GET"},
                                           {"x-forwarded-proto", "http"}};
-  NiceMock<AccessLog::MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
 
   Optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
@@ -264,7 +264,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
 
 TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
-  NiceMock<AccessLog::MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
 
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
@@ -285,7 +285,7 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
 
 TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
-  NiceMock<AccessLog::MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
   request_info.host_->cluster_.name_ = "my_upstream_cluster";
 
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
@@ -312,7 +312,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
                                           {":path", "/test"},
                                           {":method", "GET"},
                                           {"x-forwarded-proto", "https"}};
-  NiceMock<AccessLog::MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
 
   Optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
@@ -349,7 +349,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
                                           {":path", "/test"},
                                           {":method", "GET"},
                                           {"x-forwarded-proto", "http"}};
-  NiceMock<AccessLog::MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
 
   request_headers.insertHost().value(std::string("api"));
   request_headers.insertUserAgent().value(std::string("agent"));
@@ -386,7 +386,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   Optional<uint32_t> response_code(503);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
-  ON_CALL(request_info, getResponseFlag(AccessLog::ResponseFlag::UpstreamRequestTimeout))
+  ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
@@ -407,7 +407,7 @@ TEST(HttpTracerUtilityTest, operationTypeToString) {
 TEST(HttpNullTracerTest, BasicFunctionality) {
   HttpNullTracer null_tracer;
   MockConfig config;
-  AccessLog::MockRequestInfo request_info;
+  RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_headers;
 
   SpanPtr span_ptr = null_tracer.startSpan(config, request_headers, request_info);
@@ -428,7 +428,7 @@ public:
 
   Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
-  AccessLog::MockRequestInfo request_info_;
+  RequestInfo::MockRequestInfo request_info_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   MockConfig config_;
   MockDriver* driver_;

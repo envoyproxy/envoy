@@ -31,10 +31,10 @@ std::string formatUpstreamMetadataParseException(const std::string& params,
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
-// specified metadata from an AccessLog::RequestInfo. Expects a string formatted as:
+// specified metadata from an RequestInfo::RequestInfo. Expects a string formatted as:
 //   (["a", "b", "c"])
 // There must be at least 2 array elements (a metadata namespace and at least 1 key).
-std::function<std::string(const Envoy::AccessLog::RequestInfo&)>
+std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
 parseUpstreamMetadataField(const std::string& params_str) {
   if (params_str.empty() || params_str.front() != '(' || params_str.back() != ')') {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
@@ -57,7 +57,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
   }
 
-  return [params](const Envoy::AccessLog::RequestInfo& request_info) -> std::string {
+  return [params](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
     Upstream::HostDescriptionConstSharedPtr host = request_info.upstreamHost();
     if (!host) {
       return std::string();
@@ -115,11 +115,11 @@ parseUpstreamMetadataField(const std::string& params_str) {
 RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_name, bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const Envoy::AccessLog::RequestInfo& request_info) {
+    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol());
     };
   } else if (field_name == "CLIENT_IP") {
-    field_extractor_ = [](const Envoy::AccessLog::RequestInfo& request_info) {
+    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
       return request_info.getDownstreamAddress();
     };
   } else if (StringUtil::startsWith(field_name.c_str(), "UPSTREAM_METADATA")) {
@@ -131,7 +131,7 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_
 }
 
 const std::string
-RequestInfoHeaderFormatter::format(const Envoy::AccessLog::RequestInfo& request_info) const {
+RequestInfoHeaderFormatter::format(const Envoy::RequestInfo::RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }
 
