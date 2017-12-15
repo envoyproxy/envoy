@@ -18,69 +18,29 @@ namespace Http {
 using Compressor::ZlibCompressorImpl;
 
 /**
- * Configuration for the gzip fiter.
+ * Configuration for the gzip filter.
  */
 class GzipFilterConfig {
 public:
-  GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
-      : compression_level_(compressionLevelEnum(gzip.compression_level())),
-        compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
-        content_length_(static_cast<uint64_t>(gzip.content_length().value())),
-        memory_level_(static_cast<uint64_t>(gzip.memory_level().value())),
-        etag_(gzip.disable_on_etag().value()),
-        last_modified_(gzip.disable_on_last_modified().value()) {
-    for (const auto& value : gzip.cache_control()) {
-      cache_control_values_.insert(value);
-    }
-    for (const auto& value : gzip.content_type()) {
-      content_type_values_.insert(value);
-    }
-  }
+  GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip);
 
   ZlibCompressorImpl::CompressionLevel compressionLevel() const { return compression_level_; }
-
   ZlibCompressorImpl::CompressionStrategy compressionStrategy() const {
     return compression_strategy_;
   }
-
   const std::unordered_set<std::string>& cacheControlValues() const {
     return cache_control_values_;
   }
-
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
-
   uint64_t minimumLength() const { return content_length_ > 29 ? content_length_ : 30; }
-
   uint64_t memoryLevel() const { return memory_level_ > 0 ? memory_level_ : 8; }
-
   bool disableOnEtag() const { return etag_; }
-
   bool disableOnLastModified() const { return last_modified_; }
 
 private:
-  static ZlibCompressorImpl::CompressionLevel compressionLevelEnum(const auto& compression_level) {
-    if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST) {
-      return ZlibCompressorImpl::CompressionLevel::Best;
-    }
-    if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED) {
-      return ZlibCompressorImpl::CompressionLevel::Speed;
-    }
-    return ZlibCompressorImpl::CompressionLevel::Standard;
-  }
-
+  static ZlibCompressorImpl::CompressionLevel compressionLevelEnum(const auto& compression_level);
   static ZlibCompressorImpl::CompressionStrategy
-  compressionStrategyEnum(const auto& compression_strategy) {
-    if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE) {
-      return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
-    }
-    if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED) {
-      return ZlibCompressorImpl::CompressionStrategy::Filtered;
-    }
-    if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN) {
-      return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
-    }
-    return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
-  }
+  compressionStrategyEnum(const auto& compression_strategy);
 
   ZlibCompressorImpl::CompressionLevel compression_level_;
   ZlibCompressorImpl::CompressionStrategy compression_strategy_;
@@ -145,6 +105,8 @@ private:
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+
+  const static uint64_t WINDOW_BITS;
 };
 
 } // namespace Http

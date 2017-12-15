@@ -16,7 +16,7 @@ public:
 
   void SetUp() override { decompressor_.init(31); }
 
-  void setUpTest(const std::string json) {
+  void setUpTest(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::api::v2::filter::http::Gzip gzip;
 
@@ -68,6 +68,12 @@ public:
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
   }
 
+  void gzipFilterBadConfigHelper(std::string&& json) {
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
+    envoy::api::v2::filter::http::Gzip gzip;
+    EXPECT_THROW(Config::FilterJson::translateGzipFilter(*config, gzip), EnvoyException);
+  }
+
 protected:
   GzipFilterConfigSharedPtr config_;
   std::unique_ptr<GzipFilter> filter_;
@@ -92,9 +98,82 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(0, config_->contentTypeValues().size());
 }
 
-// Bad config testing ??
+// Bad configuration - memory_level is out of range.
+TEST_F(GzipFilterTest, BadConfigMemoryLevelOutOfRange) {
+  gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 10 })EOF");
+}
 
-// Acceptance Testing with minimum configuration.
+// Bad configuration - memory_level is zero.
+TEST_F(GzipFilterTest, BadConfigMemoryLevelZero) {
+  gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 0 })EOF");
+}
+
+// Bad configuration - content_length is zero.
+TEST_F(GzipFilterTest, BadConfigContentLengthZero) {
+  gzipFilterBadConfigHelper(R"EOF({ "content_length" : 0 })EOF");
+}
+
+// Bad configuration - compression_level has invalid value.
+TEST_F(GzipFilterTest, BadConfigCompressionLevelInvalid) {
+  gzipFilterBadConfigHelper(R"EOF({ "compression_level" : "banana" })EOF");
+}
+
+// Bad configuration - compression_strategy is invalid.
+TEST_F(GzipFilterTest, BadConfigCompressionStrategyInvalid) {
+  gzipFilterBadConfigHelper(R"EOF({ "compression_strategy" : "banana" })EOF");
+}
+
+// Bad configuration - cache_control is not unique.
+TEST_F(GzipFilterTest, BadConfigCacheControlNotUnique) {
+  gzipFilterBadConfigHelper(R"EOF({ "cache_control" : ["val1", "val1"] })EOF");
+}
+
+// Bad configuration - disable_on_etag has invalid value.
+TEST_F(GzipFilterTest, BadConfigDisableOnEtagInvalid) {
+  gzipFilterBadConfigHelper(R"EOF({ "disable_on_etag" : "banana" })EOF");
+}
+
+// Bad configuration - disable_on_last_modified has invalid value.
+TEST_F(GzipFilterTest, BadConfigDisableLastModifiedInvalid) {
+  gzipFilterBadConfigHelper(R"EOF({ "disable_on_last_modified" : "banana" })EOF");
+}
+
+// Bad configuration - config has invalid key/val.
+TEST_F(GzipFilterTest, BadConfigInvalidKey) {
+  gzipFilterBadConfigHelper(R"EOF({ "banana" : "banana" })EOF");
+}
+
+// Bad configuration - cache_control exceeded 10 items.
+TEST_F(GzipFilterTest, BadConfigCacheControlExceededLimit) {
+  gzipFilterBadConfigHelper(R"EOF(
+    {
+      "cache_control" : [
+        "val1", "val2", "val3", "val4", "val5",
+        "val6", "val7", "val8", "val9", "val10",
+        "val11"
+      ]
+    }
+  )EOF");
+}
+
+// Bad configuration - content_type exceeded 30 items.
+TEST_F(GzipFilterTest, BadConfigContentTypeExceededLimit) {
+  gzipFilterBadConfigHelper(R"EOF(
+    {
+      "content_type" : [
+        "val1", "val2", "val3", "val4", "val5",
+        "val6", "val7", "val8", "val9", "val10",
+        "val11", "val12", "val13", "val14", "val15",
+        "val16", "val17", "val18", "val19", "val20",
+        "val21", "val22", "val23", "val24", "val25",
+        "val26", "val27", "val28", "val29", "val30",
+        "val31"
+      ]
+    }
+  )EOF");
+}
+
+// Acceptance Testing with default configuration.
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   setUpTest(R"EOF({})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, true);
@@ -164,7 +243,7 @@ TEST_F(GzipFilterTest, ContentLengthBellowSomeValue) {
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
-// Content-Type not supported from user's configuration.
+// Content-Type is not in the white-list.
 TEST_F(GzipFilterTest, ContentTypeNotSupported) {
   setUpTest(R"EOF(
     {
@@ -184,7 +263,7 @@ TEST_F(GzipFilterTest, ContentTypeNotSupported) {
       {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/jpeg"}});
 }
 
-// Content-Type allow all types.
+// Content-Type allows all types.
 TEST_F(GzipFilterTest, ContentTypeAllowAll) {
   setUpTest(R"EOF({})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
@@ -192,19 +271,15 @@ TEST_F(GzipFilterTest, ContentTypeAllowAll) {
       {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/png"}});
 }
 
-// Cache-Control not allowed value.
+// Cache-Control is not in the white-list.
 TEST_F(GzipFilterTest, CacheControlNotAllowedValue) {
-  setUpTest(R"EOF(
-    {
-      "cache_control": [ "no-cache", "no-store", "private" ]
-    }
-  )EOF");
+  setUpTest(R"EOF( {"cache_control": [ "no-cache", "no-store", "private" ] })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "max-age=1234"}});
 }
 
-// Cache-Control not allow all values.
+// Cache-Control is not specified.
 TEST_F(GzipFilterTest, CacheControlAllowAll) {
   setUpTest(R"EOF({})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
@@ -214,11 +289,7 @@ TEST_F(GzipFilterTest, CacheControlAllowAll) {
 
 // Last-Modified disable true.
 TEST_F(GzipFilterTest, LastModifiedDisableTrue) {
-  setUpTest(R"EOF(
-    {
-      "disable_on_last_modified": true
-    }
-  )EOF");
+  setUpTest(R"EOF({ "disable_on_last_modified": true })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression({{":method", "get"},
                            {"content-length", "256"},
@@ -227,11 +298,7 @@ TEST_F(GzipFilterTest, LastModifiedDisableTrue) {
 
 // Last-Modified disable false.
 TEST_F(GzipFilterTest, LastModifiedDisableFalse) {
-  setUpTest(R"EOF(
-    {
-      "disable_on_last_modified": false
-    }
-  )EOF");
+  setUpTest(R"EOF({ "disable_on_last_modified": false })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"},
                          {"content-length", "256"},
@@ -249,11 +316,7 @@ TEST_F(GzipFilterTest, LastModifiedDefault) {
 
 // Etag disable true.
 TEST_F(GzipFilterTest, EtagDisableTrue) {
-  setUpTest(R"EOF(
-    {
-      "disable_on_etag": true
-    }
-  )EOF");
+  setUpTest(R"EOF({ "disable_on_etag": true })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}});
@@ -261,11 +324,7 @@ TEST_F(GzipFilterTest, EtagDisableTrue) {
 
 // Etag disable false.
 TEST_F(GzipFilterTest, EtagDisableFalse) {
-  setUpTest(R"EOF(
-    {
-      "disable_on_etag": false
-    }
-  )EOF");
+  setUpTest(R"EOF({ "disable_on_etag": false })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}});
@@ -295,7 +354,7 @@ TEST_F(GzipFilterTest, TransferEncodingGzip) {
       {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "gzip"}});
 }
 
-// Content-Encoding: encoded response from upstream.
+// Content-Encoding: upstream response is already encoded.
 TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
   setUpTest(R"EOF({})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);

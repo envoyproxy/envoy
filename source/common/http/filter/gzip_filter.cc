@@ -7,9 +7,53 @@
 namespace Envoy {
 namespace Http {
 
+const uint64_t GzipFilter::WINDOW_BITS = 15 | 16;
+
 static const std::regex& acceptEncodingRegex() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "(?!.*gzip;\\s*q=0(,|$))(?=(.*gzip)|(^\\*$))",
                          std::regex::optimize);
+}
+
+GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
+    : compression_level_(compressionLevelEnum(gzip.compression_level())),
+      compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
+      content_length_(static_cast<uint64_t>(gzip.content_length().value())),
+      memory_level_(static_cast<uint64_t>(gzip.memory_level().value())),
+      etag_(gzip.disable_on_etag().value()),
+      last_modified_(gzip.disable_on_last_modified().value()) {
+
+  for (const auto& value : gzip.cache_control()) {
+    cache_control_values_.insert(value);
+  }
+
+  for (const auto& value : gzip.content_type()) {
+    content_type_values_.insert(value);
+  }
+}
+
+ZlibCompressorImpl::CompressionLevel
+GzipFilterConfig::compressionLevelEnum(const auto& compression_level) {
+  if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST) {
+    return ZlibCompressorImpl::CompressionLevel::Best;
+  }
+  if (compression_level == envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED) {
+    return ZlibCompressorImpl::CompressionLevel::Speed;
+  }
+  return ZlibCompressorImpl::CompressionLevel::Standard;
+}
+
+ZlibCompressorImpl::CompressionStrategy
+GzipFilterConfig::compressionStrategyEnum(const auto& compression_strategy) {
+  if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE) {
+    return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
+  }
+  if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED) {
+    return ZlibCompressorImpl::CompressionStrategy::Filtered;
+  }
+  if (compression_strategy == envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN) {
+    return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
+  }
+  return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
 }
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
@@ -35,7 +79,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
       isTransferEncodingAllowed(headers) && headers.ContentEncoding() == nullptr) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
-    compressor_.init(config_->compressionLevel(), config_->compressionStrategy(), 31,
+    compressor_.init(config_->compressionLevel(), config_->compressionStrategy(), WINDOW_BITS,
                      config_->memoryLevel());
   } else {
     skip_compression_ = true;

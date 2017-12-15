@@ -11,10 +11,10 @@ class GzipIntegrationTest : public HttpIntegrationTest,
 public:
   GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  void SetUp() override { decompressor_.init(31); }
+  void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
-  void initializeFilter(std::string&& config) {
+  void initializeFilter(const std::string& config) {
     config_helper_.addFilter(config);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -58,6 +58,30 @@ public:
     EXPECT_EQ(response_->body(), std::string(content_length, 'a'));
   }
 
+  const std::string full_config = R"EOF(
+      name: envoy.gzip
+      config:
+        memory_level: 3
+        compression_level: best
+        compression_strategy: rle
+        content_length: 100
+        content_type:
+          - text/html
+          - application/json
+        cache_control:
+          - private
+          - no-store
+          - no-cache
+        disable_on_etag: true
+        disable_on_last_modified: true
+    )EOF";
+
+  const std::string default_config = R"EOF(
+      name: envoy.gzip
+    )EOF";
+
+  const uint64_t window_bits{31};
+
   Decompressor::ZlibDecompressorImpl decompressor_{};
 };
 
@@ -67,12 +91,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, GzipIntegrationTest,
 /**
  * Exercises gzip compression with default configuration
  */
-TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
-  initializeFilter(R"EOF(
-      name: envoy.gzip
-      config:
-    )EOF");
-
+TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
+  initializeFilter(default_config);
   doRequestAndCompression(Http::TestHeaderMapImpl{{":method", "GET"},
                                                   {":path", "/test/long/url"},
                                                   {":scheme", "http"},
@@ -84,21 +104,32 @@ TEST_P(GzipIntegrationTest, GzipEncodingAcceptanceTest) {
 }
 
 /**
+ * Exercises gzip compression with full configuration
+ */
+TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
+  initializeFilter(full_config);
+  doRequestAndCompression(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                  {":path", "/test/long/url"},
+                                                  {":scheme", "http"},
+                                                  {":authority", "host"},
+                                                  {"accept-encoding", "deflate, gzip"}},
+                          Http::TestHeaderMapImpl{{":status", "200"},
+                                                  {"content-length", "4400"},
+                                                  {"content-type", "application/json"}});
+}
+
+/**
  * Exercises filter when client request contains unsupported 'accept-encoding' type
  */
 TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
-  initializeFilter(R"EOF(
-      name: envoy.gzip
-      config:
-    )EOF");
-
+  initializeFilter(default_config);
   doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
                                                     {":path", "/test/long/url"},
                                                     {":scheme", "http"},
                                                     {":authority", "host"},
                                                     {"accept-encoding", "deflate, br"}},
                             Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "4400"},
+                                                    {"content-length", "128"},
                                                     {"content-type", "text/plain"}});
 }
 
@@ -106,11 +137,7 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
  * Exercises filter when upstream response is already encoded
  */
 TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
-  initializeFilter(R"EOF(
-      name: envoy.gzip
-      config:
-    )EOF");
-
+  initializeFilter(default_config);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
@@ -119,28 +146,24 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"},
                                            {"content-encoding", "br"},
-                                           {"content-length", "4400"},
+                                           {"content-length", "128"},
                                            {"content-type", "application/json"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 4400);
+  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   ASSERT_STREQ("br", response_->headers().ContentEncoding()->value().c_str());
-  EXPECT_EQ(4400U, response_->body().size());
+  EXPECT_EQ(128U, response_->body().size());
 }
 
 /**
  * Exercises filter when upstream responds with content length below the default threshold
  */
 TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
-  initializeFilter(R"EOF(
-      name: envoy.gzip
-      config:
-    )EOF");
-
+  initializeFilter(default_config);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
@@ -161,24 +184,34 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
 }
 
 /**
- * Exercises filter when upstream responds with not supportted content type
+ * Exercises filter when upstream responds with restricted content-type value
  */
-TEST_P(GzipIntegrationTest, NotSupportedContentType) {
-  initializeFilter(R"EOF(
-    name: envoy.gzip
-    config:
-      content_type:
-        - application/json
-    )EOF");
-
+TEST_P(GzipIntegrationTest, SkipOnContentType) {
+  initializeFilter(full_config);
   doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
                                                     {":path", "/test/long/url"},
                                                     {":scheme", "http"},
                                                     {":authority", "host"},
                                                     {"accept-encoding", "deflate, gzip"}},
                             Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "1024"},
+                                                    {"content-length", "128"},
                                                     {"content-type", "application/xml"}});
+}
+
+/**
+ * Exercises filter when upstream responds with restricted cache-control value
+ */
+TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
+  initializeFilter(full_config);
+  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                    {":path", "/test/long/url"},
+                                                    {":scheme", "http"},
+                                                    {":authority", "host"},
+                                                    {"accept-encoding", "deflate, gzip"}},
+                            Http::TestHeaderMapImpl{{":status", "200"},
+                                                    {"content-length", "128"},
+                                                    {"cache-control", "max-age=3600"},
+                                                    {"content-type", "application/json"}});
 }
 
 } // namespace Envoy
