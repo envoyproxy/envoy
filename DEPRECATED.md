@@ -7,8 +7,9 @@ The following features have been DEPRECATED and will be removed in the specified
 
 ## Version 1.6.0
 
-* DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS instead.
-* CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS instead.
+* DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
+  instead.
+* CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT instead.
 
 ## Version 1.5.0
 

@@ -236,11 +236,12 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return request_info.downstreamLocalAddress()->asString();
     };
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITH_PORT") {
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return request_info.downstreamRemoteAddress()->asString();
     };
-  } else if (field_name == "DOWNSTREAM_ADDRESS" || field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+  } else if (field_name == "DOWNSTREAM_ADDRESS" ||
+             field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     // DEPRECATED: "DOWNSTREAM_ADDRESS" will be removed post 1.6.0.
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return RequestInfo::Utility::formatDownstreamAddressNoPort(

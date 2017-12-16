@@ -8,10 +8,11 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
-* Added DOWNSTREAM_REMOTE_ADDRESS and DOWNSTREAM_REMOTE_ADDRESS_WITH_PORT access log formatters.
-  DOWNSTREAM_ADDRESS access log formatter has been deprecated.
-* TCP proxy access logs now bring an IP address without a port when using DOWNSTREAM_REMOTE_ADDRESS.
-  Use DOWNSTREAM_REMOTE_ADDRESS_WITH_PORT instead.
+* Added DOWNSTREAM_REMOTE_ADDRESS, DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT, and
+  DOWNSTREAM_LOCAL_ADDRESS access log formatters. DOWNSTREAM_ADDRESS access log formatter has been
+  deprecated.
+* TCP proxy access logs now bring an IP address without a port when using DOWNSTREAM_ADDRESS.
+  Use DOWNSTREAM_REMOTE_ADDRESS instead.
 * Added DOWNSTREAM_REMOTE_ADDRESS header formatter. CLIENT_IP header formatter has been deprecated.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
