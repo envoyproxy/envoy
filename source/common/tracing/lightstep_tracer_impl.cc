@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
@@ -15,105 +16,112 @@
 namespace Envoy {
 namespace Tracing {
 
-LightStepSpan::LightStepSpan(lightstep::Span& span, lightstep::Tracer& tracer)
-    : span_(span), tracer_(tracer) {}
+namespace {
+class LightStepLogger : Logger::Loggable<Logger::Id::tracing> {
+public:
+  void operator()(lightstep::LogLevel level, opentracing::string_view message) const {
+    const fmt::StringRef fmt_message{message.data(), message.size()};
+    switch (level) {
+    case lightstep::LogLevel::debug:
+      ENVOY_LOG(debug, "{}", fmt_message);
+      break;
+    case lightstep::LogLevel::info:
+      ENVOY_LOG(info, "{}", fmt_message);
+      break;
+    default:
+      ENVOY_LOG(warn, "{}", fmt_message);
+      break;
+    }
+  }
+};
+} // namespace
 
-void LightStepSpan::finishSpan() { span_.Finish(); }
+LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
+    : driver_(driver) {}
 
-void LightStepSpan::setOperation(const std::string& operation) {
-  span_.SetOperationName(operation);
+void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& request,
+                                                 Protobuf::Message& response,
+                                                 lightstep::AsyncTransporter::Callback& callback) {
+  // TODO(rnburn): Update to use Grpc::AsyncClient when it supports abstract message classes.
+  active_callback_ = &callback;
+  active_response_ = &response;
+
+  Http::MessagePtr message =
+      Grpc::Common::prepareHeaders(driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
+                                   lightstep::CollectorMethodName());
+  message->body() = Grpc::Common::serializeBody(request);
+
+  const uint64_t timeout =
+      driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
+  driver_.clusterManager()
+      .httpAsyncClientForCluster(driver_.cluster()->name())
+      .send(std::move(message), *this, std::chrono::milliseconds(timeout));
 }
 
-void LightStepSpan::setTag(const std::string& name, const std::string& value) {
-  span_.SetTag(name, value);
+void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {
+  try {
+    Grpc::Common::validateResponse(*response);
+
+    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), true);
+    // http://www.grpc.io/docs/guides/wire.html
+    // First 5 bytes contain the message header.
+    response->body()->drain(5);
+    Buffer::ZeroCopyInputStreamImpl stream{std::move(response->body())};
+    if (!active_response_->ParseFromZeroCopyStream(&stream)) {
+      throw EnvoyException("Failed to parse LightStep collector response");
+    }
+    active_callback_->OnSuccess();
+  } catch (const Grpc::Exception& ex) {
+    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), false);
+    active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
+  }
 }
 
-void LightStepSpan::injectContext(Http::HeaderMap& request_headers) {
-  lightstep::BinaryCarrier ctx;
-  tracer_.Inject(context(), lightstep::CarrierFormat::LightStepBinaryCarrier,
-                 lightstep::ProtoWriter(&ctx));
-  const std::string current_span_context = ctx.SerializeAsString();
-  request_headers.insertOtSpanContext().value(
-      Base64::encode(current_span_context.c_str(), current_span_context.length()));
+void LightStepDriver::LightStepTransporter::onFailure(Http::AsyncClient::FailureReason) {
+  Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                           lightstep::CollectorMethodName(), false);
+  active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
 }
 
-SpanPtr LightStepSpan::spawnChild(const Config&, const std::string& name, SystemTime start_time) {
-  lightstep::Span ls_span = tracer_.StartSpan(
-      name, {lightstep::ChildOf(span_.context()), lightstep::StartTimestamp(start_time)});
-  return SpanPtr{new LightStepSpan(ls_span, tracer_)};
+LightStepDriver::LightStepMetricsObserver::LightStepMetricsObserver(LightStepDriver& driver)
+    : driver_(driver) {}
+
+void LightStepDriver::LightStepMetricsObserver::OnSpansSent(int num_spans) {
+  driver_.tracerStats().spans_sent_.add(num_spans);
 }
 
-LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepDriver& driver,
-                                     Event::Dispatcher& dispatcher)
-    : builder_(tracer), driver_(driver) {
+LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
+    const std::shared_ptr<lightstep::LightStepTracer>& tracer, LightStepDriver& driver,
+    Event::Dispatcher& dispatcher)
+    : tracer_{tracer}, driver_{driver} {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
-    flushSpans();
+    tracer_->Flush();
     enableTimer();
   });
 
   enableTimer();
 }
 
-void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
-  builder_.addSpan(std::move(span));
+const opentracing::Tracer& LightStepDriver::TlsLightStepTracer::tracer() const { return *tracer_; }
 
-  uint64_t min_flush_spans =
-      driver_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
-  if (builder_.pendingSpans() == min_flush_spans) {
-    flushSpans();
-  }
-}
-
-bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
-  // Note: We don't expect this to be called, since the Tracer
-  // reference is private to its LightStepSink.
-  return true;
-}
-
-std::unique_ptr<lightstep::Recorder>
-LightStepRecorder::NewInstance(LightStepDriver& driver, Event::Dispatcher& dispatcher,
-                               const lightstep::TracerImpl& tracer) {
-  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, driver, dispatcher));
-}
-
-void LightStepRecorder::enableTimer() {
-  uint64_t flush_interval =
+void LightStepDriver::TlsLightStepTracer::enableTimer() {
+  const uint64_t flush_interval =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-void LightStepRecorder::flushSpans() {
-  if (builder_.pendingSpans() != 0) {
-    driver_.tracerStats().spans_sent_.add(builder_.pendingSpans());
-    lightstep::collector::ReportRequest request;
-    std::swap(request, builder_.pending());
-
-    Http::MessagePtr message = Grpc::Common::prepareHeaders(driver_.cluster()->name(),
-                                                            lightstep::CollectorServiceFullName(),
-                                                            lightstep::CollectorMethodName());
-
-    message->body() = Grpc::Common::serializeBody(std::move(request));
-
-    uint64_t timeout =
-        driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-    driver_.clusterManager()
-        .httpAsyncClientForCluster(driver_.cluster()->name())
-        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
-  }
-}
-
-LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer,
-                                                        LightStepDriver& driver)
-    : tracer_(new lightstep::Tracer(tracer)), driver_(driver) {}
-
 LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-                                 std::unique_ptr<lightstep::TracerOptions> options)
-    : cm_(cluster_manager), tracer_stats_{LIGHTSTEP_TRACER_STATS(
-                                POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
-      tls_(tls.allocateSlot()), runtime_(runtime), options_(std::move(options)) {
+                                 std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
+                                 PropagationMode propagation_mode)
+    : OpenTracingDriver{stats}, cm_{cluster_manager},
+      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
+      tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
+      propagation_mode_{propagation_mode} {
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
   if (!cluster) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
@@ -127,57 +135,26 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
   }
 
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
-                             std::placeholders::_1)));
+    lightstep::LightStepTracerOptions tls_options;
+    tls_options.access_token = options_->access_token;
+    tls_options.component_name = options_->component_name;
+    tls_options.use_thread = false;
+    tls_options.use_single_key_propagation = true;
+    tls_options.logger_sink = LightStepLogger{};
+    tls_options.max_buffered_spans = std::function<size_t()>{
+        [this] { return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U); }};
+    tls_options.metrics_observer.reset(new LightStepMetricsObserver{*this});
+    tls_options.transporter.reset(new LightStepTransporter{*this});
+    std::shared_ptr<lightstep::LightStepTracer> tracer =
+        lightstep::MakeLightStepTracer(std::move(tls_options));
 
     return ThreadLocal::ThreadLocalObjectSharedPtr{
-        new TlsLightStepTracer(std::move(tracer), *this)};
+        new TlsLightStepTracer{tracer, *this, dispatcher}};
   });
 }
 
-SpanPtr LightStepDriver::startSpan(const Config&, Http::HeaderMap& request_headers,
-                                   const std::string& operation_name, SystemTime start_time) {
-  lightstep::Tracer& tracer = *tls_->getTyped<TlsLightStepTracer>().tracer_;
-  LightStepSpanPtr active_span;
-
-  if (request_headers.OtSpanContext()) {
-    // Extract downstream context from HTTP carrier.
-    // This code is safe even if decode returns empty string or data is malformed.
-    std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
-    lightstep::BinaryCarrier ctx;
-    ctx.ParseFromString(parent_context);
-
-    lightstep::SpanContext parent_span_ctx = tracer.Extract(
-        lightstep::CarrierFormat::LightStepBinaryCarrier, lightstep::ProtoReader(ctx));
-    lightstep::Span ls_span =
-        tracer.StartSpan(operation_name, {lightstep::ChildOf(parent_span_ctx),
-                                          lightstep::StartTimestamp(start_time)});
-    active_span.reset(new LightStepSpan(ls_span, tracer));
-  } else {
-    lightstep::Span ls_span =
-        tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time)});
-    active_span.reset(new LightStepSpan(ls_span, tracer));
-  }
-
-  return std::move(active_span);
-}
-
-void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
-  Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                           lightstep::CollectorMethodName(), false);
-}
-
-void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
-  try {
-    Grpc::Common::validateResponse(*msg);
-
-    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), true);
-  } catch (const Grpc::Exception& ex) {
-    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), false);
-  }
+const opentracing::Tracer& LightStepDriver::tracer() const {
+  return tls_->getTyped<TlsLightStepTracer>().tracer();
 }
 
 } // namespace Tracing

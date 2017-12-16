@@ -66,6 +66,7 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const override;
   void iterate(ConstIterateCb cb, void* context) const override;
   void iterateReverse(ConstIterateCb cb, void* context) const override;
+  Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
   void remove(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
 
