@@ -12,9 +12,13 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
+#include "common/tracing/opentracing_driver_impl.h"
 
-#include "lightstep/carrier.h"
 #include "lightstep/tracer.h"
+#include "lightstep/transporter.h"
+#include "opentracing/noop.h"
+#include "opentracing/tracer.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -27,53 +31,70 @@ struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class LightStepSpan : public Span {
-public:
-  LightStepSpan(lightstep::Span& span, lightstep::Tracer& tracer);
-
-  // Tracing::Span
-  void finishSpan() override;
-  void setOperation(const std::string& operation) override;
-  void setTag(const std::string& name, const std::string& value) override;
-  void injectContext(Http::HeaderMap& request_headers) override;
-  SpanPtr spawnChild(const Config& config, const std::string& name, SystemTime start_time) override;
-
-  lightstep::SpanContext context() { return span_.context(); }
-
-private:
-  lightstep::Span span_;
-  lightstep::Tracer& tracer_;
-};
-
-typedef std::unique_ptr<LightStepSpan> LightStepSpanPtr;
-
 /**
  * LightStep (http://lightstep.com/) provides tracing capabilities, aggregation, visualization of
  * application trace data.
  *
  * LightStepSink is for flushing data to LightStep collectors.
  */
-class LightStepDriver : public Driver {
+class LightStepDriver : public OpenTracingDriver {
 public:
   LightStepDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                   Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-                  std::unique_ptr<lightstep::TracerOptions> options);
-
-  // Tracer::TracingDriver
-  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const std::string& operation_name, SystemTime start_time) override;
+                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
+                  PropagationMode propagation_mode);
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
-private:
-  struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
-    TlsLightStepTracer(lightstep::Tracer tracer, LightStepDriver& driver);
+  // Tracer::OpenTracingDriver
+  const opentracing::Tracer& tracer() const override;
+  PropagationMode propagationMode() const override { return propagation_mode_; }
 
-    std::unique_ptr<lightstep::Tracer> tracer_;
+private:
+  class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
+  public:
+    explicit LightStepTransporter(LightStepDriver& driver);
+
+    // lightstep::AsyncTransporter
+    void Send(const Protobuf::Message& request, Protobuf::Message& response,
+              lightstep::AsyncTransporter::Callback& callback) override;
+
+    // Http::AsyncClient::Callbacks
+    void onSuccess(Http::MessagePtr&& response) override;
+    void onFailure(Http::AsyncClient::FailureReason) override;
+
+  private:
+    lightstep::AsyncTransporter::Callback* active_callback_ = nullptr;
+    Protobuf::Message* active_response_ = nullptr;
     LightStepDriver& driver_;
+  };
+
+  class LightStepMetricsObserver : public ::lightstep::MetricsObserver {
+  public:
+    explicit LightStepMetricsObserver(LightStepDriver& driver);
+
+    void OnSpansSent(int num_spans) override;
+
+  private:
+    LightStepDriver& driver_;
+  };
+
+  class TlsLightStepTracer : public ThreadLocal::ThreadLocalObject {
+  public:
+    TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
+                       LightStepDriver& driver, Event::Dispatcher& dispatcher);
+
+    const opentracing::Tracer& tracer() const;
+
+  private:
+    void enableTimer();
+
+    std::shared_ptr<lightstep::LightStepTracer> tracer_;
+    LightStepDriver& driver_;
+    Event::TimerPtr flush_timer_;
   };
 
   Upstream::ClusterManager& cm_;
@@ -81,33 +102,8 @@ private:
   LightstepTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
-  std::unique_ptr<lightstep::TracerOptions> options_;
-};
-
-class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
-public:
-  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepDriver& driver,
-                    Event::Dispatcher& dispatcher);
-
-  // lightstep::Recorder
-  void RecordSpan(lightstep::collector::Span&& span) override;
-  bool FlushWithTimeout(lightstep::Duration) override;
-
-  // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
-
-  static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepDriver& driver,
-                                                          Event::Dispatcher& dispatcher,
-                                                          const lightstep::TracerImpl& tracer);
-
-private:
-  void enableTimer();
-  void flushSpans();
-
-  lightstep::ReportBuilder builder_;
-  LightStepDriver& driver_;
-  Event::TimerPtr flush_timer_;
+  std::unique_ptr<lightstep::LightStepTracerOptions> options_;
+  const PropagationMode propagation_mode_;
 };
 
 } // Tracing
