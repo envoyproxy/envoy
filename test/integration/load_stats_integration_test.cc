@@ -191,9 +191,9 @@ public:
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
-  void requestLoadStatsResponse(const std::vector<std::string>& clusters, uint32_t secs) {
+  void requestLoadStatsResponse(const std::vector<std::string>& clusters) {
     envoy::api::v2::LoadStatsResponse loadstats_response;
-    loadstats_response.mutable_load_reporting_interval()->set_seconds(secs);
+    loadstats_response.mutable_load_reporting_interval()->set_seconds(1);
     for (const auto& cluster : clusters) {
       loadstats_response.add_clusters(cluster);
     }
@@ -266,7 +266,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // Simple 50%/50% split between dragon/winter localities. Also include an
   // unknown cluster to exercise the handling of this case.
-  requestLoadStatsResponse({"cluster_0", "cluster_1"}, 1);
+  requestLoadStatsResponse({"cluster_0", "cluster_1"});
 
   updateClusterLoadAssignment({0}, {1}, {3}, {});
 
@@ -284,7 +284,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // 33%/67% split between dragon/winter primary localities.
   updateClusterLoadAssignment({0}, {1, 2}, {}, {4});
-  requestLoadStatsResponse({"cluster_0"}, 1);
+  requestLoadStatsResponse({"cluster_0"});
 
   for (uint32_t i = 0; i < 6; ++i) {
     sendAndReceiveUpstream((i + 1) % 3);
@@ -300,7 +300,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // Change to 50/50 for the failover clusters.
   updateClusterLoadAssignment({}, {}, {3}, {4});
-  requestLoadStatsResponse({"cluster_0"}, 1);
+  requestLoadStatsResponse({"cluster_0"});
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
 
   for (uint32_t i = 0; i < 4; ++i) {
@@ -316,7 +316,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   // 100% winter locality.
   updateClusterLoadAssignment({}, {}, {}, {});
   updateClusterLoadAssignment({1}, {}, {}, {});
-  requestLoadStatsResponse({"cluster_0"}, 1);
+  requestLoadStatsResponse({"cluster_0"});
 
   for (uint32_t i = 0; i < 1; ++i) {
     sendAndReceiveUpstream(1);
@@ -328,9 +328,9 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   // A LoadStatsResponse arrives before the expiration of the reporting interval.
-  requestLoadStatsResponse({"cluster_0"}, 1);
+  requestLoadStatsResponse({"cluster_0"});
   sendAndReceiveUpstream(1);
-  requestLoadStatsResponse({"cluster_0"}, 1);
+  requestLoadStatsResponse({"cluster_0"});
   sendAndReceiveUpstream(1);
   sendAndReceiveUpstream(1);
 
@@ -351,7 +351,7 @@ TEST_P(LoadStatsIntegrationTest, Error) {
   waitForLoadStatsRequest({});
   loadstats_stream_->startGrpcStream();
 
-  requestLoadStatsResponse({"cluster_0"}, 1);
+  requestLoadStatsResponse({"cluster_0"});
   updateClusterLoadAssignment({0}, {}, {}, {});
 
   // This should count as an error since 5xx.
@@ -376,13 +376,10 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
   waitForLoadStatsStream();
   waitForLoadStatsRequest({});
   loadstats_stream_->startGrpcStream();
-
-  requestLoadStatsResponse({"cluster_0"}, 1);
-
   updateClusterLoadAssignment({0}, {}, {}, {});
 
+  requestLoadStatsResponse({"cluster_0"});
   initiateClientConnection();
-
   waitForLoadStatsRequest({localityStats("winter", 0, 0, 1)});
 
   waitForUpstreamResponse(0, 503);
@@ -408,10 +405,8 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   waitForLoadStatsRequest({});
   loadstats_stream_->startGrpcStream();
 
-  requestLoadStatsResponse({"cluster_0"}, 1);
-
   updateClusterLoadAssignment({0}, {}, {}, {});
-
+  requestLoadStatsResponse({"cluster_0"});
   // This should count as dropped, since we trigger circuit breaking.
   initiateClientConnection();
   response_->waitForEndStream();
