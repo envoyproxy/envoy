@@ -30,12 +30,12 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     io_opentracing_cpp = dict(
-        commit = "550c686e0e174c845a034f432a6c31a808f5f994",
-        remote = "https://github.com/opentracing/opentracing-cpp",
+        commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
+        remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0
     ),
     com_github_lightstep_lightstep_tracer_cpp = dict(
         commit = "deb5284395075028c3e5b4eab1416fe1e597bdb7",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.6.0
     ),
     lightstep_vendored_googleapis = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
