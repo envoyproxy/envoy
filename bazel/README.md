@@ -146,7 +146,7 @@ bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 
 Bazel will by default run all tests inside a sandbox, which disallows access to the
 local filesystem. If you need to break out of the sandbox (for example to run under a
-local script or tool with [`--run_under`](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--run_under)),
+local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#flag--run_under)),
 you can run the test with `--strategy=TestRunner=standalone`, e.g.:
 
 ```
@@ -196,7 +196,7 @@ binaries will not include debugging symbols and GDB will not be very useful.
 # Additional Envoy build and test options
 
 In general, there are 3 [compilation
-modes](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--compilation_mode)
+modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilation_mode)
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).

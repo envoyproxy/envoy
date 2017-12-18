@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/http:header_map_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/request_info:request_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -64,16 +65,5 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
-    ],
-)
-
-envoy_cc_test(
-    name = "request_info_impl_test",
-    srcs = ["request_info_impl_test.cc"],
-    deps = [
-        "//include/envoy/http:protocol_interface",
-        "//include/envoy/upstream:host_description_interface",
-        "//source/common/access_log:request_info_lib",
-        "//test/mocks/upstream:upstream_mocks",
     ],
 )

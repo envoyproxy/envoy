@@ -47,12 +47,12 @@ public:
   ~MockHttpTracer();
 
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const AccessLog::RequestInfo& request_info) override {
+                    const RequestInfo::RequestInfo& request_info) override {
     return SpanPtr{startSpan_(config, request_headers, request_info)};
   }
 
   MOCK_METHOD3(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
-                                 const AccessLog::RequestInfo& request_info));
+                                 const RequestInfo::RequestInfo& request_info));
 };
 
 class MockDriver : public Driver {

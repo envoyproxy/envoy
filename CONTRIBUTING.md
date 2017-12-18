@@ -96,6 +96,8 @@ maximize the chances of your PR being merged.
   PR. This person does not necessarily need to have commit access.
 * The previous two points generally mean that every PR should have two approvals. (Exceptions can
   be made by the senior committers).
+* The above rules may be waived for PRs which only update docs or comments, or trivial changes to
+  tests and tools (where trivial is decided by the maintainer in question).
 * In general, we should also attempt to make sure that at least one of the approvals is *from an
   organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting

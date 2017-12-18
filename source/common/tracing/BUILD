@@ -12,10 +12,13 @@ envoy_cc_library(
     name = "http_tracer_lib",
     srcs = [
         "http_tracer_impl.cc",
+        "opentracing_driver_impl.cc",
     ],
     hdrs = [
         "http_tracer_impl.h",
+        "opentracing_driver_impl.h",
     ],
+    external_deps = ["opentracing"],
     deps = [
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -23,6 +26,7 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_formatter_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
@@ -33,6 +37,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/request_info:utility_lib",
         "//source/common/runtime:uuid_util_lib",
     ],
 )

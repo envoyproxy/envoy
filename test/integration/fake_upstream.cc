@@ -55,7 +55,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stre
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
-                          parent_.connection().localAddress().asString());
+                          parent_.connection().localAddress()->asString());
   }
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
     encoder_.encodeHeaders(*headers_copy, end_stream);

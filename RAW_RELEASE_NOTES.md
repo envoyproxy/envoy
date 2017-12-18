@@ -16,3 +16,5 @@ final version.
 * grpc-json: Added support inline descriptor in config.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
+* Added support for dynamic headers generated from upstream host endpoint metadata
+  (`UPSTREAM_METADATA(...)`).

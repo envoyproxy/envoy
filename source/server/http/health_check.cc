@@ -148,7 +148,7 @@ void HealthCheckFilter::onComplete() {
   ASSERT(handling_);
   Http::HeaderMapPtr headers;
   if (context_.healthCheckFailed()) {
-    callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::FailedLocalHealthCheck);
+    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck);
     headers.reset(new Http::HeaderMapImpl{
         {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}});
   } else {
@@ -158,7 +158,7 @@ void HealthCheckFilter::onComplete() {
     }
 
     if (!Http::CodeUtility::is2xx(enumToInt(final_status))) {
-      callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::FailedLocalHealthCheck);
+      callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck);
     }
 
     headers.reset(new Http::HeaderMapImpl{

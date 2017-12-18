@@ -101,7 +101,7 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     delay_timer_ = callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
     recordDelaysInjectedStats();
-    callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::DelayInjected);
+    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::DelayInjected);
     return FilterHeadersStatus::StopIteration;
   }
 
@@ -234,7 +234,7 @@ void FaultFilter::postDelayInjection() {
 }
 
 void FaultFilter::abortWithHTTPStatus() {
-  callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::FaultInjected);
+  callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FaultInjected);
   Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_,
                                 static_cast<Http::Code>(abortHttpStatus()), "fault filter abort");
   recordAbortsInjectedStats();

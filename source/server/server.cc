@@ -70,8 +70,14 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
+
+    // Invoke shutdown methods called in run().
     thread_local_.shutdownGlobalThreading();
+    stats_store_.shutdownThreading();
     thread_local_.shutdownThread();
+
+    // Invoke the shutdown method called in the destructor.
+    restarter_.shutdown();
     throw;
   }
 }
@@ -151,6 +157,27 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
+void InstanceUtil::loadBootstrapConfig(envoy::api::v2::Bootstrap& bootstrap,
+                                       const std::string& config_path, bool v2_only) {
+  bool v2_config_loaded = false;
+  try {
+    MessageUtil::loadFromFileAndValidate(config_path, bootstrap);
+    v2_config_loaded = true;
+  } catch (const EnvoyException& e) {
+    if (v2_only) {
+      throw;
+    } else {
+      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+      ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    }
+  }
+  if (!v2_config_loaded) {
+    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(config_path);
+    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+    MessageUtil::validate(bootstrap);
+  }
+}
+
 void InstanceImpl::initialize(Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
@@ -159,22 +186,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::api::v2::Bootstrap bootstrap;
-  bool v2_config_loaded = false;
-  try {
-    MessageUtil::loadFromFileAndValidate(options.configPath(), bootstrap);
-    v2_config_loaded = true;
-  } catch (const EnvoyException& e) {
-    if (options.v2ConfigOnly()) {
-      throw;
-    } else {
-      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-      ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
-    }
-  }
-  if (!v2_config_loaded) {
-    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
-  }
+  InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.

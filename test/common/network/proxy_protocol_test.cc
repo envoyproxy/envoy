@@ -110,7 +110,7 @@ TEST_P(ProxyProtocolTest, Basic) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "1.2.3.4");
+        EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
 
         EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
         buffer.drain(9);
@@ -129,7 +129,7 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "1:2:3::4");
+        EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
 
         EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
         buffer.drain(9);
@@ -153,7 +153,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
 
   disconnect();
 
-  EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "254.254.254.254");
+  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
 }
 
 TEST_P(ProxyProtocolTest, PartialRead) {
@@ -172,7 +172,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   disconnect();
 
-  EXPECT_EQ(server_connection_->remoteAddress().ip()->addressAsString(), "254.254.254.254");
+  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
@@ -352,8 +352,8 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress().asString(), "1.2.3.4:65535");
-        EXPECT_EQ(server_connection_->localAddress().asString(), "254.254.254.254:1234");
+        EXPECT_EQ(server_connection_->remoteAddress()->asString(), "1.2.3.4:65535");
+        EXPECT_EQ(server_connection_->localAddress()->asString(), "254.254.254.254:1234");
 
         EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
         buffer.drain(9);
@@ -370,8 +370,8 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress().asString(), "[1:2:3::4]:65535");
-        EXPECT_EQ(server_connection_->localAddress().asString(), "[5:6::7:8]:1234");
+        EXPECT_EQ(server_connection_->remoteAddress()->asString(), "[1:2:3::4]:65535");
+        EXPECT_EQ(server_connection_->localAddress()->asString(), "[5:6::7:8]:1234");
 
         EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
         buffer.drain(9);

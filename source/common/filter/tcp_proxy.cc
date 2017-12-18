@@ -71,22 +71,23 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
 const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& connection) {
   for (const TcpProxyConfig::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.remoteAddress(), route.source_port_ranges_)) {
+        !Network::Utility::portInRangeList(*connection.remoteAddress(),
+                                           route.source_port_ranges_)) {
       continue;
     }
 
-    if (!route.source_ips_.empty() && !route.source_ips_.contains(connection.remoteAddress())) {
+    if (!route.source_ips_.empty() && !route.source_ips_.contains(*connection.remoteAddress())) {
       continue;
     }
 
     if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.localAddress(),
+        !Network::Utility::portInRangeList(*connection.localAddress(),
                                            route.destination_port_ranges_)) {
       continue;
     }
 
     if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(connection.localAddress())) {
+        !route.destination_ips_.contains(*connection.localAddress())) {
       continue;
     }
 
@@ -144,7 +145,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
+  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress()->asString();
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -238,14 +239,14 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     if (config_) {
       config_->stats().downstream_cx_no_route_.inc();
     }
-    request_info_.setResponseFlag(AccessLog::ResponseFlag::NoRouteFound);
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NO_ROUTE);
     return Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamOverflow);
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
     return Network::FilterStatus::StopIteration;
@@ -265,7 +266,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
     // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy.
-    request_info_.setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream);
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
     return Network::FilterStatus::StopIteration;
   }
@@ -283,7 +284,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
   request_info_.onUpstreamHostSelected(conn_info.host_description_);
-  request_info_.upstream_local_address_ = upstream_connection_->localAddress().asString();
+  request_info_.upstream_local_address_ = upstream_connection_->localAddress()->asString();
 
   ASSERT(connect_timeout_timer_ == nullptr);
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
@@ -306,7 +307,7 @@ void TcpProxy::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
-  request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
+  request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
 
   closeUpstreamConnection();
   initializeUpstreamConnection();
@@ -361,7 +362,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connecting) {
-      request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
+      request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
       read_callbacks_->upstreamHost()->outlierDetector().putResult(
           Upstream::Outlier::Result::CONNECT_FAILED);
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();

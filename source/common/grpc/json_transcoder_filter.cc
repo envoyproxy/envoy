@@ -143,7 +143,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     path = path.substr(0, pos);
   }
 
-  RequestInfo request_info;
+  struct RequestInfo request_info;
   std::vector<VariableBinding> variable_bindings;
   method_descriptor =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
