@@ -83,5 +83,14 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
   return result.empty() ? NONE : result;
 }
 
+const std::string&
+Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
+  if (address.type() == Network::Address::Type::Ip) {
+    return address.ip()->addressAsString();
+  } else {
+    return address.asString();
+  }
+}
+
 } // namespace RequestInfo
 } // namespace Envoy

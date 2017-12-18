@@ -30,7 +30,7 @@ public:
   virtual bool populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
                                   const std::string& local_service_cluster,
                                   const Http::HeaderMap& headers,
-                                  const std::string& remote_address) const PURE;
+                                  const Network::Address::Instance& remote_address) const PURE;
 };
 
 typedef std::unique_ptr<RateLimitAction> RateLimitActionPtr;
@@ -64,7 +64,7 @@ public:
                                    std::vector<RateLimit::Descriptor>& descriptors,
                                    const std::string& local_service_cluster,
                                    const Http::HeaderMap& headers,
-                                   const std::string& remote_address) const PURE;
+                                   const Network::Address::Instance& remote_address) const PURE;
 };
 
 /**

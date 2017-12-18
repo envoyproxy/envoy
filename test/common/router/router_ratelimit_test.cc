@@ -5,6 +5,7 @@
 #include "common/config/rds_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 #include "common/router/router_ratelimit.h"
 
@@ -110,6 +111,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
+  Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
 };
 
 TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {
@@ -205,7 +207,6 @@ TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
   )EOF";
 
   SetUpTest(json);
-  std::string address = "10.0.0.1";
 
   route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
   EXPECT_FALSE(route_->rateLimitPolicy().empty());
@@ -215,9 +216,9 @@ TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
-    rate_limit.populateDescriptors(*route_, descriptors, "", header_, address);
+    rate_limit.populateDescriptors(*route_, descriptors, "", header_, default_remote_address_);
   }
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors));
 }
 
@@ -257,7 +258,8 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
-    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, "");
+    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_,
+                                   default_remote_address_);
   }
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "www2test"}}}}),
               testing::ContainerEq(descriptors));
@@ -309,7 +311,6 @@ TEST_F(RateLimitConfiguration, Stages) {
   )EOF";
 
   SetUpTest(json);
-  std::string address = "10.0.0.1";
 
   route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
@@ -318,7 +319,8 @@ TEST_F(RateLimitConfiguration, Stages) {
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
-    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
+    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_,
+                                   default_remote_address_);
   }
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"destination_cluster", "www2test"}}},
@@ -330,9 +332,10 @@ TEST_F(RateLimitConfiguration, Stages) {
   EXPECT_EQ(1U, rate_limits.size());
 
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
-    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
+    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_,
+                                   default_remote_address_);
   }
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors));
 
   rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(10UL);
@@ -350,6 +353,7 @@ public:
   Http::TestHeaderMapImpl header_;
   NiceMock<MockRouteEntry> route_;
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
+  Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
 };
 
 TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
@@ -383,14 +387,15 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
   )EOF";
 
   SetUpTest(json);
-  std::string address = "10.0.0.1";
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, address);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_,
+                                         default_remote_address_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, NoAddress) {
+// Verify no descriptor is emitted if remote is a pipe.
+TEST_F(RateLimitPolicyEntryTest, PipeAddress) {
   std::string json = R"EOF(
   {
     "actions": [
@@ -403,7 +408,8 @@ TEST_F(RateLimitPolicyEntryTest, NoAddress) {
 
   SetUpTest(json);
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, "");
+  Network::Address::PipeInstance pipe_address("/hello");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, pipe_address);
   EXPECT_TRUE(descriptors_.empty());
 }
 
@@ -420,7 +426,8 @@ TEST_F(RateLimitPolicyEntryTest, SourceService) {
 
   SetUpTest(json);
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
+                                         default_remote_address_);
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
       testing::ContainerEq(descriptors_));
@@ -439,7 +446,8 @@ TEST_F(RateLimitPolicyEntryTest, DestinationService) {
 
   SetUpTest(json);
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
+                                         default_remote_address_);
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
       testing::ContainerEq(descriptors_));
@@ -461,7 +469,8 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeaders) {
   SetUpTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
+                                         default_remote_address_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -482,7 +491,8 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
   SetUpTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
+                                         default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
 }
 
@@ -500,7 +510,8 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
 
   SetUpTest(json);
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_,
+                                         default_remote_address_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -527,7 +538,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatch) {
   SetUpTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -554,7 +565,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchNoMatch) {
   SetUpTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
 }
 
@@ -581,7 +592,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersNotPresent) {
   SetUpTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -609,7 +620,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersPresent) {
   SetUpTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
 }
 
@@ -629,7 +640,8 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
 
   SetUpTest(json);
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
+                                         default_remote_address_);
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>(
           {{{{"destination_cluster", "fake_cluster"}, {"source_cluster", "service_cluster"}}}}),
@@ -660,7 +672,8 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
 
   SetUpTest(json);
 
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
+                                         default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
 }
 

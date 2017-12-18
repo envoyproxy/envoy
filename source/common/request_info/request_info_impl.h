@@ -58,7 +58,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
-  const Optional<std::string>& upstreamLocalAddress() const override {
+  const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
 
@@ -66,7 +66,13 @@ struct RequestInfoImpl : public RequestInfo {
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
-  const std::string& getDownstreamAddress() const override { return downstream_address_; };
+  const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
+    return downstream_local_address_;
+  }
+
+  const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
+    return downstream_remote_address_;
+  }
 
   Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
@@ -78,9 +84,10 @@ struct RequestInfoImpl : public RequestInfo {
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  Optional<std::string> upstream_local_address_{};
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
   bool hc_request_{};
-  std::string downstream_address_;
+  Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
 };
 
 } // namespace RequestInfo

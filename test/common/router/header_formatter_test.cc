@@ -35,12 +35,18 @@ static envoy::api::v2::Route parseRouteFromV2Yaml(const std::string& yaml) {
 
 TEST(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  const std::string downstream_addr = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "CLIENT_IP";
   RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
   const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
-  EXPECT_EQ(downstream_addr, formatted_string);
+  EXPECT_EQ("127.0.0.1", formatted_string);
+}
+
+TEST(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  const std::string variable = "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT";
+  RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false);
+  const std::string formatted_string = requestInfoHeaderFormatter.format(request_info);
+  EXPECT_EQ("127.0.0.1", formatted_string);
 }
 
 TEST(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -214,8 +220,6 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost
 
 TEST(RequestInfoHeaderFormatterTest, WrongVariableToFormat) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  const std::string downstream_addr = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "INVALID_VARIABLE";
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter requestInfoHeaderFormatter(variable, false),
                             EnvoyException,
@@ -329,8 +333,6 @@ TEST(HeaderParserTest, EvaluateHeaders) {
       parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  const std::string downstream_addr = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
 }
@@ -415,9 +417,6 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  const std::string downstream_addr = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
-
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
@@ -462,8 +461,6 @@ route:
       route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  const std::string downstream_addr = "127.0.0.1";
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
   EXPECT_TRUE(headerMap.has("x-safe"));
