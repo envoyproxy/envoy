@@ -1,6 +1,5 @@
 #include "common/config/tls_context_json.h"
 
-#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
 #include "common/protobuf/utility.h"
