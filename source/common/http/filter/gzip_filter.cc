@@ -54,7 +54,7 @@ ZlibCompressionStrategyEnum GzipFilterConfig::compressionStrategyEnum(
   return ZlibCompressionStrategyEnum::Standard;
 }
 
-const uint64_t GzipFilter::WINDOW_BITS = 15 | 16;
+const uint64_t GzipFilter::WINDOW_BITS{15 | 16};
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
