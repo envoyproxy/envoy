@@ -31,6 +31,23 @@ jobs:
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
+   ipv6_tests:
+     machine: true
+     steps:
+     - checkout
+     - run:
+         name: enable ipv6
+         command: |
+           cat <<'EOF' | sudo tee /etc/docker/daemon.json
+           {
+             "ipv6": true,
+             "fixed-cidr-v6": "2001:db8:1::/64"
+           }
+           EOF
+
+           sudo service docker restart
+     - run: ./ci/do_circle_ci_ipv6_tests.sh
+
    coverage:
      docker:
        - image: *envoy-build-image
@@ -89,6 +106,7 @@ workflows:
               only: /^v.*/
       - asan
       - tsan
+      - ipv6_tests
       - coverage
       - format
       - build_image
