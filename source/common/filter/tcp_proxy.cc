@@ -447,7 +447,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     if (config_ != nullptr && config_->idleTimeout().valid()) {
       // The idle_timer_ can be moved to a TcpProxyDrainer, so related callbacks call into
       // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
-      // the call to either TcpProxy or to TcpProxyDrainer, depedning on the current state.
+      // the call to either TcpProxy or to TcpProxyDrainer, depending on the current state.
       idle_timer_ =
           read_callbacks_->connection().dispatcher().createTimer([upstream_callbacks =
                                                                       upstream_callbacks_]() {

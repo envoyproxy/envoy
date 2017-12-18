@@ -151,8 +151,16 @@ public:
     void onIdleTimeout();
     void drain(TcpProxyDrainer& drainer);
 
+    // Either parent_ or drainer_ will be non-NULL, but never both.  This could be
+    // logically be represented as a union, but saving one pointer of memory is
+    // outweighed by more type safety/better error handling.
+    //
+    // Parent starts out as non-NULL.  If the downstream connection is closed while
+    // the upstream connection still has buffered data to flush, drainer_ becomes
+    // non-NULL and parent_ is set to NULL.
     TcpProxy* parent_{};
     TcpProxyDrainer* drainer_{};
+
     bool on_high_watermark_called_{false};
   };
 
