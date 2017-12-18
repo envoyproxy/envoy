@@ -77,7 +77,7 @@ protected:
   DispatcherPtr dispatcher_;
   std::mutex mu_;
   std::condition_variable cv_;
-  
+
   bool work_finished_;
   TimerPtr keepalive_timer_;
 };
@@ -100,23 +100,24 @@ TEST_F(DispatcherImplTest, Timer) {
   TimerPtr timer;
   dispatcher_->post([this, &timer]() {
     {
-    std::lock_guard<std::mutex> lock(mu_);
-    timer = dispatcher_->createTimer([this]() {
-      {
-        std::lock_guard<std::mutex> lock(mu_);
-        work_finished_ = true;
-      }
-      cv_.notify_one();
-    });
+      std::lock_guard<std::mutex> lock(mu_);
+      timer = dispatcher_->createTimer([this]() {
+        {
+          std::lock_guard<std::mutex> lock(mu_);
+          work_finished_ = true;
+        }
+        cv_.notify_one();
+      });
     }
     cv_.notify_one();
   });
 
   std::unique_lock<std::mutex> lock(mu_);
-  ASSERT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [&timer]() { return static_cast<bool>(timer);}));
+  ASSERT_TRUE(
+      cv_.wait_for(lock, std::chrono::seconds(5), [&timer]() { return static_cast<bool>(timer); }));
   timer->enableTimer(std::chrono::milliseconds(50));
 
-  EXPECT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return work_finished_;}));
+  EXPECT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return work_finished_; }));
 }
 
 } // namespace Event
