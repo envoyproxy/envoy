@@ -2,6 +2,9 @@
 
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
+#include "common/protobuf/utility.h"
+
+#include "api/sds.pb.validate.h"
 
 namespace Envoy {
 namespace Config {
@@ -17,6 +20,7 @@ void TlsContextJson::translateDownstreamTlsContext(
   for (const std::string& path : paths) {
     downstream_tls_context.mutable_session_ticket_keys()->mutable_keys()->Add()->set_filename(path);
   }
+  MessageUtil::validate(downstream_tls_context);
 }
 
 void TlsContextJson::translateUpstreamTlsContext(
@@ -24,6 +28,7 @@ void TlsContextJson::translateUpstreamTlsContext(
     envoy::api::v2::UpstreamTlsContext& upstream_tls_context) {
   translateCommonTlsContext(json_tls_context, *upstream_tls_context.mutable_common_tls_context());
   upstream_tls_context.set_sni(json_tls_context.getString("sni", ""));
+  MessageUtil::validate(upstream_tls_context);
 }
 
 void TlsContextJson::translateCommonTlsContext(
