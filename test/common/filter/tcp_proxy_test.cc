@@ -786,13 +786,16 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
-// Test that access log field %DOWNSTREAM_ADDRESS% is correctly logged.
+// Test that access log fields %DOWNSTREAM_ADDRESS% and %DOWNSTREAM_LOCAL_ADDRESS% are correctly
+// logged.
 TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
+  filter_callbacks_.connection_.local_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
-  setup(1, accessLogConfig("%DOWNSTREAM_ADDRESS%"));
+  setup(1, accessLogConfig("%DOWNSTREAM_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "1.1.1.1:40000");
+  EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
 // Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are

@@ -84,15 +84,6 @@ public:
   static uint64_t getResponseStatus(const HeaderMap& headers);
 
   /**
-   * Determine whether this is an internal origin request by parsing out x-forwarded-for from
-   * HTTP headers. Currently this returns true IFF the following holds true:
-   * - There is a single XFF header
-   * - There is a single address in the single XFF header
-   * - The address is an RFC1918 address.
-   */
-  static bool isInternalRequest(const HeaderMap& headers);
-
-  /**
    * Determine whether this is a WebSocket Upgrade request.
    * This function returns true if the following HTTP headers and values are present:
    * - Connection: Upgrade
@@ -150,11 +141,12 @@ public:
                            Code response_code);
 
   /**
-   * Retrieves the last address in x-forwarded-for header. If it isn't set, returns empty string.
-   * @param request_headers
-   * @return last_address_in_xff
+   * Retrieves the last IPv4/IPv6 address in the x-forwarded-for header.
+   * @param request_headers supplies the request headers.
+   * @return a valid IPv4 or IPv6 address if one could be parsed, otherwise nullptr.
    */
-  static std::string getLastAddressFromXFF(const Http::HeaderMap& request_headers);
+  static Network::Address::InstanceConstSharedPtr
+  getLastAddressFromXFF(const Http::HeaderMap& request_headers);
 };
 
 } // namespace Http

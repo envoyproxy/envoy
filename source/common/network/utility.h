@@ -91,7 +91,7 @@ public:
   static Address::InstanceConstSharedPtr copyInternetAddressAndPort(const Address::Ip& ip);
 
   /**
-   * Create a new Intance from an internet host address (IPv4 or IPv6) and port.
+   * Create a new Instance from an internet host address (IPv4 or IPv6) and port.
    * @param ip_addr string to be parsed as an internet address and port. Examples:
    *        - "1.2.3.4:80"
    *        - "[1234:5678::9]:443"
@@ -112,7 +112,7 @@ public:
    * Determine whether this is an internal (RFC1918) address.
    * @return bool the address is an RFC1918 address.
    */
-  static bool isInternalAddress(const char* address);
+  static bool isInternalAddress(const Address::Instance& address);
 
   /**
    * Check if address is loopback address.

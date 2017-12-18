@@ -5,6 +5,12 @@ As of release 1.3.0, Envoy will follow a
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 
+## Version 1.6.0
+
+* DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
+  instead.
+* CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT instead.
+
 ## Version 1.5.0
 
 * The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
