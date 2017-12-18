@@ -190,9 +190,7 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  std::string access_log_line =
-      formatter_->format(*request_headers, *response_headers, request_info);
-  log_file_->write(access_log_line);
+  log_file_->write(formatter_->format(*request_headers, *response_headers, request_info));
 }
 
 } // namespace AccessLog

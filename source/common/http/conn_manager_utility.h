@@ -16,11 +16,18 @@ namespace Http {
  */
 class ConnectionManagerUtility {
 public:
-  static void mutateRequestHeaders(Http::HeaderMap& request_headers, Protocol protocol,
-                                   Network::Connection& connection, ConnectionManagerConfig& config,
-                                   const Router::Config& route_config,
-                                   Runtime::RandomGenerator& random, Runtime::Loader& runtime,
-                                   const LocalInfo::LocalInfo& local_info);
+  /**
+   * Mutates request headers in various ways. This functionality is broken out because of its
+   * complexity for ease of testing. See the method itself for detailed comments on what
+   * mutations are performed.
+   * @return the final trusted remote address. This depends on various settings and the
+   *         existence of the x-forwarded-for header. Again see the method for more details.
+   */
+  static Network::Address::InstanceConstSharedPtr
+  mutateRequestHeaders(Http::HeaderMap& request_headers, Protocol protocol,
+                       Network::Connection& connection, ConnectionManagerConfig& config,
+                       const Router::Config& route_config, Runtime::RandomGenerator& random,
+                       Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
                                     const Http::HeaderMap& request_headers);

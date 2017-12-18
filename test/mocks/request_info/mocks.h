@@ -30,16 +30,20 @@ public:
   MOCK_CONST_METHOD0(duration, std::chrono::microseconds());
   MOCK_CONST_METHOD1(getResponseFlag, bool(ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
-  MOCK_CONST_METHOD0(upstreamLocalAddress, const Optional<std::string>&());
+  MOCK_CONST_METHOD0(upstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
-  MOCK_CONST_METHOD0(getDownstreamAddress, const std::string&());
+  MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
   Optional<std::chrono::microseconds> request_received_duration_;
   Optional<std::chrono::microseconds> response_received_duration_;
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
 };
 
 } // namespace RequestInfo

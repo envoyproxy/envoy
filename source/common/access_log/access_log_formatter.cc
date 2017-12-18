@@ -228,14 +228,24 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      const Optional<std::string>& upstream_local_address = request_info.upstreamLocalAddress();
-      return upstream_local_address.valid() ? upstream_local_address.value()
-                                            : UnspecifiedValueString;
+      return request_info.upstreamLocalAddress() != nullptr
+                 ? request_info.upstreamLocalAddress()->asString()
+                 : UnspecifiedValueString;
     };
-  } else if (field_name == "DOWNSTREAM_ADDRESS") {
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      const std::string& downstream_address = request_info.getDownstreamAddress();
-      return downstream_address.empty() ? UnspecifiedValueString : downstream_address;
+      return request_info.downstreamLocalAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return request_info.downstreamRemoteAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_ADDRESS" ||
+             field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
+    // DEPRECATED: "DOWNSTREAM_ADDRESS" will be removed post 1.6.0.
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return RequestInfo::Utility::formatDownstreamAddressNoPort(
+          *request_info.downstreamRemoteAddress());
     };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));

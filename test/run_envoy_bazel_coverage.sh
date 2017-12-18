@@ -55,7 +55,7 @@ COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 pushd "${GCOVR_DIR}"
 for f in $(find -L bazel-out/ -name "*.gcno")
 do
-  cp --parents "$f" bazel-out/local-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
+  cp --parents "$f" bazel-out/k8-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
 done
 popd
 

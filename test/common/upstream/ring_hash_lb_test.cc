@@ -33,7 +33,7 @@ public:
   Optional<uint64_t> hash_key_;
 };
 
-class RingHashLoadBalancerTest : public testing::Test {
+class RingHashLoadBalancerTest : public ::testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
@@ -41,8 +41,13 @@ public:
     lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_));
   }
 
+  // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
+  // all the load balancers have equivalent functonality for failover host sets.
+  MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
+
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
+  MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
@@ -51,6 +56,9 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<RingHashLoadBalancer> lb_;
 };
+
+INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RingHashLoadBalancerTest,
+                        ::testing::Values(true, false));
 
 TEST_F(RingHashLoadBalancerTest, NoHost) {
   init();
@@ -116,6 +124,30 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
     EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+}
+
+// Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
+TEST_P(RingHashLoadBalancerTest, BasicFailover) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
+
+  config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
+  config_.value().mutable_minimum_ring_size()->set_value(12);
+  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
+  init();
+
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+
+  // Add a healthy host at P=0 and it will be chosen.
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+
+  // Remove the healthy host and ensure we fail back over to the failover_host_set_
+  host_set_.healthy_hosts_ = {};
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
 #ifndef __APPLE__

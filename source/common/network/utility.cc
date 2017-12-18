@@ -200,34 +200,32 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isInternalAddress(const char* address) {
-  // First try as an IPv4 address.
-  in_addr addr;
-  int rc = inet_pton(AF_INET, address, &addr);
-  if (rc == 1) {
+bool Utility::isInternalAddress(const Address::Instance& address) {
+  if (address.type() != Address::Type::Ip) {
+    return false;
+  }
+
+  if (address.ip()->version() == Address::IpVersion::v4) {
     // Handle the RFC1918 space for IPV4. Also count loopback as internal.
-    uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&addr.s_addr);
-    if ((address_bytes[0] == 10) || (address_bytes[0] == 192 && address_bytes[1] == 168) ||
-        (address_bytes[0] == 172 && address_bytes[1] >= 16 && address_bytes[1] <= 31) ||
-        addr.s_addr == htonl(INADDR_LOOPBACK)) {
+    const uint32_t address4 = address.ip()->ipv4()->address();
+    const uint8_t* address4_bytes = reinterpret_cast<const uint8_t*>(&address4);
+    if ((address4_bytes[0] == 10) || (address4_bytes[0] == 192 && address4_bytes[1] == 168) ||
+        (address4_bytes[0] == 172 && address4_bytes[1] >= 16 && address4_bytes[1] <= 31) ||
+        address4 == htonl(INADDR_LOOPBACK)) {
       return true;
     } else {
       return false;
     }
   }
 
-  // Now try as an IPv6 address.
-  in6_addr addr6;
-  int rc6 = inet_pton(AF_INET6, address, &addr6);
-  if (rc6 == 1) {
-    // Local IPv6 address prefix defined in RFC4193. Local addresses have prefix FC00::/7.
-    // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the
-    // future.
-    uint8_t* address6_bytes = reinterpret_cast<uint8_t*>(&addr6.s6_addr);
-    if (address6_bytes[0] == 0xfd ||
-        memcmp(address6_bytes, &in6addr_loopback, sizeof(in6addr_loopback)) == 0) {
-      return true;
-    }
+  // Local IPv6 address prefix defined in RFC4193. Local addresses have prefix FC00::/7.
+  // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the
+  // future.
+  const auto address6 = address.ip()->ipv6()->address();
+  const uint8_t* address6_bytes = reinterpret_cast<const uint8_t*>(address6.data());
+  if (address6_bytes[0] == 0xfd ||
+      memcmp(address6_bytes, &in6addr_loopback, sizeof(in6addr_loopback)) == 0) {
+    return true;
   }
 
   return false;

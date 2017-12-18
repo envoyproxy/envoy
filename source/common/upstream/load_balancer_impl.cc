@@ -36,11 +36,23 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
-LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
-                                   const PrioritySet* local_priority_set, ClusterStats& stats,
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : stats_(stats), runtime_(runtime), random_(random), priority_set_(priority_set),
-      best_available_host_set_(bestAvailable(&priority_set)),
+      best_available_host_set_(bestAvailable(&priority_set)) {
+  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                         const std::vector<HostSharedPtr>&) -> void {
+    // Update the host set to use for picking, based on the new state.
+    best_available_host_set_ = bestAvailable(&priority_set_);
+  });
+
+} // namespace Upstream
+
+ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority_set,
+                                                     const PrioritySet* local_priority_set,
+                                                     ClusterStats& stats, Runtime::Loader& runtime,
+                                                     Runtime::RandomGenerator& random)
+    : LoadBalancerBase(priority_set, stats, runtime, random),
       local_priority_set_(local_priority_set) {
   ASSERT(priority_set.hostSetsPerPriority().size() > 0);
   resizePerPriorityState();
@@ -74,13 +86,13 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
   }
 }
 
-LoadBalancerBase::~LoadBalancerBase() {
+ZoneAwareLoadBalancerBase::~ZoneAwareLoadBalancerBase() {
   if (local_priority_set_member_update_cb_handle_ != nullptr) {
     local_priority_set_member_update_cb_handle_->remove();
   }
 }
 
-void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
+void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
   // We are updating based on a change for a priority level in priority_set_, or the latched
@@ -153,14 +165,14 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
   }
 };
 
-void LoadBalancerBase::resizePerPriorityState() {
+void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
   const uint32_t size = priority_set_.hostSetsPerPriority().size();
   while (per_priority_state_.size() < size) {
     per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
   }
 }
 
-bool LoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
+bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
   if (priority_set_.hostSetsPerPriority().size() < priority + 1) {
     return true;
   }
@@ -191,7 +203,7 @@ bool LoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
   return false;
 }
 
-bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime) {
+bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime) {
   uint64_t global_panic_threshold =
       std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
   double healthy_percent = host_set.hosts().size() == 0
@@ -206,7 +218,7 @@ bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, Runtime::Loader
   return false;
 }
 
-void LoadBalancerBase::calculateLocalityPercentage(
+void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
     const std::vector<std::vector<HostSharedPtr>>& hosts_per_locality, uint64_t* ret) {
   uint64_t total_hosts = 0;
   for (const auto& locality_hosts : hosts_per_locality) {
@@ -219,7 +231,7 @@ void LoadBalancerBase::calculateLocalityPercentage(
   }
 }
 
-const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts() {
+const std::vector<HostSharedPtr>& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts() {
   PerPriorityState& state = *per_priority_state_[bestAvailablePriority()];
   ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
@@ -268,12 +280,12 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts(
   return best_available_host_set_->healthyHostsPerLocality()[i];
 }
 
-const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
+const std::vector<HostSharedPtr>& ZoneAwareLoadBalancerBase::hostsToUse() {
   ASSERT(best_available_host_set_->healthyHosts().size() <=
          best_available_host_set_->hosts().size());
 
   // If the best available priority has insufficient healthy hosts, return all hosts.
-  if (LoadBalancerUtility::isGlobalPanic(*best_available_host_set_, runtime_)) {
+  if (isGlobalPanic(*best_available_host_set_, runtime_)) {
     stats_.lb_healthy_panic_.inc();
     return best_available_host_set_->hosts();
   }
@@ -290,7 +302,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
     return best_available_host_set_->healthyHosts();
   }
 
-  if (LoadBalancerUtility::isGlobalPanic(localHostSet(), runtime_)) {
+  if (isGlobalPanic(localHostSet(), runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
@@ -313,7 +325,7 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const PrioritySet& priority_s
                                                    const PrioritySet* local_priority_set,
                                                    ClusterStats& stats, Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
-    : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {
+    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {
   priority_set.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
                                         const std::vector<HostSharedPtr>& hosts_removed) -> void {
     if (last_host_) {
