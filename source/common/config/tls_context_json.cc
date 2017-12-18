@@ -39,27 +39,22 @@ void TlsContextJson::translateCommonTlsContext(
     common_tls_context.add_alpn_protocols(alpn_protocol);
   }
 
-  if (!json_tls_context.getString("alt_alpn_protocols", "").empty()) {
-    common_tls_context.mutable_deprecated_v1()->set_alt_alpn_protocols(
-        json_tls_context.getString("alt_alpn_protocols", ""));
-  }
+  common_tls_context.mutable_deprecated_v1()->set_alt_alpn_protocols(
+      json_tls_context.getString("alt_alpn_protocols", ""));
 
-  if (!json_tls_context.getString("cert_chain_file", "").empty() ||
-      !json_tls_context.getString("private_key_file", "").empty()) {
-    translateTlsCertificate(json_tls_context,
-                            *common_tls_context.mutable_tls_certificates()->Add());
-  }
+  translateTlsCertificate(json_tls_context, *common_tls_context.mutable_tls_certificates()->Add());
 
-  if (!json_tls_context.getString("ca_cert_file", "").empty()) {
-    common_tls_context.mutable_validation_context()->mutable_trusted_ca()->set_filename(
+  auto* validation_context = common_tls_context.mutable_validation_context();
+  if (json_tls_context.hasObject("ca_cert_file")) {
+    validation_context->mutable_trusted_ca()->set_filename(
         json_tls_context.getString("ca_cert_file", ""));
   }
-  if (!json_tls_context.getString("verify_certificate_hash", "").empty()) {
-    common_tls_context.mutable_validation_context()->add_verify_certificate_hash(
+  if (json_tls_context.hasObject("verify_certificate_hash")) {
+    validation_context->add_verify_certificate_hash(
         json_tls_context.getString("verify_certificate_hash"));
   }
   for (const auto& san : json_tls_context.getStringArray("verify_subject_alt_name", true)) {
-    common_tls_context.mutable_validation_context()->add_verify_subject_alt_name(san);
+    validation_context->add_verify_subject_alt_name(san);
   }
 
   const std::vector<std::string> cipher_suites =
@@ -76,11 +71,11 @@ void TlsContextJson::translateCommonTlsContext(
 
 void TlsContextJson::translateTlsCertificate(const Json::Object& json_tls_context,
                                              envoy::api::v2::TlsCertificate& tls_certificate) {
-  if (!json_tls_context.getString("cert_chain_file", "").empty()) {
+  if (json_tls_context.hasObject("cert_chain_file")) {
     tls_certificate.mutable_certificate_chain()->set_filename(
         json_tls_context.getString("cert_chain_file", ""));
   }
-  if (!json_tls_context.getString("private_key_file", "").empty()) {
+  if (json_tls_context.hasObject("private_key_file")) {
     tls_certificate.mutable_private_key()->set_filename(
         json_tls_context.getString("private_key_file", ""));
   }
