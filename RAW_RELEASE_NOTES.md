@@ -13,7 +13,8 @@ final version.
   deprecated.
 * TCP proxy access logs now bring an IP address without a port when using DOWNSTREAM_ADDRESS.
   Use DOWNSTREAM_REMOTE_ADDRESS instead.
-* Added DOWNSTREAM_REMOTE_ADDRESS header formatter. CLIENT_IP header formatter has been deprecated.
+* Added DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT header formatter. CLIENT_IP header formatter has been
+  deprecated.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
   refactored with the interface.
