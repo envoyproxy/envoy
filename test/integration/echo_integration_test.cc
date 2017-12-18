@@ -28,7 +28,7 @@ public:
   }
 
   /**
-   *  Initializer for an individual test.
+   * Initializer for an individual test.
    */
   void SetUp() override {
     named_ports_ = {{"echo"}};
