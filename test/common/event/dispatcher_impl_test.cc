@@ -1,3 +1,4 @@
+#include <condition_variable>
 #include <functional>
 #include <mutex>
 
@@ -55,12 +56,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
 class DispatcherImplTest : public ::testing::Test {
 protected:
-  DispatcherImplTest() {
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      work_id_ = 0;
-    }
-    dispatcher_ = std::make_unique<DispatcherImpl>();
+  DispatcherImplTest() : dispatcher_(std::make_unique<DispatcherImpl>()), work_finished_(false) {
     dispatcher_thread_ = std::make_unique<Thread::Thread>([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -80,49 +76,47 @@ protected:
   std::unique_ptr<Thread::Thread> dispatcher_thread_;
   DispatcherPtr dispatcher_;
   std::mutex mu_;
-  int work_id_;
+  std::condition_variable cv_;
+  
+  bool work_finished_;
   TimerPtr keepalive_timer_;
 };
 
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
-    std::lock_guard<std::mutex> lock(mu_);
-    work_id_ = 1;
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      work_finished_ = true;
+    }
+    cv_.notify_one();
   });
 
-  bool reached_value = false;
-  while (!reached_value) {
-    std::lock_guard<std::mutex> lock(mu_);
-    reached_value = work_id_ == 1;
-  }
+  std::unique_lock<std::mutex> lock(mu_);
+
+  EXPECT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return work_finished_; }));
 }
 
 TEST_F(DispatcherImplTest, Timer) {
-  std::unique_ptr<Timer> timer;
+  TimerPtr timer;
   dispatcher_->post([this, &timer]() {
-
+    {
     std::lock_guard<std::mutex> lock(mu_);
     timer = dispatcher_->createTimer([this]() {
-      std::lock_guard<std::mutex> lock(mu_);
-      work_id_ = 1;
+      {
+        std::lock_guard<std::mutex> lock(mu_);
+        work_finished_ = true;
+      }
+      cv_.notify_one();
     });
-
+    }
+    cv_.notify_one();
   });
 
-  bool reached_value = false;
-  while (!reached_value) {
-    std::lock_guard<std::mutex> lock(mu_);
-    if (timer) {
-      timer->enableTimer(std::chrono::milliseconds(50));
-      reached_value = true;
-    }
-  }
+  std::unique_lock<std::mutex> lock(mu_);
+  ASSERT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [&timer]() { return static_cast<bool>(timer);}));
+  timer->enableTimer(std::chrono::milliseconds(50));
 
-  reached_value = false;
-  while (!reached_value) {
-    std::lock_guard<std::mutex> lock(mu_);
-    reached_value = work_id_ == 1;
-  }
+  EXPECT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return work_finished_;}));
 }
 
 } // namespace Event
