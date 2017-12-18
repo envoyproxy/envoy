@@ -544,7 +544,7 @@ TEST_P(ConnectionImplTest, BindTest) {
   }
   setUpBasicConnection();
   connect();
-  EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
+  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
 
   disconnect(true);
 }

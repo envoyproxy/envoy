@@ -66,10 +66,14 @@ void TlsContextJson::translateCommonTlsContext(
 
 void TlsContextJson::translateTlsCertificate(const Json::Object& json_tls_context,
                                              envoy::api::v2::TlsCertificate& tls_certificate) {
-  tls_certificate.mutable_certificate_chain()->set_filename(
-      json_tls_context.getString("cert_chain_file", ""));
-  tls_certificate.mutable_private_key()->set_filename(
-      json_tls_context.getString("private_key_file", ""));
+  if (json_tls_context.hasObject("cert_chain_file")) {
+    tls_certificate.mutable_certificate_chain()->set_filename(
+        json_tls_context.getString("cert_chain_file", ""));
+  }
+  if (json_tls_context.hasObject("private_key_file")) {
+    tls_certificate.mutable_private_key()->set_filename(
+        json_tls_context.getString("private_key_file", ""));
+  }
 }
 
 } // namespace Config

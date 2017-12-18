@@ -59,13 +59,6 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
           tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
   // TODO(htuch): Support multiple hashes.
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
-  if (!config.tls_certificates().empty()) {
-    // TODO(htuch): Support inline cert material delivery.
-    ASSERT(config.tls_certificates()[0].certificate_chain().specifier_case() ==
-           envoy::api::v2::DataSource::kFilename);
-    ASSERT(config.tls_certificates()[0].private_key().specifier_case() ==
-           envoy::api::v2::DataSource::kFilename);
-  }
 }
 
 unsigned
@@ -140,7 +133,14 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
         return ret;
       }()) {
   // TODO(PiotrSikora): Support multiple TLS certificates.
+  // TODO(mattklein123): All of the ASSERTs in this file need to be converted to exceptions with
+  //                     proper error handling.
+  // TODO(htuch): Support inline cert material delivery.
   ASSERT(config.common_tls_context().tls_certificates().size() == 1);
+  ASSERT(config.common_tls_context().tls_certificates()[0].certificate_chain().specifier_case() ==
+         envoy::api::v2::DataSource::kFilename);
+  ASSERT(config.common_tls_context().tls_certificates()[0].private_key().specifier_case() ==
+         envoy::api::v2::DataSource::kFilename);
 }
 
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)

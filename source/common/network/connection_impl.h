@@ -78,8 +78,8 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const Address::Instance& remoteAddress() const override { return *remote_address_; }
-  const Address::Instance& localAddress() const override { return *local_address_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   const Ssl::Connection* ssl() const override { return nullptr; }

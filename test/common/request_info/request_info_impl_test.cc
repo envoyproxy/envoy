@@ -4,7 +4,7 @@
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/access_log/request_info_impl.h"
+#include "common/request_info/request_info_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
 
@@ -13,7 +13,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace AccessLog {
+namespace RequestInfo {
 namespace {
 
 class RequestInfoTimingWrapper {
@@ -145,5 +145,5 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
 }
 
 } // namespace
-} // namespace AccessLog
+} // namespace RequestInfo
 } // namespace Envoy

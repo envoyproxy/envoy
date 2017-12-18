@@ -175,6 +175,7 @@ public:
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
 
   const std::string versionInfo() const override;
+  const std::string& localClusterName() const override { return local_cluster_name_; }
 
 private:
   /**
@@ -265,6 +266,8 @@ private:
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
+  // The name of the local cluster of this Envoy instance if defined, else the empty string.
+  std::string local_cluster_name_;
 };
 
 } // namespace Upstream

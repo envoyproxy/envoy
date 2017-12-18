@@ -16,11 +16,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/request_info_impl.h"
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
+#include "common/request_info/request_info_impl.h"
 
 #include "api/filter/network/tcp_proxy.pb.h"
 
@@ -209,7 +209,7 @@ protected:
   Stats::TimespanPtr connected_timespan_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  AccessLog::RequestInfoImpl request_info_;
+  RequestInfo::RequestInfoImpl request_info_;
   uint32_t connect_attempts_{};
 };
 

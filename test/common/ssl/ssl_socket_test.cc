@@ -1798,7 +1798,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
+  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
 
   disconnect();
 }

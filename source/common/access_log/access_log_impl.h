@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/request_info/request_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
@@ -51,7 +52,8 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -64,7 +66,8 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -88,7 +91,8 @@ public:
   AndFilter(const envoy::api::v2::filter::accesslog::AndFilter& config, Runtime::Loader& runtime);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -99,7 +103,8 @@ public:
   OrFilter(const envoy::api::v2::filter::accesslog::OrFilter& config, Runtime::Loader& runtime);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -110,7 +115,8 @@ public:
   NotHealthCheckFilter() {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -119,7 +125,8 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 };
 
 /**
@@ -131,7 +138,8 @@ public:
                 Runtime::Loader& runtime);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) override;
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -160,7 +168,7 @@ public:
 
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-           const RequestInfo& request_info) override;
+           const RequestInfo::RequestInfo& request_info) override;
 
 private:
   Filesystem::FileSharedPtr log_file_;

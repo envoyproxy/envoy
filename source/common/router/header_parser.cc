@@ -54,12 +54,15 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const AccessLog::RequestInfo& request_info) const {
+                                   const RequestInfo::RequestInfo& request_info) const {
   for (const auto& formatter : headers_to_add_) {
-    if (formatter.second->append()) {
-      headers.addReferenceKey(formatter.first, formatter.second->format(request_info));
-    } else {
-      headers.setReferenceKey(formatter.first, formatter.second->format(request_info));
+    const std::string value = formatter.second->format(request_info);
+    if (!value.empty()) {
+      if (formatter.second->append()) {
+        headers.addReferenceKey(formatter.first, value);
+      } else {
+        headers.setReferenceKey(formatter.first, value);
+      }
     }
   }
 

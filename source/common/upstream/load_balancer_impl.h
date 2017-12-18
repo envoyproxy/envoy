@@ -31,6 +31,7 @@ public:
  */
 class LoadBalancerBase {
 protected:
+  // Both priority_set and local_priority_set if non-null must have at least one host set.
   LoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                    ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random);
   ~LoadBalancerBase();
@@ -44,18 +45,27 @@ protected:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
-  // TODO(alyssawilk) make load balancers priority-aware and remove.
-protected:
-  const HostSet& host_set_;
-
 private:
-  enum class LocalityRoutingState { NoLocalityRouting, LocalityDirect, LocalityResidual };
+  enum class LocalityRoutingState {
+    // Locality based routing is off.
+    NoLocalityRouting,
+    // All queries can be routed to the local locality.
+    LocalityDirect,
+    // The local locality can not handle the anticipated load. Residual load will be spread across
+    // various other localities.
+    LocalityResidual
+  };
+
+  /**
+   * Increase per_priority_state_ to at least priority_set.hostSetsPerPriority().size()
+   */
+  void resizePerPriorityState();
 
   /**
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRouting();
+  bool earlyExitNonLocalityRouting(uint32_t priority);
 
   /**
    * Try to select upstream hosts from the same locality.
@@ -74,13 +84,38 @@ private:
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
-  void regenerateLocalityRoutingStructures();
+  void regenerateLocalityRoutingStructures(uint32_t priority);
 
-  const HostSet* local_host_set_;
-  uint64_t local_percent_to_route_{};
-  LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
-  std::vector<uint64_t> residual_capacity_;
-  Common::CallbackHandle* local_host_set_member_update_cb_handle_{};
+  uint32_t bestAvailablePriority() const { return best_available_host_set_->priority(); }
+
+  HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
+
+  // The priority-ordered set of hosts to use for load balancing.
+  const PrioritySet& priority_set_;
+  // The lowest priority host set from priority_set_ with healthy hosts, or the
+  // zero-priority host set if all host sets are fully unhealthy.
+  const HostSet* best_available_host_set_;
+
+  // The set of local Envoy instances which are load balancing across priority_set_.
+  const PrioritySet* local_priority_set_;
+
+  struct PerPriorityState {
+    // The percent of requests which can be routed to the local locality.
+    uint64_t local_percent_to_route_{};
+    // Tracks the current state of locality based routing.
+    LocalityRoutingState locality_routing_state_{LocalityRoutingState::NoLocalityRouting};
+    // When locality_routing_state_ == LocalityResidual this tracks the capacity
+    // for each of the non-local localities to determine what traffic should be
+    // routed where.
+    std::vector<uint64_t> residual_capacity_;
+  };
+  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  // Routing state broken out for each priority level in priority_set_.
+  // With the current implementation we could save some CPU and memory by only
+  // tracking this for best_available_host_set_ but as we support gentle
+  // failover it's useful to precompute it for all priority levels.
+  std::vector<PerPriorityStatePtr> per_priority_state_;
+  Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
 };
 
 /**

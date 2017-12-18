@@ -13,7 +13,8 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
-WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, const AccessLog::RequestInfo& request_info,
+WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
+                             const RequestInfo::RequestInfo& request_info,
                              const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks)
