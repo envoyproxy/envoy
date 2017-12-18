@@ -312,9 +312,7 @@ TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
 }
 
 TEST_P(SslSocketTest, NoCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-  })EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
@@ -327,10 +325,7 @@ TEST_P(SslSocketTest, NoCert) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
@@ -364,10 +359,7 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
@@ -402,10 +394,7 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthHashVerificationNoClientCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-  }
-  )EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
