@@ -90,7 +90,6 @@ public:
   }
 
 private:
-  bool isAcceptEncodingGzip(const HeaderMap& headers) const;
   bool isCacheControlAllowed(const HeaderMap& headers) const;
   bool isContentTypeAllowed(const HeaderMap& headers) const;
   bool isMinimumContentLength(const HeaderMap& headers) const;

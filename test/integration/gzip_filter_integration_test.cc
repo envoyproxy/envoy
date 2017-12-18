@@ -80,7 +80,7 @@ public:
       name: envoy.gzip
     )EOF";
 
-  const uint64_t window_bits{31};
+  const uint64_t window_bits{15 | 16};
 
   Decompressor::ZlibDecompressorImpl decompressor_{};
 };
@@ -89,7 +89,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, GzipIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 /**
- * Exercises gzip compression with default configuration
+ * Exercises gzip compression with default configuration.
  */
 TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
   initializeFilter(default_config);
@@ -104,7 +104,7 @@ TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
 }
 
 /**
- * Exercises gzip compression with full configuration
+ * Exercises gzip compression with full configuration.
  */
 TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
   initializeFilter(full_config);
@@ -119,7 +119,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
 }
 
 /**
- * Exercises filter when client request contains unsupported 'accept-encoding' type
+ * Exercises filter when client request contains unsupported 'accept-encoding' type.
  */
 TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
   initializeFilter(default_config);
@@ -134,7 +134,7 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
 }
 
 /**
- * Exercises filter when upstream response is already encoded
+ * Exercises filter when upstream response is already encoded.
  */
 TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
   initializeFilter(default_config);
@@ -160,7 +160,7 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
 }
 
 /**
- * Exercises filter when upstream responds with content length below the default threshold
+ * Exercises filter when upstream responds with content length below the default threshold.
  */
 TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
   initializeFilter(default_config);
@@ -184,7 +184,30 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
 }
 
 /**
- * Exercises filter when upstream responds with restricted content-type value
+ * Exercises filter when response from upstream service is empty.
+ */
+TEST_P(GzipIntegrationTest, EmptyResponse) {
+  initializeFilter(default_config);
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"accept-encoding", "deflate, gzip"}};
+
+  Http::TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "0"}};
+
+  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("204", response_->headers().Status()->value().c_str());
+  ASSERT_TRUE(response_->headers().ContentEncoding() == nullptr);
+  EXPECT_EQ(0U, response_->body().size());
+}
+
+/**
+ * Exercises filter when upstream responds with restricted content-type value.
  */
 TEST_P(GzipIntegrationTest, SkipOnContentType) {
   initializeFilter(full_config);
@@ -199,7 +222,7 @@ TEST_P(GzipIntegrationTest, SkipOnContentType) {
 }
 
 /**
- * Exercises filter when upstream responds with restricted cache-control value
+ * Exercises filter when upstream responds with restricted cache-control value.
  */
 TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
   initializeFilter(full_config);

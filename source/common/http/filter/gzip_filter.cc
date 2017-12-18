@@ -65,18 +65,17 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
   // TODO(gsagula): The current implementation checks for the presence of 'gzip' and if the same
   // is followed by Qvalue. Since gzip is the only available encoding right now, order/priority of
   // preferred server encodings is disregarded (RFC2616-14.3).
-  skip_compression_ = !isAcceptEncodingGzip(headers);
+  skip_compression_ =
+      !(headers.AcceptEncoding() &&
+        std::regex_search(headers.AcceptEncoding()->value().c_str(), acceptEncodingRegex()));
   return FilterHeadersStatus::Continue;
 }
 
 FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
-  if (end_stream || skip_compression_) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (isMinimumContentLength(headers) && isContentTypeAllowed(headers) &&
-      isCacheControlAllowed(headers) && isEtagAllowed(headers) && isLastModifiedAllowed(headers) &&
-      isTransferEncodingAllowed(headers) && headers.ContentEncoding() == nullptr) {
+  if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
+      isContentTypeAllowed(headers) && isCacheControlAllowed(headers) && isEtagAllowed(headers) &&
+      isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
+      !headers.ContentEncoding()) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(), WINDOW_BITS,
@@ -103,7 +102,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
     compressor_.flush(compressed_data_);
   }
 
-  if (compressed_data_.length() > 0) {
+  if (compressed_data_.length()) {
     data.drain(n_data);
     data.move(compressed_data_);
     return Http::FilterDataStatus::Continue;
@@ -112,40 +111,29 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-bool GzipFilter::isAcceptEncodingGzip(const HeaderMap& headers) const {
-  if (headers.AcceptEncoding() != nullptr) {
-    return std::regex_search(headers.AcceptEncoding()->value().c_str(), acceptEncodingRegex());
-  }
-  return false;
-}
-
 bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
-  if (config_->contentTypeValues().size() > 0 && headers.ContentType() != nullptr) {
-    for (const auto& value : config_->contentTypeValues()) {
-      if (headers.ContentType()->value().find(value.c_str())) {
-        return true;
-      }
-    }
-    return false;
+  if (config_->contentTypeValues().size() && headers.ContentType()) {
+    return std::any_of(config_->contentTypeValues().begin(), config_->contentTypeValues().end(),
+                       [&headers](const auto& value) {
+                         return headers.ContentType()->value().find(value.c_str());
+                       });
   }
   return true;
 }
 
 bool GzipFilter::isCacheControlAllowed(const HeaderMap& headers) const {
-  if (config_->cacheControlValues().size() > 0 && headers.CacheControl() != nullptr) {
-    for (const auto& value : config_->cacheControlValues()) {
-      if (headers.CacheControl()->value().find(value.c_str())) {
-        return true;
-      }
-    }
-    return false;
+  if (config_->cacheControlValues().size() && headers.CacheControl()) {
+    return std::any_of(config_->cacheControlValues().begin(), config_->cacheControlValues().end(),
+                       [&headers](const auto& value) {
+                         return headers.CacheControl()->value().find(value.c_str());
+                       });
   }
   return true;
 }
 
 bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {
   uint64_t content_length;
-  if (headers.ContentLength() != nullptr &&
+  if (headers.ContentLength() &&
       StringUtil::atoul(headers.ContentLength()->value().c_str(), content_length)) {
     return content_length >= config_->minimumLength();
   }
@@ -153,11 +141,11 @@ bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {
 }
 
 bool GzipFilter::isEtagAllowed(const HeaderMap& headers) const {
-  return config_->disableOnEtag() ? headers.Etag() == nullptr : true;
+  return config_->disableOnEtag() ? !headers.Etag() : true;
 }
 
 bool GzipFilter::isLastModifiedAllowed(const HeaderMap& headers) const {
-  return config_->disableOnLastModified() ? headers.LastModified() == nullptr : true;
+  return config_->disableOnLastModified() ? !headers.LastModified() : true;
 }
 
 bool GzipFilter::isTransferEncodingAllowed(const HeaderMap& headers) const {

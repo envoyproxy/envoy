@@ -367,5 +367,15 @@ TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
 }
 
+// No compression when upstream response is empty.
+TEST_F(GzipFilterTest, EmptyResponse) {
+  setUpTest(R"EOF({})EOF");
+  Http::TestHeaderMapImpl headers{{":method", "get"}, {":status", "204"}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
+  EXPECT_EQ("", headers.get_("content-length"));
+  EXPECT_EQ("", headers.get_("content-encoding"));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+}
+
 } // namespace Http
 } // namespace Envoy
