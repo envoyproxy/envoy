@@ -30,6 +30,9 @@ public:
   typedef std::function<void(envoy::api::v2::filter::network::HttpConnectionManager&)>
       HttpModifierFunction;
 
+  // A basic configuration (admin port, cluster_0, one listener) with no network filters.
+  static const std::string BASE_CONFIG;
+
   // A basic configuration for L4 proxying.
   static const std::string TCP_PROXY_CONFIG;
   // A basic configuration for L7 proxying.
@@ -86,7 +89,7 @@ public:
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
-  void loadHttpConnectionManager(envoy::api::v2::filter::network::HttpConnectionManager& hcm);
+  bool loadHttpConnectionManager(envoy::api::v2::filter::network::HttpConnectionManager& hcm);
   // Stick the contents of the procided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void

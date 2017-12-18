@@ -269,10 +269,12 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_);
-  // Need to ensure we have an LDS update before invoking registerTestServerPorts() below that
-  // needs to know about the bound listener ports.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  registerTestServerPorts(port_names);
+  if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
+    // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
+    // needs to know about the bound listener ports.
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    registerTestServerPorts(port_names);
+  }
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
