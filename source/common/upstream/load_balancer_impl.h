@@ -27,7 +27,6 @@ protected:
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random);
-  ~LoadBalancerBase() {}
 
   uint32_t bestAvailablePriority() const { return best_available_host_set_->priority(); }
 
