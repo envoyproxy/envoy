@@ -48,12 +48,12 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * Each filter can set independent response flag, flags are accumulated.
+   * Each filter can set independent response flags. The flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
-   * Filter can trigger this callback when an upstream host has been selected.
+   * Filters can trigger this callback when an upstream host has been selected.
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
@@ -129,9 +129,9 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
-   * Get the upstream local address, eg the source ip:port of the connection.
+   * Get the upstream local address.
    */
-  virtual const Optional<std::string>& upstreamLocalAddress() const PURE;
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
 
   /**
    * @return whether the request is a health check request or not.
@@ -144,9 +144,16 @@ public:
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
-   * Get the downstream address.
+   * Get the downstream local address. Note that this will never be nullptr.
    */
-  virtual const std::string& getDownstreamAddress() const PURE;
+  virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
+
+  /**
+   * Get the downstream remote address. Note that this will never be nullptr. Additionally note
+   * that this may not be the address of the physical connection if for example the address was
+   * inferred from proxy proto, x-forwarded-for, etc.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
 };
 
 } // namespace RequestInfo

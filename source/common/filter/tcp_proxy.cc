@@ -165,7 +165,8 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress()->asString();
+  request_info_.downstream_local_address_ = read_callbacks_->connection().localAddress();
+  request_info_.downstream_remote_address_ = read_callbacks_->connection().remoteAddress();
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -345,7 +346,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
   request_info_.onUpstreamHostSelected(conn_info.host_description_);
-  request_info_.upstream_local_address_ = upstream_connection_->localAddress()->asString();
+  request_info_.upstream_local_address_ = upstream_connection_->localAddress();
 
   ASSERT(connect_timeout_timer_ == nullptr);
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(

@@ -96,7 +96,7 @@ public:
                      void(const RouteEntry& route,
                           std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address));
+                          const Network::Address::Instance& remote_address));
 
   uint64_t stage_{};
   std::string disable_key_;
