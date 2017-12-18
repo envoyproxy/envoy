@@ -34,7 +34,7 @@ static envoy::api::v2::Route parseRouteFromV2Yaml(const std::string& yaml) {
 }
 
 TEST(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "CLIENT_IP";
@@ -44,7 +44,7 @@ TEST(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
 }
 
 TEST(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
   const std::string variable = "PROTOCOL";
@@ -54,7 +54,7 @@ TEST(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
 }
 
 TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
@@ -202,7 +202,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 }
 
 TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
@@ -213,7 +213,7 @@ TEST(RequestInfoFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost
 }
 
 TEST(RequestInfoHeaderFormatterTest, WrongVariableToFormat) {
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const std::string variable = "INVALID_VARIABLE";
@@ -328,7 +328,7 @@ TEST(HeaderParserTest, EvaluateHeaders) {
   HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
       parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   req_header_parser->evaluateHeaders(headerMap, request_info);
@@ -354,7 +354,7 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   envoy::api::v2::Metadata metadata;
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
@@ -379,7 +379,7 @@ TEST(HeaderParserTest, EvaluateStaticHeaders) {
   HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
       parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
@@ -414,7 +414,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   Http::TestHeaderMapImpl headerMap{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
 
@@ -461,7 +461,7 @@ route:
   HeaderParserPtr resp_header_parser = Envoy::Router::HeaderParser::configure(
       route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   const std::string downstream_addr = "127.0.0.1";
   ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   resp_header_parser->evaluateHeaders(headerMap, request_info);

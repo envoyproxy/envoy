@@ -1132,7 +1132,7 @@ Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
   return parent_.connection_manager_.read_callbacks_->connection().dispatcher();
 }
 
-AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
+RequestInfo::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
   return parent_.request_info_;
 }
 
