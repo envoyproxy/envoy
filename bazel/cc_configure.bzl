@@ -21,7 +21,7 @@
 # limitations under the License.
 """Rules for configuring the C++ toolchain (experimental)."""
 
-load("//bazel:osx_cc_configure.bzl", "configure_osx_toolchain")
+load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
 load("//bazel:unix_cc_configure.bzl", "configure_unix_toolchain")
 load("//bazel:lib_cc_configure.bzl", "get_cpu_value")
 
