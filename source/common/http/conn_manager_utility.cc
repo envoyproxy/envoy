@@ -49,8 +49,10 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
+  bool single_xff_address;
   if (config.useRemoteAddress()) {
     final_remote_address = connection.remoteAddress();
+    single_xff_address = request_headers.ForwardedFor() == nullptr;
     if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
@@ -60,12 +62,10 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
-    // If we find one, use it. Otherwise just use real connection's remote address for logging and
-    // internal/external calculations.
-    final_remote_address = Utility::getLastAddressFromXFF(request_headers);
-    if (final_remote_address == nullptr) {
-      final_remote_address = connection.remoteAddress();
-    }
+    // If we find one, use it.
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    final_remote_address = ret.address_;
+    single_xff_address = ret.single_address_;
   }
 
   // If we didn't already replace x-forwarded-proto because we are using the remote address, and
@@ -75,13 +75,27 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
-  // At this point we can determine whether this is an internal or external request. This is done
-  // via XFF, which was set above or we trust.
-  bool internal_request = Network::Utility::isInternalAddress(*final_remote_address);
+  // At this point we can determine whether this is an internal or external request. The
+  // determination of internal status uses the following:
+  // 1) After remote address/XFF appending, the XFF header must contain a *single* address.
+  // 2) The single address must be an internal address.
+  // 3) If configured to not use remote address, but no XFF header is available, even if the real
+  //    remote is internal, the request is considered external.
+  // HUGE WARNING: The way we do this is not optimal but is how it worked "from the beginning" so
+  //               we can't change it at this point. In the future we will likely need to add
+  //               additional inference modes and make this mode legacy.
+  const bool internal_request = single_xff_address && final_remote_address != nullptr &&
+                                Network::Utility::isInternalAddress(*final_remote_address);
+
+  // After determining internal request status, if there is no final remote address, due to no XFF,
+  // busted XFF, etc., use the direct connection remote address for logging.
+  if (final_remote_address == nullptr) {
+    final_remote_address = connection.remoteAddress();
+  }
 
   // Edge request is the request from external clients to front Envoy.
   // Request from front Envoy to the internal service will be treated as not edge request.
-  bool edge_request = !internal_request && config.useRemoteAddress();
+  const bool edge_request = !internal_request && config.useRemoteAddress();
 
   // If internal request, set header and do other internal only modifications.
   if (internal_request) {

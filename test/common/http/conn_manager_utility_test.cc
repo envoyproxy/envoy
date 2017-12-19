@@ -36,6 +36,25 @@ public:
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
   }
 
+  struct MutateRequestRet {
+    bool operator==(const MutateRequestRet& rhs) const {
+      return downstream_address_ == rhs.downstream_address_ && internal_ == rhs.internal_;
+    }
+
+    std::string downstream_address_;
+    bool internal_;
+  };
+
+  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol protocol) {
+    MutateRequestRet ret;
+    ret.downstream_address_ =
+        ConnectionManagerUtility::mutateRequestHeaders(
+            headers, protocol, connection_, config_, route_config_, random_, runtime_, local_info_)
+            ->asString();
+    ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
+    return ret;
+  }
+
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
@@ -50,75 +69,55 @@ public:
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
 
-  TestHeaderMapImpl headers{};
-  EXPECT_EQ("12.12.12.12:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                 headers, Protocol::Http2, connection_, config_, route_config_,
-                                 random_, runtime_, local_info_)
-                                 ->asString());
-
-  EXPECT_TRUE(headers.has(Headers::get().ForwardedFor));
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(connection_.remote_address_->ip()->addressAsString(),
             headers.get_(Headers::get().ForwardedFor));
 }
 
-TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) {
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+  TestHeaderMapImpl headers;
 
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-  EXPECT_CALL(config_, localAddress()).WillRepeatedly(ReturnRef(local_address));
-
-  TestHeaderMapImpl headers{};
-  EXPECT_EQ("127.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                               headers, Protocol::Http2, connection_, config_, route_config_,
-                               random_, runtime_, local_info_)
-                               ->asString());
-
-  EXPECT_TRUE(headers.has(Headers::get().ForwardedFor));
+  EXPECT_EQ((MutateRequestRet{"127.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(local_address.ip()->addressAsString(), headers.get_(Headers::get().ForwardedFor));
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
-
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestHeaderMapImpl headers{{"user-agent", "foo"}};
-  EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
 
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
-  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
-
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(local_info_, nodeName()).WillByDefault(Return(canary_node_));
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
-  EXPECT_CALL(local_info_, nodeName()).Times(2).WillRepeatedly(Return(canary_node_));
-  EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
 
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
   EXPECT_EQ("canary", headers.get_(Headers::get().EnvoyDownstreamServiceNode));
-  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
 TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
-
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
 
   {
@@ -128,11 +127,9 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     EXPECT_CALL(random_, uuid()).Times(0);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
-    EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                headers, Protocol::Http2, connection_, config_, route_config_,
-                                random_, runtime_, local_info_)
-                                ->asString());
 
+    EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     // Traceable (forced trace) variant of uuid
     EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get_(Headers::get().RequestId));
   }
@@ -144,10 +141,9 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     EXPECT_CALL(random_, uuid()).Times(0);
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
-    EXPECT_EQ("34.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                headers, Protocol::Http2, connection_, config_, route_config_,
-                                random_, runtime_, local_info_)
-                                ->asString());
+
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ(uuid, headers.get_(Headers::get().RequestId));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyForceTrace));
   }
@@ -155,7 +151,6 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
-
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
@@ -166,11 +161,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     EXPECT_CALL(random_, uuid());
 
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
-    EXPECT_EQ("34.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                headers, Protocol::Http2, connection_, config_, route_config_,
-                                random_, runtime_, local_info_)
-                                ->asString());
-
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
     // No changes to uuid as x-client-trace-id is missing.
@@ -186,11 +178,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(false));
 
-    EXPECT_EQ("34.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                headers, Protocol::Http2, connection_, config_, route_config_,
-                                random_, runtime_, local_info_)
-                                ->asString());
-
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
@@ -205,11 +194,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
         .WillOnce(Return(true));
 
-    EXPECT_EQ("34.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                headers, Protocol::Http2, connection_, config_, route_config_,
-                                random_, runtime_, local_info_)
-                                ->asString());
-
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     // Traceable (client trace) variant of random_.uuid_
     EXPECT_EQ("a121e9e1-feae-b136-9e0e-6fac343d56c9", headers.get_(Headers::get().RequestId));
@@ -217,59 +203,46 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstream) {
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(false));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
   TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                             {"x-request-id", "id"},
                             {"x-forwarded-for", "34.0.0.1"}};
 
   EXPECT_CALL(local_info_, nodeName()).Times(0);
-  EXPECT_EQ("34.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
 
+  EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("foo", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("id", headers.get_(Headers::get().RequestId));
-  EXPECT_FALSE(headers.has(Headers::get().EnvoyInternalRequest));
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
-
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   user_agent_.value("bar");
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
   EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(empty_node_));
-  EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
 
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
-  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
-
-  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
-
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   user_agent_.value("bar");
-  TestHeaderMapImpl headers{};
-  EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
+  TestHeaderMapImpl headers;
 
-  EXPECT_TRUE(headers.has(Headers::get().UserAgent));
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
-  EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
 TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
@@ -277,10 +250,8 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
     TestHeaderMapImpl headers{{":authority", "host"}, {":path", "/"}};
     EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_uuid"));
 
-    EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                    headers, Protocol::Http2, connection_, config_, route_config_,
-                                    random_, runtime_, local_info_)
-                                    ->asString());
+    EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ("generated_uuid", headers.get_("x-request-id"));
   }
 
@@ -288,13 +259,10 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
     Runtime::RandomGeneratorImpl rand;
     TestHeaderMapImpl headers{{"x-client-trace-id", "trace-id"}};
     std::string uuid = rand.uuid();
-
     EXPECT_CALL(random_, uuid()).WillOnce(Return(uuid));
 
-    EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                    headers, Protocol::Http2, connection_, config_, route_config_,
-                                    random_, runtime_, local_info_)
-                                    ->asString());
+    EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
     // x-request-id should not be set to be traceable as it's not edge request
     EXPECT_EQ(uuid, headers.get_("x-request-id"));
   }
@@ -302,38 +270,30 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
 
 TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternalRequest) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
-  EXPECT_CALL(config_, useRemoteAddress()).WillOnce(Return(true));
-
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestHeaderMapImpl headers{{"x-request-id", "original_request_id"}};
   EXPECT_CALL(random_, uuid()).Times(0);
 
-  EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("original_request_id", headers.get_("x-request-id"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
-  TestHeaderMapImpl headers{{"x-request-id", "original"}};
-
-  EXPECT_CALL(random_, uuid()).WillOnce(Return("override"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "original"}};
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("override"));
 
-  EXPECT_EQ("134.2.2.11:0", ConnectionManagerUtility::mutateRequestHeaders(
-                                headers, Protocol::Http2, connection_, config_, route_config_,
-                                random_, runtime_, local_info_)
-                                ->asString());
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("override", headers.get_("x-request-id"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
-
   TestHeaderMapImpl headers{{"x-envoy-decorator-operation", "foo"},
                             {"x-envoy-downstream-service-cluster", "foo"},
                             {"x-envoy-retry-on", "foo"},
@@ -344,12 +304,10 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                             {"x-envoy-upstream-rq-timeout-ms", "foo"},
                             {"x-envoy-expected-rq-timeout-ms", "10"},
                             {"custom_header", "foo"}};
-  EXPECT_EQ("50.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
-  EXPECT_FALSE(headers.has("x-envoy-internal"));
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
@@ -365,55 +323,56 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("60.0.0.2");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                             {"x-forwarded-for", "60.0.0.1"}};
-  EXPECT_EQ("60.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"60.0.0.1:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("60.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_EQ("60.0.0.1", headers.get_("x-forwarded-for"));
-  EXPECT_FALSE(headers.has("x-envoy-internal"));
 }
 
 // Verify that if XFF is invalid we fall back to remote address, even if it is a pipe.
 TEST_F(ConnectionManagerUtilityTest, PipeAddressInvalidXFFtDontUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::PipeInstance>("/blah");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-
   TestHeaderMapImpl headers{{"x-forwarded-for", "blah"}};
-  EXPECT_EQ("/blah", ConnectionManagerUtility::mutateRequestHeaders(
-                         headers, Protocol::Http2, connection_, config_, route_config_, random_,
-                         runtime_, local_info_)
-                         ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"/blah", false}), callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-envoy-external-address"));
-  EXPECT_FALSE(headers.has("x-envoy-internal"));
+}
+
+// Verify that we treat a request as external even if the direct remote is internal and XFF
+// includes only internal addresses. Note that this is legacy behavior. See the comments
+// in mutateRequestHeaders() for more info.
+TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.2"}};
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("10.0.0.2, 10.0.0.1", headers.get_("x-forwarded-for"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                             {"x-envoy-expected-rq-timeout-ms", "10"}};
-  EXPECT_EQ("10.0.0.1:0", ConnectionManagerUtility::mutateRequestHeaders(
-                              headers, Protocol::Http2, connection_, config_, route_config_,
-                              random_, runtime_, local_info_)
-                              ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("60.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
-  EXPECT_TRUE(headers.has("x-envoy-internal"));
 }
 
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRequests) {
   TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
 
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http11, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http11));
   EXPECT_EQ("upgrade", headers.get_("connection"));
   EXPECT_EQ("websocket", headers.get_("upgrade"));
 }
@@ -421,10 +380,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
   TestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};
 
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http11, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http11));
   EXPECT_FALSE(headers.has("connection"));
   EXPECT_FALSE(headers.has("upgrade"));
 }
@@ -432,10 +389,8 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
   TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
 
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("connection"));
   EXPECT_FALSE(headers.has("upgrade"));
 }
@@ -469,12 +424,10 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
@@ -486,13 +439,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
@@ -513,13 +464,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be,By=test://foo.com/"
             "be;Hash=abcdefg;SAN=test://foo.com/fe",
@@ -542,13 +491,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;Hash=xyz;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;Hash=xyz;SAN=test://bar.com/be,"
             "Hash=abcdefg;SAN=test://foo.com/fe",
@@ -574,13 +521,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
             "Francisco/OU=Lyft/CN=test.lyft.com\";SAN=test://foo.com/fe",
@@ -606,13 +551,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::SAN);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
             "Francisco/OU=Lyft/CN=test.lyft.com\";SAN=",
@@ -628,12 +571,10 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
@@ -646,13 +587,11 @@ TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
@@ -664,12 +603,10 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;SAN=abc"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
@@ -680,13 +617,11 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;SAN=test://bar.com/be"}};
-  EXPECT_EQ("10.0.0.3:50000", ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, Protocol::Http2, connection_, config_, route_config_,
-                                  random_, runtime_, local_info_)
-                                  ->asString());
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
