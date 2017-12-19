@@ -57,9 +57,35 @@ class TcpProxyUpstreamDrainManager;
 
 /**
  * Filter configuration.
+ *
+ * This configuration holds a TLS slot, and therefore it must be destructed
+ * on the main thread.
  */
 class TcpProxyConfig {
 public:
+  /**
+   * Configuration that can be shared and have an arbitrary lifetime safely.
+   */
+  class SharedConfig {
+  public:
+    SharedConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                 Server::Configuration::FactoryContext& context);
+    const TcpProxyStats& stats() { return stats_; }
+    const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+
+  private:
+    static TcpProxyStats generateStats(Stats::Scope& scope);
+
+    // Hold a Scope for the lifetime of the configuration because connections in
+    // the TcpProxyUpstreamDrainManager can live longer than the listener.
+    const Stats::ScopePtr stats_scope_;
+
+    const TcpProxyStats stats_;
+    Optional<std::chrono::milliseconds> idle_timeout_;
+  };
+
+  typedef std::shared_ptr<SharedConfig> SharedConfigSharedPtr;
+
   TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
                  Server::Configuration::FactoryContext& context);
 
@@ -73,11 +99,12 @@ public:
    */
   const std::string& getRouteFromEntries(Network::Connection& connection);
 
-  const TcpProxyStats& stats() { return stats_; }
+  const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+  const Optional<std::chrono::milliseconds>& idleTimeout() { return shared_config_->idleTimeout(); }
   TcpProxyUpstreamDrainManager& drainManager();
+  SharedConfigSharedPtr sharedConfig() { return shared_config_; }
 
 private:
   struct Route {
@@ -90,18 +117,11 @@ private:
     std::string cluster_name_;
   };
 
-  static TcpProxyStats generateStats(Stats::Scope& scope);
-
-  // Hold a Scope for the lifetime of the configuration because connections in
-  // the TcpProxyUpstreamDrainManager can live longer than the listener.
-  Stats::ScopePtr stats_scope_;
-
   std::vector<Route> routes_;
-  const TcpProxyStats stats_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
-  Optional<std::chrono::milliseconds> idle_timeout_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
+  SharedConfigSharedPtr shared_config_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -227,7 +247,8 @@ protected:
 // connection here allows it to finish draining or timeout.
 class TcpProxyDrainer : public Event::DeferredDeletable {
 public:
-  TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent, TcpProxyConfigSharedPtr config,
+  TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
+                  TcpProxyConfig::SharedConfigSharedPtr config,
                   std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
                   Network::ClientConnectionPtr connection, Event::TimerPtr idle_timer);
 
@@ -241,7 +262,7 @@ private:
   std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks_;
   Network::ClientConnectionPtr upstream_connection_;
   Event::TimerPtr timer_;
-  TcpProxyConfigSharedPtr config_;
+  TcpProxyConfig::SharedConfigSharedPtr config_;
 };
 
 typedef std::unique_ptr<TcpProxyDrainer> TcpProxyDrainerPtr;
@@ -249,7 +270,8 @@ typedef std::unique_ptr<TcpProxyDrainer> TcpProxyDrainerPtr;
 class TcpProxyUpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
   ~TcpProxyUpstreamDrainManager();
-  void add(TcpProxyConfigSharedPtr config, Network::ClientConnectionPtr upstream_connection,
+  void add(TcpProxyConfig::SharedConfigSharedPtr config,
+           Network::ClientConnectionPtr upstream_connection,
            std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks, Event::TimerPtr idle_timer);
   void remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher);
 

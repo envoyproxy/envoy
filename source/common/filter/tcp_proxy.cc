@@ -36,21 +36,25 @@ TcpProxyConfig::Route::Route(
   }
 }
 
-TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
-                               Server::Configuration::FactoryContext& context)
+TcpProxyConfig::SharedConfig::SharedConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                                           Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)),
-      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
-      upstream_drain_manager_slot_(context.threadLocal().allocateSlot()) {
-
-  upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr(new TcpProxyUpstreamDrainManager());
-  });
-
+      stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     idle_timeout_.value(std::chrono::milliseconds(
         Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
   }
+}
+
+TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                               Server::Configuration::FactoryContext& context)
+    : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
+      upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
+      shared_config_(std::make_shared<SharedConfig>(config, context)) {
+
+  upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
+    return ThreadLocal::ThreadLocalObjectSharedPtr(new TcpProxyUpstreamDrainManager());
+  });
 
   if (config.has_deprecated_v1()) {
     for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
@@ -129,7 +133,7 @@ TcpProxy::~TcpProxy() {
 
     if (upstream_connection_->state() != Network::Connection::State::Closed) {
       if (config_ != nullptr) {
-        config_->drainManager().add(config_, std::move(upstream_connection_),
+        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
                                     std::move(upstream_callbacks_), std::move(idle_timer_));
       } else {
         upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -138,7 +142,7 @@ TcpProxy::~TcpProxy() {
   }
 }
 
-TcpProxyStats TcpProxyConfig::generateStats(Stats::Scope& scope) {
+TcpProxyStats TcpProxyConfig::SharedConfig::generateStats(Stats::Scope& scope) {
   return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
@@ -497,7 +501,7 @@ TcpProxyUpstreamDrainManager::~TcpProxyUpstreamDrainManager() {
   }
 }
 
-void TcpProxyUpstreamDrainManager::add(TcpProxyConfigSharedPtr config,
+void TcpProxyUpstreamDrainManager::add(TcpProxyConfig::SharedConfigSharedPtr config,
                                        Network::ClientConnectionPtr upstream_connection,
                                        std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
                                        Event::TimerPtr idle_timer) {
@@ -518,7 +522,7 @@ void TcpProxyUpstreamDrainManager::remove(TcpProxyDrainer& drainer, Event::Dispa
 }
 
 TcpProxyDrainer::TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
-                                 TcpProxyConfigSharedPtr config,
+                                 TcpProxyConfig::SharedConfigSharedPtr config,
                                  std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
                                  Network::ClientConnectionPtr connection,
                                  Event::TimerPtr idle_timer)
