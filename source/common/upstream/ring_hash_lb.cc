@@ -14,25 +14,24 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
-    : host_set_(*priority_set.hostSetsPerPriority()[0]), stats_(stats), runtime_(runtime),
-      random_(random), config_(config) {
-  priority_set.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
-                                        const std::vector<HostSharedPtr>&) -> void {
-    // priority!=0 will be blocked by EDS validation.
-    ASSERT(priority == 0); // TODO(alyssawilk) make ring hash LB priority-aware.
-    UNREFERENCED_PARAMETER(priority);
-    refresh();
-  });
+    : LoadBalancerBase(priority_set, stats, runtime, random), config_(config) {
+  priority_set.addMemberUpdateCb(
+      [this](uint32_t priority, const std::vector<HostSharedPtr>&,
+             const std::vector<HostSharedPtr>&) -> void { refresh(priority); });
 
-  refresh();
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    refresh(host_set->priority());
+  }
 }
 
 HostConstSharedPtr RingHashLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
+  if (isGlobalPanic(*best_available_host_set_, runtime_)) {
     stats_.lb_healthy_panic_.inc();
-    return all_hosts_ring_.chooseHost(context, random_);
+    return per_priority_state_[bestAvailablePriority()]->all_hosts_ring_.chooseHost(context,
+                                                                                    random_);
   } else {
-    return healthy_hosts_ring_.chooseHost(context, random_);
+    return per_priority_state_[bestAvailablePriority()]->healthy_hosts_ring_.chooseHost(context,
+                                                                                        random_);
   }
 }
 
@@ -139,9 +138,13 @@ void RingHashLoadBalancer::Ring::create(
 #endif
 }
 
-void RingHashLoadBalancer::refresh() {
-  all_hosts_ring_.create(config_, host_set_.hosts());
-  healthy_hosts_ring_.create(config_, host_set_.healthyHosts());
+void RingHashLoadBalancer::refresh(uint32_t priority) {
+  while (per_priority_state_.size() < priority + 1) {
+    per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+  }
+  auto& host_set = priority_set_.hostSetsPerPriority()[priority];
+  per_priority_state_[priority]->all_hosts_ring_.create(config_, host_set->hosts());
+  per_priority_state_[priority]->healthy_hosts_ring_.create(config_, host_set->healthyHosts());
 }
 
 } // namespace Upstream

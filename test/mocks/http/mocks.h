@@ -199,7 +199,6 @@ public:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<RequestInfo::MockRequestInfo> request_info_;
   std::shared_ptr<Router::MockRoute> route_;
-  std::string downstream_address_;
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
@@ -218,7 +217,6 @@ public:
   MOCK_METHOD0(requestInfo, RequestInfo::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
-  MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
@@ -261,7 +259,6 @@ public:
   MOCK_METHOD0(requestInfo, RequestInfo::RequestInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
-  MOCK_METHOD0(downstreamAddress, const std::string&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(setEncoderBufferLimit, void(uint32_t));

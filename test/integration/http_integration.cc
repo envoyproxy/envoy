@@ -154,8 +154,9 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 }
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                                         Network::Address::IpVersion version)
-    : BaseIntegrationTest(version), downstream_protocol_(downstream_protocol) {
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
   named_ports_ = {{"http"}};
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
@@ -1010,7 +1011,7 @@ void HttpIntegrationTest::testUpstreamProtocolError() {
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
   // be fixed.
-  fake_upstream_connection->waitForData(187);
+  fake_upstream_connection->waitForData(211);
   fake_upstream_connection->write("bad protocol data!");
   fake_upstream_connection->waitForDisconnect();
   codec_client_->waitForDisconnect();

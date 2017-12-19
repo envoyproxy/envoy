@@ -17,7 +17,8 @@ const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
                                              RateLimit::Descriptor& descriptor,
                                              const std::string& local_service_cluster,
-                                             const Http::HeaderMap&, const std::string&) const {
+                                             const Http::HeaderMap&,
+                                             const Network::Address::Instance&) const {
   descriptor.entries_.push_back({"source_cluster", local_service_cluster});
   return true;
 }
@@ -25,7 +26,7 @@ bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
 bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
                                                   RateLimit::Descriptor& descriptor,
                                                   const std::string&, const Http::HeaderMap&,
-                                                  const std::string&) const {
+                                                  const Network::Address::Instance&) const {
   descriptor.entries_.push_back({"destination_cluster", route.clusterName()});
   return true;
 }
@@ -33,7 +34,7 @@ bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& rout
 bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               RateLimit::Descriptor& descriptor, const std::string&,
                                               const Http::HeaderMap& headers,
-                                              const std::string&) const {
+                                              const Network::Address::Instance&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
   if (!header_value) {
     return false;
@@ -43,21 +44,21 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
   return true;
 }
 
-bool RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
-                                             RateLimit::Descriptor& descriptor, const std::string&,
-                                             const Http::HeaderMap&,
-                                             const std::string& remote_address) const {
-  if (remote_address.empty()) {
+bool RemoteAddressAction::populateDescriptor(
+    const Router::RouteEntry&, RateLimit::Descriptor& descriptor, const std::string&,
+    const Http::HeaderMap&, const Network::Address::Instance& remote_address) const {
+  if (remote_address.type() != Network::Address::Type::Ip) {
     return false;
   }
 
-  descriptor.entries_.push_back({"remote_address", remote_address});
+  descriptor.entries_.push_back({"remote_address", remote_address.ip()->addressAsString()});
   return true;
 }
 
 bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
                                           RateLimit::Descriptor& descriptor, const std::string&,
-                                          const Http::HeaderMap&, const std::string&) const {
+                                          const Http::HeaderMap&,
+                                          const Network::Address::Instance&) const {
   descriptor.entries_.push_back({"generic_key", descriptor_value_});
   return true;
 }
@@ -74,7 +75,7 @@ HeaderValueMatchAction::HeaderValueMatchAction(
 bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
-                                                const std::string&) const {
+                                                const Network::Address::Instance&) const {
   if (expect_match_ == ConfigUtility::matchHeaders(headers, action_headers_)) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
     return true;
@@ -112,11 +113,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::RateLim
   }
 }
 
-void RateLimitPolicyEntryImpl::populateDescriptors(const Router::RouteEntry& route,
-                                                   std::vector<RateLimit::Descriptor>& descriptors,
-                                                   const std::string& local_service_cluster,
-                                                   const Http::HeaderMap& headers,
-                                                   const std::string& remote_address) const {
+void RateLimitPolicyEntryImpl::populateDescriptors(
+    const Router::RouteEntry& route, std::vector<RateLimit::Descriptor>& descriptors,
+    const std::string& local_service_cluster, const Http::HeaderMap& headers,
+    const Network::Address::Instance& remote_address) const {
   RateLimit::Descriptor descriptor;
   bool result = true;
   for (const RateLimitActionPtr& action : actions_) {

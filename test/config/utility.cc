@@ -12,42 +12,38 @@
 
 namespace Envoy {
 
-const std::string ConfigHelper::TCP_PROXY_CONFIG = R"EOF(
-static_resources:
-  listeners:
-    name: listener_0
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-      filters:
-        name: envoy.tcp_proxy
-        config:
-          stat_prefix: tcp_stats
-          cluster: cluster_0
-  clusters:
-    name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+const std::string ConfigHelper::BASE_CONFIG = R"EOF(
 admin:
   access_log_path: /dev/null
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
-)EOF";
-
-const std::string ConfigHelper::HTTP_PROXY_CONFIG = R"EOF(
 static_resources:
+  clusters:
+    name: cluster_0
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
   listeners:
     name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
         port_value: 0
+)EOF";
+
+const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
+    filter_chains:
+      filters:
+        name: envoy.tcp_proxy
+        config:
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF";
+
+const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         name: envoy.http_connection_manager
@@ -66,18 +62,6 @@ static_resources:
                   prefix: "/"
               domains: "*"
             name: route_config_0
-  clusters:
-    name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
@@ -107,13 +91,17 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std:
   admin_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
 
   auto* static_resources = bootstrap_.mutable_static_resources();
-  auto* listener = static_resources->mutable_listeners(0);
-  auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
-  listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+  for (int i = 0; i < static_resources->listeners_size(); ++i) {
+    auto* listener = static_resources->mutable_listeners(i);
+    auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
+    listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+  }
 
-  auto* cluster = static_resources->mutable_clusters(0);
-  auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
-  host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
+    host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+  }
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
@@ -258,9 +246,10 @@ void ConfigHelper::setClientCodec(
     envoy::api::v2::filter::network::HttpConnectionManager::CodecType type) {
   RELEASE_ASSERT(!finalized_);
   envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
-  loadHttpConnectionManager(hcm_config);
-  hcm_config.set_codec_type(type);
-  storeHttpConnectionManager(hcm_config);
+  if (loadHttpConnectionManager(hcm_config)) {
+    hcm_config.set_codec_type(type);
+    storeHttpConnectionManager(hcm_config);
+  }
 }
 
 void ConfigHelper::addSslConfig() {
@@ -290,16 +279,29 @@ void ConfigHelper::addSslConfig() {
 
 envoy::api::v2::Filter* ConfigHelper::getFilterFromListener() {
   RELEASE_ASSERT(!finalized_);
+  if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
+    return nullptr;
+  }
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  if (listener->filter_chains_size() == 0) {
+    return nullptr;
+  }
   auto* filter_chain = listener->mutable_filter_chains(0);
+  if (filter_chain->filters_size() == 0) {
+    return nullptr;
+  }
   return filter_chain->mutable_filters(0);
 }
 
-void ConfigHelper::loadHttpConnectionManager(
+bool ConfigHelper::loadHttpConnectionManager(
     envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
-  auto* hcm_config_struct = getFilterFromListener()->mutable_config();
-  MessageUtil::jsonConvert(*hcm_config_struct, hcm);
+  auto* hcm_filter = getFilterFromListener();
+  if (hcm_filter) {
+    MessageUtil::jsonConvert(*hcm_filter->mutable_config(), hcm);
+    return true;
+  }
+  return false;
 }
 
 void ConfigHelper::storeHttpConnectionManager(

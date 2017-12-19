@@ -8,13 +8,20 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added DOWNSTREAM_REMOTE_ADDRESS, DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT, and
+  DOWNSTREAM_LOCAL_ADDRESS access log formatters. DOWNSTREAM_ADDRESS access log formatter has been
+  deprecated.
+* TCP proxy access logs now bring an IP address without a port when using DOWNSTREAM_ADDRESS.
+  Use DOWNSTREAM_REMOTE_ADDRESS instead.
+* Added DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT header formatter. CLIENT_IP header formatter has been
+  deprecated.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
   provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
   refactored with the interface.
 * Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
 * Added native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
 * grpc-json: Added support inline descriptor in config.
-* Added support for priorities for several types of load balancer.
+* Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).

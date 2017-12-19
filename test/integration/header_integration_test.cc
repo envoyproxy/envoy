@@ -291,6 +291,7 @@ protected:
     headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
     headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-proto"});
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
+    headers.remove(Envoy::Http::LowerCaseString{"x-envoy-internal"});
 
     EXPECT_EQ(expected_headers, headers);
   }

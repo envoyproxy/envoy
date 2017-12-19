@@ -213,15 +213,18 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   } while (log_result.empty());
 
   // Regex matching localhost:port
-  const std::string localhostIpPortRegex = (GetParam() == Network::Address::IpVersion::v4)
-                                               ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
-                                               : R"EOF(\[::1\]:[0-9]+)EOF";
+  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+                                        ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
+                                        : R"EOF(\[::1\]:[0-9]+)EOF";
+
+  const std::string ip_regex =
+      (GetParam() == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
 
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={0}\n.*",
-                                       localhostIpPortRegex)));
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\n.*",
+                                       ip_port_regex, ip_regex)));
 }
 
 } // namespace
