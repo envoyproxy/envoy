@@ -61,6 +61,7 @@ public:
     std::copy(cluster_names.begin(), cluster_names.end(),
               Protobuf::RepeatedPtrFieldBackInserter(response->mutable_clusters()));
 
+    EXPECT_CALL(*response_timer_, disableTimer());
     EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
@@ -86,6 +87,25 @@ TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
+}
+
+TEST_F(LoadStatsReporterTest, TestPubSub) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createLoadStatsReporter();
+  deliverLoadStatsResponse({"foo"});
+
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*response_timer_, disableTimer());
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  response_timer_cb_();
+
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*response_timer_, disableTimer());
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  response_timer_cb_();
+
+  deliverLoadStatsResponse({"bar"});
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
