@@ -45,6 +45,9 @@ public:
     bool internal_;
   };
 
+  // This is a convenience method used to call mutateRequestHeaders(). It is done in this
+  // convoluted way to force tests to check both the final downstream address as well as whether
+  // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol protocol) {
     MutateRequestRet ret;
     ret.downstream_address_ =
@@ -67,6 +70,8 @@ public:
   std::string empty_node_{""};
 };
 
+// Verify external request and XFF is set when we are using remote address and the address is
+// external.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -78,6 +83,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
             headers.get_(Headers::get().ForwardedFor));
 }
 
+// Verify internal request and XFF is set when we are using remote address the address is internal.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   Network::Address::Ipv4Instance local_address("10.3.2.1");
@@ -90,6 +96,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress)
   EXPECT_EQ(local_address.ip()->addressAsString(), headers.get_(Headers::get().ForwardedFor));
 }
 
+// Verify that we don't set user agent when it is already set.
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -102,6 +109,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
 }
 
+// Verify that we do set user agent when it is empty.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -116,12 +124,13 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   EXPECT_EQ("canary", headers.get_(Headers::get().EnvoyDownstreamServiceNode));
 }
 
+// Test not-cleaning/cleaning the force trace headers in different scenarios.
 TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
 
   {
-    // Internal request, make traceable
+    // Internal request, make traceable.
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "10.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
@@ -149,6 +158,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   }
 }
 
+// Test generating request-id in various edge request scenarios.
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -170,7 +180,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   }
 
   {
-    // Runtime does not allow to make request traceable even though x-client-request-id set
+    // Runtime does not allow to make request traceable even though x-client-trace-id set.
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
@@ -185,8 +195,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   }
 
   {
-    // Runtime is enabled for tracing and x-client-request-id set
-
+    // Runtime is enabled for tracing and x-client-trace-id set.
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
@@ -202,6 +211,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   }
 }
 
+// This tests that an external request, but not an edge request (because not using remote address)
+// does not overwrite x-request-id. This happens in the internal ingress case.
 TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstream) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
@@ -218,6 +229,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
   EXPECT_EQ("id", headers.get_(Headers::get().RequestId));
 }
 
+// Verify that we don't overwrite user agent, but do set x-envoy-downstream-service-cluster
+// correctly.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -233,6 +246,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
 }
 
+// Verify that we set both user agent and x-envoy-downstream-service-cluster.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -245,6 +259,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
 }
 
+// Test different permutations of request-id generation.
 TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
   {
     TestHeaderMapImpl headers{{":authority", "host"}, {":path", "/"}};
@@ -258,7 +273,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
   {
     Runtime::RandomGeneratorImpl rand;
     TestHeaderMapImpl headers{{"x-client-trace-id", "trace-id"}};
-    std::string uuid = rand.uuid();
+    const std::string uuid = rand.uuid();
     EXPECT_CALL(random_, uuid()).WillOnce(Return(uuid));
 
     EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
@@ -268,6 +283,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
   }
 }
 
+// Make sure we do not overwrite x-request-id if the request is internal.
 TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternalRequest) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -279,6 +295,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
   EXPECT_EQ("original_request_id", headers.get_("x-request-id"));
 }
 
+// Make sure that we do overwrite x-request-id for "edge" external requests.
 TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -290,6 +307,8 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
   EXPECT_EQ("override", headers.get_("x-request-id"));
 }
 
+// A request that uses remote address and is from an external address should be treated as an
+// external request with all internal only headers cleaned.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -320,6 +339,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("custom_header"));
 }
 
+// A request that is from an external address, but does not use remote address, should pull the
+// address from XFF.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("60.0.0.2");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
@@ -355,6 +376,8 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
   EXPECT_EQ("10.0.0.2, 10.0.0.1", headers.get_("x-forwarded-for"));
 }
 
+// A request that is from an internal address and uses remote address should be an internal request.
+// It should also preserve x-envoy-external-address.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -368,6 +391,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
 }
 
+// Make sure we don't remove connection headers for WS requests.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRequests) {
   TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
 
@@ -377,6 +401,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
   EXPECT_EQ("websocket", headers.get_("upgrade"));
 }
 
+// Make sure we do remove connection headers for non-WS requests.
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
   TestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};
 
@@ -386,6 +411,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
   EXPECT_FALSE(headers.has("upgrade"));
 }
 
+// Make sure we remove connections headers for a WS request over h2.
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
   TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
 
@@ -395,6 +421,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
   EXPECT_FALSE(headers.has("upgrade"));
 }
 
+// Test cleaning response headers.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   TestHeaderMapImpl response_headers{
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
@@ -407,6 +434,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   EXPECT_FALSE(response_headers.has("x-request-id"));
 }
 
+// Test that we correctly return x-request-id if we were requested to force a trace.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl response_headers;
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
@@ -416,6 +444,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 
+// Test full sanitization of x-forwarded-client-cert.
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
@@ -431,6 +460,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
+// Test that we sanitize and set x-forwarded-client-cert.
 TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
@@ -448,11 +478,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
+// This test assumes the following scenario:
+// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+// calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
-  // This test assumes the following scenario:
-  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
-  // also sends the XFCC
-  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
@@ -475,11 +505,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
+// This test assumes the following scenario:
+// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+// calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
-  // This test assumes the following scenario:
-  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
-  // also sends the XFCC
-  // header with the authentication result of the previous hop, (bar.com/be calling foo.com/fe).
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(""));
@@ -502,11 +532,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
             headers.get_("x-forwarded-client-cert"));
 }
 
+// This test assumes the following scenario:
+// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+// calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
-  // This test assumes the following scenario:
-  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
-  // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
-  // calling foo.com/fe).
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
@@ -532,11 +562,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
+// This test assumes the following scenario:
+// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
+// calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
-  // This test assumes the following scenario:
-  // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
-  // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
-  // calling foo.com/fe).
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).Times(2).WillRepeatedly(Return("test://foo.com/be"));
@@ -562,8 +592,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
             headers.get_("x-forwarded-client-cert"));
 }
 
+// forward_only, append_forward and sanitize_set are only effective in mTLS connection.
 TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
-  // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -578,8 +608,8 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
+// always_forward_only works regardless whether the connection is TLS/mTLS.
 TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
-  // always_forward_only works regardless whether the connection is TLS/mTLS.
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -596,8 +626,8 @@ TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
+// forward_only, append_forward and sanitize_set are only effective in mTLS connection.
 TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
-  // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
   ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
@@ -610,8 +640,8 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
 
+// always_forward_only works regardless whether the connection is TLS/mTLS.
 TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
-  // always_forward_only works regardless whether the connection is TLS/mTLS.
   ON_CALL(connection_, ssl()).WillByDefault(Return(nullptr));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
