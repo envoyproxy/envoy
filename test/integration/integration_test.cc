@@ -204,10 +204,10 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
   // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 252 bytes.
+  // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  const std::string data = fake_upstream_connection->waitForData(252);
+  const std::string data = fake_upstream_connection->waitForData(228);
   // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
   // content-length header is present. No body websocket upgrade request send to upstream has
   // content-length header and has no transfer-encoding header.
@@ -218,15 +218,15 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   tcp_client->waitForData(upgrade_resp_str);
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 252 + strlen(hello)
-  fake_upstream_connection->waitForData(257);
+  // datalen = 228 + strlen(hello)
+  fake_upstream_connection->waitForData(233);
   fake_upstream_connection->write("world");
   tcp_client->waitForData(upgrade_resp_str + "world");
   tcp_client->write("bye!");
   // downstream disconnect
   tcp_client->close();
-  // datalen = 252 + strlen(hello) + strlen(bye!)
-  fake_upstream_connection->waitForData(261);
+  // datalen = 228 + strlen(hello) + strlen(bye!)
+  fake_upstream_connection->waitForData(237);
   fake_upstream_connection->waitForDisconnect();
 }
 
@@ -247,8 +247,8 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   tcp_client->write(upgrade_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 252 bytes.
-  const std::string data = fake_upstream_connection->waitForData(252);
+  // The size of headers received by the destination is 228 bytes.
+  const std::string data = fake_upstream_connection->waitForData(228);
   // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
   // content-length header is present. No body websocket upgrade request send to upstream has
   // content-length header and has no transfer-encoding header.
@@ -259,8 +259,8 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   tcp_client->waitForData(upgrade_resp_str);
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 252 + strlen(hello)
-  fake_upstream_connection->waitForData(257);
+  // datalen = 228 + strlen(hello)
+  fake_upstream_connection->waitForData(233);
   fake_upstream_connection->write("world");
   // upstream disconnect
   fake_upstream_connection->close();
