@@ -53,7 +53,7 @@ public:
    * See if the headers specified in the config are present in a request.
    * @param request_headers supplies the headers from the request.
    * @param config_headers supplies the list of configured header conditions on which to match.
-   * @return true if all the headers (and values) in the config_headers are found in the
+   * @return bool true if all the headers (and values) in the config_headers are found in the
    *         request_headers
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
