@@ -93,7 +93,7 @@ TEST_F(DispatcherImplTest, Post) {
 
   std::unique_lock<std::mutex> lock(mu_);
 
-  EXPECT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return work_finished_; }));
+  cv_.wait(lock, [this]() { return work_finished_; });
 }
 
 TEST_F(DispatcherImplTest, Timer) {
@@ -113,11 +113,10 @@ TEST_F(DispatcherImplTest, Timer) {
   });
 
   std::unique_lock<std::mutex> lock(mu_);
-  ASSERT_TRUE(
-      cv_.wait_for(lock, std::chrono::seconds(5), [&timer]() { return static_cast<bool>(timer); }));
+  cv_.wait(lock, [&timer]() { return timer != nullptr; });
   timer->enableTimer(std::chrono::milliseconds(50));
 
-  EXPECT_TRUE(cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return work_finished_; }));
+  cv_.wait(lock, [this]() { return work_finished_; });
 }
 
 } // namespace Event
