@@ -52,9 +52,9 @@ public:
   /**
    * See if the headers specified in the config are present in a request.
    * @param request_headers supplies the headers from the request.
-   * @param request_headers supplies the list of configured header conditions on which to match.
-   * @return true all the headers (and values) in the search_list set are found in the
-   * request_headers
+   * @param config_headers supplies the list of configured header conditions on which to match.
+   * @return true if all the headers (and values) in the config_headers are found in the
+   *         request_headers
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
                            const std::vector<HeaderData>& config_headers);
