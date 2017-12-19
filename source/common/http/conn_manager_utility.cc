@@ -62,7 +62,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
-    // If we find one, use it.
+    // If we find one, it will be used as the downstream address for logging. It may or may not be
+    // used for determining internal/external status (see below).
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     final_remote_address = ret.address_;
     single_xff_address = ret.single_address_;
