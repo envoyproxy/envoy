@@ -49,8 +49,8 @@ private:
   ZlibCompressionStrategyEnum compression_strategy_;
   int32_t content_length_;
   int32_t memory_level_;
-  std::unordered_set<std::string> content_type_values_;
   std::unordered_set<std::string> cache_control_values_;
+  std::unordered_set<std::string> content_type_values_;
   bool etag_;
   bool last_modified_;
 };

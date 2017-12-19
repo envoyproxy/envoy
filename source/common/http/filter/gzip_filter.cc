@@ -17,43 +17,39 @@ GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzi
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       content_length_(static_cast<uint64_t>(gzip.content_length().value())),
       memory_level_(static_cast<uint64_t>(gzip.memory_level().value())),
+      cache_control_values_(gzip.cache_control().cbegin(), gzip.cache_control().cend()),
+      content_type_values_(gzip.content_type().cbegin(), gzip.content_type().cend()),
       etag_(gzip.disable_on_etag().value()),
-      last_modified_(gzip.disable_on_last_modified().value()) {
-
-  for (const auto& value : gzip.cache_control()) {
-    cache_control_values_.insert(value);
-  }
-
-  for (const auto& value : gzip.content_type()) {
-    content_type_values_.insert(value);
-  }
-}
+      last_modified_(gzip.disable_on_last_modified().value()) {}
 
 ZlibCompressionLevelEnum
 GzipFilterConfig::compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level) {
-  if (compression_level == GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_BEST) {
+  switch (compression_level) {
+  case GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_BEST:
     return ZlibCompressionLevelEnum::Best;
-  }
-  if (compression_level == GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_SPEED) {
+  case GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_SPEED:
     return ZlibCompressionLevelEnum::Speed;
+  default:
+    return ZlibCompressionLevelEnum::Standard;
   }
-  return ZlibCompressionLevelEnum::Standard;
 }
 
 ZlibCompressionStrategyEnum GzipFilterConfig::compressionStrategyEnum(
     const GzipV2CompressionStrategyEnum& compression_strategy) {
-  if (compression_strategy == GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_RLE) {
+  switch (compression_strategy) {
+  case GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_RLE:
     return ZlibCompressionStrategyEnum::Rle;
-  }
-  if (compression_strategy == GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_FILTERED) {
+  case GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_FILTERED:
     return ZlibCompressionStrategyEnum::Filtered;
-  }
-  if (compression_strategy == GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_HUFFMAN) {
+  case GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_HUFFMAN:
     return ZlibCompressionStrategyEnum::Huffman;
+  default:
+    return ZlibCompressionStrategyEnum::Standard;
   }
-  return ZlibCompressionStrategyEnum::Standard;
 }
 
+// By adding 16 to the default and max window_bits(15), a gzip header and a trailer will be placed
+// around the compressed data.
 const uint64_t GzipFilter::WINDOW_BITS{15 | 16};
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
