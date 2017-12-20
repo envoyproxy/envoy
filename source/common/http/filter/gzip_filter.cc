@@ -12,11 +12,22 @@ static const std::regex& acceptEncodingRegex() {
                          std::regex::optimize);
 }
 
+// Default and max compression window size.
+const uint64_t GzipFilterConfig::DEFAULT_WINDOW_BITS{15};
+// When this value is summed to window bits, it gives a gzip header and trailer around the
+// compressed content.
+const uint64_t GzipFilterConfig::GZIP_HEADER_VALUE{16};
+// Default zlib memory level.
+const uint64_t GzipFilterConfig::DEFAULT_MEMORY_LEVEL{8};
+// Minimum length in bytes of an upstream response.
+const uint64_t GzipFilterConfig::MINIMUM_CONTENT_LENGTH{30};
+
 GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       content_length_(static_cast<uint64_t>(gzip.content_length().value())),
       memory_level_(static_cast<uint64_t>(gzip.memory_level().value())),
+      window_bits_(static_cast<uint64_t>(gzip.window_bits().value())),
       cache_control_values_(gzip.cache_control().cbegin(), gzip.cache_control().cend()),
       content_type_values_(gzip.content_type().cbegin(), gzip.content_type().cend()),
       etag_(gzip.disable_on_etag().value()),
@@ -48,9 +59,17 @@ ZlibCompressionStrategyEnum GzipFilterConfig::compressionStrategyEnum(
   }
 }
 
-// By adding 16 to the default and max window_bits(15), a gzip header and a trailer will be placed
-// around the compressed data.
-const uint64_t GzipFilter::WINDOW_BITS{15 | 16};
+uint64_t GzipFilterConfig::memoryLevel() const {
+  return memory_level_ > 0 ? memory_level_ : DEFAULT_MEMORY_LEVEL;
+}
+
+uint64_t GzipFilterConfig::minimumLength() const {
+  return content_length_ > 29 ? content_length_ : MINIMUM_CONTENT_LENGTH;
+}
+
+uint64_t GzipFilterConfig::windowBits() const {
+  return (window_bits_ > 0 ? window_bits_ : DEFAULT_WINDOW_BITS) | GZIP_HEADER_VALUE;
+}
 
 GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
@@ -74,8 +93,8 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
       !headers.ContentEncoding()) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
-    compressor_.init(config_->compressionLevel(), config_->compressionStrategy(), WINDOW_BITS,
-                     config_->memoryLevel());
+    compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
+                     config_->windowBits(), config_->memoryLevel());
   } else {
     skip_compression_ = true;
   }
@@ -90,7 +109,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
 
   const uint64_t n_data{data.length()};
 
-  if (n_data > 0) {
+  if (n_data) {
     compressor_.compress(data, compressed_data_);
   }
 

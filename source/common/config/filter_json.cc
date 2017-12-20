@@ -437,8 +437,9 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
   JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_etag);
   JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_last_modified);
 
-  JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);
   JSON_UTIL_SET_INTEGER(json_config, proto_config, content_length);
+  JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);
+  JSON_UTIL_SET_INTEGER(json_config, proto_config, window_bits);
 
   for (const auto& json_content_type : json_config.getStringArray("content_type", true)) {
     auto* content_type = proto_config.mutable_content_type()->Add();

@@ -1099,6 +1099,11 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         "minimum" : 1,
         "maximum" : 9
       },
+      "window_bits" : {
+        "type" : "integer",
+        "minimum" : 9,
+        "maximum" : 15
+      },
       "content_length" : {
         "type" : "integer",
         "minimum" : 30

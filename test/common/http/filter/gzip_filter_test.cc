@@ -88,6 +88,7 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   setUpTest(R"EOF({})EOF");
   EXPECT_EQ(8, config_->memoryLevel());
   EXPECT_EQ(30, config_->minimumLength());
+  EXPECT_EQ(31, config_->windowBits());
   EXPECT_EQ(false, config_->disableOnEtag());
   EXPECT_EQ(false, config_->disableOnLastModified());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
@@ -106,6 +107,18 @@ TEST_F(GzipFilterTest, BadConfigMemoryLevelOutOfRange) {
 // Bad configuration - memory_level is zero.
 TEST_F(GzipFilterTest, BadConfigMemoryLevelZero) {
   gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 0 })EOF");
+}
+
+// Bad configuration - window_bits is out of range.
+TEST_F(GzipFilterTest, BadConfigWindowBitsOutOfRange) {
+  gzipFilterBadConfigHelper(R"EOF({ "window_bits" : 16 })EOF");
+}
+
+// Bad configuration - window_bits is out of range.
+// This should failed when window bits bug in zlib gets fixed
+// and gzip.proto gets updated to support window size 8.
+TEST_F(GzipFilterTest, BadConfigWindowBitsBellowSupported) {
+  gzipFilterBadConfigHelper(R"EOF({ "window_bits" : 8 })EOF");
 }
 
 // Bad configuration - content_length is zero.

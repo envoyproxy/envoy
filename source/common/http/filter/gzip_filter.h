@@ -17,7 +17,6 @@ namespace Http {
 
 using ZlibCompressionLevelEnum = Compressor::ZlibCompressorImpl::CompressionLevel;
 using ZlibCompressionStrategyEnum = Compressor::ZlibCompressorImpl::CompressionStrategy;
-
 using GzipV2CompressionLevelEnum = envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum;
 using GzipV2CompressionStrategyEnum = envoy::api::v2::filter::http::Gzip_CompressionStrategy;
 
@@ -34,10 +33,11 @@ public:
   const std::unordered_set<std::string>& cacheControlValues() const {
     return cache_control_values_;
   }
-  uint64_t minimumLength() const { return content_length_ > 29 ? content_length_ : 30; }
-  uint64_t memoryLevel() const { return memory_level_ > 0 ? memory_level_ : 8; }
   bool disableOnEtag() const { return etag_; }
   bool disableOnLastModified() const { return last_modified_; }
+  uint64_t memoryLevel() const;
+  uint64_t minimumLength() const;
+  uint64_t windowBits() const;
 
 private:
   static ZlibCompressionLevelEnum
@@ -49,10 +49,16 @@ private:
   ZlibCompressionStrategyEnum compression_strategy_;
   int32_t content_length_;
   int32_t memory_level_;
+  int32_t window_bits_;
   std::unordered_set<std::string> cache_control_values_;
   std::unordered_set<std::string> content_type_values_;
   bool etag_;
   bool last_modified_;
+
+  const static uint64_t DEFAULT_WINDOW_BITS;
+  const static uint64_t GZIP_HEADER_VALUE;
+  const static uint64_t MINIMUM_CONTENT_LENGTH;
+  const static uint64_t DEFAULT_MEMORY_LEVEL;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -107,8 +113,6 @@ private:
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
-
-  const static uint64_t WINDOW_BITS;
 };
 
 } // namespace Http

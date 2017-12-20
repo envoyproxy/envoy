@@ -62,6 +62,7 @@ public:
       name: envoy.gzip
       config:
         memory_level: 3
+        window_bits: 9
         compression_level: best
         compression_strategy: rle
         content_length: 100
