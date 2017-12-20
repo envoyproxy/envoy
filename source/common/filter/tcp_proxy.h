@@ -248,9 +248,11 @@ protected:
 class TcpProxyDrainer : public Event::DeferredDeletable {
 public:
   TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
-                  TcpProxyConfig::SharedConfigSharedPtr config,
-                  std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
-                  Network::ClientConnectionPtr connection, Event::TimerPtr idle_timer);
+                  const TcpProxyConfig::SharedConfigSharedPtr& config,
+                  const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+                  Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
+                  const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+                  Stats::TimespanPtr&& connected_timespan);
 
   void onEvent(Network::ConnectionEvent event);
   void onIdleTimeout();
@@ -262,6 +264,8 @@ private:
   std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks_;
   Network::ClientConnectionPtr upstream_connection_;
   Event::TimerPtr timer_;
+  Stats::TimespanPtr connected_timespan_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
   TcpProxyConfig::SharedConfigSharedPtr config_;
 };
 
@@ -270,16 +274,19 @@ typedef std::unique_ptr<TcpProxyDrainer> TcpProxyDrainerPtr;
 class TcpProxyUpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
   ~TcpProxyUpstreamDrainManager();
-  void add(TcpProxyConfig::SharedConfigSharedPtr config,
-           Network::ClientConnectionPtr upstream_connection,
-           std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks, Event::TimerPtr idle_timer);
+  void add(const TcpProxyConfig::SharedConfigSharedPtr& config,
+           Network::ClientConnectionPtr&& upstream_connection,
+           const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+           Event::TimerPtr&& idle_timer,
+           const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+           Stats::TimespanPtr&& connected_timespan);
   void remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher);
 
 private:
   // This must be a map instead of set because there is no way to move elements
   // out of a set, and these elements get passed to deferredDelete() instead of
   // being deleted in-place. The key and value will always be equal.
-  std::map<TcpProxyDrainer*, TcpProxyDrainerPtr> drainers_;
+  std::unordered_map<TcpProxyDrainer*, TcpProxyDrainerPtr> drainers_;
 };
 
 } // Filter

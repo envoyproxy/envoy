@@ -127,18 +127,6 @@ TcpProxy::~TcpProxy() {
 
   if (upstream_connection_) {
     finalizeUpstreamConnectionStats();
-    if (upstream_connection_->state() == Network::Connection::State::Open) {
-      upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
-    }
-
-    if (upstream_connection_->state() != Network::Connection::State::Closed) {
-      if (config_ != nullptr) {
-        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
-                                    std::move(upstream_callbacks_), std::move(idle_timer_));
-      } else {
-        upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
-      }
-    }
   }
 }
 
@@ -146,16 +134,19 @@ TcpProxyStats TcpProxyConfig::SharedConfig::generateStats(Stats::Scope& scope) {
   return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
+namespace {
+void finalizeConnectionStats(const Upstream::HostDescription& host,
+                             Stats::Timespan connected_timespan) {
+  host.cluster().stats().upstream_cx_destroy_.inc();
+  host.cluster().stats().upstream_cx_active_.dec();
+  host.stats().cx_active_.dec();
+  host.cluster().resourceManager(Upstream::ResourcePriority::Default).connections().dec();
+  connected_timespan.complete();
+}
+} // namespace
+
 void TcpProxy::finalizeUpstreamConnectionStats() {
-  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_.inc();
-  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.dec();
-  read_callbacks_->upstreamHost()->stats().cx_active_.dec();
-  read_callbacks_->upstreamHost()
-      ->cluster()
-      .resourceManager(Upstream::ResourcePriority::Default)
-      .connections()
-      .dec();
-  connected_timespan_->complete();
+  finalizeConnectionStats(*read_callbacks_->upstreamHost(), *connected_timespan_);
 }
 
 void TcpProxy::closeUpstreamConnection() {
@@ -392,6 +383,19 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   if (upstream_connection_) {
     if (event == Network::ConnectionEvent::RemoteClose) {
       upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
+
+      if (upstream_connection_->state() != Network::Connection::State::Closed) {
+        if (config_ != nullptr) {
+          config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
+                                      std::move(upstream_callbacks_), std::move(idle_timer_),
+                                      read_callbacks_->upstreamHost(),
+                                      std::move(connected_timespan_));
+        } else {
+          upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+          disableIdleTimer();
+        }
+      }
+
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
       disableIdleTimer();
@@ -501,12 +505,15 @@ TcpProxyUpstreamDrainManager::~TcpProxyUpstreamDrainManager() {
   }
 }
 
-void TcpProxyUpstreamDrainManager::add(TcpProxyConfig::SharedConfigSharedPtr config,
-                                       Network::ClientConnectionPtr upstream_connection,
-                                       std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
-                                       Event::TimerPtr idle_timer) {
-  TcpProxyDrainerPtr drainer(new TcpProxyDrainer(
-      *this, config, callbacks, std::move(upstream_connection), std::move(idle_timer)));
+void TcpProxyUpstreamDrainManager::add(
+    const TcpProxyConfig::SharedConfigSharedPtr& config,
+    Network::ClientConnectionPtr&& upstream_connection,
+    const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks, Event::TimerPtr&& idle_timer,
+    const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+    Stats::TimespanPtr&& connected_timespan) {
+  TcpProxyDrainerPtr drainer(
+      new TcpProxyDrainer(*this, config, callbacks, std::move(upstream_connection),
+                          std::move(idle_timer), upstream_host, std::move(connected_timespan)));
   callbacks->drain(*drainer);
 
   // Use temporary to ensure we get the pointer before we move it out of drainer
@@ -522,12 +529,15 @@ void TcpProxyUpstreamDrainManager::remove(TcpProxyDrainer& drainer, Event::Dispa
 }
 
 TcpProxyDrainer::TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
-                                 TcpProxyConfig::SharedConfigSharedPtr config,
-                                 std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks,
-                                 Network::ClientConnectionPtr connection,
-                                 Event::TimerPtr idle_timer)
+                                 const TcpProxyConfig::SharedConfigSharedPtr& config,
+                                 const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+                                 Network::ClientConnectionPtr&& connection,
+                                 Event::TimerPtr&& idle_timer,
+                                 const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+                                 Stats::TimespanPtr&& connected_timespan)
     : parent_(parent), callbacks_(callbacks), upstream_connection_(std::move(connection)),
-      timer_(std::move(idle_timer)), config_(config) {
+      timer_(std::move(idle_timer)), connected_timespan_(std::move(connected_timespan)),
+      upstream_host_(upstream_host), config_(config) {
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
 }
@@ -539,6 +549,7 @@ void TcpProxyDrainer::onEvent(Network::ConnectionEvent event) {
       timer_->disableTimer();
     }
     config_->stats().upstream_flush_active_.dec();
+    finalizeConnectionStats(*upstream_host_, *connected_timespan_);
     parent_.remove(*this, upstream_connection_->dispatcher());
   }
 }

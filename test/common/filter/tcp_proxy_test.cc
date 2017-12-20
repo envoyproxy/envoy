@@ -827,7 +827,6 @@ TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
-      .WillOnce(Return(Network::Connection::State::Closing))
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
@@ -858,7 +857,6 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
-      .WillOnce(Return(Network::Connection::State::Closing))
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
@@ -890,7 +888,6 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
-      .WillOnce(Return(Network::Connection::State::Closing))
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
