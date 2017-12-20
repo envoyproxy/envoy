@@ -140,13 +140,20 @@ public:
   static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
                            Code response_code);
 
+  struct GetLastAddressFromXffInfo {
+    // Last valid address pulled from the XFF header.
+    Network::Address::InstanceConstSharedPtr address_;
+    // Whether this is the only address in the XFF header.
+    bool single_address_;
+  };
+
   /**
    * Retrieves the last IPv4/IPv6 address in the x-forwarded-for header.
    * @param request_headers supplies the request headers.
-   * @return a valid IPv4 or IPv6 address if one could be parsed, otherwise nullptr.
+   * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
+   *         @see GetLastAddressFromXffInfo for more information.
    */
-  static Network::Address::InstanceConstSharedPtr
-  getLastAddressFromXFF(const Http::HeaderMap& request_headers);
+  static GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers);
 };
 
 } // namespace Http

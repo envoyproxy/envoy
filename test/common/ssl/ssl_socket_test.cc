@@ -312,17 +312,12 @@ TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
 }
 
 TEST_P(SslSocketTest, NoCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "",
-    "private_key_file": ""
-  })EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": ""
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem"
   }
   )EOF";
 
@@ -330,12 +325,7 @@ TEST_P(SslSocketTest, NoCert) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "",
-    "private_key_file": ""
-  }
-  )EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
@@ -369,12 +359,7 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "",
-    "private_key_file": ""
-  }
-  )EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
@@ -409,12 +394,7 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
 }
 
 TEST_P(SslSocketTest, FailedClientAuthHashVerificationNoClientCert) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "",
-    "private_key_file": ""
-  }
-  )EOF";
+  std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
   {
