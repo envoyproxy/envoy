@@ -27,7 +27,9 @@ then
         cd ci/build_container
         docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
-        for distro in ubuntu centos
+        # centos has been removed because the version of cmake is too old to build now. Someone who
+        # cares about centos needs to come back and fix this.
+        for distro in ubuntu
         do
             echo "Updating envoyproxy/envoy-build-${distro} image"
             LINUX_DISTRO=$distro ./docker_build.sh
