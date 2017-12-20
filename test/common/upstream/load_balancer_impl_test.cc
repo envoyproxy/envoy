@@ -39,6 +39,62 @@ protected:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
+class TestLb : public LoadBalancerBase {
+public:
+  TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+         Runtime::RandomGenerator& random)
+      : LoadBalancerBase(priority_set, stats, runtime, random) {}
+  using LoadBalancerBase::chooseHostSet;
+  using LoadBalancerBase::percentageLoad;
+};
+
+class LoadBalancerBaseTest : public LoadBalancerTestBase {
+public:
+  TestLb lb_{priority_set_, stats_, runtime_, random_};
+};
+
+INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
+
+// Basic test of host set selection.
+TEST_P(LoadBalancerBaseTest, PrioritySelecton) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.runCallbacks({}, {});
+
+  // With both the primary and failover hosts unhealthy, we should select an
+  // unhealthy primary host.
+  EXPECT_EQ(100, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(1));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+
+  // Update the priority set with a new priority level P=2 and ensure the host
+  // is chosen
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  tertiary_host_set_.hosts_ = *hosts;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  tertiary_host_set_.runCallbacks({}, {});
+  EXPECT_EQ(0, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(1));
+  EXPECT_EQ(100, lb_.percentageLoad(2));
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+
+  // Now add a healthy host in P=0 and make sure it is immediately selected.
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  tertiary_host_set_.runCallbacks({}, {});
+  EXPECT_EQ(100, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(2));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  host_set_.healthy_hosts_ = {};
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(0, lb_.percentageLoad(0));
+  EXPECT_EQ(100, lb_.percentageLoad(2));
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+}
+
 class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init(bool need_local_cluster) {
