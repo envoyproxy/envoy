@@ -14,16 +14,15 @@ index 9d6d29fc8..3d0c9e551 100644
  # Copyright 2016 The Bazel Authors. All rights reserved.
  #
  # Licensed under the Apache License, Version 2.0 (the "License");
-@@ -13,25 +21,20 @@
+@@ -13,5 +21,3 @@
  # limitations under the License.
  """Rules for configuring the C++ toolchain (experimental)."""
  
 -
 -load("@bazel_tools//tools/cpp:windows_cc_configure.bzl", "configure_windows_toolchain")
--load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
+load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
 -load("@bazel_tools//tools/cpp:unix_cc_configure.bzl", "configure_unix_toolchain")
 -load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_cpu_value")
-+load("//bazel:osx_cc_configure.bzl", "configure_osx_toolchain")
 +load("//bazel:unix_cc_configure.bzl", "configure_unix_toolchain")
 +load("//bazel:lib_cc_configure.bzl", "get_cpu_value")
  

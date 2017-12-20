@@ -145,7 +145,18 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return temporaryFileSubstitute(path, ParamMap(), port_map, version);
 }
 
-// TODO(htuch): Switch to a single pass variable substitution.
+std::string TestEnvironment::readFileToStringForTest(const std::string& filename) {
+  std::ifstream file(filename);
+  if (file.fail()) {
+    std::cerr << "failed to open: " << filename << std::endl;
+    RELEASE_ASSERT(false);
+  }
+
+  std::stringstream file_string_stream;
+  file_string_stream << file.rdbuf();
+  return file_string_stream.str();
+}
+
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
                                                      const ParamMap& param_map,
                                                      const PortMap& port_map,
@@ -153,18 +164,8 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
   const std::string json_path = TestEnvironment::runfilesPath(path);
-  std::string out_json_string;
-  {
-    std::ifstream file(json_path);
-    if (file.fail()) {
-      std::cerr << "failed to open: " << json_path << std::endl;
-      RELEASE_ASSERT(false);
-    }
+  std::string out_json_string = readFileToStringForTest(json_path);
 
-    std::stringstream file_string_stream;
-    file_string_stream << file.rdbuf();
-    out_json_string = file_string_stream.str();
-  }
   // Substitude params.
   for (auto it : param_map) {
     const std::regex param_regex("\\{\\{ " + it.first + " \\}\\}");
