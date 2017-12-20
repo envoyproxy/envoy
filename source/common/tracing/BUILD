@@ -12,13 +12,10 @@ envoy_cc_library(
     name = "http_tracer_lib",
     srcs = [
         "http_tracer_impl.cc",
-        "opentracing_driver_impl.cc",
     ],
     hdrs = [
         "http_tracer_impl.h",
-        "opentracing_driver_impl.h",
     ],
-    external_deps = ["opentracing"],
     deps = [
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -43,6 +40,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "opentracing_driver_lib",
+    srcs = [
+        "opentracing_driver_impl.cc",
+    ],
+    hdrs = [
+        "opentracing_driver_impl.h",
+    ],
+    external_deps = ["opentracing"],
+    deps = [
+        ":http_tracer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "lightstep_tracer_lib",
     srcs = [
         "lightstep_tracer_impl.cc",
@@ -53,5 +64,6 @@ envoy_cc_library(
     external_deps = ["lightstep"],
     deps = [
         ":http_tracer_lib",
+        ":opentracing_driver_lib",
     ],
 )
