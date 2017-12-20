@@ -57,13 +57,14 @@ Utility::QueryParams Utility::parseQueryString(const std::string& url) {
     if (end == std::string::npos) {
       end = url.size();
     }
+    auto param = StringUtil::subspan(url, start, end);
 
-    size_t equal = url.find('=', start);
+    size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(url, start, equal),
-                     StringUtil::subspan(url, equal + 1, end));
+      params.emplace(StringUtil::subspan(param, 0, equal),
+                     StringUtil::subspan(param, equal + 1, param.length()));
     } else {
-      params.emplace(StringUtil::subspan(url, start, end), "");
+      params.emplace(param, "");
     }
 
     start = end + 1;

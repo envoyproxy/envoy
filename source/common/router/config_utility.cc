@@ -45,6 +45,28 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
+bool ConfigUtility::matchQueryParams(const Http::Utility::QueryParams& query_params,
+                                     const std::vector<QueryParameterMatcher>& config_query_params) {
+  bool matches = true;
+  for (const auto& config_query_param : config_query_params) {
+    auto query_param = query_params.find(config_query_param.name_);
+    if (query_param == query_params.end()) {
+      matches &= false;
+    } else if (config_query_param.is_regex_) {
+      matches &= std::regex_match(query_param->second, config_query_param.regex_pattern_);
+    } else if (config_query_param.value_.length() == 0) {
+      matches &= true;
+    } else {
+      matches &= (config_query_param.value_ == query_param->second);
+    }
+    if (!matches) {
+      break;
+    }
+  }
+
+  return matches;
+}
+
 Http::Code ConfigUtility::parseRedirectResponseCode(
     const envoy::api::v2::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
