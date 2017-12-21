@@ -161,8 +161,6 @@ protected:
 
   // The named ports for createGeneratedApiTestServer. Used mostly for lookupPort.
   std::vector<std::string> named_ports_{{"default_port"}};
-  // The ports from upstreams created in createUpstreams()
-  std::vector<uint32_t> ports_;
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
   bool initialized() const { return initialized_; }

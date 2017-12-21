@@ -93,13 +93,7 @@ public:
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
     load_report_upstream_ = fake_upstreams_.back().get();
-
-    for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
-      fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-      service_upstream_[i] = fake_upstreams_.back().get();
-    }
   }
 
   void initialize() override {
@@ -129,6 +123,10 @@ public:
     });
     named_ports_ = {"http"};
     HttpIntegrationTest::initialize();
+    for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
+      fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+      service_upstream_[i] = fake_upstreams_.back().get();
+    }
   }
 
   void initiateClientConnection() {
