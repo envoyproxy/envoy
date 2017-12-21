@@ -137,6 +137,8 @@ public:
   const std::string LIGHTSTEP = "envoy.lightstep";
   // Zipkin tracer
   const std::string ZIPKIN = "envoy.zipkin";
+  // Dynamic tracer
+  const std::string DYNAMIC = "envoy.dynamic";
 };
 
 typedef ConstSingleton<HttpTracerNameValues> HttpTracerNames;

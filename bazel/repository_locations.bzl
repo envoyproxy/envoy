@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     io_opentracing_cpp = dict(
-        commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
-        remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0
+        commit = "c41edee9322b6563022de843162d5c24c1824b77",
+        remote = "https://github.com/rnburn/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
         # This picks up a commit after v0.6.0 (d4501f84de2d149da2a7a56c545a1c40f214db3f) that fixes

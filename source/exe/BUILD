@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/server:hot_restart_lib",
         "//source/server:options_lib",
         "//source/server/config/http:lightstep_lib",
+        "//source/server/config/http:dynamic_opentracing_lib",
         "//source/server/config/http:zipkin_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],

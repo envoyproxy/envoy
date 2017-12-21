@@ -1221,6 +1221,26 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "required" : ["type", "config"],
         "additionalProperties" : false
       },
+      "dynamic_driver" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["dynamic"]
+          },
+          "config" : {
+            "type" : "object",
+            "properties" : {
+              "library" : {"type" : "string"},
+              "config_file" : {"type" : "string"}
+            },
+            "required": ["library", "config_file"],
+            "additionalProperties" : false
+          }
+        },
+        "required" : ["type", "config"],
+        "additionalProperties" : false
+      },
       "zipkin_driver" : {
         "type" : "object",
         "properties" : {
@@ -1297,6 +1317,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
                 "type" : "object",
                 "oneOf" : [
                   {"$ref" : "#/definitions/lightstep_driver"},
+                  {"$ref" : "#/definitions/dynamic_driver"},
                   {"$ref" : "#/definitions/zipkin_driver"}
                 ]
               }
