@@ -8,6 +8,7 @@
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
 
+#include "api/filter/accesslog/accesslog.pb.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;
@@ -23,6 +24,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
+  initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
 
@@ -40,6 +42,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
+  initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
@@ -55,6 +58,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
 // Test proxying data in both directions, and that all data is flushed properly
 // when the client disconnects.
 TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
+  initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
@@ -68,10 +72,13 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+
   std::string data(1024 * 16, 'a');
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy_with_write_limits"));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write(data);
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection();
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   fake_upstream_connection->waitForData(data.size());
   fake_upstream_connection->write(data);
   tcp_client->waitForData(data);
@@ -79,24 +86,17 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   fake_upstream_connection->waitForDisconnect();
 
   uint32_t upstream_pauses =
-      test_server_
-          ->counter("cluster.cluster_with_buffer_limits.upstream_flow_control_paused_reading_total")
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
           ->value();
   uint32_t upstream_resumes =
-      test_server_
-          ->counter(
-              "cluster.cluster_with_buffer_limits.upstream_flow_control_resumed_reading_total")
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
           ->value();
   EXPECT_EQ(upstream_pauses, upstream_resumes);
 
   uint32_t downstream_pauses =
-      test_server_
-          ->counter("tcp.tcp_with_write_limits.downstream_flow_control_paused_reading_total")
-          ->value();
+      test_server_->counter("tcp.tcp_stats.downstream_flow_control_paused_reading_total")->value();
   uint32_t downstream_resumes =
-      test_server_
-          ->counter("tcp.tcp_with_write_limits.downstream_flow_control_resumed_reading_total")
-          ->value();
+      test_server_->counter("tcp.tcp_stats.downstream_flow_control_resumed_reading_total")->value();
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
@@ -104,6 +104,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
 // termination.
 void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                                                     const std::string& data_to_send_downstream) {
+  config_helper_.addSslConfig();
+  initialize();
+
   Network::ClientConnectionPtr ssl_client;
   FakeRawConnectionPtr fake_upstream_connection;
   testing::NiceMock<Runtime::MockLoader> runtime;
@@ -127,28 +130,28 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
       }));
   // Set up the SSl client.
   Network::Address::InstanceConstSharedPtr address =
-      Ssl::getSslAddress(version_, lookupPort("tcp_proxy_with_tls_termination"));
+      Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context = Ssl::createClientSslContext(false, false, *context_manager);
   ssl_client = dispatcher_->createSslClientConnection(*context, address,
                                                       Network::Address::InstanceConstSharedPtr());
 
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
-
   ssl_client->addConnectionCallbacks(connect_callbacks);
   ssl_client->connect();
   while (!connect_callbacks.connected()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  // Ship some data upstream.
 
+  // Ship some data upstream.
   Buffer::OwnedImpl buffer(data_to_send_upstream);
   ssl_client->write(buffer);
   while (client_write_buffer->bytes_drained() != data_to_send_upstream.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+
   // Make sure the data makes it upstream.
-  fake_upstream_connection = fake_upstreams_[1]->waitForRawConnection();
+  fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   fake_upstream_connection->waitForData(data_to_send_upstream.size());
   // Now send data downstream and make sure it arrives.
 
@@ -171,6 +174,28 @@ TEST_P(TcpProxyIntegrationTest, LargeBidirectionalTlsWrites) {
 }
 
 TEST_P(TcpProxyIntegrationTest, AccessLog) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}.txt", GetParam() == Network::Address::IpVersion::v4 ? "v4" : "v6"));
+  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+
+    envoy::api::v2::filter::network::TcpProxy tcp_proxy_config;
+    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("envoy.file_access_log");
+    envoy::api::v2::filter::accesslog::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.set_format("upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
+                                 "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_ADDRESS%\n");
+    MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
+
+    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+  });
+  initialize();
+
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
 
@@ -181,25 +206,25 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   fake_upstream_connection->waitForDisconnect();
   tcp_client->waitForDisconnect();
 
-  const std::string path = TestEnvironment::temporaryPath(fmt::format(
-      "tcp_{}.log", (GetParam() == Network::Address::IpVersion::v4) ? "127.0.0.1" : "[::1]"));
   std::string log_result;
-
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
   do {
-    log_result = Filesystem::fileReadToEnd(path);
+    log_result = Filesystem::fileReadToEnd(access_log_path);
   } while (log_result.empty());
 
   // Regex matching localhost:port
-  const std::string localhostIpPortRegex = (GetParam() == Network::Address::IpVersion::v4)
-                                               ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
-                                               : R"EOF(\[::1\]:[0-9]+)EOF";
+  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+                                        ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
+                                        : R"EOF(\[::1\]:[0-9]+)EOF";
+
+  const std::string ip_regex =
+      (GetParam() == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
 
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={0}\n.*",
-                                       localhostIpPortRegex)));
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\n.*",
+                                       ip_port_regex, ip_regex)));
 }
 
 } // namespace

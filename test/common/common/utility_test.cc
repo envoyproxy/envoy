@@ -38,6 +38,25 @@ TEST(ProdSystemTimeSourceTest, All) {
   source.currentTime();
 }
 
+TEST(InputConstMemoryStream, All) {
+  {
+    InputConstMemoryStream istream{nullptr, 0};
+    std::string s;
+    istream >> s;
+    EXPECT_TRUE(s.empty());
+    EXPECT_TRUE(istream.eof());
+  }
+
+  {
+    std::string data{"123"};
+    InputConstMemoryStream istream{data.data(), data.size()};
+    int x;
+    istream >> x;
+    EXPECT_EQ(123, x);
+    EXPECT_TRUE(istream.eof());
+  }
+}
+
 TEST(StringUtil, caseInsensitiveCompare) {
   EXPECT_EQ(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "content-length"));
   EXPECT_LT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "blah"));

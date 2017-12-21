@@ -291,7 +291,7 @@ TEST_P(IntegrationTest, TestBind) {
 
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   std::string address =
-      fake_upstream_connection_->connection().remoteAddress().ip()->addressAsString();
+      fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
   EXPECT_EQ(address, address_string);
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForEndStream(*dispatcher_);

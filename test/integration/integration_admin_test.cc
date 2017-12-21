@@ -16,6 +16,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationAdminTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
+  initialize();
+
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/healthcheck", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -40,14 +42,21 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("http_buffer"), "GET", "/healthcheck",
-                                                "", downstreamProtocol(), version_);
+TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/healthcheck", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationAdminTest, AdminLogging) {
+  initialize();
+
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/logging", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -92,6 +101,8 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
 }
 
 TEST_P(IntegrationAdminTest, Admin) {
+  initialize();
+
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -136,13 +147,13 @@ TEST_P(IntegrationAdminTest, Admin) {
               testing::HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
   EXPECT_THAT(
       response->body(),
-      testing::HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cds\"} 0\n"));
+      testing::HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("version_info::\n"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("version_info::static\n"));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);
@@ -185,6 +196,12 @@ TEST_P(IntegrationAdminTest, Admin) {
 #ifdef TCMALLOC
 
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
+  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+    auto* admin = bootstrap.mutable_admin();
+    admin->set_profile_path(TestEnvironment::temporaryPath("/envoy.prof"));
+  });
+
+  initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());

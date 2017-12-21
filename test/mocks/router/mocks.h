@@ -96,7 +96,7 @@ public:
                      void(const RouteEntry& route,
                           std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address));
+                          const Network::Address::Instance& remote_address));
 
   uint64_t stage_{};
   std::string disable_key_;
@@ -194,9 +194,9 @@ public:
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(clusterNotFoundResponseCode, Http::Code());
   MOCK_CONST_METHOD2(finalizeRequestHeaders,
-                     void(Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info));
+                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
-                     void(Http::HeaderMap& headers, const AccessLog::RequestInfo& request_info));
+                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());

@@ -45,7 +45,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
     // The local address of the downstream connection is the original destination address,
     // if usingOriginalDst() returns 'true'.
     if (connection && connection->usingOriginalDst()) {
-      const Network::Address::Instance& dst_addr = connection->localAddress();
+      const Network::Address::Instance& dst_addr = *connection->localAddress();
 
       // Check if a host with the destination address is already in the host set.
       HostSharedPtr host = host_map_.find(dst_addr);

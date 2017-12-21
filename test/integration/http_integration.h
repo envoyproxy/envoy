@@ -72,25 +72,16 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version);
+                      Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
-  void SetUp();
-
 protected:
-  // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
-  void initialize() override;
-
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
-  // Set up the fake upstream connections. This is called by initialize() and
-  // is virtual to allow subclass overrides.
-  virtual void createUpstreams();
   // sets downstream_protocol_ and alters the client protocol in the config_helper_
   void setDownstreamProtocol(Http::CodecClient::Type type);
-  // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
-  void setUpstreamProtocol(FakeHttpConnection::Type type);
 
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
@@ -177,17 +168,9 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
-  // The named ports for createGeneratedApiTestServer
-  std::vector<std::string> named_ports_{{"http"}};
-  // The ports from upstreams created in createUpstreams()
-  std::vector<uint32_t> ports_;
-  // If true, use AutonomousUpstream for fake upstreams.
-  bool autonomous_upstream_{false};
 
 private:
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
-  // The type for the Envoy-to-backend connection
-  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
 };
 } // namespace Envoy

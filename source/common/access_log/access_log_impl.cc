@@ -64,14 +64,14 @@ FilterPtr FilterFactory::fromProto(const envoy::api::v2::filter::accesslog::Acce
   }
 }
 
-bool TraceableRequestFilter::evaluate(const RequestInfo& info,
+bool TraceableRequestFilter::evaluate(const RequestInfo::RequestInfo& info,
                                       const Http::HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.is_tracing && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&) {
+bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
   if (!info.responseCode().valid()) {
     return compareAgainstValue(0ULL);
   }
@@ -79,7 +79,7 @@ bool StatusCodeFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&)
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&) {
+bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
   return compareAgainstValue(
       std::chrono::duration_cast<std::chrono::milliseconds>(info.duration()).count());
 }
@@ -88,7 +88,8 @@ RuntimeFilter::RuntimeFilter(const envoy::api::v2::filter::accesslog::RuntimeFil
                              Runtime::Loader& runtime)
     : runtime_(runtime), runtime_key_(config.runtime_key()) {}
 
-bool RuntimeFilter::evaluate(const RequestInfo&, const Http::HeaderMap& request_header) {
+bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
+                             const Http::HeaderMap& request_header) {
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint16_t sampled_value;
   if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
@@ -117,7 +118,8 @@ AndFilter::AndFilter(const envoy::api::v2::filter::accesslog::AndFilter& config,
                      Runtime::Loader& runtime)
     : OperatorFilter(config.filters(), runtime) {}
 
-bool OrFilter::evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) {
+bool OrFilter::evaluate(const RequestInfo::RequestInfo& info,
+                        const Http::HeaderMap& request_headers) {
   bool result = false;
   for (auto& filter : filters_) {
     result |= filter->evaluate(info, request_headers);
@@ -130,7 +132,8 @@ bool OrFilter::evaluate(const RequestInfo& info, const Http::HeaderMap& request_
   return result;
 }
 
-bool AndFilter::evaluate(const RequestInfo& info, const Http::HeaderMap& request_headers) {
+bool AndFilter::evaluate(const RequestInfo::RequestInfo& info,
+                         const Http::HeaderMap& request_headers) {
   bool result = true;
   for (auto& filter : filters_) {
     result &= filter->evaluate(info, request_headers);
@@ -143,7 +146,7 @@ bool AndFilter::evaluate(const RequestInfo& info, const Http::HeaderMap& request
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const Http::HeaderMap&) {
+bool NotHealthCheckFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
   return !info.healthCheck();
 }
 
@@ -171,7 +174,8 @@ FileAccessLog::FileAccessLog(const std::string& access_log_path, FilterPtr&& fil
 }
 
 void FileAccessLog::log(const Http::HeaderMap* request_headers,
-                        const Http::HeaderMap* response_headers, const RequestInfo& request_info) {
+                        const Http::HeaderMap* response_headers,
+                        const RequestInfo::RequestInfo& request_info) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -186,9 +190,7 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  std::string access_log_line =
-      formatter_->format(*request_headers, *response_headers, request_info);
-  log_file_->write(access_log_line);
+  log_file_->write(formatter_->format(*request_headers, *response_headers, request_info));
 }
 
 } // namespace AccessLog

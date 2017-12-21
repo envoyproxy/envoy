@@ -103,10 +103,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "lds_api_test",
     srcs = ["lds_api_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         "//source/common/config:utility_lib",
         "//source/server:lds_api_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

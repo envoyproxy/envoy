@@ -16,6 +16,8 @@
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
+#include "test/mocks/buffer/mocks.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -109,11 +111,10 @@ public:
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
-  Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
+  Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
-private:
   std::list<DeferredDeletablePtr> to_delete_;
-  Buffer::WatermarkFactoryPtr buffer_factory_;
+  MockBufferFactory buffer_factory_;
 };
 
 class MockTimer : public Timer {

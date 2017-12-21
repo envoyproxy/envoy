@@ -41,6 +41,11 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
     : stats_(generateStats(config.stat_prefix(), context.scope())),
       max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)) {
 
+  if (config.has_idle_timeout()) {
+    idle_timeout_.value(std::chrono::milliseconds(
+        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
+  }
+
   if (config.has_deprecated_v1()) {
     for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
          config.deprecated_v1().routes()) {
@@ -66,22 +71,23 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
 const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& connection) {
   for (const TcpProxyConfig::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.remoteAddress(), route.source_port_ranges_)) {
+        !Network::Utility::portInRangeList(*connection.remoteAddress(),
+                                           route.source_port_ranges_)) {
       continue;
     }
 
-    if (!route.source_ips_.empty() && !route.source_ips_.contains(connection.remoteAddress())) {
+    if (!route.source_ips_.empty() && !route.source_ips_.contains(*connection.remoteAddress())) {
       continue;
     }
 
     if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.localAddress(),
+        !Network::Utility::portInRangeList(*connection.localAddress(),
                                            route.destination_port_ranges_)) {
       continue;
     }
 
     if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(connection.localAddress())) {
+        !route.destination_ips_.contains(*connection.localAddress())) {
       continue;
     }
 
@@ -139,7 +145,8 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  request_info_.downstream_address_ = read_callbacks_->connection().remoteAddress().asString();
+  request_info_.downstream_local_address_ = read_callbacks_->connection().localAddress();
+  request_info_.downstream_remote_address_ = read_callbacks_->connection().remoteAddress();
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -233,14 +240,14 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     if (config_) {
       config_->stats().downstream_cx_no_route_.inc();
     }
-    request_info_.setResponseFlag(AccessLog::ResponseFlag::NoRouteFound);
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NO_ROUTE);
     return Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamOverflow);
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
     return Network::FilterStatus::StopIteration;
@@ -260,7 +267,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
     // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy.
-    request_info_.setResponseFlag(AccessLog::ResponseFlag::NoHealthyUpstream);
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
     return Network::FilterStatus::StopIteration;
   }
@@ -278,7 +285,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
   request_info_.onUpstreamHostSelected(conn_info.host_description_);
-  request_info_.upstream_local_address_ = upstream_connection_->localAddress().asString();
+  request_info_.upstream_local_address_ = upstream_connection_->localAddress();
 
   ASSERT(connect_timeout_timer_ == nullptr);
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
@@ -301,7 +308,7 @@ void TcpProxy::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
-  request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
+  request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
 
   closeUpstreamConnection();
   initializeUpstreamConnection();
@@ -312,6 +319,7 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
   request_info_.bytes_received_ += data.length();
   upstream_connection_->write(data);
   ASSERT(0 == data.length());
+  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
 }
 
@@ -324,6 +332,7 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
     // downstream connection to stick around, or, we need to be able to pass this connection to a
     // flush worker which will attempt to flush the remaining data with a timeout.
     upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+    disableIdleTimer();
   }
 }
 
@@ -331,6 +340,7 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   request_info_.bytes_sent_ += data.length();
   read_callbacks_->connection().write(data);
   ASSERT(0 == data.length());
+  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
 void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
@@ -345,10 +355,15 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     connect_timeout_timer_.reset();
   }
 
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    disableIdleTimer();
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connecting) {
-      request_info_.setResponseFlag(AccessLog::ResponseFlag::UpstreamConnectionFailure);
+      request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
       read_callbacks_->upstreamHost()->outlierDetector().putResult(
           Upstream::Outlier::Result::CONNECT_FAILED);
       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
@@ -370,6 +385,35 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
+
+    if (config_ != nullptr && config_->idleTimeout().valid()) {
+      idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+          [this]() -> void { onIdleTimeout(); });
+      resetIdleTimer();
+      Network::Connection::BytesSentCb cb = [this](uint64_t) { resetIdleTimer(); };
+      read_callbacks_->connection().addBytesSentCallback(cb);
+      upstream_connection_->addBytesSentCallback(cb);
+    }
+  }
+}
+
+void TcpProxy::onIdleTimeout() {
+  config_->stats().idle_timeout_.inc();
+  closeUpstreamConnection();
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void TcpProxy::resetIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    ASSERT(config_->idleTimeout().valid());
+    idle_timer_->enableTimer(config_->idleTimeout().value());
+  }
+}
+
+void TcpProxy::disableIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    idle_timer_->disableTimer();
+    idle_timer_.reset();
   }
 }
 

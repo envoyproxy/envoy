@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/request_info/utility.h"
 
 #include "fmt/format.h"
 
@@ -13,82 +14,6 @@ namespace Envoy {
 namespace AccessLog {
 
 static const std::string UnspecifiedValueString = "-";
-
-const std::string ResponseFlagUtils::NONE = UnspecifiedValueString;
-const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
-const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
-const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
-const std::string ResponseFlagUtils::LOCAL_RESET = "LR";
-const std::string ResponseFlagUtils::UPSTREAM_REMOTE_RESET = "UR";
-const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
-const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
-const std::string ResponseFlagUtils::UPSTREAM_OVERFLOW = "UO";
-const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
-const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
-const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
-const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
-
-void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
-  if (result.empty()) {
-    result = append;
-  } else {
-    result += "," + append;
-  }
-}
-
-const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
-  std::string result;
-
-  if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
-    appendString(result, FAILED_LOCAL_HEALTH_CHECK);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::NoHealthyUpstream)) {
-    appendString(result, NO_HEALTHY_UPSTREAM);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
-    appendString(result, UPSTREAM_REQUEST_TIMEOUT);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::LocalReset)) {
-    appendString(result, LOCAL_RESET);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
-    appendString(result, UPSTREAM_REMOTE_RESET);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
-    appendString(result, UPSTREAM_CONNECTION_FAILURE);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
-    appendString(result, UPSTREAM_CONNECTION_TERMINATION);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamOverflow)) {
-    appendString(result, UPSTREAM_OVERFLOW);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::NoRouteFound)) {
-    appendString(result, NO_ROUTE_FOUND);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::DelayInjected)) {
-    appendString(result, DELAY_INJECTED);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::FaultInjected)) {
-    appendString(result, FAULT_INJECTED);
-  }
-
-  if (request_info.getResponseFlag(ResponseFlag::RateLimited)) {
-    appendString(result, RATE_LIMITED);
-  }
-
-  return result.empty() ? NONE : result;
-}
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
@@ -129,7 +54,7 @@ FormatterImpl::FormatterImpl(const std::string& format) {
 
 std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
                                   const Http::HeaderMap& response_headers,
-                                  const RequestInfo& request_info) const {
+                                  const RequestInfo::RequestInfo& request_info) const {
   std::string log_line;
   log_line.reserve(256);
 
@@ -234,11 +159,11 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
 RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
   if (field_name == "START_TIME") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
     };
   } else if (field_name == "REQUEST_DURATION") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       Optional<std::chrono::microseconds> duration = request_info.requestReceivedDuration();
       if (duration.valid()) {
         return std::to_string(
@@ -248,7 +173,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       }
     };
   } else if (field_name == "RESPONSE_DURATION") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       Optional<std::chrono::microseconds> duration = request_info.responseReceivedDuration();
       if (duration.valid()) {
         return std::to_string(
@@ -258,34 +183,34 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       }
     };
   } else if (field_name == "BYTES_RECEIVED") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return std::to_string(request_info.bytesReceived());
     };
   } else if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogFormatUtils::protocolToString(request_info.protocol());
     };
   } else if (field_name == "RESPONSE_CODE") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return request_info.responseCode().valid()
                  ? std::to_string(request_info.responseCode().value())
                  : "0";
     };
   } else if (field_name == "BYTES_SENT") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return std::to_string(request_info.bytesSent());
     };
   } else if (field_name == "DURATION") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return std::to_string(
           std::chrono::duration_cast<std::chrono::milliseconds>(request_info.duration()).count());
     };
   } else if (field_name == "RESPONSE_FLAGS") {
-    field_extractor_ = [](const RequestInfo& request_info) {
-      return ResponseFlagUtils::toShortString(request_info);
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return RequestInfo::ResponseFlagUtils::toShortString(request_info);
     };
   } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       if (request_info.upstreamHost()) {
         return request_info.upstreamHost()->address()->asString();
       } else {
@@ -293,7 +218,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       }
     };
   } else if (field_name == "UPSTREAM_CLUSTER") {
-    field_extractor_ = [](const RequestInfo& request_info) {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       std::string upstream_cluster_name;
       if (nullptr != request_info.upstreamHost()) {
         upstream_cluster_name = request_info.upstreamHost()->cluster().name();
@@ -302,15 +227,25 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       return upstream_cluster_name.empty() ? UnspecifiedValueString : upstream_cluster_name;
     };
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = [](const RequestInfo& request_info) {
-      const Optional<std::string>& upstream_local_address = request_info.upstreamLocalAddress();
-      return upstream_local_address.valid() ? upstream_local_address.value()
-                                            : UnspecifiedValueString;
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return request_info.upstreamLocalAddress() != nullptr
+                 ? request_info.upstreamLocalAddress()->asString()
+                 : UnspecifiedValueString;
     };
-  } else if (field_name == "DOWNSTREAM_ADDRESS") {
-    field_extractor_ = [](const RequestInfo& request_info) {
-      const std::string& downstream_address = request_info.getDownstreamAddress();
-      return downstream_address.empty() ? UnspecifiedValueString : downstream_address;
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return request_info.downstreamLocalAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return request_info.downstreamRemoteAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_ADDRESS" ||
+             field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
+    // DEPRECATED: "DOWNSTREAM_ADDRESS" will be removed post 1.6.0.
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return RequestInfo::Utility::formatDownstreamAddressNoPort(
+          *request_info.downstreamRemoteAddress());
     };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));
@@ -318,14 +253,14 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
 }
 
 std::string RequestInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
-                                         const RequestInfo& request_info) const {
+                                         const RequestInfo::RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }
 
 PlainStringFormatter::PlainStringFormatter(const std::string& str) : str_(str) {}
 
 std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
-                                         const RequestInfo&) const {
+                                         const RequestInfo::RequestInfo&) const {
   return str_;
 }
 
@@ -362,7 +297,7 @@ ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
                                             const Http::HeaderMap& response_headers,
-                                            const RequestInfo&) const {
+                                            const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(response_headers);
 }
 
@@ -372,7 +307,8 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
-                                           const Http::HeaderMap&, const RequestInfo&) const {
+                                           const Http::HeaderMap&,
+                                           const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(request_headers);
 }
 

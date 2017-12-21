@@ -15,11 +15,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/request_info_impl.h"
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
+#include "common/request_info/request_info_impl.h"
 
 #include "api/filter/network/tcp_proxy.pb.h"
 
@@ -38,7 +38,8 @@ namespace Filter {
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_no_route)                                                                  \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
-  COUNTER(downstream_flow_control_resumed_reading_total)
+  COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(idle_timeout)
 // clang-format on
 
 /**
@@ -69,6 +70,7 @@ public:
   const TcpProxyStats& stats() { return stats_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
+  const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
 
 private:
   struct Route {
@@ -87,6 +89,7 @@ private:
   const TcpProxyStats stats_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
+  Optional<std::chrono::milliseconds> idle_timeout_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -177,6 +180,9 @@ protected:
   void onUpstreamEvent(Network::ConnectionEvent event);
   void finalizeUpstreamConnectionStats();
   void closeUpstreamConnection();
+  void onIdleTimeout();
+  void resetIdleTimer();
+  void disableIdleTimer();
 
   TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -184,11 +190,12 @@ protected:
   Network::ClientConnectionPtr upstream_connection_;
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr connect_timeout_timer_;
+  Event::TimerPtr idle_timer_;
   Stats::TimespanPtr connect_timespan_;
   Stats::TimespanPtr connected_timespan_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  AccessLog::RequestInfoImpl request_info_;
+  RequestInfo::RequestInfoImpl request_info_;
   uint32_t connect_attempts_{};
 };
 

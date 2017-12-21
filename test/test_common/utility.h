@@ -35,6 +35,13 @@ namespace Envoy {
     EXPECT_EQ(message, std::string(e.what()));                                                     \
   }
 
+#define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
+  try {                                                                                            \
+    statement;                                                                                     \
+  } catch (EnvoyException & e) {                                                                   \
+    ADD_FAILURE() << "Unexpected exception: " << std::string(e.what());                            \
+  }
+
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {
@@ -232,6 +239,17 @@ public:
   TestHeaderMapImpl();
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
+
+  friend std::ostream& operator<<(std::ostream& os, const TestHeaderMapImpl& p) {
+    p.iterate(
+        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+          std::ostream* local_os = static_cast<std::ostream*>(context);
+          *local_os << header.key().c_str() << " " << header.value().c_str() << std::endl;
+          return HeaderMap::Iterate::Continue;
+        },
+        &os);
+    return os;
+  }
 
   using HeaderMapImpl::addCopy;
   void addCopy(const std::string& key, const std::string& value);

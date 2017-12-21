@@ -143,6 +143,8 @@ def _envoy_api_deps():
         "protocol",
         "rds",
         "sds",
+        "stats",
+        "trace",
     ]
     for t in api_bind_targets:
         native.bind(
@@ -235,6 +237,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
+    _io_opentracing_cpp()
     _com_github_lightstep_lightstep_tracer_cpp()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
@@ -309,23 +312,22 @@ def _com_github_gcovr_gcovr():
         actual = "@com_github_gcovr_gcovr//:gcovr",
     )
 
+def _io_opentracing_cpp():
+    _repository_impl("io_opentracing_cpp")
+    native.bind(
+        name = "opentracing",
+        actual = "@io_opentracing_cpp//:opentracing",
+    )
+
 def _com_github_lightstep_lightstep_tracer_cpp():
-    location = REPOSITORY_LOCATIONS[
-        "com_github_lightstep_lightstep_tracer_cpp"]
-    genrule_repository(
-        name = "com_github_lightstep_lightstep_tracer_cpp",
-        urls = location["urls"],
-        sha256 = location["sha256"],
-        strip_prefix = location["strip_prefix"],
-        patches = [
-            "@envoy//bazel/external:lightstep-missing-header.patch",
-        ],
-        genrule_cmd_file = "@envoy//bazel/external:lightstep.genrule_cmd",
-        build_file = "@envoy//bazel/external:lightstep.BUILD",
+    _repository_impl("com_github_lightstep_lightstep_tracer_cpp")
+    _repository_impl(
+        name = "lightstep_vendored_googleapis",
+        build_file = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
     )
     native.bind(
         name = "lightstep",
-        actual = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+        actual = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep_tracer",
     )
 
 def _com_github_tencent_rapidjson():
@@ -360,6 +362,10 @@ def _com_google_absl():
     native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
+    )
+    native.bind(
+        name = "abseil_strings",
+        actual = "@com_google_absl//absl/strings:strings",
     )
 
 def _com_google_protobuf():

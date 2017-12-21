@@ -12,69 +12,125 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+const HostSet* bestAvailable(const PrioritySet* priority_set) {
+  if (priority_set == nullptr) {
+    return nullptr;
+  }
+  // This is used for LoadBalancerBase priority_set_ and local_priority_set_
+  // which are guaranteed to have at least one host set.
+  ASSERT(priority_set->hostSetsPerPriority().size() > 0);
+
+  for (auto& host_set : priority_set->hostSetsPerPriority()) {
+    if (!host_set->healthyHosts().empty()) {
+      return host_set.get();
+    }
+  }
+  return priority_set->hostSetsPerPriority()[0].get();
+}
+
+} // namespace
 
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
-LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set,
-                                   const PrioritySet* local_priority_set, ClusterStats& stats,
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random)
-    : stats_(stats), runtime_(runtime), random_(random),
-      host_set_(*priority_set.hostSetsPerPriority()[0]),
-      local_host_set_(local_priority_set ? local_priority_set->hostSetsPerPriority()[0].get()
-                                         : nullptr) {
-  if (local_host_set_) {
-    host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                       const std::vector<HostSharedPtr>&) -> void {
-      regenerateLocalityRoutingStructures();
-    });
-    local_host_set_member_update_cb_handle_ =
-        local_host_set_->addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                                  const std::vector<HostSharedPtr>&) -> void {
-          regenerateLocalityRoutingStructures();
+    : stats_(stats), runtime_(runtime), random_(random), priority_set_(priority_set),
+      best_available_host_set_(bestAvailable(&priority_set)) {
+  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                         const std::vector<HostSharedPtr>&) -> void {
+    // Update the host set to use for picking, based on the new state.
+    best_available_host_set_ = bestAvailable(&priority_set_);
+  });
+
+} // namespace Upstream
+
+ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority_set,
+                                                     const PrioritySet* local_priority_set,
+                                                     ClusterStats& stats, Runtime::Loader& runtime,
+                                                     Runtime::RandomGenerator& random)
+    : LoadBalancerBase(priority_set, stats, runtime, random),
+      local_priority_set_(local_priority_set) {
+  ASSERT(priority_set.hostSetsPerPriority().size() > 0);
+  resizePerPriorityState();
+  priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
+                                         const std::vector<HostSharedPtr>&) -> void {
+    // Update the host set to use for picking, based on the new state.
+    best_available_host_set_ = bestAvailable(&priority_set_);
+    // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
+    resizePerPriorityState();
+    // If there's a local priority set, regenerate all routing based on a potential size change to
+    // the hosts routed to.
+    if (local_priority_set_) {
+      regenerateLocalityRoutingStructures(priority);
+    }
+  });
+  if (local_priority_set_) {
+    // Multiple priorities are unsupported for local priority sets.
+    // In order to support priorities correctly, one would have to make some assumptions about
+    // routing (all local Envoys fail over at the same time) and use all priorities when computing
+    // the locality routing structure.
+    ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
+    local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
+        [this](uint32_t priority, const std::vector<HostSharedPtr>&,
+               const std::vector<HostSharedPtr>&) -> void {
+          ASSERT(priority == 0);
+          UNREFERENCED_PARAMETER(priority);
+          // If the set of local Envoys changes, regenerate routing based on potential changes to
+          // the set of servers routing to priority_set_.
+          regenerateLocalityRoutingStructures(bestAvailablePriority());
         });
   }
 }
 
-LoadBalancerBase::~LoadBalancerBase() {
-  if (local_host_set_member_update_cb_handle_ != nullptr) {
-    local_host_set_member_update_cb_handle_->remove();
+ZoneAwareLoadBalancerBase::~ZoneAwareLoadBalancerBase() {
+  if (local_priority_set_member_update_cb_handle_ != nullptr) {
+    local_priority_set_member_update_cb_handle_->remove();
   }
 }
 
-void LoadBalancerBase::regenerateLocalityRoutingStructures() {
+void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
+  ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
+  // We are updating based on a change for a priority level in priority_set_, or the latched
+  // bestAvailablePriority() which is a latched priority for priority_set_.
+  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
+  // resizePerPriorityState should ensure these stay in sync.
+  ASSERT(per_priority_state_.size() == priority_set_.hostSetsPerPriority().size());
 
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.
-  if (earlyExitNonLocalityRouting()) {
-    locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
+  PerPriorityState& state = *per_priority_state_[priority];
+  if (earlyExitNonLocalityRouting(priority)) {
+    state.locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
     return;
   }
-
-  size_t num_localities = host_set_.healthyHostsPerLocality().size();
+  HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  size_t num_localities = host_set.healthyHostsPerLocality().size();
   ASSERT(num_localities > 0);
 
   uint64_t local_percentage[num_localities];
-  calculateLocalityPercentage(local_host_set_->healthyHostsPerLocality(), local_percentage);
+  calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage);
 
   uint64_t upstream_percentage[num_localities];
-  calculateLocalityPercentage(host_set_.healthyHostsPerLocality(), upstream_percentage);
+  calculateLocalityPercentage(host_set.healthyHostsPerLocality(), upstream_percentage);
 
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
   if (upstream_percentage[0] >= local_percentage[0]) {
-    locality_routing_state_ = LocalityRoutingState::LocalityDirect;
+    state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
     return;
   }
 
-  locality_routing_state_ = LocalityRoutingState::LocalityResidual;
+  state.locality_routing_state_ = LocalityRoutingState::LocalityResidual;
 
   // If we cannot route all requests to the same locality, calculate what percentage can be routed.
   // For example, if local percentage is 20% and upstream is 10%
   // we can route only 50% of requests directly.
-  local_percent_to_route_ = upstream_percentage[0] * 10000 / local_percentage[0];
+  state.local_percent_to_route_ = upstream_percentage[0] * 10000 / local_percentage[0];
 
   // Local locality does not have additional capacity (we have already routed what we could).
   // Now we need to figure out how much traffic we can route cross locality and to which exact
@@ -92,42 +148,54 @@ void LoadBalancerBase::regenerateLocalityRoutingStructures() {
   // residual_capacity: 0 10000 15000
   // Now to find a locality to route (bucket) we could simply iterate over residual_capacity
   // searching where sampled value is placed.
-  residual_capacity_.resize(num_localities);
+  state.residual_capacity_.resize(num_localities);
 
   // Local locality (index 0) does not have residual capacity as we have routed all we could.
-  residual_capacity_[0] = 0;
+  state.residual_capacity_[0] = 0;
   for (size_t i = 1; i < num_localities; ++i) {
     // Only route to the localities that have additional capacity.
     if (upstream_percentage[i] > local_percentage[i]) {
-      residual_capacity_[i] =
-          residual_capacity_[i - 1] + upstream_percentage[i] - local_percentage[i];
+      state.residual_capacity_[i] =
+          state.residual_capacity_[i - 1] + upstream_percentage[i] - local_percentage[i];
     } else {
       // Locality with index "i" does not have residual capacity, but we keep accumulating previous
       // values to make search easier on the next step.
-      residual_capacity_[i] = residual_capacity_[i - 1];
+      state.residual_capacity_[i] = state.residual_capacity_[i - 1];
     }
   }
 };
 
-bool LoadBalancerBase::earlyExitNonLocalityRouting() {
-  if (host_set_.healthyHostsPerLocality().size() < 2) {
+void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
+  const uint32_t size = priority_set_.hostSetsPerPriority().size();
+  while (per_priority_state_.size() < size) {
+    per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+  }
+}
+
+bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
+  if (priority_set_.hostSetsPerPriority().size() < priority + 1) {
     return true;
   }
 
-  if (host_set_.healthyHostsPerLocality()[0].empty()) {
+  HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  if (host_set.healthyHostsPerLocality().size() < 2) {
+    return true;
+  }
+
+  if (host_set.healthyHostsPerLocality()[0].empty()) {
     return true;
   }
 
   // Same number of localities should be for local and upstream cluster.
-  if (host_set_.healthyHostsPerLocality().size() !=
-      local_host_set_->healthyHostsPerLocality().size()) {
+  if (host_set.healthyHostsPerLocality().size() !=
+      localHostSet().healthyHostsPerLocality().size()) {
     stats_.lb_zone_number_differs_.inc();
     return true;
   }
 
   // Do not perform locality routing for small clusters.
   uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
-  if (host_set_.healthyHosts().size() < min_cluster_size) {
+  if (host_set.healthyHosts().size() < min_cluster_size) {
     stats_.lb_zone_cluster_too_small_.inc();
     return true;
   }
@@ -135,7 +203,7 @@ bool LoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime) {
+bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime) {
   uint64_t global_panic_threshold =
       std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
   double healthy_percent = host_set.hosts().size() == 0
@@ -150,7 +218,7 @@ bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, Runtime::Loader
   return false;
 }
 
-void LoadBalancerBase::calculateLocalityPercentage(
+void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
     const std::vector<std::vector<HostSharedPtr>>& hosts_per_locality, uint64_t* ret) {
   uint64_t total_hosts = 0;
   for (const auto& locality_hosts : hosts_per_locality) {
@@ -163,29 +231,28 @@ void LoadBalancerBase::calculateLocalityPercentage(
   }
 }
 
-const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts() {
-  ASSERT(locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
+const std::vector<HostSharedPtr>& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts() {
+  PerPriorityState& state = *per_priority_state_[bestAvailablePriority()];
+  ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
   // At this point it's guaranteed to be at least 2 localities.
-  size_t number_of_localities = host_set_.healthyHostsPerLocality().size();
+  size_t number_of_localities = best_available_host_set_->healthyHostsPerLocality().size();
 
   ASSERT(number_of_localities >= 2U);
-  ASSERT(local_host_set_->healthyHostsPerLocality().size() ==
-         host_set_.healthyHostsPerLocality().size());
 
   // Try to push all of the requests to the same locality first.
-  if (locality_routing_state_ == LocalityRoutingState::LocalityDirect) {
+  if (state.locality_routing_state_ == LocalityRoutingState::LocalityDirect) {
     stats_.lb_zone_routing_all_directly_.inc();
-    return host_set_.healthyHostsPerLocality()[0];
+    return best_available_host_set_->healthyHostsPerLocality()[0];
   }
 
-  ASSERT(locality_routing_state_ == LocalityRoutingState::LocalityResidual);
+  ASSERT(state.locality_routing_state_ == LocalityRoutingState::LocalityResidual);
 
   // If we cannot route all requests to the same locality, we already calculated how much we can
   // push to the local locality, check if we can push to local locality on current iteration.
-  if (random_.random() % 10000 < local_percent_to_route_) {
+  if (random_.random() % 10000 < state.local_percent_to_route_) {
     stats_.lb_zone_routing_sampled_.inc();
-    return host_set_.healthyHostsPerLocality()[0];
+    return best_available_host_set_->healthyHostsPerLocality()[0];
   }
 
   // At this point we must route cross locality as we cannot route to the local locality.
@@ -193,44 +260,53 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalLocalityHosts(
 
   // This is *extremely* unlikely but possible due to rounding errors when calculating
   // locality percentages. In this case just select random locality.
-  if (residual_capacity_[number_of_localities - 1] == 0) {
+  if (state.residual_capacity_[number_of_localities - 1] == 0) {
     stats_.lb_zone_no_capacity_left_.inc();
-    return host_set_.healthyHostsPerLocality()[random_.random() % number_of_localities];
+    return best_available_host_set_
+        ->healthyHostsPerLocality()[random_.random() % number_of_localities];
   }
 
   // Random sampling to select specific locality for cross locality traffic based on the additional
   // capacity in localities.
-  uint64_t threshold = random_.random() % residual_capacity_[number_of_localities - 1];
+  uint64_t threshold = random_.random() % state.residual_capacity_[number_of_localities - 1];
 
   // This potentially can be optimized to be O(log(N)) where N is the number of localities.
   // Linear scan should be faster for smaller N, in most of the scenarios N will be small.
   int i = 0;
-  while (threshold > residual_capacity_[i]) {
+  while (threshold > state.residual_capacity_[i]) {
     i++;
   }
 
-  return host_set_.healthyHostsPerLocality()[i];
+  return best_available_host_set_->healthyHostsPerLocality()[i];
 }
 
-const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
-  ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
+const std::vector<HostSharedPtr>& ZoneAwareLoadBalancerBase::hostsToUse() {
+  ASSERT(best_available_host_set_->healthyHosts().size() <=
+         best_available_host_set_->hosts().size());
 
-  if (LoadBalancerUtility::isGlobalPanic(host_set_, runtime_)) {
+  // If the best available priority has insufficient healthy hosts, return all hosts.
+  if (isGlobalPanic(*best_available_host_set_, runtime_)) {
     stats_.lb_healthy_panic_.inc();
-    return host_set_.hosts();
+    return best_available_host_set_->hosts();
   }
 
-  if (locality_routing_state_ == LocalityRoutingState::NoLocalityRouting) {
-    return host_set_.healthyHosts();
+  // If we've latched that we can't do priority-based routing, return healthy
+  // hosts for the best available priority.
+  if (per_priority_state_[bestAvailablePriority()]->locality_routing_state_ ==
+      LocalityRoutingState::NoLocalityRouting) {
+    return best_available_host_set_->healthyHosts();
   }
 
+  // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
-    return host_set_.healthyHosts();
+    return best_available_host_set_->healthyHosts();
   }
 
-  if (LoadBalancerUtility::isGlobalPanic(*local_host_set_, runtime_)) {
+  if (isGlobalPanic(localHostSet(), runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
-    return host_set_.healthyHosts();
+    // If the local Envoy instances are in global panic, do not do locality
+    // based routing.
+    return best_available_host_set_->healthyHosts();
   }
 
   return tryChooseLocalLocalityHosts();
@@ -249,9 +325,9 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const PrioritySet& priority_s
                                                    const PrioritySet* local_priority_set,
                                                    ClusterStats& stats, Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
-    : LoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {
-  host_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                     const std::vector<HostSharedPtr>& hosts_removed) -> void {
+    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {
+  priority_set.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
+                                        const std::vector<HostSharedPtr>& hosts_removed) -> void {
     if (last_host_) {
       for (const HostSharedPtr& host : hosts_removed) {
         if (host == last_host_) {

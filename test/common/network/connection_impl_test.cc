@@ -13,6 +13,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -31,6 +32,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::SaveArg;
 using testing::Sequence;
 using testing::StrictMock;
 using testing::Test;
@@ -542,7 +544,7 @@ TEST_P(ConnectionImplTest, BindTest) {
   }
   setUpBasicConnection();
   connect();
-  EXPECT_EQ(address_string, server_connection_->remoteAddress().ip()->addressAsString());
+  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
 
   disconnect(true);
 }
@@ -571,6 +573,114 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   EXPECT_CALL(connection_stats.bind_errors_, inc());
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+class ConnectionImplBytesSentTest : public testing::Test {
+public:
+  ConnectionImplBytesSentTest() {
+    EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
+        .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                  std::function<void()> above_high) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(below_low, above_high);
+        }));
+
+    EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
+        .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(new Event::MockFileEvent)));
+    transport_socket_ = new NiceMock<MockTransportSocket>;
+    connection_.reset(new ConnectionImpl(
+        dispatcher_, 0, Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4),
+        Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4),
+        Network::Address::InstanceConstSharedPtr(), TransportSocketPtr(transport_socket_), false,
+        true));
+    connection_->addConnectionCallbacks(callbacks_);
+  }
+
+  ~ConnectionImplBytesSentTest() { connection_->close(ConnectionCloseType::NoFlush); }
+
+  std::unique_ptr<ConnectionImpl> connection_;
+  Event::MockDispatcher dispatcher_;
+  NiceMock<MockConnectionCallbacks> callbacks_;
+  NiceMock<MockTransportSocket>* transport_socket_;
+  Event::FileReadyCb file_ready_cb_;
+};
+
+// Test that BytesSentCb is invoked at the correct times
+TEST_F(ConnectionImplBytesSentTest, BytesSentCallback) {
+  uint64_t bytes_sent = 0;
+  uint64_t cb_called = 0;
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called++;
+    bytes_sent = arg;
+  });
+
+  // 100 bytes were sent; expect BytesSent event
+  EXPECT_CALL(*transport_socket_, doWrite(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 100}));
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called, 1);
+  EXPECT_EQ(bytes_sent, 100);
+  cb_called = false;
+  bytes_sent = 0;
+
+  // 0 bytes were sent; no event
+  EXPECT_CALL(*transport_socket_, doWrite(_)).WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0}));
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called, 0);
+
+  // Reading should not cause BytesSent
+  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(Return(IoResult{PostIoAction::KeepOpen, 1}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  EXPECT_EQ(cb_called, 0);
+
+  // Closed event should not raise a BytesSent event (but does raise RemoteClose)
+  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  file_ready_cb_(Event::FileReadyType::Closed);
+  EXPECT_EQ(cb_called, 0);
+}
+
+// Make sure that multiple registered callbacks all get called
+TEST_F(ConnectionImplBytesSentTest, BytesSentMultiple) {
+  uint64_t cb_called1 = 0;
+  uint64_t cb_called2 = 0;
+  uint64_t bytes_sent1 = 0;
+  uint64_t bytes_sent2 = 0;
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called1++;
+    bytes_sent1 = arg;
+  });
+
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called2++;
+    bytes_sent2 = arg;
+  });
+
+  EXPECT_CALL(*transport_socket_, doWrite(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 100}));
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 1);
+  EXPECT_EQ(cb_called2, 1);
+  EXPECT_EQ(bytes_sent1, 100);
+  EXPECT_EQ(bytes_sent2, 100);
+}
+
+// Test that if a callback closes the connection, further callbacks are not called.
+TEST_F(ConnectionImplBytesSentTest, CloseInCallback) {
+  // Order is not defined, so register two callbacks that both close the connection. Only
+  // one of them should be called.
+  uint64_t cb_called = 0;
+  Connection::BytesSentCb cb = [&](uint64_t) {
+    cb_called++;
+    connection_->close(ConnectionCloseType::NoFlush);
+  };
+  connection_->addBytesSentCallback(cb);
+  connection_->addBytesSentCallback(cb);
+
+  EXPECT_CALL(*transport_socket_, doWrite(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 100}));
+  file_ready_cb_(Event::FileReadyType::Write);
+
+  EXPECT_EQ(cb_called, 1);
+  EXPECT_EQ(connection_->state(), Connection::State::Closed);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

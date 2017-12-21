@@ -46,6 +46,7 @@ envoy_cc_library(
         ":raw_buffer_socket_lib",
         ":utility_lib",
         "//include/envoy/common:optional",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -55,7 +56,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
-        "//source/common/event:dispatcher_includes",
         "//source/common/event:libevent_lib",
     ],
 )

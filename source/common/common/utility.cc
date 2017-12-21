@@ -32,6 +32,17 @@ std::string DateFormatter::now() {
 ProdSystemTimeSource ProdSystemTimeSource::instance_;
 ProdMonotonicTimeSource ProdMonotonicTimeSource::instance_;
 
+ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
+  // std::streambuf won't modify `data`, but the interface still requires a char* for convenience,
+  // so we need to const_cast.
+  char* ptr = const_cast<char*>(data);
+
+  this->setg(ptr, ptr, ptr + size);
+}
+
+InputConstMemoryStream::InputConstMemoryStream(const char* data, size_t size)
+    : ConstMemoryStreamBuffer{data, size}, std::istream{static_cast<std::streambuf*>(this)} {}
+
 bool DateUtil::timePointValid(SystemTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;

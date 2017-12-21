@@ -44,7 +44,9 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
       const std::string hex_string = entry->getString("binary");
       send_text += hex_string;
     }
-    tcp_health_check->mutable_send()->set_text(send_text);
+    if (!send_text.empty()) {
+      tcp_health_check->mutable_send()->set_text(send_text);
+    }
     for (const Json::ObjectSharedPtr& entry : json_health_check.getObjectArray("receive")) {
       const std::string hex_string = entry->getString("binary");
       tcp_health_check->mutable_receive()->Add()->set_text(hex_string);

@@ -3,10 +3,10 @@
 #include <chrono>
 #include <cstdint>
 
-#include "envoy/access_log/access_log.h"
+#include "envoy/request_info/request_info.h"
 
 namespace Envoy {
-namespace AccessLog {
+namespace RequestInfo {
 
 struct RequestInfoImpl : public RequestInfo {
   RequestInfoImpl()
@@ -15,7 +15,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   RequestInfoImpl(Http::Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
 
-  // AccessLog::RequestInfo
+  // RequestInfo::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
   const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
@@ -48,9 +48,7 @@ struct RequestInfoImpl : public RequestInfo {
                                                                  start_time_monotonic_);
   }
 
-  void setResponseFlag(AccessLog::ResponseFlag response_flag) override {
-    response_flags_ |= response_flag;
-  }
+  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
   bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
@@ -60,7 +58,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
-  const Optional<std::string>& upstreamLocalAddress() const override {
+  const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
 
@@ -68,7 +66,13 @@ struct RequestInfoImpl : public RequestInfo {
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
-  const std::string& getDownstreamAddress() const override { return downstream_address_; };
+  const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
+    return downstream_local_address_;
+  }
+
+  const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
+    return downstream_remote_address_;
+  }
 
   Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
@@ -80,10 +84,11 @@ struct RequestInfoImpl : public RequestInfo {
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  Optional<std::string> upstream_local_address_{};
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
   bool hc_request_{};
-  std::string downstream_address_;
+  Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
 };
 
-} // namespace AccessLog
+} // namespace RequestInfo
 } // namespace Envoy

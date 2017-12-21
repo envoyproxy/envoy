@@ -8,17 +8,8 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/config/filter_json.h"
-#include "common/config/well_known_names.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
-#include "common/stats/stats_impl.h"
-#include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -30,7 +21,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "api/filter/network/http_connection_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -51,7 +41,7 @@ parseAccessLogFromJson(const std::string& json_string) {
   return access_log;
 }
 
-class TestRequestInfo : public RequestInfo {
+class TestRequestInfo : public RequestInfo::RequestInfo {
 public:
   TestRequestInfo() {
     tm fake_time;
@@ -78,20 +68,27 @@ public:
   std::chrono::microseconds duration() const override {
     return std::chrono::microseconds(duration_);
   }
-  bool getResponseFlag(ResponseFlag response_flag) const override {
+  bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
-  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
+  void setResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) override {
+    response_flags_ |= response_flag;
+  }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
-  const Optional<std::string>& upstreamLocalAddress() const override {
+  const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
-  const std::string& getDownstreamAddress() const override { return downstream_address_; }
+  const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
+    return downstream_local_address_;
+  }
+  const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
+    return downstream_remote_address_;
+  }
 
   SystemTime start_time_;
   Optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
@@ -101,9 +98,10 @@ public:
   uint64_t response_flags_{};
   uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  Optional<std::string> upstream_local_address_{};
   bool hc_request_{};
-  std::string downstream_address_;
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
 };
 
 class AccessLogImplTest : public testing::Test {
@@ -136,7 +134,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   EXPECT_CALL(*file_, write(_));
-  request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
+  request_info_.response_flags_ = RequestInfo::ResponseFlag::UpstreamConnectionFailure;
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addCopy(Http::Headers::get().Host, "host");

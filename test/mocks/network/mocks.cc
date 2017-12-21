@@ -42,6 +42,12 @@ void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   }
 }
 
+void MockConnectionBase::raiseBytesSentCallbacks(uint64_t num_bytes) {
+  for (Network::Connection::BytesSentCb& cb : bytes_sent_callbacks_) {
+    cb(num_bytes);
+  }
+}
+
 void MockConnectionBase::runHighWatermarkCallbacks() {
   for (auto* callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();
@@ -61,11 +67,15 @@ template <class T> static void initializeMockConnection(T& connection) {
       .WillByDefault(Invoke([&connection](Network::ConnectionCallbacks& callbacks) -> void {
         connection.callbacks_.push_back(&callbacks);
       }));
+  ON_CALL(connection, addBytesSentCallback(_))
+      .WillByDefault(Invoke([&connection](Network::Connection::BytesSentCb cb) {
+        connection.bytes_sent_callbacks_.emplace_back(cb);
+      }));
   ON_CALL(connection, close(_)).WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
     connection.raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
-  ON_CALL(connection, remoteAddress()).WillByDefault(ReturnPointee(connection.remote_address_));
-  ON_CALL(connection, localAddress()).WillByDefault(ReturnPointee(connection.local_address_));
+  ON_CALL(connection, remoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
+  ON_CALL(connection, localAddress()).WillByDefault(ReturnRef(connection.local_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
@@ -146,6 +156,9 @@ MockListener::~MockListener() { onDestroy(); }
 
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
+
+MockTransportSocket::MockTransportSocket() {}
+MockTransportSocket::~MockTransportSocket() {}
 
 } // namespace Network
 } // namespace Envoy

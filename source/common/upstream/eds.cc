@@ -25,9 +25,10 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                                bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
                              added_via_api),
-      local_info_(local_info), cluster_name_(cluster.eds_cluster_config().service_name().empty()
-                                                 ? cluster.name()
-                                                 : cluster.eds_cluster_config().service_name()) {
+      cm_(cm), local_info_(local_info),
+      cluster_name_(cluster.eds_cluster_config().service_name().empty()
+                        ? cluster.name()
+                        : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info);
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
@@ -64,6 +65,10 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   }
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
+    if (priority > 0 && !cluster_name_.empty() && cluster_name_ == cm_.localClusterName()) {
+      throw EnvoyException(
+          fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
+    }
     if (new_hosts.size() <= priority) {
       new_hosts.resize(priority + 1);
     }

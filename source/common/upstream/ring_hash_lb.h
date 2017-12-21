@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
+#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -20,7 +21,9 @@ namespace Upstream {
  * 2) Per-zone rings and optional zone aware routing (not all applications will want this).
  * 3) Max request fallback to support hot shards (not all applications will want this).
  */
-class RingHashLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
+class RingHashLoadBalancer : public LoadBalancerBase,
+                             public LoadBalancer,
+                             Logger::Loggable<Logger::Id::upstream> {
 public:
   RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
@@ -43,15 +46,15 @@ private:
     std::vector<RingEntry> ring_;
   };
 
-  void refresh();
+  void refresh(uint32_t priority);
 
-  HostSet& host_set_;
-  ClusterStats& stats_;
-  Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
   const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
-  Ring all_hosts_ring_;
-  Ring healthy_hosts_ring_;
+  struct PerPriorityState {
+    Ring all_hosts_ring_;
+    Ring healthy_hosts_ring_;
+  };
+  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  std::vector<PerPriorityStatePtr> per_priority_state_;
 };
 
 } // namespace Upstream
