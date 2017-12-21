@@ -24,6 +24,7 @@ public:
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
+  const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
@@ -82,6 +83,7 @@ public:
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
   const LowerCaseString XB3Sampled{"x-b3-sampled"};
   const LowerCaseString XB3Flags{"x-b3-flags"};
+  const LowerCaseString XContentTypeOptions{"x-content-type-options"};
 
   struct {
     const std::string Close{"close"};
