@@ -88,8 +88,10 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);
   stats_.responses_.inc();
+  // When the connection is established, the message has not yet been read so we
+  // will not have a load reporting period.
   if (message_.get()) {
-    prepareForResponse();
+    startLoadReportPeriod();
   }
 }
 
@@ -113,10 +115,10 @@ void LoadStatsReporter::onReceiveMessage(
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   stats_.requests_.inc();
   message_ = std::move(message);
-  prepareForResponse();
+  startLoadReportPeriod();
 }
 
-void LoadStatsReporter::prepareForResponse() {
+void LoadStatsReporter::startLoadReportPeriod() {
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
   for (const std::string& cluster_name : message_->clusters()) {
@@ -127,18 +129,14 @@ void LoadStatsReporter::prepareForResponse() {
       continue;
     }
     auto& cluster = it->second.get();
-    int endpoints = 0;
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto host : host_set->hosts()) {
         host->stats().rq_success_.latch();
         host->stats().rq_error_.latch();
-        ++endpoints;
       }
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   }
-  // Disable any previous alarm.
-  response_timer_->disableTimer();
   response_timer_->enableTimer(std::chrono::milliseconds(
       Protobuf::util::TimeUtil::DurationToMilliseconds(message_->load_reporting_interval())));
 }

@@ -58,7 +58,7 @@ private:
   void establishNewStream();
   void sendLoadStatsRequest();
   void handleFailure();
-  void prepareForResponse();
+  void startLoadReportPeriod();
 
   ClusterManager& cm_;
   LoadReporterStats stats_;

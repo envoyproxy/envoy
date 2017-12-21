@@ -61,7 +61,6 @@ public:
     std::copy(cluster_names.begin(), cluster_names.end(),
               Protobuf::RepeatedPtrFieldBackInserter(response->mutable_clusters()));
 
-    EXPECT_CALL(*response_timer_, disableTimer());
     EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
@@ -96,12 +95,10 @@ TEST_F(LoadStatsReporterTest, TestPubSub) {
   deliverLoadStatsResponse({"foo"});
 
   EXPECT_CALL(async_stream_, sendMessage(_, _));
-  EXPECT_CALL(*response_timer_, disableTimer());
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 
   EXPECT_CALL(async_stream_, sendMessage(_, _));
-  EXPECT_CALL(*response_timer_, disableTimer());
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 

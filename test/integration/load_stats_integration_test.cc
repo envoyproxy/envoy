@@ -217,7 +217,6 @@ public:
       loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
 
       mergeLoadStats(loadstats_request, local_loadstats_request);
-      std::cerr << "aggregated loadstats " << loadstats_request.DebugString() << std::endl;
 
       EXPECT_STREQ("POST", loadstats_stream_->headers().Method()->value().c_str());
       EXPECT_STREQ("/envoy.api.v2.EndpointDiscoveryService/StreamLoadStats",
@@ -335,6 +334,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0), localityStats("dragon", 2, 0, 0)});
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  // On slow machines, more than one load stats response may be pushed while we are simulating load.
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
