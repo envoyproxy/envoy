@@ -30,10 +30,9 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
  * @param fd file descriptor.
- * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr for bound address.
  */
-InstanceConstSharedPtr addressFromFd(int fd, bool v6only = true);
+InstanceConstSharedPtr addressFromFd(int fd);
 
 /**
  * Obtain the address of the peer of the socket with the specified file descriptor.

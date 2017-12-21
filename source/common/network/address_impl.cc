@@ -48,14 +48,22 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   NOT_REACHED;
 }
 
-InstanceConstSharedPtr addressFromFd(int fd, bool v6only) {
+InstanceConstSharedPtr addressFromFd(int fd) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
-  const int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (rc != 0) {
-    throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(errno)));
+    throw EnvoyException(
+        fmt::format("getsockname failed for '{}': ({}) {}", fd, errno, strerror(errno)));
   }
-  return addressFromSockAddr(ss, ss_len, v6only);
+  int socket_v6only = 0;
+  socklen_t size_int = sizeof(socket_v6only);
+  rc = ::getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
+  if (rc != 0 && errno != EOPNOTSUPP) {
+    throw EnvoyException(
+        fmt::format("getsockopt failed for '{}': ({}) {}", fd, errno, strerror(errno)));
+  }
+  return addressFromSockAddr(ss, ss_len, rc == 0 && socket_v6only);
 }
 
 InstanceConstSharedPtr peerAddressFromFd(int fd) {
