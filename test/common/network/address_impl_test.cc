@@ -60,7 +60,6 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     socklen_t size_int = sizeof(socket_v6only);
     ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int), 0);
     EXPECT_EQ(v6only, socket_v6only);
-    EXPECT_EQ(v6only, addr_port->ip()->v6only());
   }
 
   // Bind the socket to the desired address and port.

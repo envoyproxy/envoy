@@ -68,7 +68,6 @@ TEST(ResolverTest, FromProtoAddressV4Compat) {
     ipv6_address.mutable_socket_address()->set_port_value(2);
     auto resolved_addr = resolveProtoAddress(ipv6_address);
     EXPECT_EQ("[1::1]:2", resolved_addr->asString());
-    EXPECT_TRUE(resolved_addr->ip()->v6only());
   }
   {
     envoy::api::v2::Address ipv6_address;
@@ -77,7 +76,6 @@ TEST(ResolverTest, FromProtoAddressV4Compat) {
     ipv6_address.mutable_socket_address()->set_ipv4_compat(true);
     auto resolved_addr = resolveProtoAddress(ipv6_address);
     EXPECT_EQ("[1::1]:2", resolved_addr->asString());
-    EXPECT_FALSE(resolved_addr->ip()->v6only());
   }
 }
 

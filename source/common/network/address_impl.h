@@ -115,7 +115,6 @@ private:
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
     IpVersion version() const override { return IpVersion::v4; }
-    bool v6only() const override { return false; }
 
     Ipv4Helper ipv4_;
     std::string friendly_address_;
@@ -178,7 +177,6 @@ private:
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
     IpVersion version() const override { return IpVersion::v6; }
-    bool v6only() const override { return v6only_; }
 
     Ipv6Helper ipv6_;
     std::string friendly_address_;
