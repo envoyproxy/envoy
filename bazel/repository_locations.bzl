@@ -33,7 +33,7 @@ REPOSITORY_LOCATIONS = dict(
         commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
         remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0
     ),
-    com_github_lightstep_lightstep_tracer_cpp = dict(
+    com_lightstep_tracer_cpp = dict(
         # This picks up a commit after v0.6.0 (d4501f84de2d149da2a7a56c545a1c40f214db3f) that fixes
         # a Clang build issue.
         # TODO(htuch): Switch back to regular versioned releases at next release.

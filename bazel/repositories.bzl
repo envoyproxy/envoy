@@ -238,7 +238,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
     _io_opentracing_cpp()
-    _com_github_lightstep_lightstep_tracer_cpp()
+    _com_lightstep_tracer_cpp()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -319,15 +319,15 @@ def _io_opentracing_cpp():
         actual = "@io_opentracing_cpp//:opentracing",
     )
 
-def _com_github_lightstep_lightstep_tracer_cpp():
-    _repository_impl("com_github_lightstep_lightstep_tracer_cpp")
+def _com_lightstep_tracer_cpp():
+    _repository_impl("com_lightstep_tracer_cpp")
     _repository_impl(
         name = "lightstep_vendored_googleapis",
-        build_file = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
+        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
     )
     native.bind(
         name = "lightstep",
-        actual = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep_tracer",
+        actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
     )
 
 def _com_github_tencent_rapidjson():
