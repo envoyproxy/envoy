@@ -238,4 +238,28 @@ TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
                                                     {"content-type", "application/json"}});
 }
 
+/**
+ * Exercises gzip compression when upstream returns a chunked response.
+ */
+TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
+  initializeFilter(full_config);
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"accept-encoding", "deflate, gzip"}};
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"},
+                                           {"content-type", "application/json"}};
+
+  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  ASSERT_STREQ("gzip", response_->headers().ContentEncoding()->value().c_str());
+  ASSERT_STREQ("chunked", response_->headers().TransferEncoding()->value().c_str());
+}
+
 } // namespace Envoy

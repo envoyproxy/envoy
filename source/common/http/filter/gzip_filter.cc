@@ -12,14 +12,13 @@ static const std::regex& acceptEncodingRegex() {
                          std::regex::optimize);
 }
 
-// Default and max compression window size.
+// Default and maximum compression window size.
 const uint64_t GzipFilterConfig::DEFAULT_WINDOW_BITS{15};
-// When this value is summed to window bits, it gives a gzip header and trailer around the
-// compressed content.
+// When summed to window bits, this gives a gzip header and trailer around the compressed data.
 const uint64_t GzipFilterConfig::GZIP_HEADER_VALUE{16};
 // Default zlib memory level.
 const uint64_t GzipFilterConfig::DEFAULT_MEMORY_LEVEL{8};
-// Minimum length in bytes of an upstream response.
+// Minimum length of an upstream response that allows compression.
 const uint64_t GzipFilterConfig::MINIMUM_CONTENT_LENGTH{30};
 
 GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
@@ -87,10 +86,10 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
 }
 
 FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
-  if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
-      isContentTypeAllowed(headers) && isCacheControlAllowed(headers) && isEtagAllowed(headers) &&
-      isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
-      !headers.ContentEncoding()) {
+  response_headers_ = &headers;
+  if (!end_stream && !skip_compression_ && isMinimumContentLength() && isContentTypeAllowed() &&
+      isCacheControlAllowed() && isEtagAllowed() && isLastModifiedAllowed() &&
+      isTransferEncodingAllowed() && !headers.ContentEncoding()) {
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
@@ -126,48 +125,58 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-bool GzipFilter::isContentTypeAllowed(const HeaderMap& headers) const {
-  if (config_->contentTypeValues().size() && headers.ContentType()) {
-    return std::any_of(config_->contentTypeValues().begin(), config_->contentTypeValues().end(),
-                       [&headers](const auto& value) {
-                         return headers.ContentType()->value().find(value.c_str());
-                       });
-  }
-  return true;
-}
-
-bool GzipFilter::isCacheControlAllowed(const HeaderMap& headers) const {
-  if (config_->cacheControlValues().size() && headers.CacheControl()) {
-    return std::any_of(config_->cacheControlValues().begin(), config_->cacheControlValues().end(),
-                       [&headers](const auto& value) {
-                         return headers.CacheControl()->value().find(value.c_str());
-                       });
-  }
-  return true;
-}
-
-bool GzipFilter::isMinimumContentLength(const HeaderMap& headers) const {
-  uint64_t content_length;
-  if (headers.ContentLength() &&
-      StringUtil::atoul(headers.ContentLength()->value().c_str(), content_length)) {
+bool GzipFilter::isMinimumContentLength() const {
+  if (response_headers_->ContentLength()) {
+    uint64_t content_length{};
+    StringUtil::atoul(response_headers_->ContentLength()->value().c_str(), content_length);
     return content_length >= config_->minimumLength();
   }
-  return false;
+
+  return response_headers_->TransferEncoding() &&
+         response_headers_->TransferEncoding()->value().find(
+             Http::Headers::get().TransferEncodingValues.Chunked.c_str());
 }
 
-bool GzipFilter::isEtagAllowed(const HeaderMap& headers) const {
-  return config_->disableOnEtag() ? !headers.Etag() : true;
+bool GzipFilter::isContentTypeAllowed() const {
+  if (config_->contentTypeValues().size() && response_headers_->ContentType()) {
+    return std::any_of(config_->contentTypeValues().begin(), config_->contentTypeValues().end(),
+                       [this](const auto& value) {
+                         return response_headers_->ContentType()->value().find(value.c_str());
+                       });
+  }
+  return true;
 }
 
-bool GzipFilter::isLastModifiedAllowed(const HeaderMap& headers) const {
-  return config_->disableOnLastModified() ? !headers.LastModified() : true;
+bool GzipFilter::isCacheControlAllowed() const {
+  if (config_->cacheControlValues().size() && response_headers_->CacheControl()) {
+    return std::any_of(config_->cacheControlValues().begin(), config_->cacheControlValues().end(),
+                       [this](const auto& value) {
+                         return response_headers_->CacheControl()->value().find(value.c_str());
+                       });
+  }
+  return true;
 }
 
-bool GzipFilter::isTransferEncodingAllowed(const HeaderMap& headers) const {
-  return headers.TransferEncoding() != nullptr
-             ? !headers.TransferEncoding()->value().find(
-                   Http::Headers::get().TransferEncodingValues.Gzip.c_str())
-             : true;
+bool GzipFilter::isEtagAllowed() const {
+  if (response_headers_->Etag()) {
+    return !config_->disableOnEtag();
+  }
+  return true;
+}
+
+bool GzipFilter::isLastModifiedAllowed() const {
+  if (response_headers_->LastModified()) {
+    return !config_->disableOnLastModified();
+  }
+  return true;
+}
+
+bool GzipFilter::isTransferEncodingAllowed() const {
+  if (response_headers_->TransferEncoding()) {
+    return !response_headers_->TransferEncoding()->value().find(
+        Http::Headers::get().TransferEncodingValues.Gzip.c_str());
+  }
+  return true;
 }
 
 } // namespace Http
