@@ -192,7 +192,8 @@ private:
     };
 
     struct ClusterEntry : public ThreadLocalCluster {
-      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster);
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
+                   const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry();
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
@@ -205,6 +206,11 @@ private:
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
+      // LB factory if applicable. Not all load balancer types have a factory. LB types that have
+      // a factory will create a new LB on every membership update. LB types that don't have a
+      // factory will create an LB on construction and use it forever.
+      LoadBalancerFactorySharedPtr lb_factory_;
+      // Current active LB.
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
@@ -238,9 +244,19 @@ private:
     PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterSharedPtr&& cluster)
         : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
 
+    LoadBalancerFactorySharedPtr loadBalancerFactory() {
+      if (thread_aware_lb_ != nullptr) {
+        return thread_aware_lb_->factory();
+      } else {
+        return nullptr;
+      }
+    }
+
     const uint64_t config_hash_;
     const bool added_via_api_;
     ClusterSharedPtr cluster_;
+    // Optional thread aware LB depending on the LB type. Not all clusters have one.
+    ThreadAwareLoadBalancerPtr thread_aware_lb_;
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);

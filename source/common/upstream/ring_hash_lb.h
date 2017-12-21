@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <shared_mutex>
 #include <vector>
 
 #include "envoy/runtime/runtime.h"
@@ -22,15 +23,14 @@ namespace Upstream {
  * 3) Max request fallback to support hot shards (not all applications will want this).
  */
 class RingHashLoadBalancer : public LoadBalancerBase,
-                             public LoadBalancer,
+                             public ThreadAwareLoadBalancer,
                              Logger::Loggable<Logger::Id::upstream> {
 public:
   RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
                        const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
 
-  // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  LoadBalancerFactorySharedPtr factory() override { return factory_; }
 
 private:
   struct RingEntry {
@@ -39,22 +39,48 @@ private:
   };
 
   struct Ring {
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context, Runtime::RandomGenerator& random);
-    void create(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-                const std::vector<HostSharedPtr>& hosts);
+    Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+         const std::vector<HostSharedPtr>& hosts);
+    HostConstSharedPtr chooseHost(LoadBalancerContext* context,
+                                  Runtime::RandomGenerator& random) const;
 
     std::vector<RingEntry> ring_;
   };
 
-  void refresh(uint32_t priority);
+  typedef std::shared_ptr<const Ring> RingConstSharedPtr;
+
+  struct LoadBalancerImpl : public LoadBalancer {
+    LoadBalancerImpl(ClusterStats& stats, Runtime::RandomGenerator& random,
+                     const RingConstSharedPtr& ring, bool global_panic)
+        : stats_(stats), random_(random), ring_(ring), global_panic_(global_panic) {}
+
+    // Upstream::LoadBalancer
+    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+
+    ClusterStats& stats_;
+    Runtime::RandomGenerator& random_;
+    RingConstSharedPtr ring_;
+    const bool global_panic_;
+  };
+
+  struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
+    LoadBalancerFactoryImpl(ClusterStats& stats, Runtime::RandomGenerator& random)
+        : stats_(stats), random_(random) {}
+
+    // Upstream::LoadBalancerFactory
+    LoadBalancerPtr create() override;
+
+    ClusterStats& stats_;
+    Runtime::RandomGenerator& random_;
+    std::shared_timed_mutex mutex_;
+    RingConstSharedPtr current_ring_;
+    std::atomic<bool> global_panic_{};
+  };
+
+  void refresh();
 
   const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
-  struct PerPriorityState {
-    Ring all_hosts_ring_;
-    Ring healthy_hosts_ring_;
-  };
-  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
-  std::vector<PerPriorityStatePtr> per_priority_state_;
+  std::shared_ptr<LoadBalancerFactoryImpl> factory_;
 };
 
 } // namespace Upstream

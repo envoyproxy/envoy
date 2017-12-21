@@ -57,5 +57,48 @@ public:
 
 typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
 
+/**
+ * Factory for load balancers.
+ */
+class LoadBalancerFactory {
+public:
+  virtual ~LoadBalancerFactory() {}
+
+  /**
+   * @return LoadBalancerPtr a new load balancer.
+   */
+  virtual LoadBalancerPtr create() PURE;
+};
+
+typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
+
+/**
+ * A thread aware load balancer is a load balancer that is global to all workers on behalf of a
+ * cluster. These load balancers are harder to write so not every load balancer has to be one.
+ * If a load balancer is a thread aware load balancer, the following semantics are used:
+ * 1) A single instance is created on the main thread.
+ * 2) The shared factory is passed to all workers.
+ * 3) Every time there is a host set update on the main thread, all workers will create a new
+ *    worker local load balancer via the factory.
+ *
+ * The above semantics mean that any global state in the factory must be protected by appropriate
+ * locks. Additionally, the factory *must not* refer back to the owning thread aware load
+ * balancer. If a cluster is removed via CDS, the thread aware load balancer can be destroyed
+ * before cluster destruction reaches each worker. See the ring hash load balancer for one
+ * example of how this pattern is used in practice.
+ */
+class ThreadAwareLoadBalancer {
+public:
+  virtual ~ThreadAwareLoadBalancer() {}
+
+  /**
+   * @return LoadBalancerFactorySharedPtr the shared factory to use for creating new worker local
+   * load balancers.
+   */
+  virtual LoadBalancerFactorySharedPtr factory() PURE;
+};
+
+typedef std::unique_ptr<ThreadAwareLoadBalancer> ThreadAwareLoadBalancerPtr;
+
 } // namespace Upstream
 } // namespace Envoy
