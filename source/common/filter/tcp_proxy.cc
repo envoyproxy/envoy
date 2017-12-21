@@ -395,7 +395,6 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
           disableIdleTimer();
         }
       }
-
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
       disableIdleTimer();
