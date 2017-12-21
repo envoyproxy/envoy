@@ -14,7 +14,7 @@ static const std::regex& acceptEncodingRegex() {
 
 // Default and maximum compression window size.
 const uint64_t GzipFilterConfig::DEFAULT_WINDOW_BITS{15};
-// When summed to window bits, this gives a gzip header and trailer around the compressed data.
+// When summed to window bits, this sets a gzip header and trailer around the compressed data.
 const uint64_t GzipFilterConfig::GZIP_HEADER_VALUE{16};
 // Default zlib memory level.
 const uint64_t GzipFilterConfig::DEFAULT_MEMORY_LEVEL{8};
