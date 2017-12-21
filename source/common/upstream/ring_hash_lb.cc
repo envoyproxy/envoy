@@ -25,30 +25,30 @@ RingHashLoadBalancer::RingHashLoadBalancer(
 }
 
 HostConstSharedPtr RingHashLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  const HostSet& host_set = chooseHostSet();
-  if (isGlobalPanic(host_set, runtime_)) {
-    stats_.lb_healthy_panic_.inc();
-    return per_priority_state_[host_set.priority()]->all_hosts_ring_.chooseHost(context, random_);
-  } else {
-    return per_priority_state_[host_set.priority()]->healthy_hosts_ring_.chooseHost(context,
-                                                                                    random_);
-  }
-}
-
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* context,
-                                                          Runtime::RandomGenerator& random) {
-  if (ring_.empty()) {
-    return nullptr;
-  }
-
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
-  Optional<uint64_t> hash;
+  Envoy::Optional<uint64_t> hash;
   if (context) {
     hash = context->computeHashKey();
   }
-  const uint64_t h = hash.valid() ? hash.value() : random.random();
+  if (!hash.valid()) {
+    hash = random_.random();
+  }
+
+  const HostSet& host_set = chooseHostSet(hash.value());
+  if (isGlobalPanic(host_set, runtime_)) {
+    stats_.lb_healthy_panic_.inc();
+    return per_priority_state_[host_set.priority()]->all_hosts_ring_.chooseHost(hash.value());
+  } else {
+    return per_priority_state_[host_set.priority()]->healthy_hosts_ring_.chooseHost(hash.value());
+  }
+}
+
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t hash) {
+  if (ring_.empty()) {
+    return nullptr;
+  }
 
   // Ported from https://github.com/RJ/ketama/blob/master/libketama/ketama.c (ketama_get_server)
   // I've generally kept the variable names to make the code easier to compare.
@@ -66,11 +66,11 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* c
     uint64_t midval = ring_[midp].hash_;
     uint64_t midval1 = midp == 0 ? 0 : ring_[midp - 1].hash_;
 
-    if (h <= midval && h > midval1) {
+    if (hash <= midval && hash > midval1) {
       return ring_[midp].host_;
     }
 
-    if (midval < h) {
+    if (midval < hash) {
       lowp = midp + 1;
     } else {
       highp = midp - 1;

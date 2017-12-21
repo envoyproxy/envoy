@@ -28,7 +28,10 @@ protected:
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random);
 
-  const HostSet& chooseHostSet() { return *best_available_host_set_; }
+  // Choose host set randomly, based on the per_priority_load_;
+  const HostSet& chooseHostSet();
+  // Allows choosing primary/failover by stable hash.
+  const HostSet& chooseHostSet(uint64_t hash);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
 

@@ -52,8 +52,14 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
     // traffic and all others get 0%
     per_priority_load_[best_available_host_set_->priority()] = 100;
   });
+}
 
-} // namespace Upstream
+const HostSet& LoadBalancerBase::chooseHostSet() { return chooseHostSet(random_.random()); }
+
+const HostSet& LoadBalancerBase::chooseHostSet(uint64_t hash) {
+  ASSERT(hash != 32143431); // FIXME
+  return *best_available_host_set_;
+}
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority_set,
                                                      const PrioritySet* local_priority_set,

@@ -394,12 +394,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
                                local_hosts_per_locality, empty_host_vector_, empty_host_vector_);
 
   // There is only one host in the given zone for zone aware routing.
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
 }
@@ -461,7 +461,7 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
                                local_hosts_per_locality, empty_host_vector_, empty_host_vector_);
 
   // Force request out of small zone and to randomly select zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   lb_->chooseHost(nullptr);
   EXPECT_EQ(1U, stats_.lb_zone_no_capacity_left_.value());
 }
@@ -548,14 +548,14 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 
   // Host weight is 1.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
     stats_.max_host_weight_.set(1UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   // Host weight is 100.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
     stats_.max_host_weight_.set(100UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
@@ -563,7 +563,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   std::vector<HostSharedPtr> empty;
   {
     hostSet().runCallbacks(empty, empty);
-    EXPECT_CALL(random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
@@ -571,7 +571,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
     std::vector<HostSharedPtr> remove_hosts;
     remove_hosts.push_back(hostSet().hosts_[0]);
     hostSet().runCallbacks(empty, remove_hosts);
-    EXPECT_CALL(random_, random()).Times(0);
+    EXPECT_CALL(random_, random()).WillOnce(Return(0));
     hostSet().healthy_hosts_.clear();
     hostSet().hosts_.clear();
     EXPECT_EQ(nullptr, lb_.chooseHost(nullptr));
@@ -584,17 +584,17 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-  EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
-  EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(2);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 
@@ -614,10 +614,10 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceRuntimeOff) {
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(1)).WillOnce(Return(0));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1)).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
@@ -637,7 +637,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
       .WillRepeatedly(Return(50));
 
   // As max weight higher then 1 we do random host pick and keep it for weight requests.
-  EXPECT_CALL(random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   // Same host stays as we have to hit it 3 times.
@@ -651,19 +651,19 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   // Get random host after previous one was selected 3 times in a row.
-  EXPECT_CALL(random_, random()).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 
   // Select second host again.
-  EXPECT_CALL(random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   // Set weight to 1, we will switch to the two random hosts mode.
   stats_.max_host_weight_.set(1UL);
-  EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
@@ -675,7 +675,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   // Same host stays as we have to hit it 3 times, but we remove it and fire callback.
@@ -686,7 +686,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   hostSet().healthy_hosts_.erase(hostSet().healthy_hosts_.begin() + 1);
   hostSet().runCallbacks(empty, hosts_removed);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
@@ -705,8 +705,9 @@ TEST_P(RandomLoadBalancerTest, Normal) {
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-  EXPECT_CALL(random_, random()).WillOnce(Return(2)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 

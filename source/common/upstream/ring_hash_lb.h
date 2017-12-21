@@ -39,7 +39,7 @@ private:
   };
 
   struct Ring {
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context, Runtime::RandomGenerator& random);
+    HostConstSharedPtr chooseHost(uint64_t hash);
     void create(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
                 const std::vector<HostSharedPtr>& hosts);
 
