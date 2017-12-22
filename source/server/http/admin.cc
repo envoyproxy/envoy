@@ -1,4 +1,5 @@
 #include "server/http/admin.h"
+
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -620,13 +621,13 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
                            HandlerCb callback, bool removable) {
   // Sanitize prefix and help_text to ensure no XSS can be injected, as
   // we are injecting these strings into HTML that runs in a domain that
-  // can mutate Envoy server state.  Also rule out some characters that
+  // can mutate Envoy server state. Also rule out some characters that
   // make no sense as part of a URL path: ? and :.
   //
   // TODO(jmarantz): replace with absl definitive absl implementation
   std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
   if (pos != std::string::npos) {
-    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'" , prefix[pos]);
+    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix[pos]);
     return false;
   }
 

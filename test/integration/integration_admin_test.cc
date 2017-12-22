@@ -110,7 +110,7 @@ const char* ContentType(const BufferingStreamDecoderPtr& response) {
   return entry->value().c_str();
 }
 
-}  // namespace
+} // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
   initialize();

@@ -330,14 +330,14 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(8808926191882896258U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   // Test that we get the same dump if we specify the route name.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes?route_config_name=foo_route_config",
-                                              header_map, data));
+  EXPECT_EQ(Http::Code::OK,
+            handler_callback_("/routes?route_config_name=foo_route_config", header_map, data));
   EXPECT_EQ(routes_expected_output_full_table, TestUtility::bufferToString(data));
   data.drain(data.length());
 
   // Test that we get an emtpy response if the name does not match.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes?route_config_name=does_not_exist",
-                                              header_map, data));
+  EXPECT_EQ(Http::Code::OK,
+            handler_callback_("/routes?route_config_name=does_not_exist", header_map, data));
   EXPECT_EQ("[\n]\n", TestUtility::bufferToString(data));
   data.drain(data.length());
 

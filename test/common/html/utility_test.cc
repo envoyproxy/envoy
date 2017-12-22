@@ -11,5 +11,5 @@ TEST(HttpUtility, sanitizeHtml) {
   EXPECT_EQ("&lt;script&gt;", Utility::sanitize("<script>"));
 }
 
-} // namespace Http
+} // namespace Html
 } // namespace Envoy
