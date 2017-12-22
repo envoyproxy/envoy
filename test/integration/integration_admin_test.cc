@@ -151,7 +151,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
   EXPECT_TRUE(statsjson->hasObject("stats"));
-  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_STREQ("application/json", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);

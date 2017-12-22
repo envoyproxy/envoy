@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_set>
 
+#include "absl/strings/str_replace.h"
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
@@ -47,6 +49,58 @@ using namespace rapidjson;
 
 namespace Envoy {
 namespace Server {
+
+namespace {
+
+const char kEnvoyFavicon[] =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
+    "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbA"
+    "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
+    "7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HYGvZ5B7EvwmHt9K/59Cr"
+    "U3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9"
+    "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
+    "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
+    "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
+    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5"
+    "ErkJggg==";
+
+const char kAdminHtmlStart[] = R"(
+    <head>
+  <link rel='shortcut icon' type='image/png' href='@FAVICON@'/>
+  <style>
+    .home-table {
+      font-family: sans-serif;
+      font-size: medium;
+      border-collapse: collapse;
+    }
+
+    .home-row:nth-child(even) {
+      background-color: #dddddd;
+    }
+
+    .home-data {
+      border: 1px solid #dddddd;
+      text-align: left;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <table class='home-table'>
+    <thead>
+      <th class='home-data'>Command</th>
+      <th class='home-data'>Description</th>
+     </thead>
+     <tbody>
+)";
+
+const char kAdminHtmlEnd[] = R"(
+    </tbody>
+  </table>
+</body>
+)";
+
+}  // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
@@ -291,7 +345,7 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& header_map,
                                    Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
@@ -315,6 +369,7 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap&,
     const std::string format_key = params.begin()->first;
     const std::string format_value = params.begin()->second;
     if (format_key == "format" && format_value == "json") {
+      header_map.insertContentType().value(std::string("application/json"));
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
       AdminImpl::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(), response);
@@ -432,18 +487,17 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   Http::Code code = parent_.runCallback(path, *header_map, response);
-  const auto& headers = Http::Headers::get();
-  header_map->addReferenceKey(headers.Status, std::to_string(enumToInt(code)));
+  header_map->insertStatus().value(std::to_string(enumToInt(code)));
   if (header_map->ContentType() == nullptr) {
     // Default to text-plain if unset.
-    header_map->addReferenceKey(headers.ContentType, "text/plain; charset=UTF-8");
+    header_map->insertContentType().value(std::string("text/plain; charset=UTF-8"));
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the 'back button.
   if (header_map->CacheControl() == nullptr) {
-    header_map->addReferenceKey(headers.CacheControl, "no-cache, max-age=0");
+    header_map->insertCacheControl().value(std::string("no-cache, max-age=0"));
   }
   // Under no circumstance should browsers sniff content-type.
-  header_map->addReferenceKey(headers.XContentTypeOptions, "nosniff");
+  header_map->addReferenceKey(Http::Headers::get().XContentTypeOptions, "nosniff");
   callbacks_->encodeHeaders(std::move(header_map), response.length() == 0);
 
   if (response.length() > 0) {
@@ -539,7 +593,7 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::Heade
   }
 
   if (!found_handler) {
-    header_map.addReferenceKey(Http::Headers::get().ContentType, "text/plain; charset=UTF-8");
+    header_map.insertContentType().value(std::string("text/plain; charset=UTF-8"));
     response.add("invalid path. admin commands are:\n");
 
     // Prefix order is used during searching, but for printing do them in alpha order.
@@ -559,7 +613,7 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::Heade
 
 Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& header_map,
                                        Buffer::Instance& response) {
-  header_map.addReferenceKey(Http::Headers::get().ContentType, "text/html; charset=UTF-8");
+  header_map.insertContentType().value(std::string("text/html; charset=UTF-8"));
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   std::map<std::string, const UrlHandler*> sorted_handlers;
@@ -567,36 +621,7 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& head
     sorted_handlers[handler.prefix_] = &handler;
   }
 
-  response.add(R"(
-<head>
-  <link rel='shortcut icon' type='image/png' href='https://www.envoyproxy.io/img/favicon.ico'/>
-  <style>
-    .home-table {
-      font-family: sans-serif;
-      font-size: medium;
-      border-collapse: collapse;
-    }
-
-    .home-row:nth-child(even) {
-      background-color: #dddddd;
-    }
-
-    .home-data {
-      border: 1px solid #dddddd;
-      text-align: left;
-      padding: 8px;
-    }
-  </style>
-</head>
-<body>
-  <table class='home-table'>
-    <thead>
-      <th class='home-data'>Command</th>
-      <th class='home-data'>Description</th>
-     </thead>
-     <tbody>
-)");
-
+  response.add(absl::StrReplaceAll(kAdminHtmlStart, {{"@FAVICON@", kEnvoyFavicon}}));
   for (auto handler : sorted_handlers) {
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
@@ -605,11 +630,7 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& head
                              handler.first, handler.first,
                              Html::Utility::sanitize(handler.second->help_text_)));
   }
-  response.add(R"(
-    </tbody>
-  </table>
-</body>
-)");
+  response.add(kAdminHtmlEnd);
   return Http::Code::OK;
 }
 
@@ -623,8 +644,6 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state. Also rule out some characters that
   // make no sense as part of a URL path: ? and :.
-  //
-  // TODO(jmarantz): replace with absl definitive absl implementation
   std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
   if (pos != std::string::npos) {
     ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix[pos]);
