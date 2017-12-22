@@ -20,7 +20,7 @@ const HostSet* bestAvailable(const PrioritySet* priority_set) {
   }
   // This is used for LoadBalancerBase priority_set_ and local_priority_set_
   // which are guaranteed to have at least one host set.
-  ASSERT(priority_set->hostSetsPerPriority().size() > 0);
+  ASSERT(!priority_set->hostSetsPerPriority().empty());
 
   for (auto& host_set : priority_set->hostSetsPerPriority()) {
     if (!host_set->healthyHosts().empty()) {
@@ -54,7 +54,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority
                                                      Runtime::RandomGenerator& random)
     : LoadBalancerBase(priority_set, stats, runtime, random),
       local_priority_set_(local_priority_set) {
-  ASSERT(priority_set.hostSetsPerPriority().size() > 0);
+  ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_set_.addMemberUpdateCb([this](uint32_t priority, const std::vector<HostSharedPtr>&,
                                          const std::vector<HostSharedPtr>&) -> void {
