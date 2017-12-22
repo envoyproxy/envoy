@@ -74,15 +74,13 @@ loadCRL(const envoy::api::v2::CertificateValidationContext& vctx) {
 
   // Iterate through every item in the stack, adding all found CRLs to our
   // return array.
-  for (unsigned int i = 0; i < sk_X509_INFO_num(xis.get()); i++) {
-    auto xi = sk_X509_INFO_value(xis.get(), i);
+  for (const auto& xi : xis.get()) {
     if (xi->crl != nullptr) {
       crls.emplace_back(xi->crl);
 
-      // We need to set the pointer to nullptr here, since otherwise the
-      // pointer's destructor (`sk_X509_INFO_pop_free`) will free the
-      // underlying CRL, that we've just copied to the vector.
-      xi->crl = nullptr;
+      // We need to hold an additional reference to the CRL, or our stack's
+      // destructor will free it.
+      X509_CRL_up_ref(xi->crl);
     }
   }
 
