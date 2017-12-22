@@ -264,6 +264,7 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
     ],
 )

@@ -9,6 +9,7 @@
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
@@ -43,6 +44,11 @@ public:
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kPath:
+      if (!Filesystem::fileExists(config.path())) {
+        throw EnvoyException(fmt::format(
+            "envoy::api::v2::Path must refer to a existing path in your system: {} does not exist",
+            config.path()));
+      }
       result.reset(
           new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
       break;
@@ -54,6 +60,11 @@ public:
             "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
       }
       const auto& cluster_name = api_config_source.cluster_name()[0];
+      if (!cm.get(cluster_name)) {
+        throw EnvoyException(fmt::format("envoy::api::v2::ConfigSource must have a statically "
+                                         "defined cluster: {} does not exist",
+                                         cluster_name));
+      }
       switch (api_config_source.api_type()) {
       case envoy::api::v2::ApiConfigSource::REST_LEGACY:
         result.reset(rest_legacy_constructor());

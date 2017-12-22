@@ -15,6 +15,7 @@
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
@@ -206,8 +207,49 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
         bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
+  // set of statically loaded cluster names used for further config checks
+  std::unordered_set<std::string> cluster_names;
+
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     loadCluster(cluster, false);
+    cluster_names.insert(cluster.name());
+  }
+
+  // All the static clusters have been loaded. At this point we can check for the
+  // existence of the v1 sds backing cluster, and the ads backing cluster.
+  // TODO(htuch): Add support for multiple clusters, #1170.
+  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
+    const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
+    switch (sds_config.config_source_specifier_case()) {
+    case envoy::api::v2::ConfigSource::kPath:
+      if (!Filesystem::fileExists(sds_config.path())) {
+        throw EnvoyException(
+            "envoy::api::v2::Path for SDS config must refer to a existing path in your system");
+      }
+      break;
+    case envoy::api::v2::ConfigSource::kApiConfigSource: {
+      const auto& item = cluster_names.find(sds_config.api_config_source().cluster_name()[0]);
+      if (item == cluster_names.end()) {
+        throw EnvoyException(
+            "envoy::api::v2::ConfigSource for SDS config must have a statically defined cluster");
+      }
+      break;
+    }
+    case envoy::api::v2::ConfigSource::kAds: {
+      // Backing cluster will be checked below
+      break;
+    }
+    default:
+      throw EnvoyException(
+          "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
+    }
+  }
+  if (!ads_config.cluster_name().empty()) {
+    const auto& item = cluster_names.find(ads_config.cluster_name()[0]);
+    if (item == cluster_names.end()) {
+      throw EnvoyException(
+          "envoy::api::v2::AdsConfigSource must have a statically defined cluster");
+    }
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.
