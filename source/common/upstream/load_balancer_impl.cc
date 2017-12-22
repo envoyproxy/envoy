@@ -187,7 +187,8 @@ void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
 }
 
 bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
-  if (priority_set_.hostSetsPerPriority().size() < priority + 1) {
+  // Locality routing not supported for multiple priorities.
+  if (priority > 0) {
     return true;
   }
 
