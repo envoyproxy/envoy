@@ -42,6 +42,8 @@ protected:
   const PrioritySet& priority_set_;
 
 private:
+  void recalculatePerPriorityState(uint32_t priority);
+
   // The lowest priority host set from priority_set_ with healthy hosts, or the
   // zero-priority host set if all host sets are fully unhealthy.
   // This is updated as the hosts and healthy hosts in priority_set_ are updated
@@ -49,6 +51,7 @@ private:
   const HostSet* best_available_host_set_;
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
+  std::vector<uint32_t> per_priority_health_;
 };
 
 /**

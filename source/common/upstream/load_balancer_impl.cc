@@ -30,6 +30,13 @@ const HostSet* bestAvailable(const PrioritySet* priority_set) {
   return priority_set->hostSetsPerPriority()[0].get();
 }
 
+uint32_t sumEntries(std::vector<uint32_t>& vector) {
+  size_t sum = 0;
+  for (auto entry : vector) {
+    sum += entry;
+  }
+  return sum;
+}
 } // namespace
 
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
@@ -40,25 +47,69 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : stats_(stats), runtime_(runtime), random_(random), priority_set_(priority_set),
       best_available_host_set_(bestAvailable(&priority_set)) {
-  per_priority_load_.resize(priority_set.hostSetsPerPriority().size());
-  per_priority_load_[best_available_host_set_->priority()] = 100;
-  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                         const std::vector<HostSharedPtr>&) -> void {
-    per_priority_load_.resize(priority_set_.hostSetsPerPriority().size());
-    per_priority_load_[best_available_host_set_->priority()] = 0;
-    // Update the host set to use for picking, based on the new state.
-    best_available_host_set_ = bestAvailable(&priority_set_);
-    // With current picking logic, the best available host set gets 100% of
-    // traffic and all others get 0%
-    per_priority_load_[best_available_host_set_->priority()] = 100;
-  });
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    recalculatePerPriorityState(host_set->priority());
+  }
+  priority_set_.addMemberUpdateCb(
+      [this](uint32_t priority, const std::vector<HostSharedPtr>&,
+             const std::vector<HostSharedPtr>&) -> void { recalculatePerPriorityState(priority); });
+}
+
+void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
+  per_priority_load_.resize(priority_set_.hostSetsPerPriority().size());
+  per_priority_health_.resize(priority_set_.hostSetsPerPriority().size());
+
+  HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts,
+  // modified by the overprovision factor of 1.4
+  per_priority_health_[priority] = 0;
+  if (host_set.hosts().size() > 0) {
+    per_priority_health_[priority] =
+        std::min<uint32_t>(100, 140 * host_set.healthyHosts().size() / host_set.hosts().size());
+  }
+
+  // Now that we've updated health for changed priority level, we need to recaculate
+  // percentage load for each host set.
+  //
+  // First, determine if the load needs to be scaled relative to health. For example if there are
+  // 3 host sets with 20% / 20% / 10% health they will get 40% / 40% / 20% load to ensure load adds
+  // up to 100.
+  uint32_t total_health = std::min<uint32_t>(sumEntries(per_priority_health_), 100);
+  if (total_health == 0) {
+    // Everything is terrible. Send all load to P=0.
+    // In this one case sumEntries(per_priority_load_) != 100 since we sinkhole all traffic in P=0.
+    per_priority_load_[0] = 100;
+    return;
+  }
+  size_t total_load = 100;
+  for (size_t i = 0; i < per_priority_health_.size(); ++i) {
+    // Now assign as much load as possible to the high priority levels and cease assigning load when
+    // total_load runs out.
+    per_priority_load_[i] =
+        std::min<uint32_t>(total_load, per_priority_health_[i] * 100 / total_health);
+    total_load -= per_priority_load_[i];
+  }
+  if (total_load != 0) {
+    // Account for rounding errors.
+    ASSERT(total_load < per_priority_load_.size());
+    per_priority_load_[0] += total_load;
+  }
 }
 
 const HostSet& LoadBalancerBase::chooseHostSet() { return chooseHostSet(random_.random()); }
 
 const HostSet& LoadBalancerBase::chooseHostSet(uint64_t hash) {
-  ASSERT(hash != 32143431); // FIXME
-  return *best_available_host_set_;
+  hash = hash % 100 + 1; // 1-100
+  uint32_t aggregate_percentage_load = 0;
+  for (size_t priority = 0; priority < per_priority_load_.size(); ++priority) {
+    aggregate_percentage_load += per_priority_load_[priority];
+    if (hash <= aggregate_percentage_load) {
+      return *priority_set_.hostSetsPerPriority()[priority];
+    }
+  }
+  // The percentages should always add up to 100 but we have to have a return for the compiler.
+  ASSERT(0);
+  return *priority_set_.hostSetsPerPriority()[0];
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority_set,
