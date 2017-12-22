@@ -1,5 +1,4 @@
 #include "server/http/admin.h"
-
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -20,6 +19,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/html/utility.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -142,7 +142,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
+                                      Buffer::Instance& response) {
   response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
 
   for (auto& cluster : server_.clusterManager().clusters()) {
@@ -198,7 +199,8 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap&,
+                                         Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -221,24 +223,28 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instanc
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Http::HeaderMap&,
+                                             Buffer::Instance& response) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Http::HeaderMap&,
+                                               Buffer::Instance& response) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
+                                     Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
@@ -263,7 +269,8 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& r
   return rc;
 }
 
-Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -272,7 +279,8 @@ Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance&
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
+                                        Buffer::Instance& response) {
   time_t current_time = time(nullptr);
   response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
                            server_.healthCheckFailed() ? "draining" : "live",
@@ -282,7 +290,8 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Buffer::Instance& re
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap&,
+                                   Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
@@ -379,13 +388,15 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
   return strbuf.GetString();
 }
 
-Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Http::HeaderMap&,
+                                          Buffer::Instance& response) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap&,
+                                          Buffer::Instance& response) {
   std::list<std::string> listeners;
   for (auto listener : server_.listenerManager().listeners()) {
     listeners.push_back(listener.get().socket().localAddress()->asString());
@@ -394,7 +405,8 @@ Http::Code AdminImpl::handlerListenerInfo(const std::string&, Buffer::Instance& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
+                                   Buffer::Instance& response) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
@@ -417,11 +429,21 @@ void AdminFilter::onComplete() {
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
-  Http::Code code = parent_.runCallback(path, response);
-
-  Http::HeaderMapPtr headers{
-      new Http::HeaderMapImpl{{Http::Headers::get().Status, std::to_string(enumToInt(code))}}};
-  callbacks_->encodeHeaders(std::move(headers), response.length() == 0);
+  Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
+  Http::Code code = parent_.runCallback(path, *header_map, response);
+  const auto& headers = Http::Headers::get();
+  header_map->addReferenceKey(headers.Status, std::to_string(enumToInt(code)));
+  if (header_map->ContentType() == nullptr) {
+    // Default to text-plain if unset.
+    header_map->addReferenceKey(headers.ContentType, "text/plain; charset=UTF-8");
+  }
+  // Default to 'no-cache' if unset, but not 'no-store' which may break the 'back button.
+  if (header_map->CacheControl() == nullptr) {
+    header_map->addReferenceKey(headers.CacheControl, "no-cache, max-age=0");
+  }
+  // Under no circumstance should browsers sniff content-type.
+  header_map->addReferenceKey(headers.XContentTypeOptions, "nosniff");
+  callbacks_->encodeHeaders(std::move(header_map), response.length() == 0);
 
   if (response.length() > 0) {
     callbacks_->encodeData(response, true);
@@ -441,27 +463,50 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
       handlers_{
+          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false},
           {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
+                MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
           {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
+                MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
           {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
+                MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
           {"/hot_restart_version", "print the hot restart compatability version",
-           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
+                MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false},
           {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(handlerResetCounters), false},
+                MAKE_ADMIN_HANDLER(handlerResetCounters), false},
           {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(handlerServerInfo), false},
+                MAKE_ADMIN_HANDLER(handlerServerInfo), false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
-           false}},
+                false}},
       listener_stats_(
           Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
+        /*
+  addHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false);
+  addHandler("/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false);
+  addHandler("/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false);
+  addHandler("/cpuprofiler", "enable/disable the CPU profiler",
+             MAKE_ADMIN_HANDLER(handlerCpuProfiler), false);
+  addHandler("/healthcheck/fail", "cause the server to fail health checks",
+             MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false);
+  addHandler("/healthcheck/ok", "cause the server to pass health checks",
+             MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false);
+  addHandler("/hot_restart_version", "print the hot restart compatibility version",
+             MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false);
+  addHandler("/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false);
+  addHandler("/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false);
+  addHandler("/reset_counters", "reset all counters to zero",
+             MAKE_ADMIN_HANDLER(handlerResetCounters), false);
+  addHandler("/server_info", "print server version/status information",
+             MAKE_ADMIN_HANDLER(handlerServerInfo), false);
+  addHandler("/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false);
+  addHandler("/listeners", "print listener addresses",
+             MAKE_ADMIN_HANDLER(handlerListenerInfo), false);;
+        */
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -496,20 +541,27 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
   callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
 }
 
-Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& response) {
+Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::HeaderMap& header_map,
+                                  Buffer::Instance& response) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
+
+  std::string::size_type query_index = path_and_query.find('?');
+  if (query_index == std::string::npos) {
+    query_index = path_and_query.size();
+  }
+
   for (const UrlHandler& handler : handlers_) {
-    if (path.find(handler.prefix_) == 0) {
-      code = handler.handler_(path, response);
+    if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+      code = handler.handler_(path_and_query, header_map, response);
       found_handler = true;
       break;
     }
   }
 
   if (!found_handler) {
-    code = Http::Code::NotFound;
-    response.add("envoy admin commands:\n");
+    header_map.addReferenceKey(Http::Headers::get().ContentType, "text/plain; charset=UTF-8");
+    response.add("invalid path. admin commands are:\n");
 
     // Prefix order is used during searching, but for printing do them in alpha order.
     std::map<std::string, const UrlHandler*> sorted_handlers;
@@ -520,9 +572,66 @@ Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& res
     for (auto handler : sorted_handlers) {
       response.add(fmt::format("  {}: {}\n", handler.first, handler.second->help_text_));
     }
+    code = Http::Code::NotFound;
   }
 
   return code;
+}
+
+Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& header_map,
+                                       Buffer::Instance& response) {
+  header_map.addReferenceKey(Http::Headers::get().ContentType, "text/html; charset=UTF-8");
+
+  // Prefix order is used during searching, but for printing do them in alpha order.
+  std::map<std::string, const UrlHandler*> sorted_handlers;
+  for (const UrlHandler& handler : handlers_) {
+    sorted_handlers[handler.prefix_] = &handler;
+  }
+
+  response.add(R"(
+<head>
+  <link rel='shortcut icon' type='image/png' href='https://www.envoyproxy.io/img/favicon.ico'/>
+  <style>
+    .home-table {
+      font-family: sans-serif;
+      font-size: medium;
+      border-collapse: collapse;
+    }
+
+    .home-row:nth-child(even) {
+      background-color: #dddddd;
+    }
+
+    .home-data {
+      border: 1px solid #dddddd;
+      text-align: left;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <table class='home-table'>
+    <thead>
+      <th class='home-data'>Command</th>
+      <th class='home-data'>Description</th>
+     </thead>
+     <tbody>
+)");
+
+  for (auto handler : sorted_handlers) {
+    // Handlers are all specified by statically above, and are thus trusted and do
+    // not require escaping.
+    response.add(fmt::format("<tr class='home-row'><td class='home-data'><a href='{}'>{}</a></td>"
+                             "<td class='home-data'>{}</td></tr>\n",
+                             handler.first, handler.first,
+                             Html::Utility::sanitize(handler.second->help_text_)));
+  }
+  response.add(R"(
+    </tbody>
+  </table>
+</body>
+)");
+  return Http::Code::OK;
 }
 
 const Network::Address::Instance& AdminImpl::localAddress() {
@@ -531,6 +640,18 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable) {
+  // Sanitize prefix and help_text to ensure no XSS can be injected, as
+  // we are injecting these strings into HTML that runs in a domain that
+  // can mutate Envoy server state.  Also rule out some characters that
+  // make no sense as part of a URL path: ? and :.
+  //
+  // TODO(jmarantz): replace with absl definitive absl implementation
+  std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
+  if (pos != std::string::npos) {
+    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'" , prefix[pos]);
+    return false;
+  }
+
   auto it = std::find_if(handlers_.cbegin(), handlers_.cend(),
                          [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
   if (it == handlers_.end()) {

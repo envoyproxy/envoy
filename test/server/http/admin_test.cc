@@ -89,9 +89,10 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
 
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
-  admin_.runCallback("/cpuprofiler?enable=y", data);
+  Http::HeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
-  admin_.runCallback("/cpuprofiler?enable=n", data);
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -102,7 +103,8 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   AdminImpl admin_bad_profile_path(
       "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
       Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_);
-  admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", data);
+  Http::HeaderMapImpl header_map;
+  admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -122,30 +124,65 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [&](const std::string&, Buffer::Instance&) -> Http::Code {
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
 
   // Test removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true));
+  Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
 
   // Test that removable handler gets removed.
   EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/foo/bar", response));
+  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/foo/bar", header_map, response));
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false));
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
 
   // Add again and make sure it is not there twice.
   EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", response));
+  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+}
+
+TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
+  EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true));
+}
+
+TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
+  EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true));
+}
+
+TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
+
+  // It's OK to have help text with HTML characters in it, but when we render the home
+  // page they need to be escaped.
+  const std::string kPlanets = "jupiter>saturn>mars";
+  EXPECT_TRUE(admin_.addHandler("/planets", kPlanets, callback, true));
+
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response));
+  Http::HeaderString& content_type = header_map.ContentType()->value();
+  EXPECT_TRUE(content_type.find("text/html")) << content_type.c_str();
+  EXPECT_EQ(-1, response.search(kPlanets.data(), kPlanets.size(), 0));
+  const std::string kEscapedPlanets = "jupiter&gt;saturn&gt;mars";
+  EXPECT_NE(-1, response.search(kEscapedPlanets.data(), kEscapedPlanets.size(), 0));
 }
 
 } // namespace Server
