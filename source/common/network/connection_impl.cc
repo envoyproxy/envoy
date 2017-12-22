@@ -534,11 +534,11 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            connection_stats_->write_current_);
 }
 
-ClientConnectionImpl::ClientConnectionImpl(
-    Event::Dispatcher& dispatcher, Address::InstanceConstSharedPtr address,
-    const Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address, nullptr,
-                     source_address, false, false) {}
+ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                                           const Address::InstanceConstSharedPtr& remote_address,
+                                           const Address::InstanceConstSharedPtr& source_address)
+    : ConnectionImpl(dispatcher, remote_address->socket(Address::SocketType::Stream),
+                     remote_address, nullptr, source_address, false, false) {}
 
 } // namespace Network
 } // namespace Envoy

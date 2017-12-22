@@ -32,8 +32,8 @@ public:
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override;
+  void createUpstreams() override;
 
-  void SetUp() override { initialize(); }
   void TearDown() override;
 
   Ssl::ServerContextPtr createUpstreamSslContext();
@@ -41,9 +41,10 @@ public:
   Network::ClientConnectionPtr makeClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
-  void testRequestAndResponseWithXfccHeader(Network::ClientConnectionPtr&& conn,
-                                            std::string privous_xfcc, std::string expected_xfcc);
-  void startTestServerWithXfccConfig(std::string config, std::string content);
+  void testRequestAndResponseWithXfccHeader(std::string privous_xfcc, std::string expected_xfcc);
+  envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails fcc_;
+  envoy::api::v2::filter::network::HttpConnectionManager::SetCurrentClientCertDetails sccd_;
+  bool tls_ = true;
 
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
