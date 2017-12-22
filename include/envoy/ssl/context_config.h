@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -70,6 +72,11 @@ public:
    * if the private key was inlined.
    */
   virtual const std::string& privateKeyPath() const PURE;
+
+  /**
+   * @return The CRL to check if a cert is revoked.
+   */
+  virtual const std::vector<bssl::UniquePtr<X509_CRL>>& certificateRevocationLists() const PURE;
 
   /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""

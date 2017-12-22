@@ -61,6 +61,12 @@ void TlsContextJson::translateCommonTlsContext(
     common_tls_context.mutable_tls_params()->add_cipher_suites(std::string{cipher_suite});
   }
 
+  // TODO: this doesn't currently support inline data
+  if (json_tls_context.hasObject("crl_file")) {
+    validation_context->mutable_crl()->set_filename(
+      json_tls_context.getString("crl_file", ""));
+  }
+
   const std::string ecdh_curves_str{json_tls_context.getString("ecdh_curves", "")};
   for (auto ecdh_curve : StringUtil::splitToken(ecdh_curves_str, ":")) {
     common_tls_context.mutable_tls_params()->add_ecdh_curves(std::string{ecdh_curve});
