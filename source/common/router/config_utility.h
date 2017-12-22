@@ -48,12 +48,22 @@ public:
   // A QueryParameterMatcher specifies one "name" or "name=value" element
   // to match in a request's query string. It is the optimized, runtime
   // equivalent of the QueryParameterMatcher proto in the RDS v2 API.
-  struct QueryParameterMatcher {
+  class QueryParameterMatcher {
+  public:
     QueryParameterMatcher(const envoy::api::v2::QueryParameterMatcher& config)
         : name_(config.name()), value_(config.value()),
           regex_pattern_(value_, std::regex::optimize),
           is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {}
 
+    /**
+     * Check if the query parameters for a request contain a match for this
+     * QueryParameterMatcher.
+     * @param request_query_params supplies the parsed query parameters from a request.
+     * @return bool true if a match for this QueryParameterMatcher exists in request_query_params.
+     */
+    bool matches(const Http::Utility::QueryParams& request_query_params) const;
+
+  private:
     const std::string name_;
     const std::string value_;
     const std::regex regex_pattern_;
