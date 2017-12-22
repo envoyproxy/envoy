@@ -142,7 +142,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
+                                      Buffer::Instance& response) {
   response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
 
   for (auto& cluster : server_.clusterManager().clusters()) {
@@ -198,7 +199,8 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap&,
+                                         Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -221,24 +223,28 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instanc
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Http::HeaderMap&,
+                                             Buffer::Instance& response) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Http::HeaderMap&,
+                                               Buffer::Instance& response) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
+                                     Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
@@ -263,7 +269,8 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& r
   return rc;
 }
 
-Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -272,7 +279,8 @@ Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance&
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
+                                        Buffer::Instance& response) {
   time_t current_time = time(nullptr);
   response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
                            server_.healthCheckFailed() ? "draining" : "live",
@@ -282,7 +290,8 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Buffer::Instance& re
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string& url, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap&,
+                                   Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
@@ -379,13 +388,15 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
   return strbuf.GetString();
 }
 
-Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Http::HeaderMap&,
+                                          Buffer::Instance& response) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap&,
+                                          Buffer::Instance& response) {
   std::list<std::string> listeners;
   for (auto listener : server_.listenerManager().listeners()) {
     listeners.push_back(listener.get().socket().localAddress()->asString());
@@ -394,7 +405,8 @@ Http::Code AdminImpl::handlerListenerInfo(const std::string&, Buffer::Instance& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
+                                   Buffer::Instance& response) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
@@ -421,7 +433,15 @@ void AdminFilter::onComplete() {
   Http::Code code = parent_.runCallback(path, *header_map, response);
   const auto& headers = Http::Headers::get();
   header_map->addReferenceKey(headers.Status, std::to_string(enumToInt(code)));
-  header_map->addReferenceKey(headers.CacheControl, "no-cache, max-age=0");
+  if (header_map->ContentType() == nullptr) {
+    // Default to text-plain if unset.
+    header_map->addReferenceKey(headers.ContentType, "text/plain; charset=UTF-8");
+  }
+  // Default to 'no-cache' if unset, but not 'no-store' which may break the 'back button.
+  if (header_map->CacheControl() == nullptr) {
+    header_map->addReferenceKey(headers.CacheControl, "no-cache, max-age=0");
+  }
+  // Under no circumstance should browsers sniff content-type.
   header_map->addReferenceKey(headers.XContentTypeOptions, "nosniff");
   callbacks_->encodeHeaders(std::move(header_map), response.length() == 0);
 
@@ -442,14 +462,31 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
+      handlers_{
+          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false},
+          {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false},
+          {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false},
+          {"/cpuprofiler", "enable/disable the CPU profiler",
+                MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
+          {"/healthcheck/fail", "cause the server to fail health checks",
+                MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
+          {"/healthcheck/ok", "cause the server to pass health checks",
+                MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
+          {"/hot_restart_version", "print the hot restart compatability version",
+                MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
+          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false},
+          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false},
+          {"/reset_counters", "reset all counters to zero",
+                MAKE_ADMIN_HANDLER(handlerResetCounters), false},
+          {"/server_info", "print server version/status information",
+                MAKE_ADMIN_HANDLER(handlerServerInfo), false},
+          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
+          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
+                false}},
       listener_stats_(
           Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
-
-  auto home_handler = [this](const std::string& path_and_query,  Http::HeaderMap& header_map,
-                             Buffer::Instance& response) -> Http::Code {
-    return handlerAdminHome(path_and_query, header_map, response);
-  };
-  addTypedHandler("/", "Admin home page", home_handler, false);
+        /*
+  addHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false);
   addHandler("/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false);
   addHandler("/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false);
   addHandler("/cpuprofiler", "enable/disable the CPU profiler",
@@ -469,6 +506,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
   addHandler("/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false);
   addHandler("/listeners", "print listener addresses",
              MAKE_ADMIN_HANDLER(handlerListenerInfo), false);;
+        */
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -600,8 +638,8 @@ const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();
 }
 
-bool AdminImpl::addTypedHandler(const std::string& prefix, const std::string& help_text,
-                                TypedHandlerCb callback, bool removable) {
+bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
+                           HandlerCb callback, bool removable) {
   // Sanitize prefix and help_text to ensure no XSS can be injected, as
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state.  Also rule out some characters that
@@ -621,17 +659,6 @@ bool AdminImpl::addTypedHandler(const std::string& prefix, const std::string& he
     return true;
   }
   return false;
-}
-
-bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable) {
-  auto typed_handler = [callback](const std::string& path_and_query, Http::HeaderMap& header_map,
-                                  Buffer::Instance& response) {
-    Http::Code code = callback(path_and_query, response);
-    header_map.addReferenceKey(Http::Headers::get().ContentType, "text/plain; charset=UTF-8");
-    return code;
-  };
-  return addTypedHandler(prefix, help_text, typed_handler, removable);
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {

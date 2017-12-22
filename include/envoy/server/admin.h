@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/header_map.h"
 #include "envoy/network/listen_socket.h"
 
 namespace Envoy {
@@ -17,8 +18,10 @@ namespace Server {
  * used to add static handlers as in source/server/http/admin.cc and also dynamic handlers as
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
-#define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](const std::string& url, Buffer::Instance& data) -> Http::Code { return X(url, data); }
+#define MAKE_ADMIN_HANDLER(X)                                                                     \
+  [this](const std::string& url, Http::HeaderMap& header, Buffer::Instance& data) -> Http::Code { \
+    return X(url, header, data);                                                                  \
+  }
 
 /**
  * Global admin HTTP endpoint for the server.
@@ -33,7 +36,8 @@ public:
    * @param response supplies the buffer to fill in with the response body.
    * @return Http::Code the response code.
    */
-  typedef std::function<Http::Code(const std::string& url, Buffer::Instance& response)> HandlerCb;
+  typedef std::function<Http::Code(const std::string& url, Http::HeaderMap& header,
+                                   Buffer::Instance& response)> HandlerCb;
 
   /**
    * Add an admin handler.

@@ -80,27 +80,15 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
 
 private:
-  typedef std::function<Http::Code(const std::string& url, Http::HeaderMap& header,
-                                   Buffer::Instance& response)> TypedHandlerCb;
-
   /**
    * Individual admin handler including prefix, help text, and callback.
    */
   struct UrlHandler {
     const std::string prefix_;
     const std::string help_text_;
-    const TypedHandlerCb handler_;
+    const HandlerCb handler_;
     const bool removable_;
   };
-
-  /**
-   * More general purpose handler than what's declared in admin.cc, which allows for
-   * specifying cache-control and content-type via headers.  Perhaps this should be
-   * promoted to src/include/envoy/server/admin.h in the future so filter-supplied admin
-   * handlers could produce something other than text.
-   */
-  bool addTypedHandler(const std::string& prefix, const std::string& help_text,
-                       TypedHandlerCb callback, bool removable);
 
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
@@ -139,19 +127,31 @@ private:
    */
   Http::Code handlerAdminHome(const std::string& url, Http::HeaderMap& headers,
                               Buffer::Instance& response);
-  Http::Code handlerCerts(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerClusters(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerCpuProfiler(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerHealthcheckFail(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerHealthcheckOk(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerHotRestartVersion(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerListenerInfo(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerLogging(const std::string& url, Buffer::Instance& response);
+  Http::Code handlerCerts(const std::string& url, Http::HeaderMap& headers,
+                          Buffer::Instance& response);
+  Http::Code handlerClusters(const std::string& url, Http::HeaderMap& headers,
+                             Buffer::Instance& response);
+  Http::Code handlerCpuProfiler(const std::string& url, Http::HeaderMap& headers,
+                                Buffer::Instance& response);
+  Http::Code handlerHealthcheckFail(const std::string& url, Http::HeaderMap& headers,
+                                    Buffer::Instance& response);
+  Http::Code handlerHealthcheckOk(const std::string& url, Http::HeaderMap& headers,
+                                  Buffer::Instance& response);
+  Http::Code handlerHotRestartVersion(const std::string& url, Http::HeaderMap& headers,
+                                      Buffer::Instance& response);
+  Http::Code handlerListenerInfo(const std::string& url, Http::HeaderMap& headers,
+                                 Buffer::Instance& response);
+  Http::Code handlerLogging(const std::string& url, Http::HeaderMap& headers,
+                            Buffer::Instance& response);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerResetCounters(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerServerInfo(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerStats(const std::string& url, Buffer::Instance& response);
+  Http::Code handlerQuitQuitQuit(const std::string& url, Http::HeaderMap& headers,
+                                 Buffer::Instance& response);
+  Http::Code handlerResetCounters(const std::string& url, Http::HeaderMap& headers,
+                                  Buffer::Instance& response);
+  Http::Code handlerServerInfo(const std::string& url, Http::HeaderMap& headers,
+                               Buffer::Instance& response);
+  Http::Code handlerStats(const std::string& url, Http::HeaderMap& headers,
+                          Buffer::Instance& response);
 
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
