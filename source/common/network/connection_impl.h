@@ -172,8 +172,8 @@ private:
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
-                       Address::InstanceConstSharedPtr remote_address,
-                       const Address::InstanceConstSharedPtr source_address);
+                       const Address::InstanceConstSharedPtr& remote_address,
+                       const Address::InstanceConstSharedPtr& source_address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

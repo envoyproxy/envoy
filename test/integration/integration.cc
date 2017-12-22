@@ -202,7 +202,6 @@ void BaseIntegrationTest::initialize() {
   initialized_ = true;
 
   createUpstreams();
-
   createEnvoy();
 }
 
@@ -212,11 +211,16 @@ void BaseIntegrationTest::createUpstreams() {
   } else {
     fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
   }
-  ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
 }
 
 void BaseIntegrationTest::createEnvoy() {
-  config_helper_.finalize(ports_);
+  std::vector<uint32_t> ports;
+  for (auto& upstream : fake_upstreams_) {
+    if (upstream->localAddress()->ip()) {
+      ports.push_back(upstream->localAddress()->ip()->port());
+    }
+  }
+  config_helper_.finalize(ports);
 
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
                  config_helper_.bootstrap().DebugString());
