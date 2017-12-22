@@ -124,7 +124,7 @@ public:
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
-  void setUpstreamProtocol(FakeHttpConnection::Type type);
+  void setUpstreamProtocol(FakeHttpConnection::Type protocol);
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
