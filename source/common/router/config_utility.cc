@@ -45,8 +45,9 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
-bool ConfigUtility::matchQueryParams(const Http::Utility::QueryParams& query_params,
-                                     const std::vector<QueryParameterMatcher>& config_query_params) {
+bool ConfigUtility::matchQueryParams(
+    const Http::Utility::QueryParams& query_params,
+    const std::vector<QueryParameterMatcher>& config_query_params) {
   bool matches = true;
   for (const auto& config_query_param : config_query_params) {
     auto query_param = query_params.find(config_query_param.name_);

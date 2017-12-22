@@ -95,9 +95,9 @@ void RdsJson::translateHeaderMatcher(const Json::Object& json_header_matcher,
   JSON_UTIL_SET_BOOL(json_header_matcher, header_matcher, regex);
 }
 
-void RdsJson::translateQueryParameterMatcher(const Json::Object& json_query_parameter_matcher,
-                                             envoy::api::v2::QueryParameterMatcher&
-                                             query_parameter_matcher) {
+void RdsJson::translateQueryParameterMatcher(
+    const Json::Object& json_query_parameter_matcher,
+    envoy::api::v2::QueryParameterMatcher& query_parameter_matcher) {
   json_query_parameter_matcher.validateSchema(Json::Schema::QUERY_PARAMETER_CONFIGURATION_SCHEMA);
   JSON_UTIL_SET_STRING(json_query_parameter_matcher, query_parameter_matcher, name);
   JSON_UTIL_SET_STRING(json_query_parameter_matcher, query_parameter_matcher, value);
@@ -221,7 +221,7 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
   }
 
   for (const auto json_query_parameter_matcher :
-           json_route.getObjectArray("query_parameters", true)) {
+       json_route.getObjectArray("query_parameters", true)) {
     auto* query_parameter_matcher = match->mutable_query_parameters()->Add();
     translateQueryParameterMatcher(*json_query_parameter_matcher, *query_parameter_matcher);
   }
