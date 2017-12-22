@@ -284,5 +284,17 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
+TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/revoked_cert.crl"
+  }
+  )EOF";
+
+  EXPECT_NO_THROW(loadConfigJson(json));
+}
+
 } // namespace Ssl
 } // namespace Envoy
