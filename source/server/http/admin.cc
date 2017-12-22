@@ -369,7 +369,8 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& head
     const std::string format_key = params.begin()->first;
     const std::string format_value = params.begin()->second;
     if (format_key == "format" && format_value == "json") {
-      header_map.insertContentType().value(std::string("application/json"));
+      header_map.insertContentType().value().setReference(
+          Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
       AdminImpl::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(), response);
@@ -488,16 +489,18 @@ void AdminFilter::onComplete() {
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   Http::Code code = parent_.runCallback(path, *header_map, response);
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
+  const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
     // Default to text-plain if unset.
-    header_map->insertContentType().value(std::string("text/plain; charset=UTF-8"));
+    header_map->insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the 'back button.
   if (header_map->CacheControl() == nullptr) {
-    header_map->insertCacheControl().value(std::string("no-cache, max-age=0"));
+    header_map->insertCacheControl().value().setReference(headers.CacheControlValues.NoCacheMaxAge0);
   }
+
   // Under no circumstance should browsers sniff content-type.
-  header_map->addReferenceKey(Http::Headers::get().XContentTypeOptions, "nosniff");
+  header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
   callbacks_->encodeHeaders(std::move(header_map), response.length() == 0);
 
   if (response.length() > 0) {
@@ -593,7 +596,8 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::Heade
   }
 
   if (!found_handler) {
-    header_map.insertContentType().value(std::string("text/plain; charset=UTF-8"));
+    header_map.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.TextUtf8);
     response.add("invalid path. admin commands are:\n");
 
     // Prefix order is used during searching, but for printing do them in alpha order.
@@ -613,7 +617,7 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::Heade
 
 Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& header_map,
                                        Buffer::Instance& response) {
-  header_map.insertContentType().value(std::string("text/html; charset=UTF-8"));
+  header_map.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Html);
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   std::map<std::string, const UrlHandler*> sorted_handlers;
