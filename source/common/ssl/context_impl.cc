@@ -152,6 +152,16 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     }
   }
 
+  if (config.certificateRevocationLists().size() > 0) {
+    X509_STORE *cs = SSL_CTX_get_cert_store(ctx_.get());
+
+    for (const bssl::UniquePtr<X509_CRL>& crl : config.certificateRevocationLists()) {
+      X509_STORE_add_crl(cs, crl.get());
+    }
+
+    X509_STORE_set_flags(cs, X509_V_FLAG_CRL_CHECK);
+  }
+
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
 
