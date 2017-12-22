@@ -64,7 +64,8 @@ const char kEnvoyFavicon[] =
     "ErkJggg==";
 
 const char kAdminHtmlStart[] = R"(
-    <head>
+<head>
+  <title>Envoy Admin</title>
   <link rel='shortcut icon' type='image/png' href='@FAVICON@'/>
   <style>
     .home-table {
