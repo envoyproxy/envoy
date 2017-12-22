@@ -117,7 +117,6 @@ public:
   void SetUp();
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
-  // TODO(alyssawilk) port the rest of the tests to v2 and make initialized_ private.
   virtual void initialize();
   // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
@@ -159,20 +158,20 @@ protected:
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
-  bool initialized_{}; // True if initialized() has been called.
 
   // The named ports for createGeneratedApiTestServer. Used mostly for lookupPort.
   std::vector<std::string> named_ports_{{"default_port"}};
-  // The ports from upstreams created in createUpstreams()
-  std::vector<uint32_t> ports_;
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+  bool initialized() const { return initialized_; }
 
 private:
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  // True if initialized() has been called.
+  bool initialized_{};
 };
 
 } // namespace Envoy
