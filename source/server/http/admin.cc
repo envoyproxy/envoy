@@ -467,46 +467,24 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false},
           {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-                MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
+           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
           {"/healthcheck/fail", "cause the server to fail health checks",
-                MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
+           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
           {"/healthcheck/ok", "cause the server to pass health checks",
-                MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
+           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
           {"/hot_restart_version", "print the hot restart compatability version",
-                MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
+           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false},
           {"/reset_counters", "reset all counters to zero",
-                MAKE_ADMIN_HANDLER(handlerResetCounters), false},
+           MAKE_ADMIN_HANDLER(handlerResetCounters), false},
           {"/server_info", "print server version/status information",
-                MAKE_ADMIN_HANDLER(handlerServerInfo), false},
+           MAKE_ADMIN_HANDLER(handlerServerInfo), false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
-                false}},
+           false}},
       listener_stats_(
           Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
-        /*
-  addHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false);
-  addHandler("/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false);
-  addHandler("/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false);
-  addHandler("/cpuprofiler", "enable/disable the CPU profiler",
-             MAKE_ADMIN_HANDLER(handlerCpuProfiler), false);
-  addHandler("/healthcheck/fail", "cause the server to fail health checks",
-             MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false);
-  addHandler("/healthcheck/ok", "cause the server to pass health checks",
-             MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false);
-  addHandler("/hot_restart_version", "print the hot restart compatibility version",
-             MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false);
-  addHandler("/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false);
-  addHandler("/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false);
-  addHandler("/reset_counters", "reset all counters to zero",
-             MAKE_ADMIN_HANDLER(handlerResetCounters), false);
-  addHandler("/server_info", "print server version/status information",
-             MAKE_ADMIN_HANDLER(handlerServerInfo), false);
-  addHandler("/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false);
-  addHandler("/listeners", "print listener addresses",
-             MAKE_ADMIN_HANDLER(handlerListenerInfo), false);;
-        */
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
