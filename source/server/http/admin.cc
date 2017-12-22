@@ -496,7 +496,8 @@ void AdminFilter::onComplete() {
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the 'back button.
   if (header_map->CacheControl() == nullptr) {
-    header_map->insertCacheControl().value().setReference(headers.CacheControlValues.NoCacheMaxAge0);
+    header_map->insertCacheControl().value().setReference(
+        headers.CacheControlValues.NoCacheMaxAge0);
   }
 
   // Under no circumstance should browsers sniff content-type.

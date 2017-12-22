@@ -100,7 +100,7 @@ public:
 
   struct {
     const std::string Text{"text/plain"};
-    const std::string TextUtf8{"text/plain; charset=UTF-8"};  // TODO(jmarantz): fold this into Text
+    const std::string TextUtf8{"text/plain; charset=UTF-8"}; // TODO(jmarantz): fold this into Text
     const std::string Html{"text/html; charset=UTF-8"};
     const std::string Grpc{"application/grpc"};
     const std::string GrpcWeb{"application/grpc-web"};
