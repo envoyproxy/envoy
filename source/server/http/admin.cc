@@ -53,12 +53,12 @@ namespace {
 
 /**
  * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
- * while visiting https://www.envoyproxy.io/.  The resulting PNG was translated to base64
+ * while visiting https://www.envoyproxy.io/. The resulting PNG was translated to base64
  * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
  * below.
  *
  * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico is nicer
- * because it's transparent, but is also 67646 bytes, which is annoying to inline.  We could
+ * because it's transparent, but is also 67646 bytes, which is annoying to inline. We could
  * just reference that rather than inlining it, but then the favicon won't work when visiting
  * the admin page from a network that can't see the internet.
  */

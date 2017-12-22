@@ -19,10 +19,8 @@ namespace Server {
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](const std::string& url, Http::HeaderMap& response_headers, Buffer::Instance& data)        \
-      -> Http::Code {                                                                              \
-    return X(url, response_headers, data);                                                         \
-  }
+  [this](const std::string& url, Http::HeaderMap& response_headers,                                \
+         Buffer::Instance& data) -> Http::Code { return X(url, response_headers, data); }
 
 /**
  * Global admin HTTP endpoint for the server.
