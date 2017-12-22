@@ -90,7 +90,7 @@ private:
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRouting(uint32_t priority);
+  bool earlyExitNonLocalityRouting();
 
   /**
    * Try to select upstream hosts from the same locality.
@@ -110,7 +110,7 @@ private:
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
-  void regenerateLocalityRoutingStructures(uint32_t priority);
+  void regenerateLocalityRoutingStructures();
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 

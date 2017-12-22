@@ -170,7 +170,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(tertiary_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 35, 30));
 
-  // Now all health is (20% * 1.5 == 28).   28 * 3 < 100 so we have to scale.
+  // Now all health is (20% * 1.5 == 28).  28 * 3 < 100 so we have to scale.
   // Each Priority level gets 33% of the load, with P=0 picking up the rounding error.
   updateHostSet(host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);

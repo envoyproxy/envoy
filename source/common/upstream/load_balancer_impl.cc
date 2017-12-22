@@ -124,10 +124,10 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority
                                          const std::vector<HostSharedPtr>&) -> void {
     // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
     resizePerPriorityState();
-    // If there's a local priority set, regenerate all routing based on a potential size change to
-    // the hosts routed to.
-    if (local_priority_set_) {
-      regenerateLocalityRoutingStructures(priority);
+    // If P=0 changes, regenerate locality routing structures. Locality based routing is disabled
+    // at all other levels.
+    if (local_priority_set_ && priority == 0) {
+      regenerateLocalityRoutingStructures();
     }
   });
   if (local_priority_set_) {
@@ -141,11 +141,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority
                const std::vector<HostSharedPtr>&) -> void {
           ASSERT(priority == 0);
           UNREFERENCED_PARAMETER(priority);
-          // If the set of local Envoys changes, regenerate routing for all priority levels based on
-          // potential changes to the set of servers routing to priority_set_.
-          for (size_t i = 0; i < priority_set_.hostSetsPerPriority().size(); ++i) {
-            regenerateLocalityRoutingStructures(i);
-          }
+          // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
+          // based routing.
+          regenerateLocalityRoutingStructures();
         });
   }
 }
@@ -156,18 +154,18 @@ ZoneAwareLoadBalancerBase::~ZoneAwareLoadBalancerBase() {
   }
 }
 
-void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t priority) {
+void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   ASSERT(local_priority_set_);
   stats_.lb_recalculate_zone_structures_.inc();
-  // We are updating based on a change for a priority level in priority_set_.
-  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
   // resizePerPriorityState should ensure these stay in sync.
   ASSERT(per_priority_state_.size() == priority_set_.hostSetsPerPriority().size());
 
+  // We only do locality routing for P=0
+  uint32_t priority = 0;
+  PerPriorityState& state = *per_priority_state_[priority];
   // Do not perform any calculations if we cannot perform locality routing based on non runtime
   // params.
-  PerPriorityState& state = *per_priority_state_[priority];
-  if (earlyExitNonLocalityRouting(priority)) {
+  if (earlyExitNonLocalityRouting()) {
     state.locality_routing_state_ = LocalityRoutingState::NoLocalityRouting;
     return;
   }
@@ -239,17 +237,14 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures(uint32_t pri
 void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
   const uint32_t size = priority_set_.hostSetsPerPriority().size();
   while (per_priority_state_.size() < size) {
+    // Note for P!=0, PerPriorityState is created with NoLocalityRouting and never changed.
     per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
   }
 }
 
-bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting(uint32_t priority) {
-  // Locality routing not supported for multiple priorities.
-  if (priority > 0) {
-    return true;
-  }
-
-  HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
+bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
+  // We only do locality routing for P=0.
+  HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
   if (host_set.healthyHostsPerLocality().size() < 2) {
     return true;
   }
