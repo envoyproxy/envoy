@@ -63,8 +63,7 @@ void TlsContextJson::translateCommonTlsContext(
 
   // TODO: this doesn't currently support inline data
   if (json_tls_context.hasObject("crl_file")) {
-    validation_context->mutable_crl()->set_filename(
-      json_tls_context.getString("crl_file", ""));
+    validation_context->mutable_crl()->set_filename(json_tls_context.getString("crl_file", ""));
   }
 
   const std::string ecdh_curves_str{json_tls_context.getString("ecdh_curves", "")};

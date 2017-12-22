@@ -153,7 +153,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
   }
 
   if (config.certificateRevocationLists().size() > 0) {
-    X509_STORE *cs = SSL_CTX_get_cert_store(ctx_.get());
+    X509_STORE* cs = SSL_CTX_get_cert_store(ctx_.get());
 
     for (const bssl::UniquePtr<X509_CRL>& crl : config.certificateRevocationLists()) {
       X509_STORE_add_crl(cs, crl.get());

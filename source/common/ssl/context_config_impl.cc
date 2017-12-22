@@ -34,7 +34,8 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
 
 const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
 
-static std::vector<bssl::UniquePtr<X509_CRL>> loadCRL(const envoy::api::v2::CertificateValidationContext& vctx) {
+static std::vector<bssl::UniquePtr<X509_CRL>>
+loadCRL(const envoy::api::v2::CertificateValidationContext& vctx) {
   std::vector<bssl::UniquePtr<X509_CRL>> crls;
 
   if (!vctx.has_crl()) {
@@ -42,27 +43,23 @@ static std::vector<bssl::UniquePtr<X509_CRL>> loadCRL(const envoy::api::v2::Cert
   }
 
   // We want to load multiple CRLs from the same file, so we need to use
-  // OpenSSL's STACK abstraction.  We read from the input file or inline data,
+  // OpenSSL's STACK abstraction. We read from the input file or inline data,
   // and load into the stack of X509_INFOs.
   bssl::UniquePtr<STACK_OF(X509_INFO)> xis(nullptr);
 
   auto crl_conf = vctx.crl();
   if (crl_conf.filename().length()) {
-    std::unique_ptr<FILE, decltype(&fclose)> fp(
-      fopen(crl_conf.filename().c_str(), "r"),
-      &fclose
-    );
+    std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(crl_conf.filename().c_str(), "r"), &fclose);
 
     if (!fp.get()) {
-      throw EnvoyException(fmt::format("Failed to open CRL file '{}'", crl_conf.filename().c_str()));
+      throw EnvoyException(
+          fmt::format("Failed to open CRL file '{}'", crl_conf.filename().c_str()));
     }
 
     xis.reset(PEM_X509_INFO_read(fp.get(), nullptr, nullptr, nullptr));
   } else {
     std::unique_ptr<BIO, decltype(&BIO_free_all)> bio(
-      BIO_new_mem_buf(crl_conf.inline_().c_str(), crl_conf.inline_().length()),
-      BIO_free_all
-    );
+        BIO_new_mem_buf(crl_conf.inline_().c_str(), crl_conf.inline_().length()), BIO_free_all);
 
     if (!bio.get()) {
       throw EnvoyException(fmt::format("Failed to load inline CRL"));
