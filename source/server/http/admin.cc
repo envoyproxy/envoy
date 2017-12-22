@@ -5,8 +5,6 @@
 #include <string>
 #include <unordered_set>
 
-#include "absl/strings/str_replace.h"
-
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
@@ -33,6 +31,7 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "absl/strings/str_replace.h"
 #include "fmt/format.h"
 
 // TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
@@ -100,7 +99,7 @@ const char kAdminHtmlEnd[] = R"(
 </body>
 )";
 
-}  // namespace
+} // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
