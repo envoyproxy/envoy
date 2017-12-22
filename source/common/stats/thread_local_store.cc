@@ -87,6 +87,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
 }
 
 std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::vector<Tag>& tags) {
+  tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
+
   std::string tag_extracted_name = name;
   if (tag_extractors_ != nullptr) {
     for (const TagExtractorPtr& tag_extractor : *tag_extractors_) {

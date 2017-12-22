@@ -97,6 +97,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/server:options_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

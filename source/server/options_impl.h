@@ -44,6 +44,7 @@ public:
   const std::string& serviceClusterName() override { return service_cluster_; }
   const std::string& serviceNodeName() override { return service_node_; }
   const std::string& serviceZone() override { return service_zone_; }
+  const std::vector<Stats::Tag> statsTags() override { return stats_tags_; }
   uint64_t maxStats() override { return max_stats_; }
   uint64_t maxObjNameLength() override { return max_obj_name_length_; }
 
@@ -60,6 +61,7 @@ private:
   std::string service_cluster_;
   std::string service_node_;
   std::string service_zone_;
+  std::vector<Stats::Tag> stats_tags_;
   std::chrono::milliseconds file_flush_interval_msec_;
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;

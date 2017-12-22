@@ -8,6 +8,7 @@
 #include <string>
 
 #include "envoy/server/options.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -51,6 +52,7 @@ public:
   const std::string& serviceClusterName() override { return service_cluster_name_; }
   const std::string& serviceNodeName() override { return service_node_name_; }
   const std::string& serviceZone() override { return service_zone_; }
+  const std::vector<Stats::Tag> statsTags() override { return stats_tags_; }
   uint64_t maxStats() override { return 16384; }
   uint64_t maxObjNameLength() override { return 60; }
 
@@ -61,6 +63,7 @@ private:
   const std::string service_cluster_name_;
   const std::string service_node_name_;
   const std::string service_zone_;
+  const std::vector<Stats::Tag> stats_tags_;
   const std::string log_path_;
 };
 
@@ -166,6 +169,7 @@ public:
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagExtractors(const std::vector<TagExtractorPtr>&) override {}
+  void setDefaultTags(const std::vector<Tag>) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
 

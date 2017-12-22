@@ -228,6 +228,7 @@ envoy_cc_test_library(
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:options_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/api:api_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",

@@ -13,6 +13,7 @@
 #include "envoy/server/options.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/stats.h"
 
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
@@ -59,6 +60,7 @@ public:
   MOCK_METHOD0(serviceClusterName, const std::string&());
   MOCK_METHOD0(serviceNodeName, const std::string&());
   MOCK_METHOD0(serviceZone, const std::string&());
+  MOCK_METHOD0(statsTags, const std::vector<Stats::Tag>());
   MOCK_METHOD0(maxStats, uint64_t());
   MOCK_METHOD0(maxObjNameLength, uint64_t());
 
@@ -68,6 +70,7 @@ public:
   std::string service_cluster_name_;
   std::string service_node_name_;
   std::string service_zone_name_;
+  std::vector<Stats::Tag> stats_tags_;
   std::string log_path_;
 };
 

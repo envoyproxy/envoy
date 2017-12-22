@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/stats.h"
 
 #include "spdlog/spdlog.h"
 
@@ -126,6 +127,11 @@ public:
    * @return const std::string& the server's zone.
    */
   virtual const std::string& serviceZone() PURE;
+
+  /**
+   * @return const std::vector<Stats::Tag> default stats tags.
+   */
+  virtual const std::vector<Stats::Tag> statsTags() PURE;
 
   /**
    * @return uint64_t the maximum number of stats gauges and counters.
