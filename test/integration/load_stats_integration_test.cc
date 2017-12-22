@@ -160,7 +160,7 @@ public:
       return;
     }
 
-    auto local_cluster_stats = local_loadstats_request.cluster_stats(0);
+    const auto local_cluster_stats = local_loadstats_request.cluster_stats(0);
     auto* cluster_stats = loadstats_request.mutable_cluster_stats(0);
 
     cluster_stats->set_total_dropped_requests(cluster_stats->total_dropped_requests() +
@@ -210,6 +210,8 @@ public:
     }
 
     envoy::api::v2::LoadStatsRequest loadstats_request;
+    // Because multiple load stats may be sent while load in being sent (on slow machines), loop and
+    // merge until all the expected load has been reported.
     do {
       envoy::api::v2::LoadStatsRequest local_loadstats_request;
       loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
