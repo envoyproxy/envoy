@@ -1,6 +1,6 @@
 #include "common/html/utility.h"
 
-#include "testing/base/public/gunit.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Html {

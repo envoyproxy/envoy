@@ -1,7 +1,7 @@
 licenses(["notice"])  # Apache 2
 
 load(
-    "//third_party/envoy/src/bazel:envoy_build_system.bzl",
+    "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )

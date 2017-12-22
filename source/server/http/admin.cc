@@ -608,7 +608,7 @@ bool AdminImpl::addTypedHandler(const std::string& prefix, const std::string& he
   // make no sense as part of a URL path: ? and :.
   //
   // TODO(jmarantz): replace with absl definitive absl implementation
-  string::size_type pos = prefix.find_first_of("&\"'<>?:");
+  std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
   if (pos != std::string::npos) {
     ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'" , prefix[pos]);
     return false;
