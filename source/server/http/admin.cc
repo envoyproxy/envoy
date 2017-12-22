@@ -51,7 +51,18 @@ namespace Server {
 
 namespace {
 
-const char kEnvoyFavicon[] =
+/**
+ * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
+ * while visiting https://www.envoyproxy.io/.  The resulting PNG was translated to base64
+ * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
+ * below.
+ *
+ * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico is nicer
+ * because it's transparent, but is also 67646 bytes, which is annoying to inline.  We could
+ * just reference that rather than inlining it, but then the favicon won't work when visiting
+ * the admin page from a network that can't see the internet.
+ */
+const char EnvoyFavicon[] =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
     "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbA"
     "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
@@ -63,7 +74,7 @@ const char kEnvoyFavicon[] =
     "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5"
     "ErkJggg==";
 
-const char kAdminHtmlStart[] = R"(
+const char AdminHtmlStart[] = R"(
 <head>
   <title>Envoy Admin</title>
   <link rel='shortcut icon' type='image/png' href='@FAVICON@'/>
@@ -94,7 +105,7 @@ const char kAdminHtmlStart[] = R"(
      <tbody>
 )";
 
-const char kAdminHtmlEnd[] = R"(
+const char AdminHtmlEnd[] = R"(
     </tbody>
   </table>
 </body>
@@ -104,8 +115,9 @@ const char kAdminHtmlEnd[] = R"(
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
-  request_headers_ = &headers;
+Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& response_headers,
+                                                     bool end_stream) {
+  request_headers_ = &response_headers;
   if (end_stream) {
     onComplete();
   }
@@ -578,8 +590,8 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
   callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
 }
 
-Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::HeaderMap& header_map,
-                                  Buffer::Instance& response) {
+Http::Code AdminImpl::runCallback(const std::string& path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -590,14 +602,14 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::Heade
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
-      code = handler.handler_(path_and_query, header_map, response);
+      code = handler.handler_(path_and_query, response_headers, response);
       found_handler = true;
       break;
     }
   }
 
   if (!found_handler) {
-    header_map.insertContentType().value().setReference(
+    response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.TextUtf8);
     response.add("invalid path. admin commands are:\n");
 
@@ -616,9 +628,10 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query, Http::Heade
   return code;
 }
 
-Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& header_map,
+Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& response_headers,
                                        Buffer::Instance& response) {
-  header_map.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Html);
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Html);
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   std::map<std::string, const UrlHandler*> sorted_handlers;
@@ -626,7 +639,7 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& head
     sorted_handlers[handler.prefix_] = &handler;
   }
 
-  response.add(absl::StrReplaceAll(kAdminHtmlStart, {{"@FAVICON@", kEnvoyFavicon}}));
+  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
   for (auto handler : sorted_handlers) {
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
@@ -635,7 +648,7 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& head
                              handler.first, handler.first,
                              Html::Utility::sanitize(handler.second->help_text_)));
   }
-  response.add(kAdminHtmlEnd);
+  response.add(AdminHtmlEnd);
   return Http::Code::OK;
 }
 
@@ -649,7 +662,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state. Also rule out some characters that
   // make no sense as part of a URL path: ? and :.
-  std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
+  const std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
   if (pos != std::string::npos) {
     ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix[pos]);
     return false;
