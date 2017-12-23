@@ -25,13 +25,13 @@ RingHashLoadBalancer::RingHashLoadBalancer(
 }
 
 HostConstSharedPtr RingHashLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  if (isGlobalPanic(*best_available_host_set_, runtime_)) {
+  const HostSet& host_set = chooseHostSet();
+  if (isGlobalPanic(host_set, runtime_)) {
     stats_.lb_healthy_panic_.inc();
-    return per_priority_state_[bestAvailablePriority()]->all_hosts_ring_.chooseHost(context,
-                                                                                    random_);
+    return per_priority_state_[host_set.priority()]->all_hosts_ring_.chooseHost(context, random_);
   } else {
-    return per_priority_state_[bestAvailablePriority()]->healthy_hosts_ring_.chooseHost(context,
-                                                                                        random_);
+    return per_priority_state_[host_set.priority()]->healthy_hosts_ring_.chooseHost(context,
+                                                                                    random_);
   }
 }
 
