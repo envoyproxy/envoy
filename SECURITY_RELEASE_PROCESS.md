@@ -210,7 +210,7 @@ New membership requests are sent to envoy-security@googlegroups.com.
 In the body of your request please specify how you qualify and fulfill each
 criterion listed in [Membership Criteria](#membership-criteria).
 
-Here is a psuedo example:
+Here is a pseudo example:
 
 ```
 To: envoy-security@googlegroups.com
