@@ -8,6 +8,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "api/eds.pb.h"
@@ -48,6 +49,8 @@ public:
   Stats::MockIsolatedStatsStore stats_store_;
 };
 
+class SubscriptionFactoryTestApiConfigSource : public SubscriptionFactoryTest, public testing::WithParamInterface<::envoy::api::v2::ApiConfigSource_ApiType> {};
+
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   envoy::api::v2::ConfigSource config;
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
@@ -69,12 +72,21 @@ TEST_F(SubscriptionFactoryTest, WrongClusterNameLength) {
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
   envoy::api::v2::ConfigSource config;
-  config.set_path("/blahblah");
+  std::string test_path = TestEnvironment::temporaryDirectory();
+  config.set_path(test_path);
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-  EXPECT_CALL(*watcher, addWatch("/blahblah", _, _));
+  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+}
+
+TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
+  envoy::api::v2::ConfigSource config;
+  config.set_path("/blahblah");
+  EXPECT_THROW_WITH_MESSAGE(
+      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+      "envoy::api::v2::Path must refer to a existing path in your system: /blahblah does not exist")
 }
 
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
@@ -82,6 +94,8 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
   api_config_source->add_cluster_name("eds_cluster");
+  EXPECT_CALL(cm_, get("eds_cluster")).Times(2);
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi());
   EXPECT_CALL(*legacy_subscription_, start(_, _));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
@@ -91,6 +105,8 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST);
   api_config_source->add_cluster_name("eds_cluster");
+  EXPECT_CALL(cm_, get("eds_cluster")).Times(2);
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi());
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
@@ -113,6 +129,8 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
   api_config_source->add_cluster_name("eds_cluster");
+  EXPECT_CALL(cm_, get("eds_cluster")).Times(2);
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi());
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
   NiceMock<Http::MockAsyncClientStream> stream;
@@ -126,6 +144,27 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   EXPECT_CALL(stream, sendHeaders(HeaderMapEqualRef(&headers), _));
   EXPECT_CALL(cm_.async_client_.dispatcher_, deferredDelete_(_));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+}
+
+INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource, SubscriptionFactoryTestApiConfigSource, ::testing::Values(envoy::api::v2::ApiConfigSource::REST_LEGACY, envoy::api::v2::ApiConfigSource::REST, envoy::api::v2::ApiConfigSource::GRPC));
+
+TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
+  envoy::api::v2::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(GetParam());
+  api_config_source->add_cluster_name("eds_cluster");
+  EXPECT_CALL(cm_, get("eds_cluster")).WillOnce(Return(nullptr));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException, "envoy::api::v2::ConfigSource must have a statically defined cluster: eds_cluster does not exist or was added via api");
+}
+
+TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
+  envoy::api::v2::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(GetParam());
+  api_config_source->add_cluster_name("eds_cluster");
+  EXPECT_CALL(cm_, get("eds_cluster")).Times(2);
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillOnce(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException, "envoy::api::v2::ConfigSource must have a statically defined cluster: eds_cluster does not exist or was added via api");
 }
 
 } // namespace Config
