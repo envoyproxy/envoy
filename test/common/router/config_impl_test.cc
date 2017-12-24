@@ -995,6 +995,99 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   }
 }
 
+TEST(RouteMatcherTest, QueryParamMatchedRouting) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_multiple_query_parameters",
+          "query_parameters": [
+            {"name": "id", "value": "\\d+[02468]", "regex": true},
+            {"name": "debug"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_query_parameter",
+          "query_parameters": [
+            {"name": "param", "value": "test"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_valueless_query_parameter",
+          "query_parameters": [
+            {"name": "debug"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_without_query_parameters"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=testing", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=test", "GET");
+    EXPECT_EQ("local_service_with_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug", "GET");
+    EXPECT_EQ("local_service_with_valueless_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug=2", "GET");
+    EXPECT_EQ("local_service_with_valueless_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=test&debug&id=01", "GET");
+    EXPECT_EQ("local_service_with_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=test&debug&id=02", "GET");
+    EXPECT_EQ("local_service_with_multiple_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 class RouterMatcherHashPolicyTest : public testing::Test {
 public:
   RouterMatcherHashPolicyTest()

@@ -721,6 +721,13 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
           "type" : "object"
         }
       },
+      "query_parameters": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object"
+        }
+      },
       "rate_limits" : {"type" : "array"},
       "include_vh_rate_limits" : {"type" : "boolean"},
       "hash_policy" : {
@@ -781,6 +788,20 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
   )EOF");
 
 const std::string Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema" : "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "name" : {"type" : "string"},
+      "value" : {"type" : "string"},
+      "regex" : {"type" : "boolean"}
+    },
+    "required" : ["name"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::QUERY_PARAMETER_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema" : "http://json-schema.org/schema#",
     "type" : "object",

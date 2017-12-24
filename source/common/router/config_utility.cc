@@ -9,6 +9,20 @@
 namespace Envoy {
 namespace Router {
 
+bool ConfigUtility::QueryParameterMatcher::matches(
+    const Http::Utility::QueryParams& request_query_params) const {
+  auto query_param = request_query_params.find(name_);
+  if (query_param == request_query_params.end()) {
+    return false;
+  } else if (is_regex_) {
+    return std::regex_match(query_param->second, regex_pattern_);
+  } else if (value_.length() == 0) {
+    return true;
+  } else {
+    return (value_ == query_param->second);
+  }
+}
+
 Upstream::ResourcePriority
 ConfigUtility::parsePriority(const envoy::api::v2::RoutingPriority& priority) {
   switch (priority) {
@@ -43,6 +57,18 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
 
   return matches;
+}
+
+bool ConfigUtility::matchQueryParams(
+    const Http::Utility::QueryParams& query_params,
+    const std::vector<QueryParameterMatcher>& config_query_params) {
+  for (const auto& config_query_param : config_query_params) {
+    if (!config_query_param.matches(query_params)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 Http::Code ConfigUtility::parseRedirectResponseCode(
