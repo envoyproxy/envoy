@@ -77,6 +77,13 @@ private:
  */
 class ClusterManagerInitHelper : Logger::Loggable<Logger::Id::upstream> {
 public:
+  /**
+   * @param per_cluster_init_callback supplies the callback to call when a cluster has itself
+   *        initialized. The cluster manager can use this for post-init processing.
+   */
+  ClusterManagerInitHelper(const std::function<void(Cluster&)>& per_cluster_init_callback)
+      : per_cluster_init_callback_(per_cluster_init_callback) {}
+
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
     // are immediately initialized.
@@ -103,7 +110,9 @@ public:
 
 private:
   void maybeFinishInitialize();
+  void onClusterInit(Cluster& cluster);
 
+  std::function<void(Cluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   std::function<void()> initialized_callback_;
   std::list<Cluster*> primary_init_clusters_;
@@ -261,7 +270,7 @@ private:
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
-  void postInitializeCluster(Cluster& cluster);
+  void onPerClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed);

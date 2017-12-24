@@ -30,7 +30,9 @@ public:
                        Runtime::RandomGenerator& random,
                        const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
 
+  // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
+  void initialize() override;
 
 private:
   struct RingEntry {

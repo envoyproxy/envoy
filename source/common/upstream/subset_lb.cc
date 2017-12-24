@@ -355,6 +355,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     thread_aware_lb_.reset(new RingHashLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_,
                                                     subset_lb.random_,
                                                     subset_lb.lb_ring_hash_config_));
+    thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
 

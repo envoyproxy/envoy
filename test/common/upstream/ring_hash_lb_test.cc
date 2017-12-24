@@ -39,6 +39,7 @@ public:
 
   void init() {
     lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_));
+    lb_->initialize();
   }
 
   // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
@@ -296,6 +297,7 @@ TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   RingHashLoadBalancer thread_aware_lb{priority_set_, stats_, runtime_, random_, config_};
+  thread_aware_lb.initialize();
 
   LoadBalancerPtr lb = thread_aware_lb.factory()->create();
   for (uint64_t i = 0; i < keys_to_simulate; i++) {

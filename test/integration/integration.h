@@ -149,10 +149,14 @@ public:
   void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
 
 protected:
+  bool initialized() const { return initialized_; }
+
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
+  // Steps that should be done prior to the workers starting. E.g., xDS pre-init.
+  std::function<void()> pre_worker_start_test_steps_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
@@ -163,7 +167,6 @@ protected:
   std::vector<std::string> named_ports_{{"default_port"}};
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
-  bool initialized() const { return initialized_; }
 
 private:
   // The codec type for the client-to-Envoy connection

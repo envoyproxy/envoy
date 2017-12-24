@@ -96,6 +96,14 @@ public:
    * load balancers.
    */
   virtual LoadBalancerFactorySharedPtr factory() PURE;
+
+  /**
+   * When a thread aware load balancer is constructed, it should return nullptr for any created
+   * load balancer chooseHost() calls. Once initialize is called, the load balancer should
+   * instantiate any needed structured and prepare for further updates. The cluster manager
+   * will do this at the appropriate time.
+   */
+  virtual void initialize() PURE;
 };
 
 typedef std::unique_ptr<ThreadAwareLoadBalancer> ThreadAwareLoadBalancerPtr;
