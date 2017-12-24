@@ -59,7 +59,7 @@ Utility::QueryParams Utility::parseQueryString(const std::string& url) {
     }
     absl::string_view param(url.c_str() + start, end - start);
 
-    size_t equal = param.find('=');
+    const size_t equal = param.find('=');
     if (equal != std::string::npos) {
       params.emplace(StringUtil::subspan(url, start, start + equal),
                      StringUtil::subspan(url, start + equal + 1, end));
