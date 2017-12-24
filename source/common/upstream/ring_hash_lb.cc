@@ -132,7 +132,7 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
           : true;
 
   std::unique_ptr<char[]> hash_key_buffer;
-  uint64_t last_hash_key_size;
+  uint64_t last_hash_key_size = 0;
   for (const auto& host : hosts) {
     const std::string& address_string = host->address()->asString();
     uint64_t offset_start = address_string.size();
