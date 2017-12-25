@@ -86,6 +86,16 @@ typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
  * balancer. If a cluster is removed via CDS, the thread aware load balancer can be destroyed
  * before cluster destruction reaches each worker. See the ring hash load balancer for one
  * example of how this pattern is used in practice.
+ *
+ * TODO(mattklein123): The reason that locking is used in the above threading model vs. pure TLS
+ * has to do with the lack of a TLS function that does the following:
+ * 1) Create a per-worker data structure on the main thread. E.g., allocate 4 objects for 4
+ *    workers.
+ * 2) Then fan those objects out to each worker.
+ * With the existence of a function like that, the callback locking from the worker to the main
+ * thread could be removed. We can look at this in a follow up. The reality though is that the
+ * locking is currently only used to protected some small bits of data on host set update and
+ * will never be contended.
  */
 class ThreadAwareLoadBalancer {
 public:

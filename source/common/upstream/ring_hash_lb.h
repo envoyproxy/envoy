@@ -61,7 +61,7 @@ private:
 
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
-    RingConstSharedPtr ring_;
+    const RingConstSharedPtr ring_;
     const bool global_panic_;
   };
 
@@ -76,7 +76,7 @@ private:
     Runtime::RandomGenerator& random_;
     std::shared_timed_mutex mutex_;
     RingConstSharedPtr current_ring_;
-    std::atomic<bool> global_panic_{};
+    bool global_panic_{};
   };
 
   void refresh();

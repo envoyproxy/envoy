@@ -59,10 +59,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "hash_lib",
     hdrs = ["hash.h"],
-    external_deps = [
-        "abseil_strings",
-        "xxhash",
-    ],
+    external_deps = ["xxhash"],
 )
 
 envoy_cc_library(
