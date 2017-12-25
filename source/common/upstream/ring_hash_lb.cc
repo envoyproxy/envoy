@@ -142,7 +142,7 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
     // buffer on the heap and use it for all calculations. The needed size is the sizse of the
     // address, plus '_', plus 32 bytes for the index. All of this is done to avoid string
     // allocations in the fast path.
-    const uint64_t needed_size = address_string.size() + 1 + 32;
+    const uint64_t needed_size = std::min(128UL, address_string.size() + 1 + 32);
     if (hash_key_buffer == nullptr || last_hash_key_size < needed_size) {
       hash_key_buffer.reset(new char[needed_size]);
       last_hash_key_size = needed_size;
