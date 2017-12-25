@@ -57,11 +57,13 @@ InstanceConstSharedPtr addressFromFd(int fd) {
         fmt::format("getsockname failed for '{}': ({}) {}", fd, errno, strerror(errno)));
   }
   int socket_v6only = 0;
-  socklen_t size_int = sizeof(socket_v6only);
-  rc = ::getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
-  if (rc != 0 && errno != EOPNOTSUPP) {
-    throw EnvoyException(
-        fmt::format("getsockopt failed for '{}': ({}) {}", fd, errno, strerror(errno)));
+  if (ss.ss_family == AF_INET6) {
+    socklen_t size_int = sizeof(socket_v6only);
+    rc = ::getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
+    if (rc != 0) {
+      throw EnvoyException(
+          fmt::format("getsockopt failed for '{}': ({}) {}", fd, errno, strerror(errno)));
+    }
   }
   return addressFromSockAddr(ss, ss_len, rc == 0 && socket_v6only);
 }
