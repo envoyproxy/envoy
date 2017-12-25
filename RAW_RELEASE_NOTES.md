@@ -16,7 +16,7 @@ final version.
 * Added DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT header formatter. CLIENT_IP header formatter has been
   deprecated.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
-  provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
+  provides read and write logic with buffer encryption and decryption. The existing TLS implementation is
   refactored with the interface.
 * Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
 * Added native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`

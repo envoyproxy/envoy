@@ -39,6 +39,62 @@ protected:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
+class TestLb : public LoadBalancerBase {
+public:
+  TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+         Runtime::RandomGenerator& random)
+      : LoadBalancerBase(priority_set, stats, runtime, random) {}
+  using LoadBalancerBase::chooseHostSet;
+  using LoadBalancerBase::percentageLoad;
+};
+
+class LoadBalancerBaseTest : public LoadBalancerTestBase {
+public:
+  TestLb lb_{priority_set_, stats_, runtime_, random_};
+};
+
+INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
+
+// Basic test of host set selection.
+TEST_P(LoadBalancerBaseTest, PrioritySelecton) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.runCallbacks({}, {});
+
+  // With both the primary and failover hosts unhealthy, we should select an
+  // unhealthy primary host.
+  EXPECT_EQ(100, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(1));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+
+  // Update the priority set with a new priority level P=2 and ensure the host
+  // is chosen
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts(
+      new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  tertiary_host_set_.hosts_ = *hosts;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  tertiary_host_set_.runCallbacks({}, {});
+  EXPECT_EQ(0, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(1));
+  EXPECT_EQ(100, lb_.percentageLoad(2));
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+
+  // Now add a healthy host in P=0 and make sure it is immediately selected.
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  tertiary_host_set_.runCallbacks({}, {});
+  EXPECT_EQ(100, lb_.percentageLoad(0));
+  EXPECT_EQ(0, lb_.percentageLoad(2));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  host_set_.healthy_hosts_ = {};
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(0, lb_.percentageLoad(0));
+  EXPECT_EQ(100, lb_.percentageLoad(2));
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+}
+
 class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init(bool need_local_cluster) {
@@ -231,9 +287,13 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
 
-  // Cluster size is computed once at zone aware struct regeneration point.
-  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
-
+  if (&hostSet() == &host_set_) {
+    // Cluster size is computed once at zone aware struct regeneration point.
+    EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
+  } else {
+    EXPECT_EQ(0U, stats_.lb_zone_cluster_too_small_.value());
+    return;
+  }
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(1));
   // Trigger reload.
@@ -243,6 +303,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   HostVectorSharedPtr hosts(new std::vector<HostSharedPtr>(
       {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
        makeTestHost(info_, "tcp://127.0.0.1:82")}));
@@ -270,6 +333,9 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   HostVectorSharedPtr hosts(new std::vector<HostSharedPtr>(
       {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
        makeTestHost(info_, "tcp://127.0.0.1:82")}));
@@ -305,6 +371,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   HostVectorSharedPtr upstream_hosts(new std::vector<HostSharedPtr>(
       {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
        makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
@@ -349,6 +418,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   // upstream_hosts and local_hosts do not matter, zone aware routing is based on per zone hosts.
   HostVectorSharedPtr upstream_hosts(
       new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:80")}));
@@ -411,6 +483,9 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   HostVectorSharedPtr hosts(
       new std::vector<HostSharedPtr>({makeTestHost(info_, "tcp://127.0.0.1:80")}));
   HostListsSharedPtr hosts_per_locality(
@@ -445,6 +520,9 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   HostVectorSharedPtr upstream_hosts(new std::vector<HostSharedPtr>(
       {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
   HostVectorSharedPtr local_hosts(new std::vector<HostSharedPtr>({}, {}));
