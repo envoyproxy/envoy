@@ -22,6 +22,7 @@ public:
   LdsApiTest() : request_(&cluster_manager_.async_client_) {}
 
   void setup(bool v2_rest = false) {
+    interval_timer_ = new Event::MockTimer(&dispatcher_);
     v2_rest_ = v2_rest;
     const std::string config_json = R"EOF(
     {
@@ -90,7 +91,7 @@ public:
   MockListenerManager listener_manager_;
   Http::MockAsyncClientRequest request_;
   std::unique_ptr<LdsApi> lds_;
-  Event::MockTimer* interval_timer_{new Event::MockTimer(&dispatcher_)};
+  Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
 
 private:
@@ -124,10 +125,13 @@ TEST_F(LdsApiTest, UnknownCluster) {
   ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
-                            EnvoyException, "lds: unknown cluster 'foo_cluster'");
+                            EnvoyException,
+                            "envoy::api::v2::ConfigSource must have a statically defined cluster: "
+                            "foo_cluster does not exist or was added via api");
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
   const std::string config_json = R"EOF(
   {
     "cluster": "foo_cluster",

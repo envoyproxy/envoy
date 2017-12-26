@@ -49,7 +49,9 @@ public:
   Stats::MockIsolatedStatsStore stats_store_;
 };
 
-class SubscriptionFactoryTestApiConfigSource : public SubscriptionFactoryTest, public testing::WithParamInterface<::envoy::api::v2::ApiConfigSource_ApiType> {};
+class SubscriptionFactoryTestApiConfigSource
+    : public SubscriptionFactoryTest,
+      public testing::WithParamInterface<::envoy::api::v2::ApiConfigSource_ApiType> {};
 
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   envoy::api::v2::ConfigSource config;
@@ -146,7 +148,11 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 
-INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource, SubscriptionFactoryTestApiConfigSource, ::testing::Values(envoy::api::v2::ApiConfigSource::REST_LEGACY, envoy::api::v2::ApiConfigSource::REST, envoy::api::v2::ApiConfigSource::GRPC));
+INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource,
+                        SubscriptionFactoryTestApiConfigSource,
+                        ::testing::Values(envoy::api::v2::ApiConfigSource::REST_LEGACY,
+                                          envoy::api::v2::ApiConfigSource::REST,
+                                          envoy::api::v2::ApiConfigSource::GRPC));
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   envoy::api::v2::ConfigSource config;
@@ -154,7 +160,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   api_config_source->set_api_type(GetParam());
   api_config_source->add_cluster_name("eds_cluster");
   EXPECT_CALL(cm_, get("eds_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException, "envoy::api::v2::ConfigSource must have a statically defined cluster: eds_cluster does not exist or was added via api");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "envoy::api::v2::ConfigSource must have a statically defined cluster: "
+                            "eds_cluster does not exist or was added via api");
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
@@ -164,7 +173,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   api_config_source->add_cluster_name("eds_cluster");
   EXPECT_CALL(cm_, get("eds_cluster")).Times(2);
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillOnce(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException, "envoy::api::v2::ConfigSource must have a statically defined cluster: eds_cluster does not exist or was added via api");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "envoy::api::v2::ConfigSource must have a statically defined cluster: "
+                            "eds_cluster does not exist or was added via api");
 }
 
 } // namespace Config
