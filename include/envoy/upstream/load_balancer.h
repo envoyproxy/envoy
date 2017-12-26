@@ -94,8 +94,8 @@ typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
  * 2) Then fan those objects out to each worker.
  * With the existence of a function like that, the callback locking from the worker to the main
  * thread could be removed. We can look at this in a follow up. The reality though is that the
- * locking is currently only used to protected some small bits of data on host set update and
- * will never be contended.
+ * locking is currently only used to protect some small bits of data on host set update and will
+ * never be contended.
  */
 class ThreadAwareLoadBalancer {
 public:
