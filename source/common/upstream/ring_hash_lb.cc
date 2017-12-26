@@ -7,6 +7,8 @@
 #include "common/common/assert.h"
 #include "common/upstream/load_balancer_impl.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -136,12 +138,36 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
       config.valid()
           ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, true)
           : true;
+
+  std::unique_ptr<char[]> hash_key_buffer;
+  uint64_t last_hash_key_size = 0;
   for (const auto& host : hosts) {
+    const std::string& address_string = host->address()->asString();
+    uint64_t offset_start = address_string.size();
+
+    // Although in almost all cases the buffer could be stack allocated to 128 bytes or so, we
+    // don't explicitly know what is in the address string (e.g., UDS path). We allocate a raw
+    // buffer on the heap and use it for all calculations. The needed size is the size of the
+    // address, plus '_', plus 32 bytes for the index. All of this is done to avoid string
+    // allocations in the fast path.
+    const uint64_t needed_size = std::min(128UL, address_string.size() + 1 + 32);
+    if (hash_key_buffer == nullptr || last_hash_key_size < needed_size) {
+      hash_key_buffer.reset(new char[needed_size]);
+      last_hash_key_size = needed_size;
+    }
+
+    memcpy(hash_key_buffer.get(), address_string.c_str(), offset_start);
+    hash_key_buffer[offset_start++] = '_';
     for (uint64_t i = 0; i < hashes_per_host; i++) {
-      const std::string hash_key(host->address()->asString() + "_" + std::to_string(i));
-      const uint64_t hash =
-          use_std_hash ? std::hash<std::string>()(hash_key) : HashUtil::xxHash64(hash_key);
-      ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
+      const uint64_t total_hash_key_len =
+          offset_start + StringUtil::itoa(&hash_key_buffer.get()[offset_start], 32, i);
+      absl::string_view hash_key(hash_key_buffer.get(), total_hash_key_len);
+
+      // Sadly std::hash provides no mechanism for hashing arbitrary bytes so we must copy here.
+      // xxHash is done wihout copies.
+      const uint64_t hash = use_std_hash ? std::hash<std::string>()(std::string(hash_key))
+                                         : HashUtil::xxHash64(hash_key);
+      ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
       ring_.push_back({hash, host});
     }
   }
