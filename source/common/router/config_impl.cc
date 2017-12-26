@@ -291,6 +291,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     config_headers_.push_back(header_map);
   }
 
+  for (const auto& query_parameter : route.match().query_parameters()) {
+    config_query_parameters_.push_back(query_parameter);
+  }
+
   if (!route.route().hash_policy().empty()) {
     hash_policy_.reset(new HashPolicyImpl(route.route().hash_policy()));
   }
@@ -315,6 +319,11 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   }
 
   matches &= ConfigUtility::matchHeaders(headers, config_headers_);
+  if (!config_query_parameters_.empty()) {
+    Http::Utility::QueryParams query_parameters =
+        Http::Utility::parseQueryString(headers.Path()->value().c_str());
+    matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
+  }
 
   return matches;
 }
