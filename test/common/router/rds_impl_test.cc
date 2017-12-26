@@ -177,7 +177,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
                                 store_, "foo.", init_manager_, *route_config_provider_manager_),
                             EnvoyException,
                             "envoy::api::v2::ConfigSource must have a statically defined cluster: "
-                            "foo_cluster does not exist or was added via api");
+                            "'foo_cluster' does not exist or was added via api");
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {

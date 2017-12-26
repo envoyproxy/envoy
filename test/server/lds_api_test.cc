@@ -127,7 +127,7 @@ TEST_F(LdsApiTest, UnknownCluster) {
                                    local_info_, store_, listener_manager_),
                             EnvoyException,
                             "envoy::api::v2::ConfigSource must have a statically defined cluster: "
-                            "foo_cluster does not exist or was added via api");
+                            "'foo_cluster' does not exist or was added via api");
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {

@@ -88,7 +88,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
   config.set_path("/blahblah");
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
-      "envoy::api::v2::Path must refer to a existing path in your system: /blahblah does not exist")
+      "envoy::api::v2::Path must refer to a existing path in your system: '/blahblah' does not exist")
 }
 
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
@@ -163,7 +163,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
                             EnvoyException,
                             "envoy::api::v2::ConfigSource must have a statically defined cluster: "
-                            "eds_cluster does not exist or was added via api");
+                            "'eds_cluster' does not exist or was added via api");
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
@@ -176,7 +176,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
                             EnvoyException,
                             "envoy::api::v2::ConfigSource must have a statically defined cluster: "
-                            "eds_cluster does not exist or was added via api");
+                            "'eds_cluster' does not exist or was added via api");
 }
 
 } // namespace Config

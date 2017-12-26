@@ -46,7 +46,7 @@ public:
     case envoy::api::v2::ConfigSource::kPath:
       if (!Filesystem::fileExists(config.path())) {
         throw EnvoyException(fmt::format(
-            "envoy::api::v2::Path must refer to a existing path in your system: {} does not exist",
+            "envoy::api::v2::Path must refer to a existing path in your system: '{}' does not exist",
             config.path()));
       }
       result.reset(
@@ -62,7 +62,7 @@ public:
       const auto& cluster_name = api_config_source.cluster_name()[0];
       if (!cm.get(cluster_name) || cm.get(cluster_name)->info()->addedViaApi()) {
         throw EnvoyException(fmt::format("envoy::api::v2::ConfigSource must have a statically "
-                                         "defined cluster: {} does not exist or was added via api",
+                                         "defined cluster: '{}' does not exist or was added via api",
                                          cluster_name));
       }
       switch (api_config_source.api_type()) {
