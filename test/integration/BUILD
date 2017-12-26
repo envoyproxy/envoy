@@ -443,3 +443,21 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "squash_filter_integration_test",
+    srcs = [
+        "squash_filter_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration:squash_filter.yaml",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/server/config/http:squash_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

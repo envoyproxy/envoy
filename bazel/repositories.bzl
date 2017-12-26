@@ -168,6 +168,7 @@ def _envoy_api_deps():
         "lua",
         "rate_limit",
         "router",
+        "squash",
         "transcoder",
     ]
     for t in http_filter_bind_targets:
