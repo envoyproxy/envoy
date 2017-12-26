@@ -158,5 +158,12 @@ public:
    */
   static std::string writeStringToFileForTest(const std::string& filename,
                                               const std::string& contents);
+  /**
+   * Dumps the contents of the file into the string.
+   *
+   * @param filename: the fully qualified name of the file to use
+   * @return string the contents of the file.
+   */
+  static std::string readFileToStringForTest(const std::string& filename);
 };
 } // namespace Envoy

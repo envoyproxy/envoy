@@ -5,7 +5,7 @@ buffer contains more data than the configured limit, the high watermark callback
 off a chain of events which eventually informs the data source to stop sending data. This back-off
 may be immediate (stop reading from a socket) or gradual (stop HTTP/2 window updates) so all
 buffer limits in Envoy are considered soft limits. When the buffer eventually drains (generally to
-half of of the high watermark to avoid thrashing back and forth) the low watermark callback will
+half of the high watermark to avoid thrashing back and forth) the low watermark callback will
 fire, informing the sender it can resume sending data.
 
 ### TCP implementation details
@@ -82,7 +82,7 @@ responsible for intercepting watermark events for its own buffers, the individua
 any events to the connection manager, which has the ability to call `readDisable()` to enable and
 disable further data from downstream. On the reverse path, when the downstream connection
 backs up, the connection manager collects events for the downstream streams and
-the downstream conection. It passes events to the router filter via
+the downstream connection. It passes events to the router filter via
 `Envoy::Http::DownstreamWatermarkCallbacks` and the router can then call `readDisable()` on the
 upstream stream. Filters opt into subscribing to `DownstreamWatermarkCallbacks` as a performance
 optimization to avoid each watermark event on a downstream HTTP/2 connection resulting in
@@ -92,7 +92,7 @@ the router filter only subscribes to notifications when it has an upstream
 connection, the connection manager tracks how many outstanding high watermark
 events have occurred and passes any on to the router filter when it subscribes.
 
-It is worth noting that the router does not unwind`readDisable(true)` calls on
+It is worth noting that the router does not unwind `readDisable(true)` calls on
 destruction. Each codec must ensure that any necessary readDisable calls are
 unwound. In the case of HTTP/2 the `Envoy::Http::Http2::ConnectionImpl` will consume
 any outstanding flow control window on stream deletion to avoid leaking the connection-level
@@ -123,7 +123,7 @@ configured bytes without calling the appropriate watermark callbacks or sending
 an error response.
 
 Filters may override the default limit with calls to `setDecoderBufferLimit()`
-and `setEncoderBufferLimit()`. These limits are applied as filters are creaeted
+and `setEncoderBufferLimit()`. These limits are applied as filters are created
 so filters later in the chain can override the limits set by prior filters.
 
 Most filters do not buffer internally, but instead push back on data by
@@ -323,7 +323,7 @@ The low watermark path is as follows:
 # HTTP/2 network downstream network buffer
 
 When a downstream network connection buffers too much data, it informs the
-connection manager which passes theh high watermark event to all of the streams
+connection manager which passes the high watermark event to all of the streams
 on the connection. They pass the watermark event to the router, which calls
 `readDisable()` on the upstream streams.
 

@@ -8,7 +8,6 @@
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace RequestInfo {
