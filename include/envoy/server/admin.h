@@ -32,11 +32,12 @@ public:
   /**
    * Callback for admin URL handlers.
    * @param url supplies the URL prefix to install the handler for.
-   * @param header enables setting of http headers (eg content-type, cache-control) in the handler.
+   * @param response_headers enables setting of http headers (eg content-type, cache-control) in the
+   * handler.
    * @param response supplies the buffer to fill in with the response body.
    * @return Http::Code the response code.
    */
-  typedef std::function<Http::Code(const std::string& url, Http::HeaderMap& header,
+  typedef std::function<Http::Code(const std::string& url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response)>
       HandlerCb;
 

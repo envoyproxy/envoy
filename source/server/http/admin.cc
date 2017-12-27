@@ -508,7 +508,7 @@ void AdminFilter::onComplete() {
     // Default to text-plain if unset.
     header_map->insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
   }
-  // Default to 'no-cache' if unset, but not 'no-store' which may break the 'back button.
+  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
   if (header_map->CacheControl() == nullptr) {
     header_map->insertCacheControl().value().setReference(
         headers.CacheControlValues.NoCacheMaxAge0);
@@ -612,6 +612,8 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query,
   }
 
   if (!found_handler) {
+    // Extra space is emitted below to have "invalid path." be a separate sentence in the
+    // 404 output from "admin commands are:" in handlerHelp.
     response.add("invalid path. ");
     handlerHelp(path_and_query, response_headers, response);
     code = Http::Code::NotFound;
@@ -630,7 +632,7 @@ Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
     sorted_handlers[handler.prefix_] = &handler;
   }
 
-  for (auto handler : sorted_handlers) {
+  for (const auto handler : sorted_handlers) {
     response.add(fmt::format("  {}: {}\n", handler.first, handler.second->help_text_));
   }
   return Http::Code::OK;
@@ -648,7 +650,7 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& resp
   }
 
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  for (auto handler : sorted_handlers) {
+  for (const auto handler : sorted_handlers) {
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
     response.add(fmt::format("<tr class='home-row'><td class='home-data'><a href='{}'>{}</a></td>"
