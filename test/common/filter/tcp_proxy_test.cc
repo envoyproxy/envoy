@@ -622,7 +622,7 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
   upstream_read_filter_->onData(response);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -817,6 +817,88 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   EXPECT_THAT(access_log_data_,
               MatchesRegex(
                   "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
+}
+
+// Tests that upstream flush works properly with no idle timeout configured.
+TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  // Send some bytes; no timeout configured so this should be a no-op (not a crash).
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(1);
+
+  // Simulate flush complete.
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
+  EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
+}
+
+// Tests that upstream flush works with an idle timeout configured, but the connection
+// finishes draining before the timer expires.
+TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
+  envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  NiceMock<Event::MockTimer>* idle_timer =
+      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  filter_.reset();
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(1);
+
+  // Simulate flush complete.
+  EXPECT_CALL(*idle_timer, disableTimer());
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
+  EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
+  EXPECT_EQ(0U, config_->stats().idle_timeout_.value());
+}
+
+// Tests that upstream flush closes the connection when the idle timeout fires.
+TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
+  envoy::api::v2::filter::network::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  NiceMock<Event::MockTimer>* idle_timer =
+      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  filter_.reset();
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  idle_timer->callback_();
+  EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
+  EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
+  EXPECT_EQ(1U, config_->stats().idle_timeout_.value());
 }
 
 class TcpProxyRoutingTest : public testing::Test {
