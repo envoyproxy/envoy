@@ -357,7 +357,7 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& header_map,
+Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
@@ -381,7 +381,7 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& head
     const std::string format_key = params.begin()->first;
     const std::string format_value = params.begin()->second;
     if (format_key == "format" && format_value == "json") {
-      header_map.insertContentType().value().setReference(
+      response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
@@ -464,8 +464,10 @@ Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response) {
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   std::list<std::string> listeners;
   for (auto listener : server_.listenerManager().listeners()) {
     listeners.push_back(listener.get().socket().localAddress()->asString());
@@ -543,6 +545,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
           {"/healthcheck/ok", "cause the server to pass health checks",
            MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
+          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false},
           {"/hot_restart_version", "print the hot restart compatability version",
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false},
@@ -609,23 +612,28 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query,
   }
 
   if (!found_handler) {
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.TextUtf8);
-    response.add("invalid path. admin commands are:\n");
-
-    // Prefix order is used during searching, but for printing do them in alpha order.
-    std::map<std::string, const UrlHandler*> sorted_handlers;
-    for (const UrlHandler& handler : handlers_) {
-      sorted_handlers[handler.prefix_] = &handler;
-    }
-
-    for (auto handler : sorted_handlers) {
-      response.add(fmt::format("  {}: {}\n", handler.first, handler.second->help_text_));
-    }
+    response.add("invalid path. ");
+    handlerHelp(path_and_query, response_headers, response);
     code = Http::Code::NotFound;
   }
 
   return code;
+}
+
+Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
+                                  Buffer::Instance& response) {
+  response.add("admin commands are:\n");
+
+  // Prefix order is used during searching, but for printing do them in alpha order.
+  std::map<std::string, const UrlHandler*> sorted_handlers;
+  for (const UrlHandler& handler : handlers_) {
+    sorted_handlers[handler.prefix_] = &handler;
+  }
+
+  for (auto handler : sorted_handlers) {
+    response.add(fmt::format("  {}: {}\n", handler.first, handler.second->help_text_));
+  }
+  return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& response_headers,

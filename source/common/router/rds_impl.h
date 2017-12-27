@@ -170,7 +170,7 @@ private:
    * @param response supplies the buffer to fill with information.
    * @return Http::Code OK if the endpoint can parse and operate on the url, NotFound otherwise.
    */
-  Http::Code handlerRoutes(const std::string& url, Http::HeaderMap& headers,
+  Http::Code handlerRoutes(const std::string& url, Http::HeaderMap& response_headers,
                            Buffer::Instance& response);
 
   /**

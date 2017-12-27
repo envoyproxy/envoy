@@ -125,32 +125,35 @@ private:
   /**
    * URL handlers.
    */
-  Http::Code handlerAdminHome(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerAdminHome(const std::string& path_and_query, Http::HeaderMap& response_headers,
                               Buffer::Instance& response);
-  Http::Code handlerCerts(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerCerts(const std::string& path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
-  Http::Code handlerClusters(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerClusters(const std::string& path_and_query, Http::HeaderMap& response_headers,
                              Buffer::Instance& response);
-  Http::Code handlerCpuProfiler(const std::string& url, Http::HeaderMap& response_headers,
-                                Buffer::Instance& response);
-  Http::Code handlerHealthcheckFail(const std::string& url, Http::HeaderMap& response_headers,
-                                    Buffer::Instance& response);
-  Http::Code handlerHealthcheckOk(const std::string& url, Http::HeaderMap& response_headers,
-                                  Buffer::Instance& response);
-  Http::Code handlerHotRestartVersion(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerCpuProfiler(const std::string& path_and_query,
+                                Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerHealthcheckFail(const std::string& path_and_query,
+                                    Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerHealthcheckOk(const std::string& path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerHelp(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                         Buffer::Instance& response);
+  Http::Code handlerHotRestartVersion(const std::string& path_and_query,
+                                      Http::HeaderMap& response_headers,
                                       Buffer::Instance& response);
-  Http::Code handlerListenerInfo(const std::string& url, Http::HeaderMap& response_headers,
-                                 Buffer::Instance& response);
-  Http::Code handlerLogging(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerListenerInfo(const std::string& path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerLogging(const std::string& path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(const std::string& url, Http::HeaderMap& response_headers,
-                                 Buffer::Instance& response);
-  Http::Code handlerResetCounters(const std::string& url, Http::HeaderMap& response_headers,
-                                  Buffer::Instance& response);
-  Http::Code handlerServerInfo(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerQuitQuitQuit(const std::string& path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerResetCounters(const std::string& path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerServerInfo(const std::string& path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response);
-  Http::Code handlerStats(const std::string& url, Http::HeaderMap& response_headers,
+  Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
 
   Server::Instance& server_;
