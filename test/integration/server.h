@@ -187,7 +187,8 @@ class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public Server::ComponentFactory {
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
-                                         const Network::Address::IpVersion version);
+                                         const Network::Address::IpVersion version,
+                                         std::function<void()> pre_worker_start_test_steps);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -201,7 +202,8 @@ public:
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
     on_worker_listener_removed_cb_ = on_worker_listener_removed;
   }
-  void start(const Network::Address::IpVersion version);
+  void start(const Network::Address::IpVersion version,
+             std::function<void()> pre_worker_start_test_steps);
   void start();
 
   void waitForCounterGe(const std::string& name, uint64_t value) {
