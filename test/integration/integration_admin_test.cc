@@ -120,12 +120,23 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_NE(std::string::npos, response->body().find("invalid path. admin commands are:"))
+      << response->body();
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/help", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_NE(std::string::npos, response->body().find("admin commands are:")) << response->body();
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/html; charset=UTF-8", ContentType(response));
+  EXPECT_NE(std::string::npos, response->body().find("<title>Envoy Admin</title>"))
+      << response->body();
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/server_info", "",
                                                 downstreamProtocol(), version_);
