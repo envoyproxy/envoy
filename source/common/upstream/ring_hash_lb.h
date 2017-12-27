@@ -77,8 +77,11 @@ private:
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
     std::shared_timed_mutex mutex_;
-    RingConstSharedPtr current_ring_ GUARDED_BY(mutex_);
-    bool global_panic_ GUARDED_BY(mutex_){};
+    // TOOD(mattklein123): Added GUARDED_BY(mutex_) to to the following variables. OSX clang
+    // seems to not like them with shared mutexes so we need to ifdef them out on OSX. I don't
+    // have time to do this right now.
+    RingConstSharedPtr current_ring_;
+    bool global_panic_{};
   };
 
   void refresh();
