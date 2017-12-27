@@ -9,6 +9,8 @@
 
 #include "server/options_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -60,7 +62,8 @@ TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
-      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 "
+      "--service-zone zone --stats-tag test_y:2 --stats-tag test_x:1 --file-flush-interval-msec "
+      "9000 --drain-time-s 60 "
       "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
@@ -74,6 +77,11 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
   EXPECT_EQ("zone", options->serviceZone());
+  auto tags = options->statsTags();
+  EXPECT_EQ(tags[0].name_, "test_y");
+  EXPECT_EQ(tags[0].value_, "2");
+  EXPECT_EQ(tags[1].name_, "test_x");
+  EXPECT_EQ(tags[1].value_, "1");
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
@@ -105,4 +113,11 @@ TEST(OptionsImplTest, BadObjNameLenOption) {
     EXPECT_THAT(e.what(), HasSubstr("'max-obj-name-len' value specified"));
   }
 }
+
+TEST(OptionsImplTest, BadStatsTagOption) {
+  EXPECT_THROW_WITH_MESSAGE(
+      createOptionsImpl("envoy -c hello --stats-tag abc"), EnvoyException,
+      "Invalid form of --stats-tag was given: 'abc'. Use 'name:value' format.");
+}
+
 } // namespace Envoy

@@ -246,6 +246,11 @@ public:
   virtual void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractor) PURE;
 
   /**
+   * Set the given tags as default tags for all metrics.
+   */
+  virtual void setDefaultTags(const std::vector<Tag> tags) PURE;
+
+  /**
    * Initialize the store for threading. This will be called once after all worker threads have
    * been initialized. At this point the store can initialize itself for multi-threaded operation.
    */

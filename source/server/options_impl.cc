@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/stats/stats_impl.h"
 
@@ -30,6 +31,24 @@
 #endif
 
 namespace Envoy {
+
+const Stats::Tag parseTag(const std::string tag) {
+  const std::vector<std::string> key_value = StringUtil::split(tag, ":");
+  if (key_value.size() != 2) {
+    throw EnvoyException(
+        fmt::format("Invalid form of --stats-tag was given: '{}'. Use 'name:value' format.", tag));
+  }
+  return Stats::Tag{key_value[0], key_value[1]};
+}
+
+const std::vector<Stats::Tag> parseTags(const std::vector<std::string> tags) {
+  std::vector<Stats::Tag> parsed_tags;
+  for (const std::string tag : tags) {
+    parsed_tags.emplace_back(parseTag(tag));
+  }
+  return parsed_tags;
+}
+
 OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level) {
   std::string log_levels_string = "Log levels: ";
@@ -70,6 +89,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                             cmd);
   TCLAP::ValueArg<std::string> service_zone("", "service-zone", "Zone name", false, "", "string",
                                             cmd);
+  TCLAP::MultiArg<std::string> stats_tags(
+      "", "stats-tag", "Tags for stats metrics ('name:value' format)", false, "string", cmd);
   TCLAP::ValueArg<uint32_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
                                                      10000, "uint32_t", cmd);
@@ -164,10 +185,12 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   service_cluster_ = service_cluster.getValue();
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
+  stats_tags_ = parseTags(stats_tags.getValue());
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   max_obj_name_length_ = max_obj_name_len.getValue();
 }
+
 } // namespace Envoy

@@ -25,3 +25,5 @@ final version.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
+* Added universal tag support, the tags which will be added to all metrics. The tags can be specified
+  with commandline argument. :ref:`Command line options doc<operations_cli>`.
