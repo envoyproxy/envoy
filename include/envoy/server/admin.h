@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/header_map.h"
 #include "envoy/network/listen_socket.h"
 
 namespace Envoy {
@@ -18,7 +19,8 @@ namespace Server {
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](const std::string& url, Buffer::Instance& data) -> Http::Code { return X(url, data); }
+  [this](const std::string& url, Http::HeaderMap& response_headers,                                \
+         Buffer::Instance& data) -> Http::Code { return X(url, response_headers, data); }
 
 /**
  * Global admin HTTP endpoint for the server.
@@ -30,10 +32,14 @@ public:
   /**
    * Callback for admin URL handlers.
    * @param url supplies the URL prefix to install the handler for.
+   * @param response_headers enables setting of http headers (eg content-type, cache-control) in the
+   * handler.
    * @param response supplies the buffer to fill in with the response body.
    * @return Http::Code the response code.
    */
-  typedef std::function<Http::Code(const std::string& url, Buffer::Instance& response)> HandlerCb;
+  typedef std::function<Http::Code(const std::string& url, Http::HeaderMap& response_headers,
+                                   Buffer::Instance& response)>
+      HandlerCb;
 
   /**
    * Add an admin handler.

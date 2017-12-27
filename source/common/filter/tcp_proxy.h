@@ -39,7 +39,9 @@ namespace Filter {
   COUNTER(downstream_cx_no_route)                                                                  \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
-  COUNTER(idle_timeout)
+  COUNTER(idle_timeout)                                                                            \
+  COUNTER(upstream_flush_total)                                                                    \
+  GAUGE  (upstream_flush_active)
 // clang-format on
 
 /**
@@ -49,11 +51,40 @@ struct TcpProxyStats {
   ALL_TCP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+class TcpProxyDrainer;
+class TcpProxyUpstreamDrainManager;
+
 /**
  * Filter configuration.
+ *
+ * This configuration holds a TLS slot, and therefore it must be destructed
+ * on the main thread.
  */
 class TcpProxyConfig {
 public:
+  /**
+   * Configuration that can be shared and have an arbitrary lifetime safely.
+   */
+  class SharedConfig {
+  public:
+    SharedConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                 Server::Configuration::FactoryContext& context);
+    const TcpProxyStats& stats() { return stats_; }
+    const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+
+  private:
+    static TcpProxyStats generateStats(Stats::Scope& scope);
+
+    // Hold a Scope for the lifetime of the configuration because connections in
+    // the TcpProxyUpstreamDrainManager can live longer than the listener.
+    const Stats::ScopePtr stats_scope_;
+
+    const TcpProxyStats stats_;
+    Optional<std::chrono::milliseconds> idle_timeout_;
+  };
+
+  typedef std::shared_ptr<SharedConfig> SharedConfigSharedPtr;
+
   TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
                  Server::Configuration::FactoryContext& context);
 
@@ -67,10 +98,12 @@ public:
    */
   const std::string& getRouteFromEntries(Network::Connection& connection);
 
-  const TcpProxyStats& stats() { return stats_; }
+  const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+  const Optional<std::chrono::milliseconds>& idleTimeout() { return shared_config_->idleTimeout(); }
+  TcpProxyUpstreamDrainManager& drainManager();
+  SharedConfigSharedPtr sharedConfig() { return shared_config_; }
 
 private:
   struct Route {
@@ -83,13 +116,11 @@ private:
     std::string cluster_name_;
   };
 
-  static TcpProxyStats generateStats(const std::string& name, Stats::Scope& scope);
-
   std::vector<Route> routes_;
-  const TcpProxyStats stats_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
-  Optional<std::chrono::milliseconds> idle_timeout_;
+  ThreadLocal::SlotPtr upstream_drain_manager_slot_;
+  SharedConfigSharedPtr shared_config_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -123,6 +154,35 @@ public:
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
 
+  struct UpstreamCallbacks : public Network::ConnectionCallbacks,
+                             public Network::ReadFilterBaseImpl {
+    UpstreamCallbacks(TcpProxy* parent) : parent_(parent) {}
+
+    // Network::ConnectionCallbacks
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
+
+    // Network::ReadFilter
+    Network::FilterStatus onData(Buffer::Instance& data) override;
+
+    void onBytesSent();
+    void onIdleTimeout();
+    void drain(TcpProxyDrainer& drainer);
+
+    // Either parent_ or drainer_ will be non-NULL, but never both. This could be
+    // logically be represented as a union, but saving one pointer of memory is
+    // outweighed by more type safety/better error handling.
+    //
+    // Parent starts out as non-NULL. If the downstream connection is closed while
+    // the upstream connection still has buffered data to flush, drainer_ becomes
+    // non-NULL and parent_ is set to NULL.
+    TcpProxy* parent_{};
+    TcpProxyDrainer* drainer_{};
+
+    bool on_high_watermark_called_{false};
+  };
+
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
@@ -131,25 +191,6 @@ protected:
     void onEvent(Network::ConnectionEvent event) override { parent_.onDownstreamEvent(event); }
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
-
-    TcpProxy& parent_;
-    bool on_high_watermark_called_{false};
-  };
-
-  struct UpstreamCallbacks : public Network::ConnectionCallbacks,
-                             public Network::ReadFilterBaseImpl {
-    UpstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
-
-    // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override { parent_.onUpstreamEvent(event); }
-    void onAboveWriteBufferHighWatermark() override;
-    void onBelowWriteBufferLowWatermark() override;
-
-    // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
-      parent_.onUpstreamData(data);
-      return Network::FilterStatus::StopIteration;
-    }
 
     TcpProxy& parent_;
     bool on_high_watermark_called_{false};
@@ -197,6 +238,54 @@ protected:
                                                           // read filter.
   RequestInfo::RequestInfoImpl request_info_;
   uint32_t connect_attempts_{};
+};
+
+// This class holds ownership of an upstream connection that needs to finish
+// flushing, when the downstream connection has been closed. The TcpProxy is
+// destroyed when the downstream connection is closed, so moving the upstream
+// connection here allows it to finish draining or timeout.
+class TcpProxyDrainer : public Event::DeferredDeletable {
+public:
+  TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
+                  const TcpProxyConfig::SharedConfigSharedPtr& config,
+                  const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+                  Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
+                  const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+                  Stats::TimespanPtr&& connected_timespan);
+
+  void onEvent(Network::ConnectionEvent event);
+  void onIdleTimeout();
+  void onBytesSent();
+  void cancelDrain();
+
+private:
+  TcpProxyUpstreamDrainManager& parent_;
+  std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks_;
+  Network::ClientConnectionPtr upstream_connection_;
+  Event::TimerPtr timer_;
+  Stats::TimespanPtr connected_timespan_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  TcpProxyConfig::SharedConfigSharedPtr config_;
+};
+
+typedef std::unique_ptr<TcpProxyDrainer> TcpProxyDrainerPtr;
+
+class TcpProxyUpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
+public:
+  ~TcpProxyUpstreamDrainManager();
+  void add(const TcpProxyConfig::SharedConfigSharedPtr& config,
+           Network::ClientConnectionPtr&& upstream_connection,
+           const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+           Event::TimerPtr&& idle_timer,
+           const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+           Stats::TimespanPtr&& connected_timespan);
+  void remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher);
+
+private:
+  // This must be a map instead of set because there is no way to move elements
+  // out of a set, and these elements get passed to deferredDelete() instead of
+  // being deleted in-place. The key and value will always be equal.
+  std::unordered_map<TcpProxyDrainer*, TcpProxyDrainerPtr> drainers_;
 };
 
 } // Filter
