@@ -33,6 +33,7 @@ public:
   static const std::string HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA;
   static const std::string RDS_CONFIGURATION_SCHEMA;
   static const std::string HEADER_DATA_CONFIGURATION_SCHEMA;
+  static const std::string QUERY_PARAMETER_CONFIGURATION_SCHEMA;
 
   // HTTP Filter Schemas
   static const std::string BUFFER_HTTP_FILTER_SCHEMA;
