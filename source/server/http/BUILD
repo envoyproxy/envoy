@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/common:version_includes",
+        "//source/common/html:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",
