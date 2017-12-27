@@ -8,7 +8,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_cyan4973_xxhash = dict(
-        commit = "50a564c33c36b3f0c83f027dd21c25cba2967c72",  # v0.6.3
+        commit = "7caf8bd76440c75dfe1070d3acfbd7891aea8fca",  # v0.6.4
         remote = "https://github.com/Cyan4973/xxHash",
     ),
     com_github_eile_tclap = dict(
