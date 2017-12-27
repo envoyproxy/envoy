@@ -85,7 +85,8 @@ typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
  * locks. Additionally, the factory *must not* refer back to the owning thread aware load
  * balancer. If a cluster is removed via CDS, the thread aware load balancer can be destroyed
  * before cluster destruction reaches each worker. See the ring hash load balancer for one
- * example of how this pattern is used in practice.
+ * example of how this pattern is used in practice. The common expected pattern is that the
+ * factory will be consuming shared immutable state from the main thread
  *
  * TODO(mattklein123): The reason that locking is used in the above threading model vs. pure TLS
  * has to do with the lack of a TLS function that does the following:

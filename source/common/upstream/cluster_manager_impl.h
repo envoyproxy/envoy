@@ -270,7 +270,7 @@ private:
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
-  void onPerClusterInit(Cluster& cluster);
+  void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const std::vector<HostSharedPtr>& hosts_added,
                                     const std::vector<HostSharedPtr>& hosts_removed);

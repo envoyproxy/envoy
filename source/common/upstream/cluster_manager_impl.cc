@@ -170,7 +170,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
                                        Event::Dispatcher& primary_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
-      init_helper_([this](Cluster& cluster) { onPerClusterInit(cluster); }) {
+      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   const auto& ads_config = bootstrap.dynamic_resources().ads_config();
   if (ads_config.cluster_name().empty()) {
     ENVOY_LOG(debug, "No ADS clusters defined, ADS will not be initialized.");
@@ -266,7 +266,7 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void ClusterManagerImpl::onPerClusterInit(Cluster& cluster) {
+void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // This routine is called when a cluster has finished initializing. The cluster has not yet
   // been setup for cross-thread updates to avoid needless updates during initialization. The order
   // of operations here is important. We start by initializing the thread aware load balancer if

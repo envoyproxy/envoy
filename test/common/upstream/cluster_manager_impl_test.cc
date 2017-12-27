@@ -131,13 +131,8 @@ envoy::api::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
 }
 
 TEST_F(ClusterManagerImplTest, VersionInfoStatic) {
-  const std::string json = fmt::sprintf(
-      R"EOF(
-  {
-    %s
-  }
-  )EOF",
-      clustersJson({defaultStaticClusterJson("cluster_0")}));
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
 
   create(parseBootstrapFromJson(json));
   EXPECT_EQ("static", cluster_manager_->versionInfo());
@@ -432,13 +427,8 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerThreadAwareUpdate) {
-  const std::string json = fmt::sprintf(
-      R"EOF(
-  {
-    %s
-  }
-  )EOF",
-      clustersJson({defaultStaticClusterJson("cluster_0")}));
+  const std::string json =
+      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
 
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "cluster_0";

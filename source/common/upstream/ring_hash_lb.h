@@ -10,6 +10,8 @@
 #include "common/common/logger.h"
 #include "common/upstream/load_balancer_impl.h"
 
+#include "absl/base/thread_annotations.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -75,8 +77,8 @@ private:
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
     std::shared_timed_mutex mutex_;
-    RingConstSharedPtr current_ring_;
-    bool global_panic_{};
+    RingConstSharedPtr current_ring_ GUARDED_BY(mutex_);
+    bool global_panic_ GUARDED_BY(mutex_){};
   };
 
   void refresh();
