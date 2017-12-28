@@ -21,6 +21,7 @@ exports_files([
     "server_xfcc.json",
     "tcp_proxy.json",
     "squash_filter.yaml",
+    "squash_filter.json",
 ])
 
 filegroup(
