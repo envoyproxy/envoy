@@ -22,7 +22,6 @@ public:
   LdsApiTest() : request_(&cluster_manager_.async_client_) {}
 
   void setup(bool v2_rest = false) {
-    interval_timer_ = new Event::MockTimer(&dispatcher_);
     v2_rest_ = v2_rest;
     const std::string config_json = R"EOF(
     {
@@ -37,6 +36,13 @@ public:
     if (v2_rest) {
       lds_config.mutable_api_config_source()->set_api_type(envoy::api::v2::ApiConfigSource::REST);
     }
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockCluster cluster;
+    cluster_map.emplace("foo_cluster", cluster);
+    EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, addedViaApi());
+    interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_, registerTarget(_));
     lds_.reset(new LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_,
                           store_, listener_manager_));
@@ -122,7 +128,8 @@ TEST_F(LdsApiTest, UnknownCluster) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
-  ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
                             EnvoyException,
@@ -142,6 +149,12 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("foo_cluster", cluster);
+  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cluster, info());
+  EXPECT_CALL(*cluster.info_, addedViaApi());
   ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),

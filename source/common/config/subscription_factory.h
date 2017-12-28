@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/config/subscription.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"
@@ -45,26 +46,32 @@ public:
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kPath:
       if (!Filesystem::fileExists(config.path())) {
-        throw EnvoyException(fmt::format(
-            "envoy::api::v2::Path must refer to a existing path in your system: '{}' does not exist",
-            config.path()));
+        throw EnvoyException(fmt::format("envoy::api::v2::Path must refer to a existing path in "
+                                         "your system: '{}' does not exist",
+                                         config.path()));
       }
       result.reset(
           new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
       break;
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
       const auto& api_config_source = config.api_config_source();
+
       if (api_config_source.cluster_name().size() != 1) {
         // TODO(htuch): Add support for multiple clusters, #1170.
         throw EnvoyException(
             "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
       }
+
       const auto& cluster_name = api_config_source.cluster_name()[0];
-      if (!cm.get(cluster_name) || cm.get(cluster_name)->info()->addedViaApi()) {
-        throw EnvoyException(fmt::format("envoy::api::v2::ConfigSource must have a statically "
-                                         "defined cluster: '{}' does not exist or was added via api",
-                                         cluster_name));
+      const Upstream::ClusterManager::ClusterInfoMap loaded_clusters = cm.clusters();
+      const auto& it = loaded_clusters.find(cluster_name);
+      if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
+        throw EnvoyException(
+            fmt::format("envoy::api::v2::ConfigSource must have a statically "
+                        "defined cluster: '{}' does not exist or was added via api",
+                        cluster_name));
       }
+
       switch (api_config_source.api_type()) {
       case envoy::api::v2::ApiConfigSource::REST_LEGACY:
         result.reset(rest_legacy_constructor());

@@ -208,18 +208,30 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
   }
 
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    loadCluster(cluster, false);
+    // First load all the primary clusters.
+    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
+  }
+
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    // Now load all the secondary clusters.
+    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
   }
 
   // All the static clusters have been loaded. At this point we can check for the
   // existence of the v1 sds backing cluster, and the ads backing cluster.
   // TODO(htuch): Add support for multiple clusters, #1170.
+  const ClusterInfoMap loaded_clusters = clusters();
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
     switch (sds_config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
       const auto& sds_cluster_name = sds_config.api_config_source().cluster_name()[0];
-      if (!get(sds_cluster_name) || get(sds_cluster_name)->info()->addedViaApi()) {
+      const auto& it = loaded_clusters.find(sds_cluster_name);
+      if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
         throw EnvoyException(
             "envoy::api::v2::ConfigSource for SDS config must have a statically defined cluster");
       }
@@ -243,7 +255,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
   }
   if (!ads_config.cluster_name().empty()) {
     const auto& ads_cluster_name = ads_config.cluster_name()[0];
-    if (!get(ads_cluster_name) || get(ads_cluster_name)->info()->addedViaApi()) {
+    const auto& it = loaded_clusters.find(ads_cluster_name);
+    if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
       throw EnvoyException(
           "envoy::api::v2::AdsConfigSource must have a statically defined cluster");
     }
