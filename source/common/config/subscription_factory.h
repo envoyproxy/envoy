@@ -44,7 +44,9 @@ public:
     std::unique_ptr<Subscription<ResourceType>> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
-    case envoy::api::v2::ConfigSource::kPath:
+    case envoy::api::v2::ConfigSource::kPath: {
+      // TODO(junr03): the file might be deleted between this check and the
+      // watch addition.
       if (!Filesystem::fileExists(config.path())) {
         throw EnvoyException(fmt::format("envoy::api::v2::Path must refer to a existing path in "
                                          "your system: '{}' does not exist",
@@ -53,9 +55,9 @@ public:
       result.reset(
           new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
       break;
+    }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
       const auto& api_config_source = config.api_config_source();
-
       if (api_config_source.cluster_name().size() != 1) {
         // TODO(htuch): Add support for multiple clusters, #1170.
         throw EnvoyException(

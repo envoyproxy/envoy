@@ -207,6 +207,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
         bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
+  // Cluster loading happens in two phases: first all the primary clusters
+  // are loaded, and then all the secondary clusters are loaded. As it
+  // currently stands all non-EDS clusters are primary and only EDS
+  // clusters are secondary.
+  // This two phase loading is done for the same reason that we have
+  // a two phase cluster initialization sequence: secondary clusters
+  // might depend on primary clusters, and thus we need to load
+  // secondary cluster dependencies first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
@@ -228,19 +236,21 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
     switch (sds_config.config_source_specifier_case()) {
+    case envoy::api::v2::ConfigSource::kPath: {
+      // TODO(junr03): the file might be deleted between this check and the
+      // watch addition.
+      if (!Filesystem::fileExists(sds_config.path())) {
+        throw EnvoyException(
+            "envoy::api::v2::Path for SDS config must refer to a existing path in your system");
+      }
+      break;
+    }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
       const auto& sds_cluster_name = sds_config.api_config_source().cluster_name()[0];
       const auto& it = loaded_clusters.find(sds_cluster_name);
       if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
         throw EnvoyException(
             "envoy::api::v2::ConfigSource for SDS config must have a statically defined cluster");
-      }
-      break;
-    }
-    case envoy::api::v2::ConfigSource::kPath: {
-      if (!Filesystem::fileExists(sds_config.path())) {
-        throw EnvoyException(
-            "envoy::api::v2::Path for SDS config must refer to a existing path in your system");
       }
       break;
     }

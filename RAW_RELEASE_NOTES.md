@@ -25,3 +25,5 @@ final version.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
+* Added restrictions for the backing sources of xDS resources. For filesystem based
+xDS the file must exist at configuration time. For cluster based xDS (api\_config\_source, and ADS) the backing cluster must be statically defined.
