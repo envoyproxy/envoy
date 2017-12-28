@@ -128,21 +128,7 @@ SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::Cluster
 
 SquashFilter::~SquashFilter() {}
 
-void SquashFilter::onDestroy() {
-  if (in_flight_request_ != nullptr) {
-    in_flight_request_->cancel();
-    in_flight_request_ = nullptr;
-  }
-
-  if (attachment_timeout_timer_) {
-    attachment_timeout_timer_->disableTimer();
-    attachment_timeout_timer_.reset();
-  }
-
-  if (delay_timer_.get() != nullptr) {
-    delay_timer_.reset();
-  }
-}
+void SquashFilter::onDestroy() { cleanup(); }
 
 FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 
@@ -311,6 +297,11 @@ void SquashFilter::pollForAttachment() {
 }
 
 void SquashFilter::doneSquashing() {
+  cleanup();
+  decoder_callbacks_->continueDecoding();
+}
+
+void SquashFilter::cleanup() {
   state_ = State::INITIAL;
 
   if (delay_timer_) {
@@ -329,8 +320,6 @@ void SquashFilter::doneSquashing() {
   }
 
   debugAttachmentPath_ = EMPTY_STRING;
-
-  decoder_callbacks_->continueDecoding();
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(MessagePtr&& m) {

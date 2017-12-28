@@ -71,6 +71,7 @@ private:
   void retry();
   void pollForAttachment();
   void doneSquashing();
+  void cleanup();
   Json::ObjectSharedPtr getJsonBody(MessagePtr&& m);
 
   const SquashFilterConfigSharedPtr config_;
