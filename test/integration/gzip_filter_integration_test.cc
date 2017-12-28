@@ -58,7 +58,7 @@ public:
     EXPECT_EQ(response_->body(), std::string(content_length, 'a'));
   }
 
-  const std::string full_config = R"EOF(
+  const std::string full_config{R"EOF(
       name: envoy.gzip
       config:
         memory_level: 3
@@ -75,11 +75,9 @@ public:
           - no-cache
         disable_on_etag: true
         disable_on_last_modified: true
-    )EOF";
+    )EOF"};
 
-  const std::string default_config = R"EOF(
-      name: envoy.gzip
-    )EOF";
+  const std::string default_config{"name: envoy.gzip"};
 
   const uint64_t window_bits{15 | 16};
 

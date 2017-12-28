@@ -96,12 +96,12 @@ public:
   }
 
 private:
-  bool isCacheControlAllowed() const;
-  bool isContentTypeAllowed() const;
-  bool isMinimumContentLength() const;
-  bool isEtagAllowed() const;
-  bool isLastModifiedAllowed() const;
-  bool isTransferEncodingAllowed() const;
+  bool isCacheControlAllowed(HeaderMap& headers) const;
+  bool isContentTypeAllowed(HeaderMap& headers) const;
+  bool isMinimumContentLength(HeaderMap& headers) const;
+  bool isEtagAllowed(HeaderMap& headers) const;
+  bool isLastModifiedAllowed(HeaderMap& headers) const;
+  bool isTransferEncodingAllowed(HeaderMap& headers) const;
 
   bool skip_compression_;
 
@@ -110,8 +110,6 @@ private:
   Compressor::ZlibCompressorImpl compressor_;
 
   GzipFilterConfigSharedPtr config_{nullptr};
-
-  const Http::HeaderMap* response_headers_{nullptr};
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

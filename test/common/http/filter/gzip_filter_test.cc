@@ -85,7 +85,7 @@ protected:
 
 // Default config values.
 TEST_F(GzipFilterTest, DefaultConfigValues) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   EXPECT_EQ(8, config_->memoryLevel());
   EXPECT_EQ(30, config_->minimumLength());
   EXPECT_EQ(31, config_->windowBits());
@@ -188,63 +188,63 @@ TEST_F(GzipFilterTest, BadConfigContentTypeExceededLimit) {
 
 // Acceptance Testing with default configuration.
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: gzip;q=0, identity;q=0.5, *;q=0.
 TEST_F(GzipFilterTest, AcceptEncodingValues) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=0, identity;q=0.5, *;q=0"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: identity;q=0.5, gzip; q=0, *;q=0.
 TEST_F(GzipFilterTest, AcceptEncodingGzipQ0) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "identity;q=0.5, gzip; q=0, *;q=0"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: gzip;q=0, identity.
 TEST_F(GzipFilterTest, AcceptEncodingGzipQ0NoSpace) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip; q=0, identity"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: identity;q=0.5, gzip, *;q=0.
 TEST_F(GzipFilterTest, AcceptEncodingGzipNoQ0) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "identity;q=0.5, gzip, *;q=0"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: identity;q=0.5, gzip; q=0.8, br;q=0.
 TEST_F(GzipFilterTest, AcceptEncodingGzipNoQ08) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "identity;q=0.5, gzip; q=0.8, br;q=0"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: *.
 TEST_F(GzipFilterTest, AcceptEncodingGzipWildcard) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "*"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Accept-Encoding: gzip.
 TEST_F(GzipFilterTest, AcceptEncodingGzipGzip) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Content-Length below default configuration.
 TEST_F(GzipFilterTest, ContentLengthBellowDefault) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "10"}});
 }
@@ -278,15 +278,33 @@ TEST_F(GzipFilterTest, ContentTypeNotSupported) {
 
 // Content-Type allows all types.
 TEST_F(GzipFilterTest, ContentTypeAllowAll) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/png"}});
 }
 
+// Content-Type contains paramater.
+TEST_F(GzipFilterTest, ContentTypeWithParameter) {
+  setUpTest("{}");
+  doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
+  doResponseCompression({{":method", "get"},
+                         {"content-length", "256"},
+                         {"content-type", "application/json;charset=utf-8"}});
+}
+
+// Content-Type contains paramater and space.
+TEST_F(GzipFilterTest, ContentTypeWithParameterAndSpace) {
+  setUpTest("{}");
+  doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
+  doResponseCompression({{":method", "get"},
+                         {"content-length", "256"},
+                         {"content-type", "application/json; charset=utf-8"}});
+}
+
 // Cache-Control is not in the white-list.
 TEST_F(GzipFilterTest, CacheControlNotAllowedValue) {
-  setUpTest(R"EOF( {"cache_control": [ "no-cache", "no-store", "private" ] })EOF");
+  setUpTest(R"EOF({"cache_control": [ "no-cache", "no-store", "private" ] })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "max-age=1234"}});
@@ -294,7 +312,7 @@ TEST_F(GzipFilterTest, CacheControlNotAllowedValue) {
 
 // Cache-Control is not specified.
 TEST_F(GzipFilterTest, CacheControlAllowAll) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "max-age=1234"}});
@@ -320,7 +338,7 @@ TEST_F(GzipFilterTest, LastModifiedDisableFalse) {
 
 // Last-Modified default configuration.
 TEST_F(GzipFilterTest, LastModifiedDefault) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"},
                          {"content-length", "256"},
@@ -345,7 +363,7 @@ TEST_F(GzipFilterTest, EtagDisableFalse) {
 
 // Etag default configuration.
 TEST_F(GzipFilterTest, EtagDefault) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}});
@@ -353,7 +371,7 @@ TEST_F(GzipFilterTest, EtagDefault) {
 
 // Transfer-Encoding chunked.
 TEST_F(GzipFilterTest, TransferEncodingChunked) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "chunked"}});
@@ -361,7 +379,7 @@ TEST_F(GzipFilterTest, TransferEncodingChunked) {
 
 // Transfer-Encoding gzip.
 TEST_F(GzipFilterTest, TransferEncodingGzip) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "gzip"}});
@@ -369,7 +387,7 @@ TEST_F(GzipFilterTest, TransferEncodingGzip) {
 
 // Content-Encoding: upstream response is already encoded.
 TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   TestHeaderMapImpl response_headers{
       {":method", "get"}, {"content-length", "256"}, {"content-encoding", "deflate, gzip"}};
@@ -382,7 +400,7 @@ TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
 
 // No compression when upstream response is empty.
 TEST_F(GzipFilterTest, EmptyResponse) {
-  setUpTest(R"EOF({})EOF");
+  setUpTest("{}");
   Http::TestHeaderMapImpl headers{{":method", "get"}, {":status", "204"}};
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
   EXPECT_EQ("", headers.get_("content-length"));
