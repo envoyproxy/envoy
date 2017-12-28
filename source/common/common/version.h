@@ -3,6 +3,9 @@
 #include <string>
 
 namespace Envoy {
+// Release version (e.g. 1.5.0).
+static const std::string& ReleaseVersion = "1.5.0";
+
 /**
  * Wraps compiled in code versioning.
  */
