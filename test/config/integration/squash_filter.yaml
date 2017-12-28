@@ -54,7 +54,7 @@ static_resources:
         port_value: {{ upstream_squash }}
     lb_policy: ROUND_ROBIN
 admin:
-  access_log_path: /dev/stdout
+  access_log_path: /dev/null
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
