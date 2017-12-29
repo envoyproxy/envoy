@@ -5,9 +5,11 @@
 # default message is generated, but before the user is dropped into the commit
 # message editor.
 #
-# To enable this hook, run `bootstrap` or do this from the root of the repo:
+# To enable this hook, run `bootstrap`, or run the following from the root of
+# the repo. (Note that `bootstrap` will correctly install this even if this code
+# is located in a submodule, while the following won't.)
 #
-# $ ln -s ../../support/hooks/commit-msg .git/hooks/commit-msg
+# $ ln -s ../../support/hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
 
 COMMIT_MESSAGE_FILE="$1"
 AUTHOR=$(git var GIT_AUTHOR_IDENT)

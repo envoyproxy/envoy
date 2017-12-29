@@ -43,6 +43,10 @@ fi
 hooksDir="${dotGitDir}/hooks"
 hooksDirRelpath=`relpath "${hooksDir}" "${PWD}"`
 
-if [ ! -e "${_hooksdir}/prepare-commit-msg" ]; then
+if [ ! -e "${hooksDir}/prepare-commit-msg" ]; then
   ln -s "${hooksDirRelpath}/support/hooks/prepare-commit-msg" "${hooksDir}/prepare-commit-msg"
+fi
+
+if [ ! -e "${hooksDir}/pre-commit" ]; then
+  ln -s "${hooksDirRelpath}/support/hooks/pre-commit" "${hooksDir}/pre-commit"
 fi
