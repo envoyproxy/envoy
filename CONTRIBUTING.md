@@ -112,6 +112,17 @@ maximize the chances of your PR being merged.
 
 # DCO: Sign your work
 
+Envoy ships commit hooks that allow you to auto-generate the DCO signoff line if
+it doesn't exist when you run `git commit`. Simply navigate to the Envoy project
+root and run:
+
+```bash
+./support/bootstrap
+```
+
+From here, simply commit as normal, and you will see the signoff at the bottom
+of each commit.
+
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right to
 pass it on as an open-source patch. The rules are pretty simple: if you
