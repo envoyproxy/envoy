@@ -167,7 +167,24 @@ You can add the sign off when creating the git commit via `git commit -s`.
 
 If you want this to be automatic you can set up some aliases:
 
-```
+```bash
 git config --add alias.amend "commit -s --amend"
 git config --add alias.c "commit -s"
 ```
+
+## Fixing DCO
+
+If your PR fails the DCO check, it's necessary to fix the entire commit history in the PR. Best
+practice is to [squash](http://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html)
+the commit history to a single commit, append the DCO sign-off as described above, and [force
+push](https://git-scm.com/docs/git-push#git-push---force). For example, if you have 2 commits in
+your history:
+
+```bash
+git rebase -i HEAD^^
+(interactive squash + DCO append)
+git push origin -f
+```
+
+Note, that in general rewriting history in this way is a hinderance to the review process and this
+should only be done to correct a DCO mistake.
