@@ -195,7 +195,7 @@ void SquashFilter::onSuccess(MessagePtr&& m) {
 
   case State::INITIAL: {
     // Should never happen.
-    ENVOY_LOG(info, "Squash: received send callback when no request is in progress");
+    ENVOY_LOG(info, "Squash: received send success callback when no request is in progress");
     break;
   }
   case State::CREATE_CONFIG: {
@@ -257,6 +257,8 @@ void SquashFilter::onFailure(AsyncClient::FailureReason) {
   in_flight_request_ = nullptr;
   switch (state_) {
   case State::INITIAL: {
+    // Should never happen.
+    ENVOY_LOG(info, "Squash: received send failure callback when no request is in progress");
     break;
   }
   case State::CREATE_CONFIG: {

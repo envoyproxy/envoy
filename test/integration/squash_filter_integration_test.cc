@@ -83,6 +83,9 @@ public:
   }
 };
 
+INSTANTIATE_TEST_CASE_P(IpVersions, SquashFilterIntegrationTestV1,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
 TEST_P(SquashFilterIntegrationTestV1, TestHappyPath) {
 
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);

@@ -18,7 +18,7 @@
                   "routes": [
                     {
                       "prefix": "/",
-                      "cluster": "destination"
+                      "cluster": "upstream"
                     }
                   ]
                 }
@@ -32,11 +32,10 @@
             "filters": [
               {
                 "type": "decoder",
-                "name": "squash",
+                "name": "envoy.squash",
                 "config": {
-                  "squash_cluster" : "squash",
-                  "attachment_template": "{'spec':{ 'env': {{ SQUASH_ENV_TEST }}  }}",
-                  "match_request": true,
+                  "cluster" : "squash",
+                  "attachment_template": {"spec": {"match_request": true,"attachment" : { "env": "{{ SQUASH_ENV_TEST }}"  }}},
                   "attachment_timeout_ms" : 100,
                   "attachment_poll_period_ms": 1000,
                   "request_timeout_ms": 100
@@ -69,12 +68,12 @@
         ]
       },
       {
-        "name": "destination",
+        "name": "upstream",
         "connect_timeout_ms": 5000,
         "type": "static",
         "lb_type": "round_robin",
         "hosts": [
-          {"url": "tcp://{{ ip_loopback_address }}:{{ upstream_0 }}"}
+          {"url": "tcp://{{ ip_loopback_address }}:{{ upstream }}"}
         ]
       }
     ]
