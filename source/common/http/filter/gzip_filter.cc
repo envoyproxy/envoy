@@ -133,8 +133,8 @@ bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
   }
 
   return (headers.TransferEncoding() &&
-         headers.TransferEncoding()->value().find(
-             Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
+          headers.TransferEncoding()->value().find(
+              Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
 }
 
 bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
