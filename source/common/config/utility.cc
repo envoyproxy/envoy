@@ -8,6 +8,7 @@
 #include "common/config/json_utility.h"
 #include "common/config/resources.h"
 #include "common/config/well_known_names.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -63,6 +64,16 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(
         fmt::format("{}: setting --service-cluster and --service-node is required", error_prefix));
+  }
+}
+
+void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
+  // TODO(junr03): the file might be deleted between this check and the
+  // watch addition.
+  if (!Filesystem::fileExists(path)) {
+    throw EnvoyException(fmt::format(
+        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
+        path));
   }
 }
 

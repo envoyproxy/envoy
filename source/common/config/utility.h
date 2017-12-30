@@ -118,6 +118,39 @@ public:
                              const LocalInfo::LocalInfo& local_info);
 
   /**
+   * Check the existence of a path for a filesystem subscription. Throws on error.
+   * @param path the path to validate.
+   */
+  static void checkFilesystemSubscriptionBackingPath(const std::string& path);
+
+  /**
+   * Check the validity of a cluster backing an api config source. Throws on error.
+   * @param clusters the clusters currently loaded in the cluster manager.
+   * @param api_config_source the config source to validate.
+   */
+  template <class ResourceType>
+  static void checkApiConfigSourceSubscriptionBackingCluster(
+      const Upstream::ClusterManager::ClusterInfoMap& clusters,
+      const envoy::api::v2::ApiConfigSource& api_config_source) {
+    if (api_config_source.cluster_name().size() != 1) {
+      // TODO(htuch): Add support for multiple clusters, #1170.
+      throw EnvoyException(
+          "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
+    }
+
+    const auto& cluster_name = api_config_source.cluster_name()[0];
+    const auto& it = clusters.find(cluster_name);
+    if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
+        (typeid(ResourceType) == typeid(envoy::api::v2::ClusterLoadAssignment) &&
+         it->second.get().info()->type() == envoy::api::v2::Cluster::EDS)) {
+      throw EnvoyException(fmt::format(
+          "envoy::api::v2::ConfigSource must have a statically "
+          "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
+          cluster_name));
+    }
+  }
+
+  /**
    * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::ConfigSource.
    * @param json_config source v1 SDS JSON config.
    * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.

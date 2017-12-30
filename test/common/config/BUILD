@@ -163,6 +163,8 @@ envoy_cc_test(
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

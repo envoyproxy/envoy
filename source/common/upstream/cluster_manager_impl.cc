@@ -211,10 +211,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
   // are loaded, and then all the secondary clusters are loaded. As it
   // currently stands all non-EDS clusters are primary and only EDS
   // clusters are secondary.
-  // This two phase loading is done for the same reason that we have
-  // a two phase cluster initialization sequence: secondary clusters
-  // might depend on primary clusters, and thus we need to load
-  // secondary cluster dependencies first.
+  // This two phase loading is done because in v2 configuration
+  // each EDS cluster individually sets up a subscription. When this
+  // subscription is an API
+  // source the cluster will depend on a non-EDS cluster, so the
+  //  non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
@@ -237,21 +238,12 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
     switch (sds_config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kPath: {
-      // TODO(junr03): the file might be deleted between this check and the
-      // watch addition.
-      if (!Filesystem::fileExists(sds_config.path())) {
-        throw EnvoyException(
-            "envoy::api::v2::Path for SDS config must refer to a existing path in your system");
-      }
+      Config::Utility::checkFilesystemSubscriptionBackingPath(sds_config.path());
       break;
     }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
-      const auto& sds_cluster_name = sds_config.api_config_source().cluster_name()[0];
-      const auto& it = loaded_clusters.find(sds_cluster_name);
-      if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
-        throw EnvoyException(
-            "envoy::api::v2::ConfigSource for SDS config must have a statically defined cluster");
-      }
+      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster<
+          envoy::api::v2::ClusterLoadAssignment>(loaded_clusters, sds_config.api_config_source());
       break;
     }
     case envoy::api::v2::ConfigSource::kAds: {
@@ -264,12 +256,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     }
   }
   if (!ads_config.cluster_name().empty()) {
-    const auto& ads_cluster_name = ads_config.cluster_name()[0];
-    const auto& it = loaded_clusters.find(ads_cluster_name);
-    if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
-      throw EnvoyException(
-          "envoy::api::v2::AdsConfigSource must have a statically defined cluster");
-    }
+    Config::Utility::checkApiConfigSourceSubscriptionBackingCluster<
+        envoy::api::v2::ApiConfigSource>(loaded_clusters, ads_config);
   }
 
   Optional<std::string> local_cluster_name;

@@ -183,8 +183,9 @@ TEST_F(RdsImplTest, UnknownCluster) {
                                 parseHttpConnectionManagerFromJson(config_json), runtime_, cm_,
                                 store_, "foo.", init_manager_, *route_config_provider_manager_),
                             EnvoyException,
-                            "envoy::api::v2::ConfigSource must have a statically defined cluster: "
-                            "'foo_cluster' does not exist or was added via api");
+                            "envoy::api::v2::ConfigSource must have a statically defined non-EDS "
+                            "cluster: 'foo_cluster' does not exist, was added via api, or is an "
+                            "EDS cluster");
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {

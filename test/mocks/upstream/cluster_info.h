@@ -46,6 +46,7 @@ public:
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
+  MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const Optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
@@ -70,6 +71,7 @@ public:
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
+  envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
 };

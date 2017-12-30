@@ -45,35 +45,16 @@ public:
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::ConfigSource::kPath: {
-      // TODO(junr03): the file might be deleted between this check and the
-      // watch addition.
-      if (!Filesystem::fileExists(config.path())) {
-        throw EnvoyException(fmt::format("envoy::api::v2::Path must refer to a existing path in "
-                                         "your system: '{}' does not exist",
-                                         config.path()));
-      }
+      Utility::checkFilesystemSubscriptionBackingPath(config.path());
       result.reset(
           new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
       break;
     }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
-      const auto& api_config_source = config.api_config_source();
-      if (api_config_source.cluster_name().size() != 1) {
-        // TODO(htuch): Add support for multiple clusters, #1170.
-        throw EnvoyException(
-            "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
-      }
-
-      const auto& cluster_name = api_config_source.cluster_name()[0];
-      const Upstream::ClusterManager::ClusterInfoMap loaded_clusters = cm.clusters();
-      const auto& it = loaded_clusters.find(cluster_name);
-      if (it == loaded_clusters.end() || it->second.get().info()->addedViaApi()) {
-        throw EnvoyException(
-            fmt::format("envoy::api::v2::ConfigSource must have a statically "
-                        "defined cluster: '{}' does not exist or was added via api",
-                        cluster_name));
-      }
-
+      const envoy::api::v2::ApiConfigSource& api_config_source = config.api_config_source();
+      Utility::checkApiConfigSourceSubscriptionBackingCluster<ResourceType>(cm.clusters(),
+                                                                            api_config_source);
+      const std::string& cluster_name = api_config_source.cluster_name()[0];
       switch (api_config_source.api_type()) {
       case envoy::api::v2::ApiConfigSource::REST_LEGACY:
         result.reset(rest_legacy_constructor());

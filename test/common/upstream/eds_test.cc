@@ -44,7 +44,7 @@ protected:
     Upstream::MockCluster cluster;
     cluster_map.emplace("eds", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
     cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
