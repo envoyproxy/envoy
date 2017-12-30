@@ -68,10 +68,10 @@ typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
  */
 class GzipFilter : public Http::StreamFilter {
 public:
-  GzipFilter(GzipFilterConfigSharedPtr config);
+  GzipFilter(const GzipFilterConfigSharedPtr& config);
 
   // Http::StreamFilterBase
-  void onDestroy() override;
+  void onDestroy() override{};
 
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool) override;
@@ -109,7 +109,7 @@ private:
 
   Compressor::ZlibCompressorImpl compressor_;
 
-  GzipFilterConfigSharedPtr config_{nullptr};
+  GzipFilterConfigSharedPtr config_;
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

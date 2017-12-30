@@ -451,7 +451,7 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
     *cache_control = json_cache_control;
   }
 
-  const auto& json_compression_level = json_config.getString("compression_level", "default");
+  const auto json_compression_level = json_config.getString("compression_level", "default");
   if (json_compression_level == "default") {
     proto_config.set_compression_level(
         envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_DEFAULT);
@@ -463,7 +463,7 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
         envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED);
   }
 
-  const auto& json_compression_strategy = json_config.getString("compression_strategy", "default");
+  const auto json_compression_strategy = json_config.getString("compression_strategy", "default");
   if (json_compression_strategy == "default") {
     proto_config.set_compression_strategy(
         envoy::api::v2::filter::http::Gzip_CompressionStrategy_DEFAULT);

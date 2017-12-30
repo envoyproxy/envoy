@@ -7,14 +7,12 @@
 namespace Envoy {
 namespace Http {
 
-static const std::regex& acceptEncodingRegex() {
+namespace {
+const std::regex& acceptEncodingRegex() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "(?!.*gzip;\\s*q=0(,|$))(?=(.*gzip)|(^\\*$))",
                          std::regex::optimize);
 }
-
-static const std::regex& contentTypeRegex() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, ".*?(?=\\;|$)", std::regex::optimize);
-}
+} // namespace
 
 // Default and maximum compression window size.
 const uint64_t GzipFilterConfig::DEFAULT_WINDOW_BITS{15};
@@ -74,15 +72,13 @@ uint64_t GzipFilterConfig::windowBits() const {
   return (window_bits_ > 0 ? window_bits_ : DEFAULT_WINDOW_BITS) | GZIP_HEADER_VALUE;
 }
 
-GzipFilter::GzipFilter(GzipFilterConfigSharedPtr config)
+GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
-
-void GzipFilter::onDestroy() {}
 
 FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
   // TODO(gsagula): The current implementation checks for the presence of 'gzip' and if the same
-  // is followed by Qvalue. Since gzip is the only available encoding right now, order/priority of
-  // preferred server encodings is disregarded (RFC2616-14.3).
+  // is followed by Qvalue. Since gzip is the only available content-encoding in Envoy at the
+  // moment, order/priority of preferred server encodings is disregarded (RFC2616-14.3).
   skip_compression_ =
       !(headers.AcceptEncoding() &&
         std::regex_search(headers.AcceptEncoding()->value().c_str(), acceptEncodingRegex()));
@@ -136,50 +132,47 @@ bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
     return content_length >= config_->minimumLength();
   }
 
-  return headers.TransferEncoding() &&
+  return (headers.TransferEncoding() &&
          headers.TransferEncoding()->value().find(
-             Http::Headers::get().TransferEncodingValues.Chunked.c_str());
+             Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
 }
 
 bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
-  if (config_->contentTypeValues().size() && headers.ContentType()) {
-    std::cmatch match;
-    std::regex_search(headers.ContentType()->value().c_str(), match, contentTypeRegex());
-    return config_->contentTypeValues().find(match.str()) != config_->contentTypeValues().end();
+  if (headers.ContentType() && !config_->contentTypeValues().empty()) {
+    std::string content_type{headers.ContentType()->value().c_str()};
+    StringUtil::eraseFrom(content_type, ";");
+    StringUtil::trim(content_type);
+    return config_->contentTypeValues().find(content_type) != config_->contentTypeValues().end();
   }
+
   return true;
 }
 
 bool GzipFilter::isCacheControlAllowed(HeaderMap& headers) const {
-  if (config_->cacheControlValues().size() && headers.CacheControl()) {
-    return std::any_of(config_->cacheControlValues().begin(), config_->cacheControlValues().end(),
-                       [&headers](const auto& value) {
-                         return headers.CacheControl()->value().find(value.c_str());
-                       });
+  if (headers.CacheControl() && !config_->cacheControlValues().empty()) {
+    auto header_values = StringUtil::split(headers.CacheControl()->value().c_str(), ',');
+    auto predicate = [&](const auto& header_value) {
+      return config_->cacheControlValues().find(header_value) ==
+             config_->cacheControlValues().end();
+    };
+    return !std::any_of(header_values.begin(), header_values.end(), predicate);
   }
+
   return true;
 }
 
 bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
-  if (headers.Etag()) {
-    return !config_->disableOnEtag();
-  }
-  return true;
+  return !(headers.Etag() && config_->disableOnEtag());
 }
 
 bool GzipFilter::isLastModifiedAllowed(HeaderMap& headers) const {
-  if (headers.LastModified()) {
-    return !config_->disableOnLastModified();
-  }
-  return true;
+  return !(headers.LastModified() && config_->disableOnLastModified());
 }
 
 bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
-  if (headers.TransferEncoding()) {
-    return !headers.TransferEncoding()->value().find(
-        Http::Headers::get().TransferEncodingValues.Gzip.c_str());
-  }
-  return true;
+  return !(headers.TransferEncoding() &&
+           headers.TransferEncoding()->value().find(
+               Http::Headers::get().TransferEncodingValues.Gzip.c_str()));
 }
 
 } // namespace Http
