@@ -16,37 +16,39 @@ fi
 # commit 82b040a60561cf94dec3197ea88ae15e57bcaa97, which also carries the Apache
 # V2 license, and has deployed this code successfully for some time.
 abspath() {
-    cd "`dirname "${1}"`"
-    echo "${PWD}"/"`basename "${1}"`"
+    cd "$(dirname "${1}")"
+    echo "${PWD}"/"$(basename "${1}")"
     cd "${OLDPWD}"
 }
 relpath() {
-  local from to up
-  from="`abspath "${1%/}"`" to="`abspath "${2%/}"/`"
-  while test "${to}"  = "${to#"${from}"/}" \
-          -a "${to}" != "${from}"; do
-    from="${from%/*}" up="../${up}"
+  local FROM TO UP
+  FROM="$(abspath "${1%/}")" TO="$(abspath "${2%/}"/)"
+  while test "${TO}"  = "${TO#"${FROM}"/}" \
+          -a "${TO}" != "${FROM}"; do
+    FROM="${FROM%/*}" UP="../${UP}"
   done
-  to="${up%/}${to#${from}}"
-  echo "${to:-.}"
+  TO="${UP%/}${TO#${FROM}}"
+  echo "${TO:-.}"
 }
 
 # Try to find the `.git` directory, even if it's not in Envoy project root (as
 # it wouldn't be if, say, this were in a submodule). The "blessed" but fairly
 # new way to do this is to use `--git-common-dir`.
-dotGitDir=`git rev-parse --git-common-dir`
-if test ! -d "${_gitdir}"; then
+DOT_GIT_DIR=$(git rev-parse --git-common-dir)
+if test ! -d "${DOT_GIT_DIR}"; then
   # If `--git-common-dir` is not available, fall back to older way of doing it.
-  dotGitDir=`git rev-parse --git-dir`
+  DOT_GIT_DIR=$(git rev-parse --git-dir)
 fi
 
-hooksDir="${dotGitDir}/hooks"
-hooksDirRelpath=`relpath "${hooksDir}" "${PWD}"`
+HOOKS_DIR="${DOT_GIT_DIR}/hooks"
+HOOKS_DIR_RELPATH=$(relpath "${HOOKS_DIR}" "${PWD}")
 
-if [ ! -e "${hooksDir}/prepare-commit-msg" ]; then
-  ln -s "${hooksDirRelpath}/support/hooks/prepare-commit-msg" "${hooksDir}/prepare-commit-msg"
+if [ ! -e "${HOOKS_DIR}/prepare-commit-msg" ]; then
+  echo "Installing hook 'prepare-commit-msg'"
+  ln -s "${HOOKS_DIR_RELPATH}/support/hooks/prepare-commit-msg" "${HOOKS_DIR}/prepare-commit-msg"
 fi
 
-if [ ! -e "${hooksDir}/pre-commit" ]; then
-  ln -s "${hooksDirRelpath}/support/hooks/pre-commit" "${hooksDir}/pre-commit"
+if [ ! -e "${HOOKS_DIR}/pre-commit" ]; then
+  echo "Installing hook 'pre-commit'"
+  ln -s "${HOOKS_DIR_RELPATH}/support/hooks/pre-commit" "${HOOKS_DIR}/pre-commit"
 fi
