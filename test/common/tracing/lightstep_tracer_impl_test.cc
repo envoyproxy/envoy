@@ -329,14 +329,9 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::MessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
-
-            EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
-                         message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
-            EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
           }));
@@ -348,7 +343,7 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
   span->finishSpan();
 
-  EXPECT_CALL(request, cancel()).Times(1);
+  EXPECT_CALL(request, cancel());
 
   driver_.reset();
 }
