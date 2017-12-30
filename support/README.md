@@ -31,6 +31,7 @@ functionality:
 * Automatically appending DCO signoff to the end of a commit message if it
   doesn't exist yet. Correctly covers edge cases like `commit --amend` and
   `rebase`.
-* Automatically running format checks on all files in the diff, before commit.
+* Automatically running DCO and format checks on all files in the diff, before
+  push.
 
 [filter]: https://github.com/envoyproxy/envoy-filter-example

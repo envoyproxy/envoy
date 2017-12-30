@@ -1,23 +1,13 @@
 #!/usr/bin/env bash
 #
-# An example hook script to verify what is about to be pushed.  Called by "git
-# push" after it has checked the remote status, but before anything has been
-# pushed.  If this script exits with a non-zero status nothing will be pushed.
+# A git commit hook that will automatically run format checking and DCO signoff
+# checking before the push is successful.
 #
-# This hook is called with the following parameters:
+# To enable this hook, run `bootstrap`, or run the following from the root of
+# the repo. (Note that `bootstrap` will correctly install this even if this code
+# is located in a submodule, while the following won't.)
 #
-# $1 -- Name of the remote to which the push is being done
-# $2 -- URL to which the push is being done
-#
-# If pushing without using a named remote those arguments will be equal.
-#
-# Information about the commits which are being pushed is supplied as lines to
-# the standard input in the form:
-#
-#   <local ref> <local sha1> <remote ref> <remote sha1>
-#
-# This sample shows how to prevent push of commits where the log message starts
-# with "WIP" (work in progress).
+# $ ln -s ../../support/hooks/pre-push .git/hooks/pre-push
 
 DUMMY_SHA=0000000000000000000000000000000000000000
 
