@@ -5,7 +5,11 @@
 # signoff is present during commit.
 
 # Best-effort check that we're in the envoy root directory.
-if [ ! -f .gitignore ] && [ ! -f .clang-format ]; then
+#
+# TODO(hausdorff): If compatibility becomes an issue here, come back and do this
+# "the right way". This is hard to do in general, since `realpath` is not
+# standard.
+if [ ! "$PWD" == "$(git rev-parse --show-toplevel)" ]; then
     cat >&2 <<__EOF__
 ERROR: this script must be run at the root of the envoy source tree
 __EOF__
