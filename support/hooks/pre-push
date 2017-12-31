@@ -35,8 +35,8 @@ do
     #
     # In general, we can't assume that the commits are signed off by author
     # pushing, so we settle for just checking that there is a signoff at all.
-    SIGNED_OFF=$(git rev-list --grep "^Signed-off-by: " "$RANGE")
-    NOT_SIGNED_OFF=$(git rev-list "$RANGE" | grep -Fxv "$SIGNED_OFF")
+    SIGNED_OFF=$(git rev-list --no-merges --grep "^Signed-off-by: " "$RANGE")
+    NOT_SIGNED_OFF=$(git rev-list --no-merges "$RANGE" | grep -Fxv "$SIGNED_OFF")
     if [ -n "$NOT_SIGNED_OFF" ]
     then
       echo >&2 "ERROR: The following commits do not have DCO signoff:"
