@@ -207,15 +207,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
         bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
-  // Cluster loading happens in two phases: first all the primary clusters
-  // are loaded, and then all the secondary clusters are loaded. As it
-  // currently stands all non-EDS clusters are primary and only EDS
-  // clusters are secondary.
-  // This two phase loading is done because in v2 configuration
-  // each EDS cluster individually sets up a subscription. When this
-  // subscription is an API
-  // source the cluster will depend on a non-EDS cluster, so the
-  //  non-EDS clusters must be loaded first.
+  // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
+  // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
+  // only EDS clusters are secondary. This two phase loading is done because in v2 configuration
+  // each EDS cluster individually sets up a subscription. When this subscription is an API source
+  // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
