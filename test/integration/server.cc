@@ -19,17 +19,25 @@
 
 namespace Envoy {
 
-IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path,
-                                                       const Network::Address::IpVersion version) {
+IntegrationTestServerPtr
+IntegrationTestServer::create(const std::string& config_path,
+                              const Network::Address::IpVersion version,
+                              std::function<void()> pre_worker_start_test_steps) {
   IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
-  server->start(version);
+  server->start(version, pre_worker_start_test_steps);
   return server;
 }
 
-void IntegrationTestServer::start(const Network::Address::IpVersion version) {
+void IntegrationTestServer::start(const Network::Address::IpVersion version,
+                                  std::function<void()> pre_worker_start_test_steps) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_.reset(new Thread::Thread([version, this]() -> void { threadRoutine(version); }));
+
+  // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
+  if (pre_worker_start_test_steps != nullptr) {
+    pre_worker_start_test_steps();
+  }
 
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();

@@ -320,6 +320,34 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
+TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
+  setupValidDriver();
+
+  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
+                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            return &request;
+          }));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+
+  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  span->finishSpan();
+
+  EXPECT_CALL(request, cancel());
+
+  driver_.reset();
+}
+
 TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   for (OpenTracingDriver::PropagationMode propagation_mode :
        {OpenTracingDriver::PropagationMode::SingleHeader,

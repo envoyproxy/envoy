@@ -62,10 +62,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     cluster_stats->set_cluster_name(cluster_name);
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& hosts : host_set->hostsPerLocality()) {
-        auto* locality_stats = cluster_stats->add_upstream_locality_stats();
         ASSERT(hosts.size() > 0);
-        locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
-        locality_stats->set_priority(host_set->priority());
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
@@ -74,9 +71,14 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           rq_error += host->stats().rq_error_.latch();
           rq_active += host->stats().rq_active_.value();
         }
-        locality_stats->set_total_successful_requests(rq_success);
-        locality_stats->set_total_error_requests(rq_error);
-        locality_stats->set_total_requests_in_progress(rq_active);
+        if (rq_success + rq_error + rq_active != 0) {
+          auto* locality_stats = cluster_stats->add_upstream_locality_stats();
+          locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
+          locality_stats->set_priority(host_set->priority());
+          locality_stats->set_total_successful_requests(rq_success);
+          locality_stats->set_total_error_requests(rq_error);
+          locality_stats->set_total_requests_in_progress(rq_active);
+        }
       }
     }
     cluster_stats->set_total_dropped_requests(
@@ -86,6 +88,11 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);
   stats_.responses_.inc();
+  // When the connection is established, the message has not yet been read so we
+  // will not have a load reporting period.
+  if (message_.get()) {
+    startLoadReportPeriod();
+  }
 }
 
 void LoadStatsReporter::handleFailure() {
@@ -106,9 +113,15 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) 
 void LoadStatsReporter::onReceiveMessage(
     std::unique_ptr<envoy::api::v2::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
+  stats_.requests_.inc();
+  message_ = std::move(message);
+  startLoadReportPeriod();
+}
+
+void LoadStatsReporter::startLoadReportPeriod() {
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
-  for (const std::string& cluster_name : message->clusters()) {
+  for (const std::string& cluster_name : message_->clusters()) {
     clusters_.emplace_back(cluster_name);
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
@@ -124,9 +137,8 @@ void LoadStatsReporter::onReceiveMessage(
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   }
-  stats_.requests_.inc();
   response_timer_->enableTimer(std::chrono::milliseconds(
-      Protobuf::util::TimeUtil::DurationToMilliseconds(message->load_reporting_interval())));
+      Protobuf::util::TimeUtil::DurationToMilliseconds(message_->load_reporting_interval())));
 }
 
 void LoadStatsReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {

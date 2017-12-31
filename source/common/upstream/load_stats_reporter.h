@@ -58,6 +58,7 @@ private:
   void establishNewStream();
   void sendLoadStatsRequest();
   void handleFailure();
+  void startLoadReportPeriod();
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
@@ -67,6 +68,7 @@ private:
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
   envoy::api::v2::LoadStatsRequest request_;
+  std::unique_ptr<envoy::api::v2::LoadStatsResponse> message_;
   std::vector<std::string> clusters_;
 };
 

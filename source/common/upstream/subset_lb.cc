@@ -55,7 +55,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
   }
 
   stats_.lb_subsets_fallback_.inc();
-  return fallback_subset_->lb_->chooseHost(context);
+  return fallback_subset_->priority_subset_->lb_->chooseHost(context);
 }
 
 // Find a host from the subsets. Sets host_chosen to false and returns nullptr if the context has
@@ -79,7 +79,7 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
 
   host_chosen = true;
   stats_.lb_subsets_selected_.inc();
-  return entry->lb_->chooseHost(context);
+  return entry->priority_subset_->lb_->chooseHost(context);
 }
 
 // Iterates over the given metadata match criteria (which must be lexically sorted by key) and find
@@ -140,7 +140,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority,
   if (fallback_subset_ == nullptr) {
     // First update: create the default host subset.
     fallback_subset_.reset(new LbSubsetEntry());
-    fallback_subset_->initLoadBalancer(*this, predicate);
+    fallback_subset_->priority_subset_.reset(new PrioritySubsetImpl(*this, predicate));
   } else {
     // Subsequent updates: add/remove hosts.
     fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed, predicate);
@@ -209,7 +209,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const std::vector<HostSharedP
                      // Initialize new entry with hosts and update stats. (An uninitialized entry
                      // with only removed hosts is a degenerate case and we leave the entry
                      // uninitialized.)
-                     entry->initLoadBalancer(*this, predicate);
+                     entry->priority_subset_.reset(new PrioritySubsetImpl(*this, predicate));
                      stats_.lb_subsets_active_.inc();
                      stats_.lb_subsets_created_.inc();
                    }
@@ -319,41 +319,51 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
 
 // Initialize a new HostSubsetImpl and LoadBalancer from the SubsetLoadBalancer, filtering hosts
 // with the given predicate.
-void SubsetLoadBalancer::LbSubsetEntry::initLoadBalancer(const SubsetLoadBalancer& subset_lb,
-                                                         HostPredicate predicate) {
-  priority_subset_.reset(new PrioritySubsetImpl(subset_lb.original_priority_set_));
+SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
+                                                           HostPredicate predicate)
+    : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_) {
+
+  for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
+    empty_ &= getOrCreateHostSet(i).hosts().empty();
+  }
+
   for (size_t i = 0; i < subset_lb.original_priority_set_.hostSetsPerPriority().size(); ++i) {
-    priority_subset_->update(i, subset_lb.original_priority_set_.hostSetsPerPriority()[i]->hosts(),
-                             {}, predicate);
+    update(i, subset_lb.original_priority_set_.hostSetsPerPriority()[i]->hosts(), {}, predicate);
   }
 
   switch (subset_lb.lb_type_) {
   case LoadBalancerType::LeastRequest:
-    lb_.reset(new LeastRequestLoadBalancer(*priority_subset_,
-                                           subset_lb.original_local_priority_set_, subset_lb.stats_,
-                                           subset_lb.runtime_, subset_lb.random_));
+    lb_.reset(new LeastRequestLoadBalancer(*this, subset_lb.original_local_priority_set_,
+                                           subset_lb.stats_, subset_lb.runtime_,
+                                           subset_lb.random_));
     break;
 
   case LoadBalancerType::Random:
-    lb_.reset(new RandomLoadBalancer(*priority_subset_, subset_lb.original_local_priority_set_,
+    lb_.reset(new RandomLoadBalancer(*this, subset_lb.original_local_priority_set_,
                                      subset_lb.stats_, subset_lb.runtime_, subset_lb.random_));
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb_.reset(new RoundRobinLoadBalancer(*priority_subset_, subset_lb.original_local_priority_set_,
+    lb_.reset(new RoundRobinLoadBalancer(*this, subset_lb.original_local_priority_set_,
                                          subset_lb.stats_, subset_lb.runtime_, subset_lb.random_));
     break;
 
   case LoadBalancerType::RingHash:
-    lb_.reset(new RingHashLoadBalancer(*priority_subset_, subset_lb.stats_, subset_lb.runtime_,
-                                       subset_lb.random_, subset_lb.lb_ring_hash_config_));
+    // TODO(mattklein123): The ring hash LB is thread aware, but currently the subset LB is not.
+    // We should make the subset LB thread aware since the calculations are costly, and then we
+    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
+    thread_aware_lb_.reset(new RingHashLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_,
+                                                    subset_lb.random_,
+                                                    subset_lb.lb_ring_hash_config_));
+    thread_aware_lb_->initialize();
+    lb_ = thread_aware_lb_->factory()->create();
     break;
 
   case LoadBalancerType::OriginalDst:
     NOT_REACHED;
   }
 
-  priority_subset_->triggerCallbacks();
+  triggerCallbacks();
 }
 
 // Given hosts_added and hosts_removed, update the underlying HostSet. The hosts_added Hosts must
@@ -414,13 +424,6 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const std::vector<HostSharedPtr>
                            filtered_added, filtered_removed);
 }
 
-SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const PrioritySet& original_priority_set)
-    : PrioritySetImpl(), original_priority_set_(original_priority_set) {
-  for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
-    empty_ &= getOrCreateHostSet(i).hosts().empty();
-  }
-}
-
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size());
   return HostSetImplPtr{
@@ -439,6 +442,13 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
     for (auto& host_set : hostSetsPerPriority()) {
       empty_ &= host_set->hosts().empty();
     }
+  }
+
+  // Create a new worker local LB if needed.
+  // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
+  // we can do better here.
+  if (thread_aware_lb_ != nullptr) {
+    lb_ = thread_aware_lb_->factory()->create();
   }
 }
 

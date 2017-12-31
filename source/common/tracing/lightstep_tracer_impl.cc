@@ -39,6 +39,12 @@ public:
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
     : driver_(driver) {}
 
+LightStepDriver::LightStepTransporter::~LightStepTransporter() {
+  if (active_request_ != nullptr) {
+    active_request_->cancel();
+  }
+}
+
 void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& request,
                                                  Protobuf::Message& response,
                                                  lightstep::AsyncTransporter::Callback& callback) {
@@ -53,13 +59,14 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-  driver_.clusterManager()
-      .httpAsyncClientForCluster(driver_.cluster()->name())
-      .send(std::move(message), *this, std::chrono::milliseconds(timeout));
+  active_request_ = driver_.clusterManager()
+                        .httpAsyncClientForCluster(driver_.cluster()->name())
+                        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
 }
 
 void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {
   try {
+    active_request_ = nullptr;
     Grpc::Common::validateResponse(*response);
 
     Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
@@ -80,6 +87,7 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
 }
 
 void LightStepDriver::LightStepTransporter::onFailure(Http::AsyncClient::FailureReason) {
+  active_request_ = nullptr;
   Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                            lightstep::CollectorMethodName(), false);
   active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
