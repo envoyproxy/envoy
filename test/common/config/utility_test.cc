@@ -250,8 +250,7 @@ TEST(UtilityTest, CheckApiConfigSourceSubscriptionBackingCluster) {
 
   // Non-existent cluster.
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster<
-          envoy::api::v2::ClusterLoadAssignment>(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
       "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'foo_cluster' "
       "does not exist, was added via api, or is an EDS cluster");
@@ -262,29 +261,26 @@ TEST(UtilityTest, CheckApiConfigSourceSubscriptionBackingCluster) {
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster<
-          envoy::api::v2::ClusterLoadAssignment>(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
       "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'foo_cluster' "
       "does not exist, was added via api, or is an EDS cluster");
 
   // EDS Cluster backing EDS Cluster.
-  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(cluster, info()).Times(3);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster<
-          envoy::api::v2::ClusterLoadAssignment>(cluster_map, *api_config_source),
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
       "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'foo_cluster' "
       "does not exist, was added via api, or is an EDS cluster");
 
   // All ok.
-  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(cluster, info()).Times(3);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
-  Utility::checkApiConfigSourceSubscriptionBackingCluster<envoy::api::v2::ClusterLoadAssignment>(
-      cluster_map, *api_config_source);
+  Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
 }
 
 } // namespace Config

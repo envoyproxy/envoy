@@ -238,8 +238,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
       break;
     }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
-      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster<
-          envoy::api::v2::ClusterLoadAssignment>(loaded_clusters, sds_config.api_config_source());
+      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, sds_config.api_config_source());
       break;
     }
     case envoy::api::v2::ConfigSource::kAds: {
@@ -252,8 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     }
   }
   if (!ads_config.cluster_name().empty()) {
-    Config::Utility::checkApiConfigSourceSubscriptionBackingCluster<
-        envoy::api::v2::ApiConfigSource>(loaded_clusters, ads_config);
+    Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, ads_config);
   }
 
   Optional<std::string> local_cluster_name;
