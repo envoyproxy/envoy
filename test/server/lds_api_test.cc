@@ -42,6 +42,8 @@ public:
     EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, addedViaApi());
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_, registerTarget(_));
     lds_.reset(new LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_,
@@ -154,8 +156,9 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   Upstream::MockCluster cluster;
   cluster_map.emplace("foo_cluster", cluster);
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_CALL(cluster, info());
+  EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(*cluster.info_, type());
   ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),

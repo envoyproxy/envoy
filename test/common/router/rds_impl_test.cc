@@ -76,6 +76,8 @@ public:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, addedViaApi());
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, registerTarget(_));
     rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
@@ -435,8 +437,9 @@ public:
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
+    EXPECT_CALL(*cluster.info_, type());
     provider_ = route_config_provider_manager_->getRouteConfigProvider(
         rds_, cm_, store_, "foo_prefix.", init_manager_);
   }
@@ -500,8 +503,9 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   Upstream::MockCluster cluster;
   cluster_map.emplace("bar_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_CALL(cluster, info());
+  EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(*cluster.info_, type());
   RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_->getRouteConfigProvider(
       rds2, cm_, store_, "foo_prefix", init_manager_);
   EXPECT_NE(provider3, provider_);

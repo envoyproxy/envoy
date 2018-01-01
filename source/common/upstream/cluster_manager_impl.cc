@@ -238,7 +238,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
       break;
     }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
-      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, sds_config.api_config_source());
+      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(
+          loaded_clusters, sds_config.api_config_source());
       break;
     }
     case envoy::api::v2::ConfigSource::kAds: {
