@@ -187,7 +187,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 
 TEST(PrometheusStatsFormatter, PrometheusMetricName) {
   std::string raw = "vulture.eats-liver";
-  std::string expected = "envoy_vulture_eats-liver";
+  std::string expected = "envoy_vulture_eats_liver";
   auto actual = PrometheusStatsFormatter::prometheusMetricName(raw);
   EXPECT_EQ(expected, actual);
 }
@@ -198,7 +198,7 @@ TEST(PrometheusStatsFormatter, FormatTagsForPrometheus) {
   Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag-name=\"a_tag-value\",another_tag_name=\"another_tag-value\"";
+  std::string expected = "a_tag_name=\"a_tag-value\",another_tag_name=\"another_tag-value\"";
   auto actual = PrometheusStatsFormatter::formatTagsForPrometheus(tags);
   EXPECT_EQ(expected, actual);
 }

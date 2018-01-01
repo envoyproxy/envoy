@@ -395,17 +395,20 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
   return rc;
 }
 
-std::string PrometheusStatsFormatter::sanitizePrometheusName(const std::string& name) {
+std::string PrometheusStatsFormatter::sanitizePrometheusName(const std::string& name, const bool strict) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), '.', '_');
+  if (strict) {
+    std::replace(stats_name.begin(), stats_name.end(), '-', '_');
+  }
   return stats_name;
 }
 
 std::string PrometheusStatsFormatter::formatTagsForPrometheus(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizePrometheusName(tag.name_),
-                              sanitizePrometheusName(tag.value_)));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizePrometheusName(tag.name_, true),
+                              sanitizePrometheusName(tag.value_, false)));
   }
   return StringUtil::join(buf, ",");
 }
@@ -413,7 +416,7 @@ std::string PrometheusStatsFormatter::formatTagsForPrometheus(const std::vector<
 std::string PrometheusStatsFormatter::prometheusMetricName(const std::string& extractedName) {
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
-  return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName));
+  return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName, true));
 }
 
 void PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
