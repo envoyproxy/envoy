@@ -185,5 +185,23 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   EXPECT_NE(-1, response.search(kEscapedPlanets.data(), kEscapedPlanets.size(), 0));
 }
 
+TEST(PrometheusStatsFormatter, PrometheusMetricName) {
+  std::string raw = "vulture.eats-liver";
+  std::string expected = "envoy_vulture_eats-liver";
+  auto actual = PrometheusStatsFormatter::prometheusMetricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST(PrometheusStatsFormatter, FormatTagsForPrometheus) {
+  std::vector<Stats::Tag> tags;
+  Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
+  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
+  tags.push_back(tag1);
+  tags.push_back(tag2);
+  std::string expected = "a_tag-name=\"a_tag-value\",another_tag_name=\"another_tag-value\"";
+  auto actual = PrometheusStatsFormatter::formatTagsForPrometheus(tags);
+  EXPECT_EQ(expected, actual);
+}
+
 } // namespace Server
 } // namespace Envoy

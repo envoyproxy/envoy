@@ -201,5 +201,17 @@ private:
   Http::HeaderMap* request_headers_{};
 };
 
+class PrometheusStatsFormatter {
+public:
+  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                const std::list<Stats::GaugeSharedPtr>& gauges,
+                                Buffer::Instance& response);
+  static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
+  static std::string prometheusMetricName(const std::string& extractedName);
+private:
+  static std::string sanitizePrometheusName(const std::string& name);
+};
+
+
 } // namespace Server
 } // namespace Envoy
