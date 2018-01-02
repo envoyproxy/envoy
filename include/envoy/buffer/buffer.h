@@ -22,7 +22,7 @@ struct RawSlice {
  * A callback invoked when the buffer no longer needs an externally owned
  * data. This should be used to free the memory if necessary.
  */
-typedef void(*refReleaseCb)(const void*, size_t, void*);
+typedef void (*refReleaseCb)(const void*, size_t, void*);
 
 /**
  * A basic buffer abstraction.
@@ -47,8 +47,8 @@ public:
    * @param releaseArg optional argument passed to releaseCallback as <arg>.
    * @param size supplies the size of the data.
    */
-  virtual void addReference(
-    const void* data, uint64_t size, refReleaseCb releaseCallback, void* releaseArg) PURE;
+  virtual void addReference(const void* data, uint64_t size, refReleaseCb releaseCallback,
+                            void* releaseArg) PURE;
 
   /**
    * Copy a string into the buffer.

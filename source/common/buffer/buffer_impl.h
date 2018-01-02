@@ -33,8 +33,8 @@ public:
 
   // LibEventInstance
   void add(const void* data, uint64_t size) override;
-  void addReference(
-    const void* data, uint64_t size, refReleaseCb releaseCallback, void* releaseArg) override;
+  void addReference(const void* data, uint64_t size, refReleaseCb releaseCallback,
+                    void* releaseArg) override;
   void add(const std::string& data) override;
   void add(const Instance& data) override;
   void commit(RawSlice* iovecs, uint64_t num_iovecs) override;

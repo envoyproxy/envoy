@@ -26,9 +26,11 @@ TEST_F(OwnedImplTest, AddReferenceNoCleanup) {
 TEST_F(OwnedImplTest, AddReferenceWithCleanup) {
   char input[] = "hello world";
   Buffer::OwnedImpl buffer;
-  buffer.addReference(input, 11, [](const void*, size_t, void* arg) {
-    (static_cast<OwnedImplTest*>(arg))->release_callback_called_ = true;
-  }, this);
+  buffer.addReference(input, 11,
+                      [](const void*, size_t, void* arg) {
+                        (static_cast<OwnedImplTest*>(arg))->release_callback_called_ = true;
+                      },
+                      this);
   EXPECT_EQ(11, buffer.length());
 
   buffer.drain(5);
