@@ -35,7 +35,8 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::Scope& listener_scope);
 
-  Http::Code runCallback(const std::string& path, Buffer::Instance& response);
+  Http::Code runCallback(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                         Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }
   Network::ListenSocket& mutable_socket() { return *socket_; }
 
@@ -124,18 +125,36 @@ private:
   /**
    * URL handlers.
    */
-  Http::Code handlerCerts(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerClusters(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerCpuProfiler(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerHealthcheckFail(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerHealthcheckOk(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerHotRestartVersion(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerLogging(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerResetCounters(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerServerInfo(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerStats(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
-  Http::Code handlerListenerInfo(const std::string& url, Buffer::Instance& response);
+  Http::Code handlerAdminHome(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                              Buffer::Instance& response);
+  Http::Code handlerCerts(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                          Buffer::Instance& response);
+  Http::Code handlerClusters(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                             Buffer::Instance& response);
+  Http::Code handlerCpuProfiler(const std::string& path_and_query,
+                                Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerHealthcheckFail(const std::string& path_and_query,
+                                    Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerHealthcheckOk(const std::string& path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerHelp(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                         Buffer::Instance& response);
+  Http::Code handlerHotRestartVersion(const std::string& path_and_query,
+                                      Http::HeaderMap& response_headers,
+                                      Buffer::Instance& response);
+  Http::Code handlerListenerInfo(const std::string& path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerLogging(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                            Buffer::Instance& response);
+  Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
+  Http::Code handlerQuitQuitQuit(const std::string& path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerResetCounters(const std::string& path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerServerInfo(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response);
+  Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                          Buffer::Instance& response);
 
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -163,7 +182,8 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& response_headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {

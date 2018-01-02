@@ -476,6 +476,7 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
+  std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;

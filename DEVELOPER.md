@@ -4,6 +4,8 @@ Envoy is built using the Bazel build system. Travis CI builds, tests, and runs c
 
 To get started building Envoy locally, see the [Bazel quick start](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers). To run tests, there are Bazel [targets](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#testing-envoy-with-bazel) for Google Test. To generate a coverage report, use the tooling for [gcovr](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#coverage-builds).
 
+If you plan to contribute to Envoy, you may find it useful to install the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/master/support/README.md), which helps automate parts of the development process, particularly those involving code review.
+
 Below is a list of additional documentation to aid the development process:
 
 - [General build and installation documentation](https://www.envoyproxy.io/docs/envoy/latest/install/install)

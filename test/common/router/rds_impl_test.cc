@@ -212,7 +212,8 @@ TEST_F(RdsImplTest, Basic) {
 ]
 )EOF";
   EXPECT_EQ("", rds_->versionInfo());
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
+  Http::HeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
   EXPECT_EQ(routes_expected_output_no_routes, TestUtility::bufferToString(data));
   data.drain(data.length());
   EXPECT_EQ(0UL, store_.gauge("foo.rds.foo_route_config.version").value());
@@ -245,7 +246,7 @@ TEST_F(RdsImplTest, Basic) {
 )EOF";
 
   EXPECT_EQ("hash_15ed54077da94d8b", rds_->versionInfo());
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
+  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
   EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
@@ -263,7 +264,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
   // Test Admin /routes handler. The route table should not change.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
+  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
   EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
@@ -323,18 +324,20 @@ TEST_F(RdsImplTest, Basic) {
 ]
 )EOF";
 
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
+  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
   EXPECT_EQ(routes_expected_output_full_table, TestUtility::bufferToString(data));
   data.drain(data.length());
   EXPECT_EQ(8808926191882896258U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   // Test that we get the same dump if we specify the route name.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes?route_config_name=foo_route_config", data));
+  EXPECT_EQ(Http::Code::OK,
+            handler_callback_("/routes?route_config_name=foo_route_config", header_map, data));
   EXPECT_EQ(routes_expected_output_full_table, TestUtility::bufferToString(data));
   data.drain(data.length());
 
   // Test that we get an emtpy response if the name does not match.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes?route_config_name=does_not_exist", data));
+  EXPECT_EQ(Http::Code::OK,
+            handler_callback_("/routes?route_config_name=does_not_exist", header_map, data));
   EXPECT_EQ("[\n]\n", TestUtility::bufferToString(data));
   data.drain(data.length());
 
@@ -344,7 +347,7 @@ TEST_F(RdsImplTest, Basic) {
 })EOF";
 
   // Test that we get the help text if we use the command in an invalid ways.
-  EXPECT_EQ(Http::Code::NotFound, handler_callback_("/routes?bad_param", data));
+  EXPECT_EQ(Http::Code::NotFound, handler_callback_("/routes?bad_param", header_map, data));
   EXPECT_EQ(routes_expected_output_usage, TestUtility::bufferToString(data));
   data.drain(data.length());
 
@@ -510,7 +513,8 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 )EOF";
 
   // Test Admin /routes handler.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", data));
+  Http::HeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
   EXPECT_EQ(routes_expected_output, TestUtility::bufferToString(data));
   data.drain(data.length());
 

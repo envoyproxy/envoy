@@ -39,6 +39,7 @@ public:
 
   void init() {
     lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_));
+    lb_->initialize();
   }
 
   // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
@@ -62,7 +63,7 @@ INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RingHashLoadBalancerTest,
 
 TEST_F(RingHashLoadBalancerTest, NoHost) {
   init();
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
 
 TEST_F(RingHashLoadBalancerTest, Basic) {
@@ -95,33 +96,35 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
   // :94  | 15516499411664133160
   // :90  | 16117243373044804889
 
+  LoadBalancerPtr lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(3551244743356806947);
-    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(3551244743356806948);
-    EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb->chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(16117243373044804880UL));
-    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 
   host_set_.healthy_hosts_.clear();
   host_set_.runCallbacks({}, {});
+  lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[4], lb->chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
@@ -137,17 +140,20 @@ TEST_P(RingHashLoadBalancerTest, BasicFailover) {
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   init();
 
-  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  LoadBalancerPtr lb = lb_->factory()->create();
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Add a healthy host at P=0 and it will be chosen.
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
-  EXPECT_EQ(host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  lb = lb_->factory()->create();
+  EXPECT_EQ(host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Remove the healthy host and ensure we fail back over to the failover_host_set_
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
-  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  lb = lb_->factory()->create();
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 }
 
 #ifndef __APPLE__
@@ -180,25 +186,26 @@ TEST_F(RingHashLoadBalancerTest, BasicWithStdHash) {
   // ring hash: host=127.0.0.1:80 hash=15427156902705414897
   // ring hash: host=127.0.0.1:85 hash=16375050414328759093
   // ring hash: host=127.0.0.1:80 hash=17613279263364193813
+  LoadBalancerPtr lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602068);
-    EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
   }
   {
     TestLoadBalancerContext context(1358027074129602069);
-    EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[3], lb->chooseHost(&context));
   }
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
-    EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[2], lb->chooseHost(nullptr));
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
@@ -222,9 +229,10 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   // :80  | 13838424394637650569
   // :81  | 16064866803292627174
 
+  LoadBalancerPtr lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context));
   }
 
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -239,9 +247,10 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   // :82  | 12882406409176325258
   // :81  | 16064866803292627174
 
+  lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context));
   }
 }
 
@@ -287,11 +296,13 @@ TEST_F(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
   config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
-  RingHashLoadBalancer lb{priority_set_, stats_, runtime_, random_, config_};
+  RingHashLoadBalancer thread_aware_lb{priority_set_, stats_, runtime_, random_, config_};
+  thread_aware_lb.initialize();
 
+  LoadBalancerPtr lb = thread_aware_lb.factory()->create();
   for (uint64_t i = 0; i < keys_to_simulate; i++) {
     TestLoadBalancerContext context(std::hash<std::string>()(fmt::format("{}", i)));
-    hit_counter[lb_->chooseHost(&context)->address()->asString()] += 1;
+    hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
   }
 
   std::cout << fmt::format("{:<9}  {:<4}  {:<20}", "hits", "%hit", "server") << std::endl;

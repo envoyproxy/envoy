@@ -88,6 +88,23 @@ TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
   retry_timer_cb_();
 }
 
+TEST_F(LoadStatsReporterTest, TestPubSub) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createLoadStatsReporter();
+  deliverLoadStatsResponse({"foo"});
+
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  response_timer_cb_();
+
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  response_timer_cb_();
+
+  deliverLoadStatsResponse({"bar"});
+}
+
 // Validate that the client can recover from a remote stream closure via retry.
 TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
