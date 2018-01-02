@@ -120,9 +120,9 @@ public:
 };
 
 /**
- * Verify that connections are closed when requested.
+ * Verify that connections are drained when requested.
  */
-TEST_F(Http2ConnPoolImplTest, CloseConnections) {
+TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   InSequence s;
   pool_.max_streams_ = 1;
 
@@ -138,8 +138,14 @@ TEST_F(Http2ConnPoolImplTest, CloseConnections) {
   r2.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
   expectClientConnect(1);
 
-  pool_.closeConnections();
-  EXPECT_CALL(*this, onClientDestroy()).Times(2);
+  // This will move primary to draining and destroy draining.
+  pool_.drainConnections();
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+
+  // This will destroy draining.
+  test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 }
 
