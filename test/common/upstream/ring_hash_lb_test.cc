@@ -59,11 +59,11 @@ public:
 };
 
 // For tests which don't need to be run in both primary and failover modes.
-typedef RingHashLoadBalancerTest FailoverTest;
+typedef RingHashLoadBalancerTest RingHashFailoverTest;
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RingHashLoadBalancerTest,
+INSTANTIATE_TEST_CASE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
                         ::testing::Values(true, false));
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, FailoverTest, ::testing::Values(true));
+INSTANTIATE_TEST_CASE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
@@ -140,7 +140,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 }
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
-TEST_P(FailoverTest, BasicFailover) {
+TEST_P(RingHashFailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
