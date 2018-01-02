@@ -50,7 +50,7 @@ private:
   // Represents a subset of an original PrioritySet.
   class PrioritySubsetImpl : public PrioritySetImpl {
   public:
-    PrioritySubsetImpl(const PrioritySet& original_priority_set);
+    PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
 
     void update(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
                 const std::vector<HostSharedPtr>& hosts_removed, HostPredicate predicate);
@@ -66,6 +66,11 @@ private:
         getOrCreateHostSubset(i)->triggerCallbacks();
       }
     }
+
+    // Thread aware LB if applicable.
+    ThreadAwareLoadBalancerPtr thread_aware_lb_;
+    // Current active LB.
+    LoadBalancerPtr lb_;
 
   protected:
     HostSetImplPtr createHostSet(uint32_t priority) override;
@@ -90,16 +95,13 @@ private:
   public:
     LbSubsetEntry() {}
 
-    bool initialized() const { return lb_ != nullptr && priority_subset_ != nullptr; }
+    bool initialized() const { return priority_subset_ != nullptr; }
     bool active() const { return initialized() && !priority_subset_->empty(); }
-
-    void initLoadBalancer(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
 
     LbSubsetMap children_;
 
     // Only initialized if a match exists at this level.
     PrioritySubsetImplPtr priority_subset_;
-    LoadBalancerPtr lb_;
   };
 
   // Called by HostSet::MemberUpdateCb

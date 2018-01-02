@@ -49,6 +49,15 @@ public:
                                      envoy::api::v2::HeaderMatcher& header_matcher);
 
   /**
+   * Translate a v1 JSON query parameter matcher object to v2 envoy::api::v2::QueryParameterMatcher.
+   * @param json_query_parameter_matcher source v1 JSON query parameter matcher object.
+   * @param query_parameter_matcher destination v2 envoy::api::v2::QueryParameterMatcher.
+   */
+  static void
+  translateQueryParameterMatcher(const Json::Object& json_query_parameter_matcher,
+                                 envoy::api::v2::QueryParameterMatcher& query_parameter_matcher);
+
+  /**
    * Translate a v1 JSON route configuration object to v2 envoy::api::v2::RouteConfiguration.
    * @param json_route_config source v1 JSON route configuration object.
    * @param route_config destination v2 envoy::api::v2::RouteConfiguration.

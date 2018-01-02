@@ -271,6 +271,21 @@ public:
     }
   }
 
+  void doLbTypeTest(LoadBalancerType type) {
+    EXPECT_CALL(subset_info_, fallbackPolicy())
+        .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+    lb_type_ = type;
+    init({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}});
+
+    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+    HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
+    modifyHosts({added_host}, {host_set_.hosts_.back()});
+
+    EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+  }
+
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
@@ -691,20 +706,21 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version));
 }
 
-TEST_F(SubsetLoadBalancerTest, LoadBalancerTypes) {
-  EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+// TODO(mattklein123): The following 4 tests verify basic functionality with all sub-LB tests.
+// Optimally these would also be some type of TEST_P, but that is a little bit complicated as
+// modifyHosts() also needs params. Clean this up.
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRoundRobin) {
+  doLbTypeTest(LoadBalancerType::RoundRobin);
+}
 
-  auto types =
-      std::vector<LoadBalancerType>({LoadBalancerType::RoundRobin, LoadBalancerType::LeastRequest,
-                                     LoadBalancerType::Random, LoadBalancerType::RingHash});
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesLeastRequest) {
+  doLbTypeTest(LoadBalancerType::LeastRequest);
+}
 
-  for (const auto& it : types) {
-    lb_type_ = it;
-    init();
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRandom) { doLbTypeTest(LoadBalancerType::Random); }
 
-    EXPECT_NE(nullptr, lb_->chooseHost(nullptr));
-  }
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRingHash) {
+  doLbTypeTest(LoadBalancerType::RingHash);
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
