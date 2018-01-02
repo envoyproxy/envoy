@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#
+# Bootstraps the developer tools and development environment. This includes
+# copying project-standard git commit hooks that do things like ensure DCO
+# signoff is present during commit.
+
+# Best-effort check that we're in the envoy root directory.
+#
+# TODO(hausdorff): If compatibility becomes an issue here, come back and do this
+# "the right way". This is hard to do in general, since `realpath` is not
+# standard.
+if [ ! "$PWD" == "$(git rev-parse --show-toplevel)" ]; then
+    cat >&2 <<__EOF__
+ERROR: this script must be run at the root of the envoy source tree
+__EOF__
+    exit 1
+fi
+
+# Helper functions that calculate `abspath` and `relpath`. Taken from Mesos
+# commit 82b040a60561cf94dec3197ea88ae15e57bcaa97, which also carries the Apache
+# V2 license, and has deployed this code successfully for some time.
+abspath() {
+    cd "$(dirname "${1}")"
+    echo "${PWD}"/"$(basename "${1}")"
+    cd "${OLDPWD}"
+}
+relpath() {
+  local FROM TO UP
+  FROM="$(abspath "${1%/}")" TO="$(abspath "${2%/}"/)"
+  while test "${TO}"  = "${TO#"${FROM}"/}" \
+          -a "${TO}" != "${FROM}"; do
+    FROM="${FROM%/*}" UP="../${UP}"
+  done
+  TO="${UP%/}${TO#${FROM}}"
+  echo "${TO:-.}"
+}
+
+# Try to find the `.git` directory, even if it's not in Envoy project root (as
+# it wouldn't be if, say, this were in a submodule). The "blessed" but fairly
+# new way to do this is to use `--git-common-dir`.
+DOT_GIT_DIR=$(git rev-parse --git-common-dir)
+if test ! -d "${DOT_GIT_DIR}"; then
+  # If `--git-common-dir` is not available, fall back to older way of doing it.
+  DOT_GIT_DIR=$(git rev-parse --git-dir)
+fi
+
+HOOKS_DIR="${DOT_GIT_DIR}/hooks"
+HOOKS_DIR_RELPATH=$(relpath "${HOOKS_DIR}" "${PWD}")
+
+if [ ! -e "${HOOKS_DIR}/prepare-commit-msg" ]; then
+  echo "Installing hook 'prepare-commit-msg'"
+  ln -s "${HOOKS_DIR_RELPATH}/support/hooks/prepare-commit-msg" "${HOOKS_DIR}/prepare-commit-msg"
+fi
+
+if [ ! -e "${HOOKS_DIR}/pre-push" ]; then
+  echo "Installing hook 'pre-push'"
+  ln -s "${HOOKS_DIR_RELPATH}/support/hooks/pre-push" "${HOOKS_DIR}/pre-push"
+fi

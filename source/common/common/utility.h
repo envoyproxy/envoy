@@ -124,10 +124,11 @@ public:
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
-   * @param out_len supplies the length of the output buffer. Must be >= 21.
+   * @param out_len supplies the length of the output buffer. Must be >= MIN_ITOA_OUT_LEN.
    * @param i supplies the number to convert.
    * @return the size of the string, not including the null termination.
    */
+  static constexpr size_t MIN_ITOA_OUT_LEN = 21;
   static uint32_t itoa(char* out, size_t out_len, uint64_t i);
 
   /**
