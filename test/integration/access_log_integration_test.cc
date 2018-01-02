@@ -22,11 +22,10 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
-      bootstrap.mutable_rate_limit_service()->set_cluster_name("accesslog");
-      auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ratelimit_cluster->set_name("accesslog");
-      ratelimit_cluster->mutable_http2_protocol_options();
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      accesslog_cluster->mutable_http2_protocol_options();
     });
 
     config_helper_.addConfigModifier(

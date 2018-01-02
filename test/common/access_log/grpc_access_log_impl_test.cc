@@ -214,8 +214,6 @@ http_logs:
         nanos: 4000000
       time_to_last_downstream_tx_byte:
         nanos: 6000000
-      time_to_last_downstream_tx_byte:
-        nanos: 6000000
       upstream_remote_address:
         socket_address:
           address: "10.0.0.1"
