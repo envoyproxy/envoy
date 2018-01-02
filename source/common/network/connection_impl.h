@@ -127,16 +127,6 @@ protected:
   TransportSocketPtr transport_socket_;
 
 private:
-  // clang-format off
-  struct InternalState {
-    static const uint32_t ReadEnabled              = 0x1;
-    static const uint32_t Connecting               = 0x2;
-    static const uint32_t CloseWithFlush           = 0x4;
-    static const uint32_t ImmediateConnectionError = 0x8;
-    static const uint32_t BindError                = 0x10;
-  };
-  // clang-format on
-
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();
@@ -152,7 +142,14 @@ private:
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
-  uint32_t state_{InternalState::ReadEnabled};
+  bool read_enabled_{true};
+  bool connecting_{false};
+  bool close_with_flush_{false};
+  bool immediate_connection_error_{false};
+  bool bind_error_{false};
+  const bool using_original_dst_;
+  bool above_high_watermark_{false};
+  bool detect_early_close_{true};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
@@ -161,9 +158,6 @@ private:
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
-  const bool using_original_dst_;
-  bool above_high_watermark_{false};
-  bool detect_early_close_{true};
 };
 
 /**

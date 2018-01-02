@@ -81,7 +81,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
   RELEASE_ASSERT(fd_ != -1);
 
   if (!connected) {
-    state_ |= InternalState::Connecting;
+    connecting_ = true;
   }
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
@@ -97,7 +97,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                      strerror(errno));
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
-      state_ |= InternalState::BindError;
+      bind_error_ = true;
 
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
@@ -148,8 +148,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   } else {
     // TODO(mattklein123): We need a flush timer here. We might never get open socket window.
     ASSERT(type == ConnectionCloseType::FlushWrite);
-    state_ |= InternalState::CloseWithFlush;
-    state_ &= ~InternalState::ReadEnabled;
+    close_with_flush_ = true;
+    read_enabled_ = false;
     file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
   }
 }
@@ -157,7 +157,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 Connection::State ConnectionImpl::state() const {
   if (fd_ == -1) {
     return State::Closed;
-  } else if (state_ & InternalState::CloseWithFlush) {
+  } else if (close_with_flush_) {
     return State::Closing;
   } else {
     return State::Open;
@@ -226,7 +226,7 @@ void ConnectionImpl::noDelay(bool enable) {
 uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (!(state_ & InternalState::ReadEnabled)) {
+  if (!read_enabled_) {
     return;
   }
 
@@ -239,10 +239,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
 
 void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
-
-  bool read_enabled = readEnabled();
-  UNREFERENCED_PARAMETER(read_enabled);
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled, disable);
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -255,12 +252,12 @@ void ConnectionImpl::readDisable(bool disable) {
   // TODO(mattklein123): Potentially support half-closed TCP connections. It's unclear if this is
   // required for any scenarios in which Envoy will be used (I don't know of any).
   if (disable) {
-    if (!read_enabled) {
+    if (!read_enabled_) {
       ++read_disable_count_;
       return;
     }
-    ASSERT(read_enabled);
-    state_ &= ~InternalState::ReadEnabled;
+    ASSERT(read_enabled_);
+    read_enabled_ = false;
     if (detect_early_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
@@ -271,8 +268,8 @@ void ConnectionImpl::readDisable(bool disable) {
       --read_disable_count_;
       return;
     }
-    ASSERT(!read_enabled);
-    state_ |= InternalState::ReadEnabled;
+    ASSERT(!read_enabled_);
+    read_enabled_ = true;
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -293,7 +290,7 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return state_ & InternalState::ReadEnabled; }
+bool ConnectionImpl::readEnabled() const { return read_enabled_; }
 
 void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
 
@@ -326,7 +323,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
-    if (!(state_ & InternalState::Connecting)) {
+    if (!connecting_) {
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
@@ -379,13 +376,13 @@ void ConnectionImpl::onHighWatermark() {
 void ConnectionImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (state_ & InternalState::ImmediateConnectionError) {
+  if (immediate_connection_error_) {
     ENVOY_CONN_LOG(debug, "raising immediate connect error", *this);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
 
-  if (state_ & InternalState::BindError) {
+  if (bind_error_) {
     ENVOY_CONN_LOG(debug, "raising bind error", *this);
     // Update stats here, rather than on bind failure, to give the caller a chance to
     // setConnectionStats.
@@ -419,7 +416,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
-  ASSERT(!(state_ & InternalState::Connecting));
+  ASSERT(!connecting_);
 
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
@@ -436,7 +433,7 @@ void ConnectionImpl::onReadReady() {
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
 
-  if (state_ & InternalState::Connecting) {
+  if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
     int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
@@ -445,7 +442,7 @@ void ConnectionImpl::onWriteReady() {
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
-      state_ &= ~InternalState::Connecting;
+      connecting_ = false;
       transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
@@ -468,7 +465,7 @@ void ConnectionImpl::onWriteReady() {
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if ((state_ & InternalState::CloseWithFlush) && new_buffer_size == 0) {
+  } else if (close_with_flush_ && new_buffer_size == 0) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
@@ -488,16 +485,16 @@ void ConnectionImpl::doConnect() {
   int rc = remote_address_->connect(fd_);
   if (rc == 0) {
     // write will become ready.
-    ASSERT(state_ & InternalState::Connecting);
+    ASSERT(connecting_);
   } else {
     ASSERT(rc == -1);
     if (errno == EINPROGRESS) {
-      ASSERT(state_ & InternalState::Connecting);
+      ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
-      state_ |= InternalState::ImmediateConnectionError;
-      state_ &= ~InternalState::Connecting;
+      immediate_connection_error_ = true;
+      connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }
   }
