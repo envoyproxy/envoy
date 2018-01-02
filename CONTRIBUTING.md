@@ -51,7 +51,16 @@ maximize the chances of your PR being merged.
 
 # Submitting a PR
 
-* Fork the repo and create your PR.
+* Fork the repo.
+* In your local repo, install the git hooks that implement various important pre-commit and
+  pre-push checks:
+
+  ```
+  ./support/bootstrap
+  ```
+
+  Please see [support/README.md](support/README.md) for more information on these hooks.
+* Create your PR.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
@@ -111,6 +120,17 @@ maximize the chances of your PR being merged.
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
 # DCO: Sign your work
+
+Envoy ships commit hooks that allow you to auto-generate the DCO signoff line if
+it doesn't exist when you run `git commit`. Simply navigate to the Envoy project
+root and run:
+
+```bash
+./support/bootstrap
+```
+
+From here, simply commit as normal, and you will see the signoff at the bottom
+of each commit.
 
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right to

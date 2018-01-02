@@ -72,6 +72,7 @@ envoy_cc_library(
         "//source/common/config:cds_json_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -210,6 +211,9 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         ":load_balancer_lib",
         "//include/envoy/runtime:runtime_interface",

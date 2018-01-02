@@ -15,6 +15,7 @@
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
@@ -206,16 +207,52 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
         bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
+  // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
+  // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
+  // only EDS clusters are secondary. This two phase loading is done because in v2 configuration
+  // each EDS cluster individually sets up a subscription. When this subscription is an API source
+  // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    loadCluster(cluster, false);
+    // First load all the primary clusters.
+    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
   }
 
-  // We can now potentially create the CDS API once the backing cluster exists.
-  if (bootstrap.dynamic_resources().has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
-    init_helper_.setCds(cds_api_.get());
-  } else {
-    init_helper_.setCds(nullptr);
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    // Now load all the secondary clusters.
+    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
+  }
+
+  // All the static clusters have been loaded. At this point we can check for the
+  // existence of the v1 sds backing cluster, and the ads backing cluster.
+  // TODO(htuch): Add support for multiple clusters, #1170.
+  const ClusterInfoMap loaded_clusters = clusters();
+  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
+    const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
+    switch (sds_config.config_source_specifier_case()) {
+    case envoy::api::v2::ConfigSource::kPath: {
+      Config::Utility::checkFilesystemSubscriptionBackingPath(sds_config.path());
+      break;
+    }
+    case envoy::api::v2::ConfigSource::kApiConfigSource: {
+      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(
+          loaded_clusters, sds_config.api_config_source());
+      break;
+    }
+    case envoy::api::v2::ConfigSource::kAds: {
+      // Backing cluster will be checked below
+      break;
+    }
+    default:
+      throw EnvoyException(
+          "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
+    }
+  }
+  if (!ads_config.cluster_name().empty()) {
+    Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, ads_config);
   }
 
   Optional<std::string> local_cluster_name;
@@ -234,6 +271,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
+
+  // We can now potentially create the CDS API once the backing cluster exists.
+  if (bootstrap.dynamic_resources().has_cds_config()) {
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
+    init_helper_.setCds(cds_api_.get());
+  } else {
+    init_helper_.setCds(nullptr);
+  }
 
   // Proceed to add all static bootstrap clusters to the init manager. This will immediately
   // initialize any primary clusters. Post-init processing further initializes any thread

@@ -36,6 +36,15 @@ public:
     if (v2_rest) {
       lds_config.mutable_api_config_source()->set_api_type(envoy::api::v2::ApiConfigSource::REST);
     }
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockCluster cluster;
+    cluster_map.emplace("foo_cluster", cluster);
+    EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, addedViaApi());
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, type());
+    interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_, registerTarget(_));
     lds_.reset(new LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_,
                           store_, listener_manager_));
@@ -90,7 +99,7 @@ public:
   MockListenerManager listener_manager_;
   Http::MockAsyncClientRequest request_;
   std::unique_ptr<LdsApi> lds_;
-  Event::MockTimer* interval_timer_{new Event::MockTimer(&dispatcher_)};
+  Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
 
 private:
@@ -121,13 +130,18 @@ TEST_F(LdsApiTest, UnknownCluster) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
-  ON_CALL(cluster_manager_, get("foo_cluster")).WillByDefault(Return(nullptr));
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
-                            EnvoyException, "lds: unknown cluster 'foo_cluster'");
+                            EnvoyException,
+                            "envoy::api::v2::ConfigSource must have a statically defined non-EDS "
+                            "cluster: 'foo_cluster' does not exist, was added via api, or is an "
+                            "EDS cluster");
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
   const std::string config_json = R"EOF(
   {
     "cluster": "foo_cluster",
@@ -138,6 +152,13 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   envoy::api::v2::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("foo_cluster", cluster);
+  EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(*cluster.info_, type());
   ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
   EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                    local_info_, store_, listener_manager_),
