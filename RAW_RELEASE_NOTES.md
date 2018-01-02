@@ -25,3 +25,5 @@ final version.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
+* Added support for route matching based on URL query string parameters.
+  :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
