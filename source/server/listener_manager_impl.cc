@@ -205,7 +205,8 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config, bool locked) {
+bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
+                                              bool modifiable) {
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -229,7 +230,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   }
 
   ListenerImplPtr new_listener(
-      new ListenerImpl(config, *this, name, locked, workers_started_, hash));
+      new ListenerImpl(config, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

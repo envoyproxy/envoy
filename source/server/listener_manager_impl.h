@@ -83,7 +83,7 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool locked) override;
+  bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) override;
   std::vector<std::reference_wrapper<Listener>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
@@ -170,7 +170,7 @@ public:
    * @param hash supplies the hash to use for duplicate checking.
    */
   ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-               const std::string& name, bool locked, bool workers_started, uint64_t hash);
+               const std::string& name, bool modifiable, bool workers_started, uint64_t hash);
   ~ListenerImpl();
 
   /**
