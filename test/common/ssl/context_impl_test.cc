@@ -296,5 +296,17 @@ TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
   EXPECT_NO_THROW(loadConfigJson(json));
 }
 
+TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+  }
+  )EOF";
+
+  EXPECT_THROW(loadConfigJson(json), EnvoyException);
+}
+
 } // namespace Ssl
 } // namespace Envoy
