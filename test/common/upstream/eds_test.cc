@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -39,6 +40,12 @@ protected:
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseSdsClusterFromJson(json_config, eds_config);
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockCluster cluster;
+    cluster_map.emplace("eds", cluster);
+    EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+    EXPECT_CALL(cluster, info()).Times(2);
+    EXPECT_CALL(*cluster.info_, addedViaApi());
     cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());

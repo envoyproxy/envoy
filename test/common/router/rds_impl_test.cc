@@ -70,6 +70,14 @@ public:
     }
     )EOF";
 
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockCluster cluster;
+    cluster_map.emplace("foo_cluster", cluster);
+    EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, addedViaApi());
+    EXPECT_CALL(cluster, info());
+    EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, registerTarget(_));
     rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
@@ -171,15 +179,15 @@ TEST_F(RdsImplTest, UnknownCluster) {
     }
     )EOF";
 
-  EXPECT_CALL(cm_, get("foo_cluster")).WillOnce(Return(nullptr));
-  interval_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_THROW(dynamic_cast<RdsRouteConfigProviderImpl*>(
-                   RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                                   runtime_, cm_, store_, "foo.", init_manager_,
-                                                   *route_config_provider_manager_)
-                       .get())
-                   ->initialize([] {}),
-               EnvoyException);
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_THROW_WITH_MESSAGE(RouteConfigProviderUtil::create(
+                                parseHttpConnectionManagerFromJson(config_json), runtime_, cm_,
+                                store_, "foo.", init_manager_, *route_config_provider_manager_),
+                            EnvoyException,
+                            "envoy::api::v2::ConfigSource must have a statically defined non-EDS "
+                            "cluster: 'foo_cluster' does not exist, was added via api, or is an "
+                            "EDS cluster");
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {
@@ -425,6 +433,13 @@ public:
     Envoy::Config::Utility::translateRdsConfig(*config, rds_);
 
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockCluster cluster;
+    cluster_map.emplace("foo_cluster", cluster);
+    EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+    EXPECT_CALL(cluster, info()).Times(2);
+    EXPECT_CALL(*cluster.info_, addedViaApi());
+    EXPECT_CALL(*cluster.info_, type());
     provider_ = route_config_provider_manager_->getRouteConfigProvider(
         rds_, cm_, store_, "foo_prefix.", init_manager_);
   }
@@ -484,6 +499,13 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   envoy::api::v2::filter::network::Rds rds2;
   Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
 
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("bar_cluster", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(*cluster.info_, type());
   RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_->getRouteConfigProvider(
       rds2, cm_, store_, "foo_prefix", init_manager_);
   EXPECT_NE(provider3, provider_);
