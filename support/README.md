@@ -35,3 +35,20 @@ functionality:
   push.
 
 [filter]: https://github.com/envoyproxy/envoy-filter-example
+
+## Fixing Format Problems
+
+If the pre-push format checks detect any problems, you can either fix the
+affected files manually or run the provided formatting script.
+
+To run the format fix script directly:
+
+```
+./tools/check_format.py fix
+```
+
+To run the format fix script under Docker:
+
+```
+./ci/run_envoy_docker.sh './ci/do_ci.sh fix_format'
+```
