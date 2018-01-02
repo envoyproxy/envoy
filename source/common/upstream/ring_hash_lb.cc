@@ -17,10 +17,7 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     Runtime::RandomGenerator& random,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
     : LoadBalancerBase(priority_set, stats, runtime, random), config_(config),
-      factory_(new LoadBalancerFactoryImpl(stats, random)) {
-  // Make sure we correctly return nullptr for any early chooseHost() calls.
-  factory_->current_ring_ = std::make_shared<Ring>(config_, std::vector<HostSharedPtr>{});
-}
+      factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 void RingHashLoadBalancer::initialize() {
   // TODO(mattklein123): In the future, once initialized and the initial ring is built, it would be
@@ -37,38 +34,43 @@ void RingHashLoadBalancer::initialize() {
 
 HostConstSharedPtr
 RingHashLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+  // Make sure we correctly return nullptr for any early chooseHost() calls.
+  if (per_priority_state_.size() == 0) {
+    return nullptr;
+  }
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
-  Envoy::Optional<uint64_t> hash;
+  Optional<uint64_t> hash;
   if (context) {
     hash = context->computeHashKey();
   }
-  if (!hash.valid()) {
-    hash = random_.random();
-  }
+  const uint64_t h = hash.valid() ? hash.value() : random_.random();
 
-  if (global_panic_) {
+  uint32_t priority = LoadBalancerBase::choosePriority(h, per_priority_load_);
+  if (per_priority_state_[priority]->global_panic_) {
     stats_.lb_healthy_panic_.inc();
   }
-  return ring_->chooseHost(hash.value());
+  RingConstSharedPtr ring = per_priority_state_[priority]->current_ring_;
+  return ring->chooseHost(h);
 }
 
 LoadBalancerPtr RingHashLoadBalancer::LoadBalancerFactoryImpl::create() {
   // We must protect current_ring_ via a RW lock since it is accessed and written to by multiple
-  // threads. All complex processing happens outside of locking however.
-  RingConstSharedPtr ring_to_use;
-  bool global_panic_to_use;
-  {
-    std::shared_lock<std::shared_timed_mutex> lock(mutex_);
-    ring_to_use = current_ring_;
-    global_panic_to_use = global_panic_;
-  }
+  // threads. All complex processing has already been precalculated however.
+  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
 
-  return std::make_unique<LoadBalancerImpl>(stats_, random_, ring_to_use, global_panic_to_use);
+  for (size_t i = 0; i < per_priority_state_.size(); ++i) {
+    lb->per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+    lb->per_priority_state_[i]->current_ring_ = per_priority_state_[i]->current_ring_;
+    lb->per_priority_state_[i]->global_panic_ = per_priority_state_[i]->global_panic_;
+  }
+  lb->per_priority_load_ = per_priority_load_;
+
+  return lb;
 }
 
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t hash) const {
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   if (ring_.empty()) {
     return nullptr;
   }
@@ -89,11 +91,11 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t hash) const {
     uint64_t midval = ring_[midp].hash_;
     uint64_t midval1 = midp == 0 ? 0 : ring_[midp - 1].hash_;
 
-    if (hash <= midval && hash > midval1) {
+    if (h <= midval && h > midval1) {
       return ring_[midp].host_;
     }
 
-    if (midval < hash) {
+    if (midval < h) {
       lowp = midp + 1;
     } else {
       highp = midp - 1;
@@ -183,22 +185,31 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
 
 void RingHashLoadBalancer::refresh() {
   // Note that we only compute global panic on host set refresh. Given that the runtime setting will
-  // rarely change, this is a reasonable compromise to avoid creating multiple rings when we only
-  // need to create one for LB.
-  RingConstSharedPtr new_ring;
-  bool new_global_panic;
-  const auto& host_set = chooseHostSet();
-  if (isGlobalPanic(host_set, runtime_)) {
-    new_ring = std::make_shared<Ring>(config_, host_set.hosts());
-    new_global_panic = true;
-  } else {
-    new_ring = std::make_shared<Ring>(config_, host_set.healthyHosts());
-    new_global_panic = false;
-  }
+  // rarely change, this is a reasonable compromise to avoid creating extra rings when we only
+  // need to create one per priority level.
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    RingConstSharedPtr new_ring;
+    bool new_global_panic;
+    uint32_t priority = host_set->priority();
+    if (isGlobalPanic(*host_set, runtime_)) {
+      new_ring = std::make_shared<Ring>(config_, host_set->hosts());
+      new_global_panic = true;
+    } else {
+      new_ring = std::make_shared<Ring>(config_, host_set->healthyHosts());
+      new_global_panic = false;
+    }
 
-  std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
-  factory_->current_ring_ = new_ring;
-  factory_->global_panic_ = new_global_panic;
+    std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
+    if (factory_->per_priority_state_.size() <= priority) {
+      factory_->per_priority_state_.push_back(PerPriorityStatePtr{new PerPriorityState});
+    }
+    factory_->per_priority_state_[priority]->current_ring_ = new_ring;
+    factory_->per_priority_state_[priority]->global_panic_ = new_global_panic;
+  }
+  {
+    std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
+    factory_->per_priority_load_ = per_priority_load_;
+  }
 }
 
 } // namespace Upstream
