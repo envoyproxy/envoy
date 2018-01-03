@@ -36,7 +36,7 @@ public:
           envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->set_cluster_name("accesslog");
+          common_config->mutable_cluster()->set_cluster_name("accesslog");
           MessageUtil::jsonConvert(config, *access_log->mutable_config());
         });
 

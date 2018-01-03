@@ -46,7 +46,8 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
           SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_log_streamer), [&context, &proto_config] {
             return std::make_shared<AccessLog::GrpcAccessLogStreamerImpl>(
                 std::make_unique<GrpcAccessLogClientFactoryImpl>(
-                    context.clusterManager(), proto_config.common_config().cluster_name()),
+                    context.clusterManager(),
+                    proto_config.common_config().cluster().cluster_name()),
                 context.threadLocal(), context.localInfo());
           });
 
