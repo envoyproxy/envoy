@@ -255,6 +255,7 @@ envoy_cc_test_library(
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
         "//source/server/config/access_log:file_access_log_lib",
+        "//source/server/config/access_log:grpc_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:dynamo_lib",
@@ -354,6 +355,17 @@ envoy_cc_test(
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/ratelimit:ratelimit_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "access_log_integration_test",
+    srcs = ["access_log_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
     ],
 )
 
