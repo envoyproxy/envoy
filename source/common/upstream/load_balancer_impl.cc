@@ -12,17 +12,6 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace {
-
-uint32_t sumEntries(std::vector<uint32_t>& vector) {
-  size_t sum = 0;
-  for (auto entry : vector) {
-    sum += entry;
-  }
-  return sum;
-}
-
-} // namespace
 
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
@@ -42,7 +31,7 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
     }
   }
   // The percentages should always add up to 100 but we have to have a return for the compiler.
-  ASSERT(0);
+  NOT_REACHED;
   return 0;
 }
 
@@ -63,7 +52,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
-  // overprovision factor of 1.4
+  // somewhat arbitrary overprovision factor of 1.4.
+  // Eventually the overprovision factor will likely be made configurable.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
   per_priority_health_[priority] = 0;
   if (host_set.hosts().size() > 0) {
@@ -77,7 +67,8 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   // First, determine if the load needs to be scaled relative to health. For example if there are
   // 3 host sets with 20% / 20% / 10% health they will get 40% / 40% / 20% load to ensure total load
   // adds up to 100.
-  uint32_t total_health = std::min<uint32_t>(sumEntries(per_priority_health_), 100);
+  const uint32_t total_health = std::min<uint32_t>(
+      std::accumulate(per_priority_health_.begin(), per_priority_health_.end(), 0), 100);
   if (total_health == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load_) != 100 since we sinkhole all traffic in P=0.
@@ -100,7 +91,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
 }
 
 const HostSet& LoadBalancerBase::chooseHostSet() {
-  uint32_t priority = choosePriority(random_.random(), per_priority_load_);
+  const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
   return *priority_set_.hostSetsPerPriority()[priority];
 }
 

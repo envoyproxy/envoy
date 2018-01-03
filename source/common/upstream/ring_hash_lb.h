@@ -67,7 +67,7 @@ private:
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
     std::vector<PerPriorityStatePtr> per_priority_state_;
-    std::vector<uint32_t> per_priority_load_;
+    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
@@ -85,7 +85,7 @@ private:
     // have time to do this right now.
     std::vector<PerPriorityStatePtr> per_priority_state_;
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
-    std::vector<uint32_t> per_priority_load_;
+    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
 
   void refresh();
