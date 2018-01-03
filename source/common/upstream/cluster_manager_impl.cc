@@ -666,7 +666,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host, ThreadLocal::Slot& tls) {
 
-  // Close all HTTP connection pool connections in the case of a host health failure. If outlier/
+  // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
   // health is due to ECMP flow hashing issues for example, a new set of connections might do
   // better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
@@ -680,7 +680,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         continue;
       }
 
-      pool->closeConnections();
+      pool->drainConnections();
     }
   }
 }

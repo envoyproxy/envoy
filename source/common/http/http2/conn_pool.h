@@ -30,7 +30,7 @@ public:
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
   void addDrainedCallback(DrainedCb cb) override;
-  void closeConnections() override;
+  void drainConnections() override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
 

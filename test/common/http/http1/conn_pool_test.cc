@@ -183,9 +183,9 @@ struct ActiveTestRequest {
 };
 
 /**
- * Verify that connections are closed when requested.
+ * Verify that connections are drained when requested.
  */
-TEST_F(Http1ConnPoolImplTest, CloseConnections) {
+TEST_F(Http1ConnPoolImplTest, DrainConnections) {
   cluster_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
   InSequence s;
@@ -198,8 +198,14 @@ TEST_F(Http1ConnPoolImplTest, CloseConnections) {
 
   r1.completeResponse(false);
 
-  conn_pool_.closeConnections();
-  EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
+  // This will destroy the ready client and set requests remaining to 1 on the busy client.
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+
+  // This will destroy the busy client when the response finishes.
+  r2.completeResponse(false);
+  EXPECT_CALL(conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 }
 
