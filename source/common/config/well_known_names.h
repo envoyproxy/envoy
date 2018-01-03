@@ -207,7 +207,7 @@ public:
   // SSL cipher for a connection
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
   // SSL cipher suite
-  const std::string SSL_CIPHER_SUITE  = "cipher_suite";
+  const std::string SSL_CIPHER_SUITE = "cipher_suite";
   // Stats prefix for the Client SSL Auth network filter
   const std::string CLIENTSSL_PREFIX = "envoy.clientssl_prefix";
   // Stats prefix for the Mongo Proxy network filter

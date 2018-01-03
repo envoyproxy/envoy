@@ -202,10 +202,10 @@ public:
                                 Buffer::Instance& response);
   static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
   static std::string prometheusMetricName(const std::string& extractedName);
+
 private:
   static std::string sanitizePrometheusName(const std::string& name, const bool strict);
 };
-
 
 } // namespace Server
 } // namespace Envoy

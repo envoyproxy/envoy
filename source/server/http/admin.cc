@@ -385,7 +385,8 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(), response);
+      PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(),
+                                                  server_.stats().gauges(), response);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -395,7 +396,8 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
   return rc;
 }
 
-std::string PrometheusStatsFormatter::sanitizePrometheusName(const std::string& name, const bool strict) {
+std::string PrometheusStatsFormatter::sanitizePrometheusName(const std::string& name,
+                                                             const bool strict) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), '.', '_');
   if (strict) {
@@ -420,8 +422,8 @@ std::string PrometheusStatsFormatter::prometheusMetricName(const std::string& ex
 }
 
 void PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                  const std::list<Stats::GaugeSharedPtr>& gauges,
-                                  Buffer::Instance& response) {
+                                                 const std::list<Stats::GaugeSharedPtr>& gauges,
+                                                 Buffer::Instance& response) {
   for (const auto& counter : counters) {
     const std::string tags = formatTagsForPrometheus(counter->tags());
     const std::string metric_name = prometheusMetricName(counter->tagExtractedName());
