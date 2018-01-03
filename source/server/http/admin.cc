@@ -1,5 +1,6 @@
 #include "server/http/admin.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -93,6 +94,10 @@ const char AdminHtmlStart[] = R"(
       border: 1px solid #dddddd;
       text-align: left;
       padding: 8px;
+    }
+
+    .home-form {
+      margin-bottom: 0;
     }
   </style>
 </head>
@@ -536,26 +541,30 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
       handlers_{
-          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false},
-          {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false},
-          {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false},
+          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
+          {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
+          {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false,
+           false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
+           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
+           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
-          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false},
+           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false, true},
+          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
+           false},
           {"/hot_restart_version", "print the hot restart compatability version",
-           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
-          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false},
-          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false},
+           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
+          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
+           true},
+          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
+           true},
           {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(handlerResetCounters), false},
+           MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
           {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(handlerServerInfo), false},
-          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
-          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
+           MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
+          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
+          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false}},
       listener_stats_(
           Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
@@ -622,18 +631,24 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query,
   return code;
 }
 
+std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
+  std::vector<const UrlHandler*> sorted_handlers;
+  for (const UrlHandler& handler : handlers_) {
+    sorted_handlers.push_back(&handler);
+  }
+  // Note: it's generally faster to sort a vector with std::vector than to construct a std::map.
+  std::sort(sorted_handlers.begin(), sorted_handlers.end(),
+            [&](const UrlHandler* h1, const UrlHandler* h2) { return h1->prefix_ < h2->prefix_; });
+  return sorted_handlers;
+}
+
 Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
                                   Buffer::Instance& response) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
-  std::map<std::string, const UrlHandler*> sorted_handlers;
-  for (const UrlHandler& handler : handlers_) {
-    sorted_handlers[handler.prefix_] = &handler;
-  }
-
-  for (const auto handler : sorted_handlers) {
-    response.add(fmt::format("  {}: {}\n", handler.first, handler.second->help_text_));
+  for (const UrlHandler* handler : sortedHandlers()) {
+    response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
   }
   return Http::Code::OK;
 }
@@ -643,20 +658,26 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& resp
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Html);
 
-  // Prefix order is used during searching, but for printing do them in alpha order.
-  std::map<std::string, const UrlHandler*> sorted_handlers;
-  for (const UrlHandler& handler : handlers_) {
-    sorted_handlers[handler.prefix_] = &handler;
-  }
-
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  for (const auto handler : sorted_handlers) {
+
+  // Prefix order is used during searching, but for printing do them in alpha order.
+  for (const UrlHandler* handler : sortedHandlers()) {
+    const std::string& url = handler->prefix_;
+
+    // For handlers that mutate state, render the link as a button in a POST form,
+    // rather than an anchor tag. This should discourage crawlers that find the /
+    // page from accidentally mutating all the server state by GETting all the hrefs.
+    const char* link_format =
+        handler->mutates_server_state_
+            ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
+            : "<a href='{}'>{}</a>";
+    const std::string link = fmt::format(link_format, url, url);
+
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
-    response.add(fmt::format("<tr class='home-row'><td class='home-data'><a href='{}'>{}</a></td>"
+    response.add(fmt::format("<tr class='home-row'><td class='home-data'>{}</td>"
                              "<td class='home-data'>{}</td></tr>\n",
-                             handler.first, handler.first,
-                             Html::Utility::sanitize(handler.second->help_text_)));
+                             link, Html::Utility::sanitize(handler->help_text_)));
   }
   response.add(AdminHtmlEnd);
   return Http::Code::OK;
@@ -667,7 +688,7 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable) {
+                           HandlerCb callback, bool removable, bool mutates_state) {
   // Sanitize prefix and help_text to ensure no XSS can be injected, as
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state. Also rule out some characters that
@@ -681,7 +702,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   auto it = std::find_if(handlers_.cbegin(), handlers_.cend(),
                          [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
   if (it == handlers_.end()) {
-    handlers_.push_back({prefix, help_text, callback, removable});
+    handlers_.push_back({prefix, help_text, callback, removable, mutates_state});
     return true;
   }
   return false;

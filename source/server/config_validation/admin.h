@@ -14,7 +14,7 @@ namespace Server {
  */
 class ValidationAdmin : public Admin {
 public:
-  bool addHandler(const std::string&, const std::string&, HandlerCb, bool) override;
+  bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::ListenSocket& socket() override;
 };
