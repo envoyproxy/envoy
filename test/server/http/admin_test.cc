@@ -185,21 +185,21 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   EXPECT_NE(-1, response.search(kEscapedPlanets.data(), kEscapedPlanets.size(), 0));
 }
 
-TEST(PrometheusStatsFormatter, PrometheusMetricName) {
+TEST(PrometheusStatsFormatter, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::prometheusMetricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }
 
-TEST(PrometheusStatsFormatter, FormatTagsForPrometheus) {
+TEST(PrometheusStatsFormatter, FormattedTags) {
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
   Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a_tag-value\",another_tag_name=\"another_tag-value\"";
-  auto actual = PrometheusStatsFormatter::formatTagsForPrometheus(tags);
+  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
+  auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
 }
 
