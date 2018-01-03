@@ -21,6 +21,7 @@ final version.
 * Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
 * Added native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
 * grpc-json: Added support inline descriptor in config.
+* Added support for listening for both IPv4 and IPv6 when binding to ::.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
