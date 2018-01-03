@@ -54,11 +54,12 @@ public:
   }
 
   void expectAdd(const std::string& listener_name, bool updated) {
-    EXPECT_CALL(listener_manager_, addOrUpdateListener(_))
-        .WillOnce(Invoke([listener_name, updated](const envoy::api::v2::Listener& config) -> bool {
-          EXPECT_EQ(listener_name, config.name());
-          return updated;
-        }));
+    EXPECT_CALL(listener_manager_, addOrUpdateListener(_, true))
+        .WillOnce(
+            Invoke([listener_name, updated](const envoy::api::v2::Listener& config, bool) -> bool {
+              EXPECT_EQ(listener_name, config.name());
+              return updated;
+            }));
   }
 
   void expectRequest() {

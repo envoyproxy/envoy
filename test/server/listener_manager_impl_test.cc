@@ -114,7 +114,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
@@ -127,7 +127,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBuffe
   )EOF";
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), true);
   EXPECT_EQ(1024 * 1024U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
 
@@ -141,7 +141,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLim
   )EOF";
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), true);
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
 
@@ -163,7 +163,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), true);
   EXPECT_NE(nullptr, manager_->listeners().back().get().defaultSslContext());
 }
 
@@ -176,7 +176,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
   }
   )EOF";
 
-  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(json)), Json::Exception);
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(json), true), Json::Exception);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
@@ -193,7 +193,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
   }
   )EOF";
 
-  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(json)), Json::Exception);
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(json), true), Json::Exception);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
@@ -210,7 +210,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromJson(json)),
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromJson(json), true),
                             EnvoyException,
                             "Didn't find a registered implementation for name: 'invalid'");
 }
@@ -245,7 +245,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   )EOF";
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, false));
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), true);
   manager_->listeners().front().get().listenerScope().counter("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("bar").value());
@@ -268,7 +268,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   ListenerHandle* listener_foo =
       expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), true));
   checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -289,7 +289,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Update foo listener, but with a different address. Should throw.
@@ -305,11 +305,51 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   ListenerHandle* listener_foo_different_address =
       expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_different_address_json)),
-      EnvoyException,
-      "error updating listener: 'foo' has a different address "
-      "'127.0.0.1:1235' from existing listener");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(
+                                parseListenerFromJson(listener_foo_different_address_json), true),
+                            EnvoyException,
+                            "error updating listener: 'foo' has a different address "
+                            "'127.0.0.1:1235' from existing listener");
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// Make sure that a listener that is not modifiable cannot be updated or removed.
+TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
+  InSequence s;
+
+  // Add foo listener.
+  const std::string listener_foo_json = R"EOF(
+  {
+    "name": "foo",
+    "address": "tcp://127.0.0.1:1234",
+    "filters": []
+  }
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), false));
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Update foo listener. Should be blocked.
+  const std::string listener_foo_update1_json = R"EOF(
+  {
+    "name": "foo",
+    "address": "tcp://127.0.0.1:1234",
+    "filters": [
+      { "type" : "read", "name" : "fake", "config" : {} }
+    ]
+  }
+  )EOF";
+
+  EXPECT_FALSE(
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json), false));
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Remove foo listener. Should be blocked.
+  EXPECT_FALSE(manager_->removeListener("foo"));
+  checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -328,11 +368,11 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Update duplicate should be a NOP.
-  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Update foo listener. Should share socket.
@@ -348,7 +388,8 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json)));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json), true));
   checkStats(1, 1, 0, 0, 1, 0);
 
   // Start workers.
@@ -358,7 +399,8 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   worker_->callAddCompletion(true);
 
   // Update duplicate should be a NOP.
-  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json)));
+  EXPECT_FALSE(
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json), true));
   checkStats(1, 1, 0, 0, 1, 0);
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
@@ -367,7 +409,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   worker_->callAddCompletion(true);
   checkStats(1, 2, 0, 0, 1, 1);
 
@@ -390,7 +432,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   ListenerHandle* listener_bar = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), true));
   EXPECT_EQ(2UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
@@ -407,12 +449,12 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   ListenerHandle* listener_baz = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_baz->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_json), true));
   EXPECT_EQ(2UL, manager_->listeners().size());
   checkStats(3, 2, 0, 1, 2, 0);
 
   // Update a duplicate baz that is currently warming.
-  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_json)));
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_json), true));
   checkStats(3, 2, 0, 1, 2, 0);
 
   // Update baz while it is warming.
@@ -432,7 +474,8 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
     listener_baz->target_.callback_();
   }));
   EXPECT_CALL(listener_baz_update1->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_update1_json)));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_update1_json), true));
   EXPECT_EQ(2UL, manager_->listeners().size());
   checkStats(3, 3, 0, 1, 2, 0);
 
@@ -470,7 +513,7 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   worker_->callAddCompletion(true);
   checkStats(1, 0, 0, 0, 1, 0);
 
@@ -486,7 +529,7 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false);
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   worker_->callAddCompletion(true);
   checkStats(2, 0, 1, 0, 1, 1);
 
@@ -515,7 +558,7 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   EXPECT_CALL(listener_factory_, createListenSocket(_, true))
       .WillOnce(Throw(EnvoyException("can't bind")));
   EXPECT_CALL(*listener_foo, onDestroy());
-  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)),
+  EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true),
                EnvoyException);
 }
 
@@ -536,7 +579,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   worker_->callAddCompletion(true);
   checkStats(1, 0, 0, 0, 1, 0);
 
@@ -588,7 +631,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(1, 0, 0, 1, 0, 0);
 
@@ -602,7 +645,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
   checkStats(2, 0, 1, 1, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _));
   listener_foo->target_.callback_();
@@ -623,7 +666,8 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true);
   EXPECT_CALL(listener_foo_update1->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json)));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json), true));
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(2, 1, 1, 1, 1, 0);
 
@@ -660,7 +704,7 @@ TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   ListenerHandle* listener_foo = expectListenerCreate(false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
@@ -684,7 +728,7 @@ TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   }
   )EOF";
 
-  manager_->addOrUpdateListener(parseListenerFromJson(json));
+  manager_->addOrUpdateListener(parseListenerFromJson(json), true);
   manager_->listeners().front().get().listenerScope().counter("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener.[__1]_10000.foo").value());
@@ -709,7 +753,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, false));
   EXPECT_CALL(listener_foo->target_, initialize(_));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json)));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), true));
 
   // Add bar with same non-binding address. Should fail.
   const std::string listener_bar_json = R"EOF(
@@ -724,7 +768,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   ListenerHandle* listener_bar = expectListenerCreate(true);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json)), EnvoyException,
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), true), EnvoyException,
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   // Move foo to active and then try to add again. This should still fail.
@@ -735,7 +779,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   listener_bar = expectListenerCreate(true);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json)), EnvoyException,
+      manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), true), EnvoyException,
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -777,7 +821,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithSingleFilterChain) {
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
@@ -833,7 +877,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoEqualFilterChains) {
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
@@ -890,7 +934,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
-  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
@@ -942,7 +986,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml)),
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': filter chains with mixed use "
                             "of Session Ticket Keys are currently not supported");
@@ -992,7 +1036,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml)),
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': use of different filter "
                             "chains is currently not supported");

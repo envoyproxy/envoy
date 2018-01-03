@@ -71,7 +71,8 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-                           const std::string& name, bool workers_started, uint64_t hash)
+                           const std::string& name, bool modifiable, bool workers_started,
+                           uint64_t hash)
     : parent_(parent),
       // TODO(htuch): Validate not pipe when doing v2.
       address_(
@@ -87,7 +88,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       use_original_dst_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
+      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
@@ -205,7 +206,8 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config) {
+bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
+                                              bool modifiable) {
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -218,18 +220,18 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
-  // Do a quick hash check to see if we have a duplicate before going further. This check needs
-  // to be done against both warming and active.
-  // TODO(mattklein123): In v2 move away from hashes and just do an explicit proto equality check.
+  // Do a quick blocked update check before going further. This check needs to be done against both
+  // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->hash() == hash) ||
+       (*existing_warming_listener)->blockUpdate(hash)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->hash() == hash)) {
-    ENVOY_LOG(debug, "duplicate listener '{}'. no add/update", name);
+       (*existing_active_listener)->blockUpdate(hash))) {
+    ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }
 
-  ListenerImplPtr new_listener(new ListenerImpl(config, *this, name, workers_started_, hash));
+  ListenerImplPtr new_listener(
+      new ListenerImpl(config, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
@@ -456,9 +458,11 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
-  if (existing_warming_listener == warming_listeners_.end() &&
-      existing_active_listener == active_listeners_.end()) {
-    ENVOY_LOG(debug, "unknown listener '{}'. no remove", name);
+  if ((existing_warming_listener == warming_listeners_.end() ||
+       (*existing_warming_listener)->blockRemove()) &&
+      (existing_active_listener == active_listeners_.end() ||
+       (*existing_active_listener)->blockRemove())) {
+    ENVOY_LOG(debug, "unknown/locked listener '{}'. no remove", name);
     return false;
   }
 
@@ -468,7 +472,7 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     warming_listeners_.erase(existing_warming_listener);
   }
 
-  // If there is an active listener
+  // If there is an active listener it needs to be moved to draining.
   if (existing_active_listener != active_listeners_.end()) {
     drainListener(std::move(*existing_active_listener));
     active_listeners_.erase(existing_active_listener);
