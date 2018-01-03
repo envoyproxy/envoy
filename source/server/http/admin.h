@@ -42,7 +42,7 @@ public:
 
   // Server::Admin
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  bool removable) override;
+                  bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
 
   // Network::FilterChainFactory
@@ -88,6 +88,7 @@ private:
     const std::string help_text_;
     const HandlerCb handler_;
     const bool removable_;
+    const bool mutates_server_state_;
   };
 
   /**
@@ -121,6 +122,8 @@ private:
   static std::string sanitizePrometheusName(const std::string& name);
   static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
   static std::string prometheusMetricName(const std::string& extractedName);
+
+  std::vector<const UrlHandler*> sortedHandlers() const;
 
   /**
    * URL handlers.
