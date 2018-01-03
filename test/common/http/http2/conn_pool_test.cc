@@ -126,6 +126,9 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   InSequence s;
   pool_.max_streams_ = 1;
 
+  // Test drain connections call prior to any connections being created.
+  pool_.drainConnections();
+
   expectClientCreate();
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
