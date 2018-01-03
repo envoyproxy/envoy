@@ -1,0 +1,134 @@
+{
+  "listeners": [
+    {
+      "address": "tcp://0.0.0.0:80",
+      "filters": [
+        {
+          "name": "http_connection_manager",
+          "config": {
+            "tracing": {
+              "operation_name": "ingress"
+            }, 
+            "codec_type": "auto",
+            "stat_prefix": "ingress_http",
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "service1",
+                  "domains": ["*"],
+                  "routes": [
+                    {
+                      "prefix": "/",
+                      "cluster": "local_service",
+                      "decorator": {
+                        "operation": "checkAvailability"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "name": "router",
+                "config": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "address": "tcp://0.0.0.0:9000",
+      "filters": [
+        {
+          "name": "http_connection_manager",
+          "config": {
+            "tracing": {
+              "operation_name": "egress"
+            }, 
+            "codec_type": "auto",
+            "stat_prefix": "egress_http",
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "service2",
+                  "domains": ["*"],
+                  "routes": [
+                    {
+                      "timeout_ms": 0,
+                      "prefix": "/trace/2",
+                      "cluster": "service2",
+                      "decorator": {
+                        "operation": "checkStock"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "name": "router",
+                "config": {}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tracing": {
+    "http": {
+      "driver": {
+        "type": "zipkin", 
+        "config": {
+          "collector_cluster": "zipkin",
+          "collector_endpoint": "/api/v1/spans"
+        }
+      }
+    }
+  }, 
+  "admin": {
+    "access_log_path": "/dev/null",
+    "address": "tcp://0.0.0.0:8001"
+  },
+  "cluster_manager": {
+    "clusters": [
+      {
+        "name": "local_service",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [
+          {
+            "url": "tcp://127.0.0.1:8080"
+          }
+        ]
+      },
+      {
+        "name": "service2",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "features": "http2",
+        "hosts": [
+          {
+            "url": "tcp://service2:80"
+          }
+        ]
+      },
+      {
+        "name": "zipkin", 
+        "connect_timeout_ms": 1000, 
+        "type": "strict_dns", 
+        "lb_type": "round_robin", 
+        "hosts": [
+          {
+            "url": "tcp://zipkin:9411"
+          }
+        ]
+      } 
+    ]
+  }
+}

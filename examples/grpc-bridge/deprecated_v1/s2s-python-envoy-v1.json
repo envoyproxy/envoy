@@ -1,0 +1,70 @@
+{
+  "listeners": [
+    {
+      "address": "tcp://127.0.0.1:9001",
+      "filters": [
+        {
+          "name": "http_connection_manager",
+          "config": {
+            "codec_type": "auto",
+            "add_user_agent": true,
+            "idle_timeout_s": 840,
+            "access_log": [
+              {
+                "path": "/var/log/envoy/egress_http.log"
+              }
+            ],
+            "stat_prefix": "egress_http",
+            "use_remote_address": true,
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "grpc",
+                  "domains": [
+                    "grpc"
+                  ],
+                  "routes": [
+                    {
+                      "prefix": "/",
+                      "cluster": "grpc"
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "name": "grpc_http1_bridge",
+                "config": {}
+              },
+              {
+                "name": "router",
+                "config": {}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "admin": {
+    "access_log_path": "/var/log/envoy/admin_access.log",
+    "address": "tcp://0.0.0.0:9901"
+  },
+  "cluster_manager": {
+    "clusters": [
+      {
+        "name": "grpc",
+        "type": "logical_dns",
+        "lb_type": "round_robin",
+        "connect_timeout_ms": 250,
+        "features": "http2",
+        "hosts": [
+          {
+            "url": "tcp://grpc:9211"
+          }
+        ]
+      }
+    ]
+  }
+}
