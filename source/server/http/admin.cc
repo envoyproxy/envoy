@@ -669,7 +669,6 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& resp
     // page from accidentally mutating all the server state by GETting all the hrefs.
     const char* link_format =
         handler->mutates_server_state_
-            //? "<button onclick='window.location.href=\"{}\"'>{}</button>"
             ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
             : "<a href='{}'>{}</a>";
     const std::string link = fmt::format(link_format, url, url);
