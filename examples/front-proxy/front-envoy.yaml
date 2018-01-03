@@ -1,42 +1,56 @@
 ---
-listeners:
-- address: tcp://0.0.0.0:80
-  filters:
-  - name: http_connection_manager
-    config:
-      codec_type: auto
-      stat_prefix: ingress_http
-      route_config:
-        virtual_hosts:
-        - name: backend
-          domains:
-          - "*"
-          routes:
-          - timeout_ms: 0
-            prefix: "/service/1"
-            cluster: service1
-          - timeout_ms: 0
-            prefix: "/service/2"
-            cluster: service2
-      filters:
-      - name: router
-        config: {}
-admin:
-  access_log_path: "/dev/null"
-  address: tcp://0.0.0.0:8001
-cluster_manager:
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 80
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: auto
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/service/1"
+                route:
+                  cluster: service1
+              - match:
+                  prefix: "/service/2"
+                route:
+                  cluster: service2
+          http_filters:
+          - name: envoy.router
+            config: {}
   clusters:
   - name: service1
-    connect_timeout_ms: 250
+    connect_timeout: 0.25s
     type: strict_dns
-    lb_type: round_robin
-    features: http2
+    lb_policy: round_robin
+    http2_protocol_options: {}
     hosts:
-    - url: tcp://service1:80
+    - socket_address:
+        address: service1
+        port_value: 80
   - name: service2
-    connect_timeout_ms: 250
+    connect_timeout: 0.25s
     type: strict_dns
-    lb_type: round_robin
-    features: http2
+    lb_policy: round_robin
+    http2_protocol_options: {}
     hosts:
-    - url: tcp://service2:80
+    - socket_address:
+        address: service2
+        port_value: 80
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001
