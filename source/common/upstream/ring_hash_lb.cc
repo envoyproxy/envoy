@@ -35,7 +35,7 @@ void RingHashLoadBalancer::initialize() {
 HostConstSharedPtr
 RingHashLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
   // Make sure we correctly return nullptr for any early chooseHost() calls.
-  if (per_priority_state_.size() == 0) {
+  if (per_priority_state_ == nullptr) {
     return nullptr;
   }
   // If there is no hash in the context, just choose a random value (this effectively becomes
@@ -48,27 +48,20 @@ RingHashLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context)
   const uint64_t h = hash.valid() ? hash.value() : random_.random();
 
   uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
-  if (per_priority_state_[priority]->global_panic_) {
+  if ((*per_priority_state_)[priority]->global_panic_) {
     stats_.lb_healthy_panic_.inc();
   }
-  return per_priority_state_[priority]->current_ring_->chooseHost(h);
+  return (*per_priority_state_)[priority]->current_ring_->chooseHost(h);
 }
 
 LoadBalancerPtr RingHashLoadBalancer::LoadBalancerFactoryImpl::create() {
   auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
-  std::vector<PerPriorityStatePtr> per_priority_state(per_priority_state_.size());
-
-  for (size_t i = 0; i < per_priority_state_.size(); ++i) {
-    per_priority_state[i].reset(new PerPriorityState);
-    per_priority_state[i]->current_ring_ = per_priority_state_[i]->current_ring_;
-    per_priority_state[i]->global_panic_ = per_priority_state_[i]->global_panic_;
-  }
 
   // We must protect current_ring_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
   std::shared_lock<std::shared_timed_mutex> lock(mutex_);
   lb->per_priority_load_ = per_priority_load_;
-  lb->per_priority_state_.swap(per_priority_state);
+  lb->per_priority_state_ = per_priority_state_;
 
   return lb;
 }
@@ -187,7 +180,8 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
 }
 
 void RingHashLoadBalancer::refresh() {
-  std::vector<PerPriorityStatePtr> per_priority_state(priority_set_.hostSetsPerPriority().size());
+  auto per_priority_state = std::make_shared<std::vector<PerPriorityStatePtr>>(
+      priority_set_.hostSetsPerPriority().size());
   auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
 
   // Note that we only compute global panic on host set refresh. Given that the runtime setting will
@@ -195,22 +189,22 @@ void RingHashLoadBalancer::refresh() {
   // need to create one per priority level.
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     uint32_t priority = host_set->priority();
-    per_priority_state[priority].reset(new PerPriorityState);
+    (*per_priority_state)[priority].reset(new PerPriorityState);
     if (isGlobalPanic(*host_set, runtime_)) {
-      per_priority_state[priority]->current_ring_ =
+      (*per_priority_state)[priority]->current_ring_ =
           std::make_shared<Ring>(config_, host_set->hosts());
-      per_priority_state[priority]->global_panic_ = true;
+      (*per_priority_state)[priority]->global_panic_ = true;
     } else {
-      per_priority_state[priority]->current_ring_ =
+      (*per_priority_state)[priority]->current_ring_ =
           std::make_shared<Ring>(config_, host_set->healthyHosts());
-      per_priority_state[priority]->global_panic_ = false;
+      (*per_priority_state)[priority]->global_panic_ = false;
     }
   }
 
   {
     std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
     factory_->per_priority_load_ = per_priority_load;
-    factory_->per_priority_state_.swap(per_priority_state);
+    factory_->per_priority_state_ = per_priority_state;
   }
 }
 

@@ -32,7 +32,6 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
   }
   // The percentages should always add up to 100 but we have to have a return for the compiler.
   NOT_REACHED;
-  return 0;
 }
 
 LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,

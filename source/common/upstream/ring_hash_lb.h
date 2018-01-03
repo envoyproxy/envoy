@@ -66,7 +66,7 @@ private:
 
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
-    std::vector<PerPriorityStatePtr> per_priority_state_;
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
 
@@ -83,7 +83,7 @@ private:
     // TOOD(mattklein123): Added GUARDED_BY(mutex_) to to the following variables. OSX clang
     // seems to not like them with shared mutexes so we need to ifdef them out on OSX. I don't
     // have time to do this right now.
-    std::vector<PerPriorityStatePtr> per_priority_state_;
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
     std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
