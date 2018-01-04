@@ -196,5 +196,23 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
 }
 
+TEST(PrometheusStatsFormatter, MetricName) {
+  std::string raw = "vulture.eats-liver";
+  std::string expected = "envoy_vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST(PrometheusStatsFormatter, FormattedTags) {
+  std::vector<Stats::Tag> tags;
+  Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
+  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
+  tags.push_back(tag1);
+  tags.push_back(tag2);
+  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
+  auto actual = PrometheusStatsFormatter::formattedTags(tags);
+  EXPECT_EQ(expected, actual);
+}
+
 } // namespace Server
 } // namespace Envoy

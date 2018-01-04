@@ -390,7 +390,8 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      AdminImpl::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(), response);
+      PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(),
+                                                  server_.stats().gauges(), response);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -400,40 +401,41 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
   return rc;
 }
 
-std::string AdminImpl::sanitizePrometheusName(const std::string& name) {
+std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), '.', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '-', '_');
   return stats_name;
 }
 
-std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& tags) {
+std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizePrometheusName(tag.name_),
-                              sanitizePrometheusName(tag.value_)));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
   return StringUtil::join(buf, ",");
 }
 
-std::string AdminImpl::prometheusMetricName(const std::string& extractedName) {
+std::string PrometheusStatsFormatter::metricName(const std::string& extractedName) {
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
-  return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName));
+  // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
+  return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
-void AdminImpl::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                  const std::list<Stats::GaugeSharedPtr>& gauges,
-                                  Buffer::Instance& response) {
+void PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                                 const std::list<Stats::GaugeSharedPtr>& gauges,
+                                                 Buffer::Instance& response) {
   for (const auto& counter : counters) {
-    const std::string tags = formatTagsForPrometheus(counter->tags());
-    const std::string metric_name = prometheusMetricName(counter->tagExtractedName());
+    const std::string tags = formattedTags(counter->tags());
+    const std::string metric_name = metricName(counter->tagExtractedName());
     response.add(fmt::format("# TYPE {0} counter\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
-    const std::string tags = formatTagsForPrometheus(gauge->tags());
-    const std::string metric_name = prometheusMetricName(gauge->tagExtractedName());
+    const std::string tags = formattedTags(gauge->tags());
+    const std::string metric_name = metricName(gauge->tagExtractedName());
     response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
