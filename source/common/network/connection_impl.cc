@@ -422,8 +422,8 @@ void ConnectionImpl::onReadReady() {
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
   if (result.bytes_processed_ != 0) {
-    // Connection close on OS X may produce a spurious read event with
-    // no data. Skip onRead if no bytes were processed.
+    // Skip onRead if no bytes were processed. For instance, if the connection was closed without
+    // producing more data.
     onRead(new_buffer_size);
   }
 
