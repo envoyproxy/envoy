@@ -9,7 +9,6 @@
 
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/exception.h"
-#include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -91,6 +90,7 @@ public:
 
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string&, uint64_t default_value) const override;
+  std::unordered_map<std::string, const Snapshot::Entry*> getAll() const override;
 
 private:
   struct Directory {
@@ -104,11 +104,6 @@ private:
     ~Directory() { closedir(dir_); }
 
     DIR* dir_;
-  };
-
-  struct Entry {
-    std::string string_value_;
-    Optional<uint64_t> uint_value_;
   };
 
   void walkDirectory(const std::string& path, const std::string& prefix);
@@ -188,6 +183,11 @@ private:
 
     uint64_t getInteger(const std::string&, uint64_t default_value) const override {
       return default_value;
+    }
+
+    std::unordered_map<std::string, const Snapshot::Entry*> getAll() const override {
+      std::unordered_map<std::string, const Snapshot::Entry*> entries;
+      return entries;
     }
 
     RandomGenerator& generator_;

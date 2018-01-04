@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"
@@ -174,17 +175,28 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   if (entry == values_.end()) {
     return EMPTY_STRING;
   } else {
-    return entry->second.string_value_;
+    return entry->second.string_value;
   }
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
   auto entry = values_.find(key);
-  if (entry == values_.end() || !entry->second.uint_value_.valid()) {
+  if (entry == values_.end() || !entry->second.uint_value.valid()) {
     return default_value;
   } else {
-    return entry->second.uint_value_.value();
+    return entry->second.uint_value.value();
   }
+}
+
+std::unordered_map<std::string, const Snapshot::Entry*> SnapshotImpl::getAll() const {
+  std::unordered_map<std::string, const Snapshot::Entry*> entries;
+  entries.reserve(values_.size());
+
+  for (auto& kv : values_) {
+    entries[kv.first] = &kv.second;
+  }
+
+  return entries;
 }
 
 void SnapshotImpl::walkDirectory(const std::string& path, const std::string& prefix) {
@@ -233,15 +245,15 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
         if (!line.empty() && line.at(0) == '#') {
           continue;
         }
-        entry.string_value_ += line + "\n";
+        entry.string_value += line + "\n";
       }
-      StringUtil::rtrim(entry.string_value_);
+      StringUtil::rtrim(entry.string_value);
 
       // As a perf optimization, attempt to convert the string into an integer. If we don't
       // succeed that's fine.
       uint64_t converted;
-      if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
-        entry.uint_value_.value(converted);
+      if (StringUtil::atoul(entry.string_value.c_str(), converted)) {
+        entry.uint_value.value(converted);
       }
 
       values_[full_prefix] = entry;

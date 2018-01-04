@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
+#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -36,6 +38,21 @@ typedef std::unique_ptr<RandomGenerator> RandomGeneratorPtr;
 class Snapshot {
 public:
   virtual ~Snapshot() {}
+
+  /**
+   * The raw data from a single snapshot key.
+   */
+  struct Entry {
+    /**
+     * The raw runtime data.
+     */
+    std::string string_value;
+
+    /**
+     * The possibly parsed integer value from the runtime data.
+     */
+    Optional<uint64_t> uint_value;
+  };
 
   /**
    * Test if a feature is enabled using the built in random generator. This is done by generating
@@ -96,6 +113,12 @@ public:
    * @return uint64_t the runtime value or the default value.
    */
   virtual uint64_t getInteger(const std::string& key, uint64_t default_value) const PURE;
+
+  /**
+   * Fetch the raw runtime entries map.
+   * @return std::unordered_map<std::string, const Entry*> the raw map of loaded runtime values.
+   */
+  virtual std::unordered_map<std::string, const Entry*> getAll() const PURE;
 };
 
 /**
