@@ -105,9 +105,11 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
       isContentTypeAllowed(headers) && isCacheControlAllowed(headers) && isEtagAllowed(headers) &&
       isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
       !headers.ContentEncoding()) {
+    // TODO(gsagula): tests needed.
     config_->disableVary()
         ? headers.removeVary()
         : headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
+
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
@@ -192,7 +194,7 @@ bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
     return !etag;
   }
 
-  // TODO(gsagula): do it efficiently.
+  // TODO(gsagula): tests needed / do it efficiently.
   if (etag && !etag->value().find("W/")) {
     std::string etag_str{"W/"};
     etag_str.append(etag->value().c_str());

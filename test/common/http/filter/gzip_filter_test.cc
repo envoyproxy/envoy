@@ -86,17 +86,17 @@ protected:
 // Default config values.
 TEST_F(GzipFilterTest, DefaultConfigValues) {
   setUpTest("{}");
-  EXPECT_EQ(8, config_->memoryLevel());
+  EXPECT_EQ(5, config_->memoryLevel());
   EXPECT_EQ(30, config_->minimumLength());
-  EXPECT_EQ(31, config_->windowBits());
+  EXPECT_EQ(28, config_->windowBits());
   EXPECT_EQ(false, config_->disableOnEtag());
   EXPECT_EQ(false, config_->disableOnLastModified());
+  EXPECT_EQ(false, config_->disableVary());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
-  EXPECT_EQ(0, config_->cacheControlValues().size());
-  EXPECT_EQ(0, config_->contentTypeValues().size());
+  EXPECT_EQ(8, config_->contentTypeValues().size());
 }
 
 // Bad configuration - memory_level is out of range.
@@ -176,6 +176,10 @@ TEST_F(GzipFilterTest, BadConfigContentTypeExceededLimit) {
       "content_type" : [
         "val1", "val2", "val3", "val4", "val5",
         "val6", "val7", "val8", "val9", "val10",
+        "val11", "val12", "val13", "val14", "val15",
+        "val16", "val17", "val18", "val19", "val20",
+        "val21", "val22", "val23", "val24", "val25",
+        "val26", "val27", "val28", "val29", "val30",
         "val11", "val12", "val13", "val14", "val15",
         "val16", "val17", "val18", "val19", "val20",
         "val21", "val22", "val23", "val24", "val25",
@@ -276,14 +280,6 @@ TEST_F(GzipFilterTest, ContentTypeNotSupported) {
       {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/jpeg"}});
 }
 
-// Content-Type allows all types.
-TEST_F(GzipFilterTest, ContentTypeAllowAll) {
-  setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  doResponseCompression(
-      {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/png"}});
-}
-
 // Content-Type contains paramater.
 TEST_F(GzipFilterTest, ContentTypeWithParameter) {
   setUpTest("{}");
@@ -304,10 +300,10 @@ TEST_F(GzipFilterTest, ContentTypeWithParameterAndSpace) {
 
 // Cache-Control is not in the white-list.
 TEST_F(GzipFilterTest, CacheControlNotAllowedValue) {
-  setUpTest(R"EOF({"cache_control": [ "no-cache", "no-store", "private" ] })EOF");
+  setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
-      {{":method", "get"}, {"content-length", "256"}, {"cache-control", "max-age=1234"}});
+      {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-transform"}});
 }
 
 // Cache-Control is not specified.
