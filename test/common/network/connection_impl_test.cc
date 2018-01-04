@@ -583,23 +583,26 @@ TEST_P(ConnectionImplTest, IgnoreEmptyReadTest) {
   setUpBasicConnection();
   connect();
 
+  // Write some data and verify that it appears at the read filter. Leave the buffer undrained.
   const int buffer_size = 32;
   Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
-  client_connection_->write(data);
-  client_connection_->close(ConnectionCloseType::FlushWrite);
-
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_))
       .Times(1)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
         EXPECT_EQ(buffer_size, data.length());
+        dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));
+  client_connection_->write(data);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  // Close the connection and verify that the undrained buffer is not passed to the read filter a
+  // second time.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-
+  client_connection_->close(ConnectionCloseType::NoFlush);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
