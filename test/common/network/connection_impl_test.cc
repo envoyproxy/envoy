@@ -581,7 +581,7 @@ TEST_P(ConnectionImplTest, ReadOnCloseTest) {
   setUpBasicConnection();
   connect();
 
-  // Close without flush will immediately invokes this callback.
+  // Close without flush immediately invokes this callback.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
 
   const int buffer_size = 32;
