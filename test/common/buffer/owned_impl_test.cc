@@ -17,7 +17,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, nullptr);
   Buffer::OwnedImpl buffer;
-  buffer.addBufferFragment(&frag);
+  buffer.addBufferFragment(frag);
   EXPECT_EQ(11, buffer.length());
 
   buffer.drain(11);
@@ -30,7 +30,7 @@ TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
     release_callback_called_ = true;
   });
   Buffer::OwnedImpl buffer;
-  buffer.addBufferFragment(&frag);
+  buffer.addBufferFragment(frag);
   EXPECT_EQ(11, buffer.length());
 
   buffer.drain(5);
@@ -55,7 +55,7 @@ TEST_F(OwnedImplTest, addBufferFragmentDynamicAllocation) {
       });
 
   Buffer::OwnedImpl buffer;
-  buffer.addBufferFragment(frag);
+  buffer.addBufferFragment(*frag);
   EXPECT_EQ(11, buffer.length());
 
   buffer.drain(5);

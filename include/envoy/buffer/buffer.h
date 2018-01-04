@@ -40,7 +40,7 @@ public:
   virtual void done() PURE;
 
 protected:
-  virtual ~BufferFragment(){};
+  virtual ~BufferFragment() {}
 };
 
 /**
@@ -62,7 +62,7 @@ public:
    * the fragment->data() is no longer needed, fragment->done() is called.
    * @param fragment the externally owned data to add to the buffer.
    */
-  virtual void addBufferFragment(BufferFragment* fragment) PURE;
+  virtual void addBufferFragment(BufferFragment& fragment) PURE;
 
   /**
    * Copy a string into the buffer.

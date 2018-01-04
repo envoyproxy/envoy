@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "common/common/non_copyable.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
@@ -14,7 +15,7 @@ namespace Buffer {
  * An implementation of BufferFragment where a releasor callback is called when the data is
  * no longer needed.
  */
-class BufferFragmentImpl : public BufferFragment {
+class BufferFragmentImpl : NonCopyable, public BufferFragment {
 public:
   /**
    * Creates a new wrapper around the externally owned <data> of size <size>.
@@ -25,21 +26,19 @@ public:
    * @param size size of data
    * @param releasor a callback function to be called when data is no longer needed.
    */
-  BufferFragmentImpl(const void* data, size_t size,
-                     std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor)
+  BufferFragmentImpl(
+      const void* data, size_t size,
+      const std::function<void(const void*, size_t, const BufferFragmentImpl*)>& releasor)
       : data_(data), size_(size), releasor_(releasor) {}
 
+  // Buffer::BufferFragment
   const void* data() const override { return data_; }
   size_t size() const override { return size_; }
-
   void done() override {
     if (releasor_) {
       releasor_(data_, size_, this);
     }
   }
-
-  BufferFragmentImpl(const BufferFragmentImpl&) = delete;
-  BufferFragmentImpl& operator=(const BufferFragmentImpl&) = delete;
 
 private:
   const void* const data_;
@@ -70,7 +69,7 @@ public:
 
   // LibEventInstance
   void add(const void* data, uint64_t size) override;
-  void addBufferFragment(BufferFragment* fragment) override;
+  void addBufferFragment(BufferFragment& fragment) override;
   void add(const std::string& data) override;
   void add(const Instance& data) override;
   void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
