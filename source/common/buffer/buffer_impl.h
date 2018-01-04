@@ -43,8 +43,8 @@ public:
 
 private:
   const void* const data_;
-  size_t size_;
-  std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
+  const size_t size_;
+  const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
 class LibEventInstance : public Instance {
