@@ -115,7 +115,7 @@ public:
   virtual uint64_t getInteger(const std::string& key, uint64_t default_value) const PURE;
 
   /**
-   * Fetch the raw runtime entries map.
+   * Fetch the raw runtime entries map. The map data is safe only for the lifetime of the Snapshot.
    * @return std::unordered_map<std::string, const Entry*> the raw map of loaded runtime values.
    */
   virtual std::unordered_map<std::string, const Entry*> getAll() const PURE;

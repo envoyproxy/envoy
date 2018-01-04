@@ -192,7 +192,7 @@ std::unordered_map<std::string, const Snapshot::Entry*> SnapshotImpl::getAll() c
   std::unordered_map<std::string, const Snapshot::Entry*> entries;
   entries.reserve(values_.size());
 
-  for (auto& kv : values_) {
+  for (const auto& kv : values_) {
     entries[kv.first] = &kv.second;
   }
 

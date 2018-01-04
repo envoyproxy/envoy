@@ -186,8 +186,7 @@ private:
     }
 
     std::unordered_map<std::string, const Snapshot::Entry*> getAll() const override {
-      std::unordered_map<std::string, const Snapshot::Entry*> entries;
-      return entries;
+      return std::unordered_map<std::string, const Snapshot::Entry*>();
     }
 
     RandomGenerator& generator_;
