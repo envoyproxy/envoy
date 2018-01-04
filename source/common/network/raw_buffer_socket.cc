@@ -78,7 +78,7 @@ std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
 TransportSocketPtr RawBufferSocketFactory::createTransportSocket() const {
-  return TransportSocketPtr{new RawBufferSocket};
+  return std::make_unique<RawBufferSocket>();
 }
 const std::string& RawBufferSocketFactory::httpScheme() const {
   return Http::Headers::get().SchemeValues.Http;

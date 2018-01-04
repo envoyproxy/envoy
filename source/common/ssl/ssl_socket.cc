@@ -309,7 +309,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(const ClientContextConfig& config
     : ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  return Network::TransportSocketPtr{new Ssl::SslSocket(*ssl_ctx_, Ssl::InitialState::Client)};
+  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Client);
 }
 
 const std::string& ClientSslSocketFactory::httpScheme() const {
