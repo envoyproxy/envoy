@@ -575,6 +575,34 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+// IgnoreEmptyReadTest verifies that the read filter's onData function
+// is not invoked on spurious read events due to connection
+// closure. This is known to occur on OS X, but only about once in 100
+// invocations of this test.
+TEST_P(ConnectionImplTest, IgnoreEmptyReadTest) {
+  setUpBasicConnection();
+  connect();
+
+  const int buffer_size = 32;
+  Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
+  client_connection_->write(data);
+  client_connection_->close(ConnectionCloseType::FlushWrite);
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_))
+      .Times(1)
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(buffer_size, data.length());
+        return FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 class ConnectionImplBytesSentTest : public testing::Test {
 public:
   ConnectionImplBytesSentTest() {
