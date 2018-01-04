@@ -28,10 +28,8 @@ public:
                      std::function<void(const void*, size_t)> releasor)
       : data_(data), size_(size), releasor_(releasor) {}
 
-  ~BufferFragmentImpl() override {}
-
-  const void* data() override { return data_; }
-  size_t size() override { return size_; }
+  const void* data() const override { return data_; }
+  size_t size() const override { return size_; }
 
   void done() override {
     if (releasor_) {
@@ -43,7 +41,7 @@ public:
   BufferFragmentImpl& operator=(const BufferFragmentImpl&) = delete;
 
 private:
-  const void* data_;
+  const void* const data_;
   size_t size_;
   std::function<void(const void*, size_t)> releasor_;
 };

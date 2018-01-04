@@ -26,14 +26,14 @@ class BufferFragment {
 public:
   virtual ~BufferFragment(){};
   /**
-   * @return a pointer to the referenced data.
+   * @return const void* a pointer to the referenced data.
    */
-  virtual const void* data() PURE;
+  virtual const void* data() const PURE;
 
   /**
-   * @return the size of the referenced data.
+   * @return size_t the size of the referenced data.
    */
-  virtual size_t size() PURE;
+  virtual size_t size() const PURE;
 
   /**
    * Called by a buffer when the refernced data is no longer needed.
