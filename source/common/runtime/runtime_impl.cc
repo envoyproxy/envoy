@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"
@@ -187,6 +188,10 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
+const std::unordered_map<std::string, const Snapshot::Entry>& SnapshotImpl::getAll() const {
+  return values_;
+}
+
 void SnapshotImpl::walkDirectory(const std::string& path, const std::string& prefix) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   Directory current_dir(path);
@@ -244,7 +249,10 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
         entry.uint_value_.value(converted);
       }
 
-      values_[full_prefix] = entry;
+      // Separate erase/insert calls required due to the value type being constant; this prevents
+      // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
+      values_.erase(full_prefix);
+      values_.insert({full_prefix, entry});
     }
   }
 }
