@@ -1,4 +1,3 @@
----
 admin:
   access_log_path: "/var/log/envoy/admin_access.log"
   address:
