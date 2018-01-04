@@ -436,6 +436,7 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_etag);
   JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_last_modified);
+  JSON_UTIL_SET_BOOL(json_config, proto_config, disable_vary);
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, content_length);
   JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);
@@ -444,11 +445,6 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
   for (const auto& json_content_type : json_config.getStringArray("content_type", true)) {
     auto* content_type = proto_config.mutable_content_type()->Add();
     *content_type = json_content_type;
-  }
-
-  for (const auto& json_cache_control : json_config.getStringArray("cache_control", true)) {
-    auto* cache_control = proto_config.mutable_cache_control()->Add();
-    *cache_control = json_cache_control;
   }
 
   const auto json_compression_level = json_config.getString("compression_level", "default");

@@ -293,6 +293,7 @@ private:
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \
+  HEADER_FUNC(Vary)                                                                                \
   HEADER_FUNC(XB3TraceId)                                                                          \
   HEADER_FUNC(XB3SpanId)                                                                           \
   HEADER_FUNC(XB3ParentSpanId)                                                                     \

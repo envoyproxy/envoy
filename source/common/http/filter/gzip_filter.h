@@ -9,6 +9,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_validator.h"
+#include "common/protobuf/protobuf.h"
 
 #include "api/filter/http/gzip.pb.h"
 
@@ -30,35 +31,37 @@ public:
   ZlibCompressionLevelEnum compressionLevel() const { return compression_level_; }
   ZlibCompressionStrategyEnum compressionStrategy() const { return compression_strategy_; }
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
-  const std::unordered_set<std::string>& cacheControlValues() const {
-    return cache_control_values_;
-  }
-  bool disableOnEtag() const { return etag_; }
-  bool disableOnLastModified() const { return last_modified_; }
-  uint64_t memoryLevel() const;
-  uint64_t minimumLength() const;
-  uint64_t windowBits() const;
+  bool disableOnEtag() const { return disable_on_etag_; }
+  bool disableOnLastModified() const { return disable_on_last_modified_; }
+  bool disableVary() const { return disable_vary_; }
+  uint64_t memoryLevel() const { return memory_level_; }
+  uint64_t minimumLength() const { return content_length_; }
+  uint64_t windowBits() const { return window_bits_; }
 
 private:
   static ZlibCompressionLevelEnum
   compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level);
   static ZlibCompressionStrategyEnum
   compressionStrategyEnum(const GzipV2CompressionStrategyEnum& compression_strategy);
+  static std::unordered_set<std::string>
+  contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
+
+  static uint64_t contentLengthUint(Protobuf::uint32 length);
+  static uint64_t memoryLevelUint(Protobuf::uint32 level);
+  static uint64_t windowBitsUint(Protobuf::uint32 window_bits);
 
   ZlibCompressionLevelEnum compression_level_;
   ZlibCompressionStrategyEnum compression_strategy_;
+
   int32_t content_length_;
   int32_t memory_level_;
   int32_t window_bits_;
-  std::unordered_set<std::string> cache_control_values_;
-  std::unordered_set<std::string> content_type_values_;
-  bool etag_;
-  bool last_modified_;
 
-  const static uint64_t DEFAULT_WINDOW_BITS;
-  const static uint64_t GZIP_HEADER_VALUE;
-  const static uint64_t MINIMUM_CONTENT_LENGTH;
-  const static uint64_t DEFAULT_MEMORY_LEVEL;
+  std::unordered_set<std::string> content_type_values_;
+
+  bool disable_on_etag_;
+  bool disable_on_last_modified_;
+  bool disable_vary_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;

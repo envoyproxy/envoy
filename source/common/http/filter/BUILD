@@ -81,6 +81,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
+        "//source/common/protobuf",
     ],
 )
 

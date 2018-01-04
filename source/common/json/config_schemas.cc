@@ -1080,6 +1080,11 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties" : {
+      "memory_level" : {
+        "type" : "integer",
+        "minimum" : 1,
+        "maximum" : 9
+      },
       "compression_level" : {
         "type" : "string",
         "enum" : ["best", "speed", "default"]
@@ -1087,17 +1092,6 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
       "compression_strategy" : {
         "type" : "string",
         "enum" : ["filtered", "huffman", "rle", "default"]
-      },
-      "disable_on_etag" : {
-        "type" : "boolean"
-      },
-      "disable_on_last_modified" : {
-        "type" : "boolean"
-      },
-      "memory_level" : {
-        "type" : "integer",
-        "minimum" : 1,
-        "maximum" : 9
       },
       "window_bits" : {
         "type" : "integer",
@@ -1108,23 +1102,17 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "integer",
         "minimum" : 30
       },
-      "cache_control" : {
+      "content_type" : {
         "type" : "array",
         "minItems" : 0,
-        "maxItems" : 10,
-        "uniqueItems" : true,
+        "maxItems" : 50,
         "items" : {
           "type": "string"
         }
       },
-      "content_type" : {
-        "type" : "array",
-        "minItems" : 0,
-        "maxItems" : 30,
-        "items" : {
-          "type": "string"
-        }
-      }
+      "disable_on_etag" : {"type" : "boolean"},
+      "disable_on_last_modified" : {"type" : "boolean"},
+      "disable_vary" : {"type" : "boolean"}
     },
     "additionalProperties" : false
   }
