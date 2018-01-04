@@ -116,7 +116,7 @@ public:
 
   /**
    * Fetch the raw runtime entries map. The map data is safe only for the lifetime of the Snapshot.
-   * @return std::unordered_map<std::string, const Entry*> the raw map of loaded runtime values.
+   * @return std::unordered_map<std::string, const Entry>& the raw map of loaded runtime values.
    */
   virtual const std::unordered_map<std::string, const Entry>& getAll() const PURE;
 };
