@@ -326,7 +326,8 @@ TEST(AddressFromSockAddr, IPv6) {
   EXPECT_EQ(IpVersion::v4, addressFromSockAddr(ss, sizeof(sockaddr_in6), false)->ip()->version());
   EXPECT_EQ("192.0.2.128:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6), false)->asString());
   EXPECT_EQ(IpVersion::v6, addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->ip()->version());
-  EXPECT_EQ("[::ffff:192.0.2.128]:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
+  EXPECT_EQ("[::ffff:192.0.2.128]:32000",
+            addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
 }
 
 TEST(AddressFromSockAddr, Pipe) {
