@@ -24,3 +24,12 @@ envoy_cc_test_library(
         "//conditions:default": ["//source/exe:sigaction_lib"],
     }),
 )
+
+sh_test(
+    name = "version_consistency_test",
+    srcs = ["version_consistency_test.sh"],
+    data = [
+        "//:RAW_RELEASE_NOTES.md",
+        "@envoy_api//:VERSION",
+    ],
+)
