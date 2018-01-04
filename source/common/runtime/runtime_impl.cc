@@ -249,6 +249,8 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
         entry.uint_value_.value(converted);
       }
 
+      // Separate erase/insert calls required due to the value type being constant; this prevents
+      // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
       values_.insert({full_prefix, entry});
     }
