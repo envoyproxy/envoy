@@ -1581,9 +1581,11 @@ public:
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
     client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
 
-    ClientSslSocketFactory ssl_socket_factory(*client_ctx_config_, *manager_, stats_store_);
-    client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, ssl_socket_factory.createTransportSocket());
+    client_ssl_socket_factory_.reset(
+        new ClientSslSocketFactory(*client_ctx_config_, *manager_, stats_store_));
+    client_connection_ =
+        dispatcher_->createClientConnection(socket_.localAddress(), source_address_,
+                                            client_ssl_socket_factory_->createTransportSocket());
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -1736,6 +1738,7 @@ public:
   Json::ObjectSharedPtr client_ctx_loader_;
   std::unique_ptr<ClientContextConfigImpl> client_ctx_config_;
   ClientContextPtr client_ctx_;
+  Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;
   NiceMock<Network::MockConnectionCallbacks> server_callbacks_;
