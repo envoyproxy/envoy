@@ -421,7 +421,11 @@ void ConnectionImpl::onReadReady() {
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
-  onRead(new_buffer_size);
+  if (result.bytes_processed_ != 0) {
+    // Connection close on OS X may produce a spurious read event with
+    // no data. Skip onRead if no bytes were processed.
+    onRead(new_buffer_size);
+  }
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close) {
