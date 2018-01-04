@@ -47,7 +47,7 @@ RingHashLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context)
   }
   const uint64_t h = hash.valid() ? hash.value() : random_.random();
 
-  uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
+  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
   if ((*per_priority_state_)[priority]->global_panic_) {
     stats_.lb_healthy_panic_.inc();
   }
@@ -63,7 +63,7 @@ LoadBalancerPtr RingHashLoadBalancer::LoadBalancerFactoryImpl::create() {
   lb->per_priority_load_ = per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
 
-  return lb;
+  return std::move(lb);
 }
 
 HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
