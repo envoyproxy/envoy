@@ -41,35 +41,6 @@ TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, AddBufferFragmentTwoBuffers) {
-  char input[] = "hello world";
-  BufferFragmentImpl frag(input, 11,
-                          [this](const void*, size_t) { release_callback_called_ = true; });
-  Buffer::OwnedImpl buffer1;
-  Buffer::OwnedImpl buffer2;
-  buffer1.addBufferFragment(&frag);
-
-  buffer2.addBufferFragment(&frag);
-  frag.incRef();
-
-  EXPECT_EQ(11, buffer1.length());
-  EXPECT_EQ(11, buffer2.length());
-
-  buffer1.drain(5);
-  buffer2.drain(5);
-  EXPECT_EQ(6, buffer1.length());
-  EXPECT_EQ(6, buffer2.length());
-  EXPECT_FALSE(release_callback_called_);
-
-  buffer1.drain(6);
-  EXPECT_EQ(0, buffer1.length());
-  EXPECT_FALSE(release_callback_called_);
-
-  buffer2.drain(6);
-  EXPECT_EQ(0, buffer2.length());
-  EXPECT_TRUE(release_callback_called_);
-}
-
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

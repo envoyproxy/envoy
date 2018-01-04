@@ -11,34 +11,30 @@ namespace Envoy {
 namespace Buffer {
 
 /**
- * An implementation of BufferFragment where a releasor callback is called when the ref count
- * becomes 0.
+ * An implementation of BufferFragment where a releasor callback is called when the data is
+ * no longer needed.
  */
 class BufferFragmentImpl : public BufferFragment {
 public:
   /**
-   * Creates a new wrapper around the externally owned <data> of size <size>. If non-empty,
-   * the releasor() is called when the ref count becomes 0. Ref count starts at 1 when the object
-   * is created.
+   * Creates a new wrapper around the externally owned <data> of size <size>.
    * The caller must ensure <data> is valid until releasor() is called, or for the lifetime of the
    * fragment.
    * @param data external data to reference
    * @param size size of data
-   * @param releasor a callback function to be called when data is no longer needed
+   * @param releasor a callback function to be called when data is no longer needed.
    */
   BufferFragmentImpl(const void* data, size_t size,
                      std::function<void(const void*, size_t)> releasor)
-      : data_(data), size_(size), ref_count_(1), releasor_(releasor) {}
+      : data_(data), size_(size), releasor_(releasor) {}
 
   ~BufferFragmentImpl() override {}
 
   const void* data() override { return data_; }
   size_t size() override { return size_; }
 
-  void incRef() override { ++ref_count_; }
-  void decRef() override {
-    --ref_count_;
-    if ((ref_count_ == 0) && (releasor_ != nullptr)) {
+  void done() override {
+    if (releasor_) {
       releasor_(data_, size_);
     }
   }
@@ -49,7 +45,6 @@ public:
 private:
   const void* data_;
   size_t size_;
-  int ref_count_;
   std::function<void(const void*, size_t)> releasor_;
 };
 

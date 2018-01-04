@@ -24,8 +24,7 @@ void OwnedImpl::add(const void* data, uint64_t size) { evbuffer_add(buffer_.get(
 void OwnedImpl::addBufferFragment(BufferFragment* fragment) {
   evbuffer_add_reference(
       buffer_.get(), fragment->data(), fragment->size(),
-      [](const void*, size_t, void* arg) { static_cast<BufferFragment*>(arg)->decRef(); },
-      fragment);
+      [](const void*, size_t, void* arg) { static_cast<BufferFragment*>(arg)->done(); }, fragment);
 }
 
 void OwnedImpl::add(const std::string& data) {

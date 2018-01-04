@@ -20,9 +20,7 @@ struct RawSlice {
 
 /**
  * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
- * When the buffer no longer needs the data passed in through a fragment, it calls decRef() on it.
- * Any implementation should ensure that the data() tied to a BufferFragment remains valid as long
- * it has > 0 ref count.
+ * When the buffer no longer needs the data passed in through a fragment, it calls done() on it.
  */
 class BufferFragment {
 public:
@@ -38,14 +36,9 @@ public:
   virtual size_t size() PURE;
 
   /**
-   * Increment the reference count for the data.
+   * Called by a buffer when the refernced data is no longer needed.
    */
-  virtual void incRef() PURE;
-
-  /**
-   * Decrement the reference count for the data.
-   */
-  virtual void decRef() PURE;
+  virtual void done() PURE;
 };
 
 /**
