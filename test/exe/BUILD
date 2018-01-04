@@ -17,12 +17,6 @@ sh_test(
     tags = ["no_asan"],
 )
 
-sh_test(
-    name = "show_version_test",
-    srcs = ["show_version_test.sh"],
-    data = ["//source/exe:envoy-static"],
-)
-
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
