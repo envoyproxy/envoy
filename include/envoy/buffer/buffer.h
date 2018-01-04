@@ -57,7 +57,7 @@ public:
 
   /**
    * Add externally owned data into the buffer. No copying is done. fragment is not owned. When
-   * the fragment->data() is no longer needed, fragment->decRef() is called.
+   * the fragment->data() is no longer needed, fragment->done() is called.
    * @param fragment the externally owned data to add to the buffer.
    */
   virtual void addBufferFragment(BufferFragment* fragment) PURE;
