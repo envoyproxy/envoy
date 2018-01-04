@@ -82,8 +82,8 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
-// Validate ThreadLocal::InstanceImpl's dispacher() behavior.
-TEST(ThreadLocalInstanceImplThreadedTest, All) {
+// Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
+TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
   Event::DispatcherImpl main_dispatcher;
   Event::DispatcherImpl thread_dispatcher;
