@@ -23,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AtMost;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -184,14 +185,37 @@ public:
     Network::ClientConnectionPtr client_connection =
         dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
     client_connection_ = client_connection.get();
+    client_connection_->addConnectionCallbacks(client_callbacks_);
+
     codec_ = new Http::MockClientConnection();
     client_.reset(new CodecClientForTest(std::move(client_connection), codec_, nullptr, host_));
+
+    int expected_callbacks = 2;
+
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           upstream_connection_ = std::move(conn);
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
-          dispatcher_->exit();
+
+          expected_callbacks--;
+          if (expected_callbacks == 0) {
+            dispatcher_->exit();
+          }
         }));
+
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(InvokeWithoutArgs([&]() -> void {
+          expected_callbacks--;
+          if (expected_callbacks == 0) {
+            dispatcher_->exit();
+          }
+        }));
+
+    // Since we mocked the connected event, we need to mock these close events even though we don't
+    // care about them in these tests.
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose)).Times(AtMost(1));
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose)).Times(AtMost(1));
+
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -227,8 +251,9 @@ protected:
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   Network::ConnectionPtr upstream_connection_;
-  testing::NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
+  NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
   Network::ClientConnection* client_connection_{};
+  NiceMock<Network::MockConnectionCallbacks> client_callbacks_;
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
   NiceMock<Http::MockStreamDecoder> outer_decoder_;
 };

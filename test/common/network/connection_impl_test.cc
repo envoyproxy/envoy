@@ -575,6 +575,57 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+// ReadOnCloseTest verifies that the read filter's onData function is invoked with available data
+// when the connection is closed.
+TEST_P(ConnectionImplTest, ReadOnCloseTest) {
+  setUpBasicConnection();
+  connect();
+
+  // Close without flush immediately invokes this callback.
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  const int buffer_size = 32;
+  Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
+  client_connection_->write(data);
+  client_connection_->close(ConnectionCloseType::NoFlush);
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_))
+      .Times(1)
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(buffer_size, data.length());
+        return FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// EmptyReadOnCloseTest verifies that the read filter's onData function is not invoked on empty
+// read events due to connection closure.
+TEST_P(ConnectionImplTest, EmptyReadOnCloseTest) {
+  setUpBasicConnection();
+  connect();
+
+  // Write some data and verify that the read filter's onData callback is invoked exactly once.
+  const int buffer_size = 32;
+  Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_))
+      .Times(1)
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        EXPECT_EQ(buffer_size, data.length());
+        dispatcher_->exit();
+        return FilterStatus::StopIteration;
+      }));
+  client_connection_->write(data);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  disconnect(true);
+}
+
 class ConnectionImplBytesSentTest : public testing::Test {
 public:
   ConnectionImplBytesSentTest() {
