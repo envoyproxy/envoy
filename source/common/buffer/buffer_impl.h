@@ -19,13 +19,14 @@ public:
   /**
    * Creates a new wrapper around the externally owned <data> of size <size>.
    * The caller must ensure <data> is valid until releasor() is called, or for the lifetime of the
-   * fragment.
+   * fragment. releasor() is called with <data>, <size> and <this> to allow caller to delete
+   * the fragment object.
    * @param data external data to reference
    * @param size size of data
    * @param releasor a callback function to be called when data is no longer needed.
    */
   BufferFragmentImpl(const void* data, size_t size,
-                     std::function<void(const void*, size_t)> releasor)
+                     std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor)
       : data_(data), size_(size), releasor_(releasor) {}
 
   const void* data() const override { return data_; }
@@ -33,7 +34,7 @@ public:
 
   void done() override {
     if (releasor_) {
-      releasor_(data_, size_);
+      releasor_(data_, size_, this);
     }
   }
 
@@ -43,7 +44,7 @@ public:
 private:
   const void* const data_;
   size_t size_;
-  std::function<void(const void*, size_t)> releasor_;
+  std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
 class LibEventInstance : public Instance {
