@@ -19,10 +19,34 @@ struct RawSlice {
 };
 
 /**
- * A callback invoked when the buffer no longer needs an externally owned
- * data. This should be used to free the memory if necessary.
+ * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
+ * When the buffer no longer needs the data passed in through a fragment, it calls decRef() on it.
+ * Any implementation should ensure that the data() tied to a BufferFragment remains valid as long
+ * it has > 0 ref count.
  */
-typedef void (*refReleaseCb)(const void*, size_t, void*);
+class BufferFragment {
+public:
+  virtual ~BufferFragment(){};
+  /**
+   * @return a pointer to the referenced data.
+   */
+  virtual const void* data() PURE;
+
+  /**
+   * @return the size of the referenced data.
+   */
+  virtual size_t size() PURE;
+
+  /**
+   * Increment the reference count for the data.
+   */
+  virtual void incRef() PURE;
+
+  /**
+   * Decrement the reference count for the data.
+   */
+  virtual void decRef() PURE;
+};
 
 /**
  * A basic buffer abstraction.
@@ -39,16 +63,11 @@ public:
   virtual void add(const void* data, uint64_t size) PURE;
 
   /**
-   * Add externally owned data to the buffer. Nothing is copied.
-   * The memory at <data> must be valid until all data has been read.
-   * <releaseCallback> is called when the memory is no longer needed by the buffer.
-   * @param data supplies a pointer to the externally owned data.
-   * @param releaseCallback a function to be called
-   * @param releaseArg optional argument passed to releaseCallback as <arg>.
-   * @param size supplies the size of the data.
+   * Add externally owned data into the buffer. No copying is done. fragment is not owned. When
+   * the fragment->data() is no longer needed, fragment->decRef() is called.
+   * @param fragment the externally owned data to add to the buffer.
    */
-  virtual void addReference(const void* data, uint64_t size, refReleaseCb releaseCallback,
-                            void* releaseArg) PURE;
+  virtual void addBufferFragment(BufferFragment* fragment) PURE;
 
   /**
    * Copy a string into the buffer.

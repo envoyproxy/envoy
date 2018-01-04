@@ -13,24 +13,23 @@ public:
   bool release_callback_called_ = false;
 };
 
-TEST_F(OwnedImplTest, AddReferenceNoCleanup) {
+TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
+  BufferFragmentImpl frag(input, 11, nullptr);
   Buffer::OwnedImpl buffer;
-  buffer.addReference(input, 11, nullptr, nullptr);
+  buffer.addBufferFragment(&frag);
   EXPECT_EQ(11, buffer.length());
 
   buffer.drain(11);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, AddReferenceWithCleanup) {
+TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
   char input[] = "hello world";
+  BufferFragmentImpl frag(input, 11,
+                          [this](const void*, size_t) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
-  buffer.addReference(input, 11,
-                      [](const void*, size_t, void* arg) {
-                        (static_cast<OwnedImplTest*>(arg))->release_callback_called_ = true;
-                      },
-                      this);
+  buffer.addBufferFragment(&frag);
   EXPECT_EQ(11, buffer.length());
 
   buffer.drain(5);
@@ -39,6 +38,35 @@ TEST_F(OwnedImplTest, AddReferenceWithCleanup) {
 
   buffer.drain(6);
   EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_F(OwnedImplTest, AddBufferFragmentTwoBuffers) {
+  char input[] = "hello world";
+  BufferFragmentImpl frag(input, 11,
+                          [this](const void*, size_t) { release_callback_called_ = true; });
+  Buffer::OwnedImpl buffer1;
+  Buffer::OwnedImpl buffer2;
+  buffer1.addBufferFragment(&frag);
+
+  buffer2.addBufferFragment(&frag);
+  frag.incRef();
+
+  EXPECT_EQ(11, buffer1.length());
+  EXPECT_EQ(11, buffer2.length());
+
+  buffer1.drain(5);
+  buffer2.drain(5);
+  EXPECT_EQ(6, buffer1.length());
+  EXPECT_EQ(6, buffer2.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer1.drain(6);
+  EXPECT_EQ(0, buffer1.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer2.drain(6);
+  EXPECT_EQ(0, buffer2.length());
   EXPECT_TRUE(release_callback_called_);
 }
 

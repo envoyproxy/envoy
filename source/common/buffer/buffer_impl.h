@@ -10,6 +10,49 @@
 namespace Envoy {
 namespace Buffer {
 
+/**
+ * An implementation of BufferFragment where a releasor callback is called when the ref count
+ * becomes 0.
+ */
+class BufferFragmentImpl : public BufferFragment {
+public:
+  /**
+   * Creates a new wrapper around the externally owned <data> of size <size>. If non-empty,
+   * the releasor() is called when the ref count becomes 0. Ref count starts at 1 when the object
+   * is created.
+   * The caller must ensure <data> is valid until releasor() is called, or for the lifetime of the
+   * fragment.
+   * @param data external data to reference
+   * @param size size of data
+   * @param releasor a callback function to be called when data is no longer needed
+   */
+  BufferFragmentImpl(const void* data, size_t size,
+                     std::function<void(const void*, size_t)> releasor)
+      : data_(data), size_(size), ref_count_(1), releasor_(releasor) {}
+
+  ~BufferFragmentImpl() override {}
+
+  const void* data() override { return data_; }
+  size_t size() override { return size_; }
+
+  void incRef() override { ++ref_count_; }
+  void decRef() override {
+    --ref_count_;
+    if ((ref_count_ == 0) && (releasor_ != nullptr)) {
+      releasor_(data_, size_);
+    }
+  }
+
+  BufferFragmentImpl(const BufferFragmentImpl&) = delete;
+  BufferFragmentImpl& operator=(const BufferFragmentImpl&) = delete;
+
+private:
+  const void* data_;
+  size_t size_;
+  int ref_count_;
+  std::function<void(const void*, size_t)> releasor_;
+};
+
 class LibEventInstance : public Instance {
 public:
   // Allows access into the underlying buffer for move() optimizations.
@@ -33,8 +76,7 @@ public:
 
   // LibEventInstance
   void add(const void* data, uint64_t size) override;
-  void addReference(const void* data, uint64_t size, refReleaseCb releaseCallback,
-                    void* releaseArg) override;
+  void addBufferFragment(BufferFragment* fragment) override;
   void add(const std::string& data) override;
   void add(const Instance& data) override;
   void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
