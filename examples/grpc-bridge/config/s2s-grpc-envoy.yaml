@@ -1,0 +1,45 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9211
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: auto
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                  headers:
+                  - name: content-type
+                    value: application/grpc
+                route:
+                  cluster: local_service_grpc
+          http_filters:
+          - name: envoy.router
+            config: {}
+  clusters:
+  - name: local_service_grpc
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: round_robin
+    http2_protocol_options: {}
+    hosts:
+    - socket_address:
+        address: 127.0.0.1
+        port_value: 8081
+admin:
+  access_log_path: "/var/log/envoy/admin_access.log"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901

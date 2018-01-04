@@ -116,12 +116,6 @@ private:
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats);
-  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                const std::list<Stats::GaugeSharedPtr>& gauges,
-                                Buffer::Instance& response);
-  static std::string sanitizePrometheusName(const std::string& name);
-  static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
-  static std::string prometheusMetricName(const std::string& extractedName);
 
   std::vector<const UrlHandler*> sortedHandlers() const;
 
@@ -202,6 +196,37 @@ private:
   AdminImpl& parent_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
+};
+
+/**
+ * Formatter for metric/labels exported to Prometheus.
+ *
+ * See: https://prometheus.io/docs/concepts/data_model
+ */
+class PrometheusStatsFormatter {
+public:
+  /**
+   * Extracts counters and gauges and relevant tags, appending them to
+   * the response buffer after sanitizing the metric / label names.
+   */
+  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                const std::list<Stats::GaugeSharedPtr>& gauges,
+                                Buffer::Instance& response);
+  /**
+   * Format the given tags, returning a string as a comma-separated list
+   * of <tag_name>="<tag_value>" pairs.
+   */
+  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
+  /**
+   * Format the given metric name, prefixed with "envoy_".
+   */
+  static std::string metricName(const std::string& extractedName);
+
+private:
+  /**
+   * Take a string and sanitize it according to Prometheus conventions.
+   */
+  static std::string sanitizeName(const std::string& name);
 };
 
 } // namespace Server
