@@ -17,6 +17,15 @@ sh_test(
     tags = ["no_asan"],
 )
 
+sh_test(
+    name = "version_out_test",
+    srcs = ["version_out_test.sh"],
+    data = [
+        "//source/exe:envoy-static",
+        "@envoy_api//:VERSION",
+    ],
+)
+
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
