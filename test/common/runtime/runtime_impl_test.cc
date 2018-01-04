@@ -142,19 +142,19 @@ TEST_F(RuntimeImplTest, GetAll) {
 
   auto entry = values.find("file1");
   EXPECT_FALSE(entry == values.end());
-  EXPECT_EQ("hello override", entry->second->string_value);
-  EXPECT_FALSE(entry->second->uint_value.valid());
+  EXPECT_EQ("hello override", entry->second.string_value_);
+  EXPECT_FALSE(entry->second.uint_value_.valid());
 
   entry = values.find("file2");
   EXPECT_FALSE(entry == values.end());
-  EXPECT_EQ("world", entry->second->string_value);
-  EXPECT_FALSE(entry->second->uint_value.valid());
+  EXPECT_EQ("world", entry->second.string_value_);
+  EXPECT_FALSE(entry->second.uint_value_.valid());
 
   entry = values.find("file3");
   EXPECT_FALSE(entry == values.end());
-  EXPECT_EQ("2", entry->second->string_value);
-  EXPECT_TRUE(entry->second->uint_value.valid());
-  EXPECT_EQ(2UL, entry->second->uint_value.value());
+  EXPECT_EQ("2", entry->second.string_value_);
+  EXPECT_TRUE(entry->second.uint_value_.valid());
+  EXPECT_EQ(2UL, entry->second.uint_value_.value());
 
   entry = values.find("invalid");
   EXPECT_TRUE(entry == values.end());

@@ -46,12 +46,12 @@ public:
     /**
      * The raw runtime data.
      */
-    std::string string_value;
+    std::string string_value_;
 
     /**
      * The possibly parsed integer value from the runtime data.
      */
-    Optional<uint64_t> uint_value;
+    Optional<uint64_t> uint_value_;
   };
 
   /**
@@ -118,7 +118,7 @@ public:
    * Fetch the raw runtime entries map. The map data is safe only for the lifetime of the Snapshot.
    * @return std::unordered_map<std::string, const Entry*> the raw map of loaded runtime values.
    */
-  virtual std::unordered_map<std::string, const Entry*> getAll() const PURE;
+  virtual const std::unordered_map<std::string, const Entry>& getAll() const PURE;
 };
 
 /**
