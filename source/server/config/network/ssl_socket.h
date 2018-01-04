@@ -9,7 +9,8 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
+ * Config registration for the SSL transport socket factory.
+ * @see TransportSocketConfigFactory.
  */
 class SslSocketConfigFactory : public virtual TransportSocketConfigFactory {
 public:

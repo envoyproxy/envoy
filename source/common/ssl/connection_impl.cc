@@ -13,13 +13,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                               Network::TransportSocketPtr{new SslSocket(ctx, state)},
                               using_original_dst, connected) {}
 
-ConnectionImpl::~ConnectionImpl() {
-  // Filters may care about whether this connection is an SSL connection or not in their
-  // destructors for stat reasons. We destroy the filters here vs. the base class destructors
-  // to make sure they have the chance to still inspect SSL specific data via virtual functions.
-  filter_manager_.destroyFilters();
-}
-
 ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher, Context& ctx,
                                            Network::Address::InstanceConstSharedPtr address,
                                            Network::Address::InstanceConstSharedPtr source_address)

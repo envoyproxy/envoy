@@ -18,10 +18,6 @@ ProtobufTypes::MessagePtr RawBufferSocketFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new ProtobufWkt::Empty};
 }
 
-// static Registry::RegisterFactory<DownstreamRawBufferSocketFactory,
-// DownstreamTransportSocketConfigFactory>
-//    downstream_registered_;
-
 static Registry::RegisterFactory<UpstreamRawBufferSocketFactory,
                                  UpstreamTransportSocketConfigFactory>
     upstream_registered_;

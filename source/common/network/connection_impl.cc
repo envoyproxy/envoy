@@ -115,6 +115,11 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
+
+  // Filters may care about whether this connection is an SSL connection or not in their
+  // destructors for stat reasons. We destroy the filters here vs. the base class destructors
+  // to make sure they have the chance to still inspect SSL specific data via virtual functions.
+  filter_manager_.destroyFilters();
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
@@ -532,10 +537,10 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
-    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& address,
+    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address, nullptr,
+    : ConnectionImpl(dispatcher, remote_address->socket(Address::SocketType::Stream), remote_address, nullptr,
                      source_address, std::move(transport_socket), false, false) {}
 
 } // namespace Network

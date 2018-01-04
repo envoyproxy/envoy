@@ -22,14 +22,6 @@ public:
                  Network::Address::InstanceConstSharedPtr local_address,
                  Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected, Context& ctx, InitialState state);
-  ~ConnectionImpl();
-
-  // Network::Connection
-  // TOOD(lizan): Consider move ssl() to transport socket.
-  Ssl::Connection* ssl() override { return dynamic_cast<SslSocket*>(transport_socket_.get()); }
-  const Ssl::Connection* ssl() const override {
-    return dynamic_cast<SslSocket*>(transport_socket_.get());
-  }
 };
 
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {

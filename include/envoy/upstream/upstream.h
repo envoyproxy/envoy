@@ -396,7 +396,7 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * @return Network::TransportSocketFactory& the factory of trasnprot socket to use when
+   * @return Network::TransportSocketFactory& the factory of transport socket to use when
    *         communicating with the cluster.
    */
   virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;

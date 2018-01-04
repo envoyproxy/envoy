@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/connection.h"
+#include "envoy/ssl/connection.h"
 
 namespace Envoy {
 namespace Network {
@@ -116,6 +117,16 @@ public:
    * Called when underlying transport is established.
    */
   virtual void onConnected() PURE;
+
+  /**
+   * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
+   */
+  virtual Ssl::Connection* ssl() PURE;
+
+  /**
+   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
+   */
+  virtual const Ssl::Connection* ssl() const PURE;
 };
 
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;

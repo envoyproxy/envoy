@@ -9,7 +9,8 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
+ * Config registration for the raw buffer transport socket factory.
+ * @see TransportSocketConfigFactory.
  */
 class RawBufferSocketFactory : public virtual TransportSocketConfigFactory {
 public:
@@ -21,8 +22,6 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
-// class DownstreamRawBufferSocketFactory : public DownstreamTransportSocketConfigFactory,
-//                                         public RawBufferSocketFactory {};
 class UpstreamRawBufferSocketFactory : public UpstreamTransportSocketConfigFactory,
                                        public RawBufferSocketFactory {};
 

@@ -24,7 +24,7 @@ public:
   virtual Ssl::ContextManager& sslContextManager() PURE;
 
   /**
-   * @return Stats::Scope& the tansprot socket's stats scope.
+   * @return Stats::Scope& the transport socket's stats scope.
    */
   virtual Stats::Scope& statsScope() const PURE;
 };
@@ -34,12 +34,15 @@ public:
   virtual ~TransportSocketConfigFactory() {}
 
   /**
-   * Create a particular transport socket factory implementation. If the implementation is unable
-   * to produce a factory with the provided parameters, it should throw an EnvoyException. The
-   * returned TransportSocketFactoryPtr should not be nullptr.
-   * @param config supplies the config for the transport socket implementation.
-   * @param context supplies the transport socket's context.
-   * @return Network::TransportSocketFactoryPtr the transport socket factory instance.
+   * Create a particular transport socket factory implementation.
+   * @param config const Protobuf::Message& supplies the config message for the transport socket
+   *        implementation.
+   * @param context TransportSocketFactoryContext&  supplies the transport socket's context.
+   * @return Network::TransportSocketFactoryPtr the transport socket factory instance. The returned
+   *         TransportSocketFactoryPtr should not be nullptr.
+   *
+   * @throw EnvoyException if the implementation is unable to produce a factory with the provided
+   *        parameters.
    */
   virtual Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
