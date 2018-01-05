@@ -1556,26 +1556,16 @@ TEST(RouterFilterUtilityTest, finalTimeout) {
   }
 }
 
-/*
 TEST(RouterFilterUtilityTest, setUpstreamScheme) {
-  {
-    Upstream::MockClusterInfo cluster;
-    Http::TestHeaderMapImpl headers;
-    EXPECT_CALL(cluster, sslContext()).WillOnce(Return(nullptr));
-    FilterUtility::setUpstreamScheme(headers, cluster);
-    EXPECT_EQ("http", headers.get_(":scheme"));
-  }
-
-  {
-    Upstream::MockClusterInfo cluster;
-    Ssl::MockClientContext context;
-    Http::TestHeaderMapImpl headers;
-    EXPECT_CALL(cluster, sslContext()).WillOnce(Return(&context));
-    FilterUtility::setUpstreamScheme(headers, cluster);
-    EXPECT_EQ("https", headers.get_(":scheme"));
-  }
+  std::string https = "https";
+  Upstream::MockClusterInfo cluster;
+  Network::MockTransportSocketFactory transport_socket_factory;
+  EXPECT_CALL(cluster, transportSocketFactory()).WillOnce(ReturnRef(transport_socket_factory));
+  EXPECT_CALL(transport_socket_factory, httpScheme()).WillOnce(ReturnRef(https));
+  Http::TestHeaderMapImpl headers;
+  FilterUtility::setUpstreamScheme(headers, cluster);
+  EXPECT_EQ("https", headers.get_(":scheme"));
 }
-*/
 
 TEST(RouterFilterUtilityTest, shouldShadow) {
   {

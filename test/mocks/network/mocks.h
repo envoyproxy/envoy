@@ -293,5 +293,14 @@ public:
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
 };
 
+class MockTransportSocketFactory : public TransportSocketFactory {
+public:
+  MockTransportSocketFactory();
+  ~MockTransportSocketFactory();
+
+  MOCK_CONST_METHOD0(httpScheme, std::string&());
+  MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
+};
+
 } // namespace Network
 } // namespace Envoy
