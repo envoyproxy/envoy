@@ -29,6 +29,7 @@ envoy_cc_library(
         ":context_lib",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",

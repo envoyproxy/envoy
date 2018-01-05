@@ -1,6 +1,9 @@
 #include "common/ssl/ssl_socket.h"
 
+#include <regex>
+
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
@@ -225,6 +228,30 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
   return Hex::encode(computed_hash);
+}
+
+std::string SslSocket::peerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr);
+  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1);
+  BUF_MEM* bio_buf = nullptr;
+  BIO_get_mem_ptr(buf.get(), &bio_buf);
+  RELEASE_ASSERT(bio_buf != nullptr);
+  RELEASE_ASSERT(bio_buf->data != nullptr);
+  RELEASE_ASSERT(bio_buf->length != 0);
+  std::string pem = std::string(bio_buf->data, bio_buf->length);
+  // URL encoding shortcut
+  pem = std::regex_replace(pem, std::regex("\n"), "%0A");
+  pem = std::regex_replace(pem, std::regex("="), "%3D");
+  pem = std::regex_replace(pem, std::regex(" "), "%20");
+  pem = std::regex_replace(pem, std::regex("\\+"), "%2B");
+  pem = std::regex_replace(pem, std::regex("/"), "%2F");
+  return pem;
 }
 
 std::string SslSocket::uriSanPeerCertificate() {
