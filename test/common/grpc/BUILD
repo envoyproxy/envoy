@@ -59,6 +59,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "google_grpc_test",
+    srcs = ["google_grpc_test.cc"],
+    external_deps = ["grpc"],
+)
+
+envoy_cc_test(
     name = "grpc_web_filter_test",
     srcs = ["grpc_web_filter_test.cc"],
     deps = [
