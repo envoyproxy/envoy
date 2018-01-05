@@ -26,6 +26,7 @@ public:
   std::string uriSanLocalCertificate() override;
   std::string sha256PeerCertificateDigest() override;
   std::string subjectPeerCertificate() const override;
+  std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() override;
 
   // Network::TransportSocket
@@ -43,6 +44,7 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   std::string getUriSanFromCertificate(X509* cert);
+  std::string getSubjectFromCertificate(X509* cert) const;
 
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImpl& ctx_;

@@ -248,17 +248,12 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string SslSocket::subjectPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return "";
-  }
-
+std::string SslSocket::getSubjectFromCertificate(X509* cert) const {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr);
 
   // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
-  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), 0 /* indent */, XN_FLAG_RFC2253);
+  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert), 0 /* indent */, XN_FLAG_RFC2253);
 
   const uint8_t* data;
   size_t data_len;
@@ -266,6 +261,14 @@ std::string SslSocket::subjectPeerCertificate() const {
   ASSERT(rc == 1);
   UNREFERENCED_PARAMETER(rc);
   return std::string(reinterpret_cast<const char*>(data), data_len);
+}
+
+std::string SslSocket::subjectPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+  return getSubjectFromCertificate(cert.get());
 }
 
 std::string SslSocket::uriSanPeerCertificate() {
@@ -302,6 +305,14 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
 
   sk_GENERAL_NAME_pop_free(altnames, GENERAL_NAME_free);
   return result;
+}
+
+std::string SslSocket::subjectLocalCertificate() const {
+  X509* cert = SSL_get_certificate(ssl_.get());
+  if (!cert) {
+    return "";
+  }
+  return getSubjectFromCertificate(cert);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,

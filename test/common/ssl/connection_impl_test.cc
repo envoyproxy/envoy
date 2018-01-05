@@ -39,8 +39,9 @@ namespace {
 
 void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_json,
               const std::string& expected_digest, const std::string& expected_uri,
-              const std::string& expected_stats, bool expect_success,
-              const Network::Address::IpVersion version) {
+              const std::string& expected_local_uri, const std::string& expected_subject,
+              const std::string& expected_local_subject, const std::string& expected_stats,
+              bool expect_success, const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
@@ -80,6 +81,15 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
             EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
           }
           EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
+          if (!expected_local_uri.empty()) {
+            EXPECT_EQ(expected_local_uri, server_connection->ssl()->uriSanLocalCertificate());
+          }
+          if (!expected_subject.empty()) {
+            EXPECT_EQ(expected_subject, server_connection->ssl()->subjectPeerCertificate());
+          }
+          if (!expected_local_subject.empty()) {
+            EXPECT_EQ(expected_local_subject, server_connection->ssl()->subjectLocalCertificate());
+          }
           server_connection->close(Network::ConnectionCloseType::NoFlush);
           client_connection->close(Network::ConnectionCloseType::NoFlush);
           dispatcher.exit();
@@ -245,8 +255,8 @@ TEST_P(SslConnectionImplTest, GetCertDigest) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json,
-           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "ssl.handshake",
-           true, GetParam());
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "", "", "",
+           "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetCertDigestServerCertWithoutCommonName) {
@@ -266,8 +276,8 @@ TEST_P(SslConnectionImplTest, GetCertDigestServerCertWithoutCommonName) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json,
-           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "ssl.handshake",
-           true, GetParam());
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "", "", "",
+           "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
@@ -287,8 +297,8 @@ TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "ssl.handshake",
-           true, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "",
+           "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {
@@ -308,7 +318,7 @@ TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {
   )EOF";
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.handshake", true, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, NoCert) {
@@ -326,7 +336,51 @@ TEST_P(SslConnectionImplTest, NoCert) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.no_certificate", true, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.no_certificate", true,
+           GetParam());
+}
+
+TEST_P(SslConnectionImplTest, GetUriWithLocalUriSan) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "spiffe://lyft.com/test-team", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
+TEST_P(SslConnectionImplTest, GetSubjectsWithBothCerts) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "require_client_certificate": true
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "",
+           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
+           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
+           "ssl.handshake", true, GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthCaVerificationNoClientCert) {
@@ -346,7 +400,8 @@ TEST_P(SslConnectionImplTest, FailedClientAuthCaVerificationNoClientCert) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_no_cert", false, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_no_cert", false,
+           GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthCaVerification) {
@@ -365,7 +420,8 @@ TEST_P(SslConnectionImplTest, FailedClientAuthCaVerification) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_error", false, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_error", false,
+           GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -385,7 +441,8 @@ TEST_P(SslConnectionImplTest, FailedClientAuthSanVerificationNoClientCert) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_no_cert", false, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_no_cert", false,
+           GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthSanVerification) {
@@ -405,7 +462,8 @@ TEST_P(SslConnectionImplTest, FailedClientAuthSanVerification) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_san", false, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_san", false,
+           GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthHashVerificationNoClientCert) {
@@ -425,7 +483,8 @@ TEST_P(SslConnectionImplTest, FailedClientAuthHashVerificationNoClientCert) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_no_cert", false, GetParam());
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_no_cert", false,
+           GetParam());
 }
 
 TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
@@ -445,7 +504,7 @@ TEST_P(SslConnectionImplTest, FailedClientAuthHashVerification) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "", "ssl.fail_verify_cert_hash", false,
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_cert_hash", false,
            GetParam());
 }
 
