@@ -11,11 +11,11 @@ namespace Configuration {
 Network::TransportSocketFactoryPtr
 RawBufferSocketFactory::createTransportSocketFactory(const Protobuf::Message&,
                                                      TransportSocketFactoryContext&) {
-  return Network::TransportSocketFactoryPtr{new Network::RawBufferSocketFactory};
+  return std::make_unique<Network::RawBufferSocketFactory>();
 }
 
 ProtobufTypes::MessagePtr RawBufferSocketFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new ProtobufWkt::Empty};
+  return std::make_unique<ProtobufWkt::Empty>();
 }
 
 static Registry::RegisterFactory<UpstreamRawBufferSocketFactory,

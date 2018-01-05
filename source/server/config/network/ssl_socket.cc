@@ -17,14 +17,14 @@ namespace Configuration {
 Network::TransportSocketFactoryPtr
 UpstreamSslSocketFactory::createTransportSocketFactory(const Protobuf::Message& message,
                                                        TransportSocketFactoryContext& context) {
-  return Network::TransportSocketFactoryPtr{new Ssl::ClientSslSocketFactory(
+  return std::make_unique<Ssl::ClientSslSocketFactory>(
       Ssl::ClientContextConfigImpl(
           MessageUtil::downcastAndValidate<const envoy::api::v2::UpstreamTlsContext&>(message)),
-      context.sslContextManager(), context.statsScope())};
+      context.sslContextManager(), context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::api::v2::UpstreamTlsContext};
+  return std::make_unique<envoy::api::v2::UpstreamTlsContext>();
 }
 
 static Registry::RegisterFactory<UpstreamSslSocketFactory, UpstreamTransportSocketConfigFactory>

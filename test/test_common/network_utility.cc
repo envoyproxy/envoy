@@ -162,7 +162,7 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
   throw EnvoyException(msg);
 }
 
-TransportSocketPtr createRawBufferSocket() { return TransportSocketPtr{new RawBufferSocket}; }
+TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
 
 } // namespace Test
 } // namespace Network

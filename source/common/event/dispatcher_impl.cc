@@ -73,8 +73,8 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::Address::InstanceConstSharedPtr source_address,
                                        Network::TransportSocketPtr&& transport_socket) {
   ASSERT(isThreadSafe());
-  return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(
-      *this, address, source_address, std::move(transport_socket))};
+  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
+                                                         std::move(transport_socket));
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
