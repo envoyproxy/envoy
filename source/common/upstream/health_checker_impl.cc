@@ -12,10 +12,12 @@
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codec_client.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -41,6 +43,13 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(const envoy::api::v2::Health
   case envoy::api::v2::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     return std::make_shared<RedisHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random,
                                                     Redis::ConnPool::ClientFactoryImpl::instance_);
+  case envoy::api::v2::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
+    if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
+      throw EnvoyException(fmt::format("{} cluster must support http2 for gRPC healthchecking",
+                                       cluster.info()->name()));
+    }
+    return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
+                                                       random);
   default:
     // TODO(htuch): This should be subsumed eventually by the constraint checking in #1308.
     throw EnvoyException("Health checker type not set");
@@ -584,6 +593,298 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
   values[0].asString() = "PING";
   request_.type(Redis::RespType::Array);
   request_.asArray().swap(values);
+}
+
+GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
+                                             const envoy::api::v2::HealthCheck& config,
+                                             Event::Dispatcher& dispatcher,
+                                             Runtime::Loader& runtime,
+                                             Runtime::RandomGenerator& random)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "grpc.health.v1.Health.Check")) {
+  if (!config.grpc_health_check().service_name().empty()) {
+    service_name_.value(config.grpc_health_check().service_name());
+  }
+}
+
+GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSession(
+    GrpcHealthCheckerImpl& parent, HostSharedPtr host)
+    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+
+GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
+  if (client_) {
+    // If there is an active request it will get reset, so make sure we ignore the reset.
+    expect_reset_ = true;
+    client_->close();
+  }
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
+    Http::HeaderMapPtr&& headers, bool end_stream) {
+  const auto http_response_status = Http::Utility::getResponseStatus(*headers);
+  if (http_response_status != enumToInt(Http::Code::OK)) {
+    // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
+    // grpc-status be used if available.
+    if (end_stream) {
+      auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
+      if (grpc_status.valid()) {
+        onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
+        return;
+      }
+    }
+    onRpcComplete(Grpc::Common::httpToGrpcStatus(http_response_status), "non-200 HTTP response",
+                  end_stream);
+    return;
+  }
+  if (!Grpc::Common::hasGrpcContentType(*headers)) {
+    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "invalid gRPC content-type", false);
+    return;
+  }
+  if (end_stream) {
+    // This is how, for instance, grpc-go signals about missing service - HTTP/2 200 OK with
+    // 'unimplemented' gRPC status.
+    auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
+    if (grpc_status.valid()) {
+      onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
+      return;
+    }
+    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "unexpected stream end", true);
+  }
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Instance& data,
+                                                                     bool end_stream) {
+  if (end_stream) {
+    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "unexpected stream end", true);
+    return;
+  }
+
+  // We should end up with only one frame here.
+  std::vector<Grpc::Frame> decoded_frames;
+  if (!decoder_.decode(data, decoded_frames)) {
+    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "gRPC wire protocol decode error", false);
+  }
+  for (auto& frame : decoded_frames) {
+    if (frame.length_ > 0) {
+      if (health_check_response_) {
+        // grpc.health.v1.Health.Check is unary RPC, so only one message is allowed.
+        onRpcComplete(Grpc::Status::GrpcStatus::Internal, "unexpected streaming", false);
+        return;
+      }
+      health_check_response_ = std::make_unique<grpc::health::v1::HealthCheckResponse>();
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+
+      if (frame.flags_ != Grpc::GRPC_FH_DEFAULT ||
+          !health_check_response_->ParseFromZeroCopyStream(&stream)) {
+        onRpcComplete(Grpc::Status::GrpcStatus::Internal, "invalid grpc.health.v1 RPC payload",
+                      false);
+        return;
+      }
+    }
+  }
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeTrailers(
+    Http::HeaderMapPtr&& trailers) {
+  auto maybe_grpc_status = Grpc::Common::getGrpcStatus(*trailers);
+  auto grpc_status =
+      maybe_grpc_status.valid() ? maybe_grpc_status.value() : Grpc::Status::GrpcStatus::Internal;
+  const std::string grpc_message =
+      maybe_grpc_status.valid() ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
+  onRpcComplete(grpc_status, grpc_message, true);
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    // For the raw disconnect event, we are either between intervals in which case we already have
+    // a timer setup, or we did the close or got a reset, in which case we already setup a new
+    // timer. There is nothing to do here other than blow away the client.
+    parent_.dispatcher_.deferredDelete(std::move(client_));
+  }
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
+  if (!client_) {
+    Upstream::Host::CreateConnectionData conn = host_->createConnection(parent_.dispatcher_);
+    client_ = parent_.createCodecClient(conn);
+    client_->addConnectionCallbacks(connection_callback_impl_);
+  }
+
+  request_encoder_ = &client_->newStream(*this);
+  request_encoder_->getStream().addCallbacks(*this);
+
+  auto headers_message = Grpc::Common::prepareHeaders(
+      parent_.cluster_.info()->name(), parent_.service_method_.service()->full_name(),
+      parent_.service_method_.name());
+  headers_message->headers().insertUserAgent().value().setReference(
+      Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
+
+  request_encoder_->encodeHeaders(headers_message->headers(), false);
+
+  if (request_encoder_ == nullptr) {
+    // Stream was synchronously reset inside encodeHeaders() - this can happen if GOAWAY has been
+    // received. Healthcheck error has already been reported by onResetStream() callback.
+    return;
+  }
+
+  grpc::health::v1::HealthCheckRequest request;
+  if (parent_.service_name_.valid())
+    request.set_service(parent_.service_name_.value());
+
+  request_encoder_->encodeData(*Grpc::Common::serializeBody(request), true);
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason) {
+  bool expect_reset = expect_reset_;
+  resetState();
+
+  if (expect_reset)
+    return;
+
+  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
+
+  // TODO(baranov1ch): according to all HTTP standards, we should check if reason is one of
+  // Http::StreamResetReason::RemoteRefusedStreamReset (which may mean GOAWAY),
+  // Http::StreamResetReason::RemoteReset or Http::StreamResetReason::ConnectionTermination (both
+  // mean connection close), check if connection is not fresh (was used for at least 1 request)
+  // and silently retry request on the fresh connection. This is also true for HTTP/1.1 healthcheck.
+  handleFailure(FailureType::Network);
+
+  if (client_) {
+    // Force connection close on healthcheck errors and timeouts.
+    // Rationale: healthcheck error may mean cluster host is going down gracefully. Technically (
+    // for google-written gRPC server libs), it means that host sends us GOAWAY and PING, waiting
+    // PING ACK to initiate real connection close. But nghttp2 does not respond to pings received
+    // after GOAWAY, and envoy does not handle remote-initiated GOAWAYs yet
+    // (https://github.com/nghttp2/nghttp2/issues/1103).
+    // Altogether, this results in us holding the connection, preventing gRPC server graceful
+    // shutdown until server close timeout expires (typically 1 minute). This is bad. It's better to
+    // drop connection in case of errors than to mess up backend graceful shutdown. Still, all
+    // successful checks will be performed on a single HTTP/2 connection.
+    client_->close();
+  }
+}
+
+bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
+    Grpc::Status::GrpcStatus grpc_status) const {
+  if (grpc_status != Grpc::Status::GrpcStatus::Ok)
+    return false;
+
+  if (!health_check_response_ ||
+      health_check_response_->status() != grpc::health::v1::HealthCheckResponse::SERVING) {
+    return false;
+  }
+
+  return true;
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
+    Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message, bool end_stream) {
+  logHealthCheckStatus(grpc_status, grpc_message);
+  if (isHealthCheckSucceeded(grpc_status)) {
+    handleSuccess();
+  } else {
+    handleFailure(FailureType::Active);
+  }
+
+  if (end_stream) {
+    resetState();
+  } else {
+    // resetState() will be called by onResetStream().
+    expect_reset_ = true;
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
+
+  if (!parent_.reuse_connection_)
+    client_->close();
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
+  expect_reset_ = false;
+  request_encoder_ = nullptr;
+  decoder_ = Grpc::Decoder();
+  health_check_response_.reset();
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
+  // There is a slight chance that |client_| will be null here - onInterval() did sync stream reset,
+  // and healthcheck failure, but the healthcheck timeout timer will still be started. If network
+  // connection will be closed during this time, GrpcActiveHealthCheckSession::onEvent will
+  // reset |client_|.
+  //
+  // The right thing to do in to make onInterval() signal to the caller that healthcheck has failed
+  // synchronously, so that timer is not even started.
+  //
+  // Background: before gRPC this was not a problem for HTTP/1.1 healthcheck - it was really hard
+  // to get sync stream reset before connection close. But in gRPC (i.e. HTTP/2) it is very simple -
+  // server signals GOAWAY, preventing well-behaving client from creating new streams. For envoy,
+  // (nghttp2) this practically means sync reset of all Http::StreamEncoder actions. But physically,
+  // HTTP/2 connection is going to be alive for some time.
+  //
+  // Bright side: as long as we drop the connection on healthcheck failures, this case should not
+  // fire.
+  if (client_) {
+    ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
+                   HostUtility::healthFlagsToString(*host_));
+  }
+
+  // Someone might guess, how it is possible not to have |request_encoder_| alive (which means there
+  // is no outstanding request) and still hit the timeout. Well, its *possible*. When calling
+  // onInterval(), any of Http::StreamEncoder::encodeHeaders/encodeData may synchronously reset
+  // stream, calling to our onResetStream, which will set |request_encoder_| to null. But as per
+  // above (about |client_| being null), the timeout timer will be started anyway.
+  if (request_encoder_) {
+    // resetState() will be called by onResetStream().
+    expect_reset_ = true;
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
+
+  if (client_) {
+    // Force connection close on healthcheck errors and timeouts.
+    // See onResetStream() for rationale.
+    client_->close();
+  }
+}
+
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
+    Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message) {
+  const char* service_status;
+  if (!health_check_response_) {
+    service_status = "rpc_error";
+  } else {
+    switch (health_check_response_->status()) {
+    case grpc::health::v1::HealthCheckResponse::SERVING:
+      service_status = "serving";
+      break;
+    case grpc::health::v1::HealthCheckResponse::NOT_SERVING:
+      service_status = "not_serving";
+      break;
+    case grpc::health::v1::HealthCheckResponse::UNKNOWN:
+      service_status = "unknown";
+      break;
+    default:
+      // Should not happen really, Protobuf should not parse undefined enums values.
+      NOT_REACHED;
+      break;
+    }
+  }
+  std::string grpc_status_message;
+  if (grpc_status != Grpc::Status::GrpcStatus::Ok && !grpc_message.empty()) {
+    grpc_status_message = fmt::format("{} ({})", grpc_status, grpc_message);
+  } else {
+    grpc_status_message = fmt::format("{}", grpc_status);
+  }
+  ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,
+                 grpc_status_message, service_status, HostUtility::healthFlagsToString(*host_));
+}
+
+Http::CodecClientPtr
+ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
+  return std::make_unique<Http::CodecClientProd>(
+      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_);
 }
 
 } // namespace Upstream

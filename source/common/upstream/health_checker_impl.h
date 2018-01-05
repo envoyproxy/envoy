@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/event/timer.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -17,9 +18,12 @@
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/logger.h"
+#include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/protobuf.h"
+
+#include "source/common/upstream/health.pb.h"
 
 #include "api/health_check.pb.h"
 
@@ -68,7 +72,7 @@ struct HealthCheckerStats {
 };
 
 /**
- * Base implementation for both the HTTP and TCP health checker.
+ * Base implementation for all health checkers.
  */
 class HealthCheckerImplBase : public HealthChecker,
                               protected Logger::Loggable<Logger::Id::hc>,
@@ -415,6 +419,88 @@ private:
   }
 
   Redis::ConnPool::ClientFactory& client_factory_;
+};
+
+/**
+ * gRPC health checker implementation.
+ */
+class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
+public:
+  GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                        Runtime::RandomGenerator& random);
+
+private:
+  struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
+                                        public Http::StreamDecoder,
+                                        public Http::StreamCallbacks {
+    GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, HostSharedPtr host);
+    ~GrpcActiveHealthCheckSession();
+
+    void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
+                       bool end_stream);
+    bool isHealthCheckSucceeded(Grpc::Status::GrpcStatus grpc_status) const;
+    void resetState();
+    void logHealthCheckStatus(Grpc::Status::GrpcStatus grpc_status,
+                              const std::string& grpc_message);
+
+    // ActiveHealthCheckSession
+    void onInterval() override;
+    void onTimeout() override;
+
+    // Http::StreamDecoder
+    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
+    void decodeData(Buffer::Instance&, bool end_stream) override;
+    void decodeTrailers(Http::HeaderMapPtr&&) override;
+
+    // Http::StreamCallbacks
+    void onResetStream(Http::StreamResetReason reason) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+
+    void onEvent(Network::ConnectionEvent event);
+
+    class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
+    public:
+      ConnectionCallbackImpl(GrpcActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Network::ConnectionCallbacks
+      void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
+      void onAboveWriteBufferHighWatermark() override {}
+      void onBelowWriteBufferLowWatermark() override {}
+
+    private:
+      GrpcActiveHealthCheckSession& parent_;
+    };
+
+    ConnectionCallbackImpl connection_callback_impl_{*this};
+    GrpcHealthCheckerImpl& parent_;
+    Http::CodecClientPtr client_;
+    Http::StreamEncoder* request_encoder_;
+    Grpc::Decoder decoder_;
+    std::unique_ptr<grpc::health::v1::HealthCheckResponse> health_check_response_;
+    bool expect_reset_ = false;
+  };
+
+  virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
+
+  // HealthCheckerImplBase
+  ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
+    return ActiveHealthCheckSessionPtr{new GrpcActiveHealthCheckSession(*this, host)};
+  }
+
+  const Protobuf::MethodDescriptor& service_method_;
+  Optional<std::string> service_name_;
+};
+
+/**
+ * Production implementation of the gRPC health checker that allocates a real codec client.
+ */
+class ProdGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
+public:
+  using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
+
+  // GrpcHealthCheckerImpl
+  Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 };
 
 } // namespace Upstream

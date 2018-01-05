@@ -134,6 +134,12 @@ public:
       callback->onBelowWriteBufferLowWatermark();
     }
   }
+
+  void runResetStreamCallbacks(StreamResetReason reason) {
+    for (auto* callback : callbacks_) {
+      callback->onResetStream(reason);
+    }
+  }
 };
 
 class MockStreamEncoder : public StreamEncoder {
