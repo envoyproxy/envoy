@@ -57,7 +57,7 @@ public:
   ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
   Network::TransportSocketPtr createTransportSocket() const override;
-  const std::string& httpScheme() const override;
+  bool implementsSecureTransport() const override;
 
 private:
   ClientContextPtr ssl_ctx_;

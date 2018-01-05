@@ -298,7 +298,7 @@ public:
   MockTransportSocketFactory();
   ~MockTransportSocketFactory();
 
-  MOCK_CONST_METHOD0(httpScheme, std::string&());
+  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
 };
 

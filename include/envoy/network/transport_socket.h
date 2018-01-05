@@ -139,9 +139,9 @@ public:
   virtual ~TransportSocketFactory() {}
 
   /**
-   * @return std::string the value to be used as :scheme header in a HTTP request
+   * @return bool whether the transport socket implements secure transport.
    */
-  virtual const std::string& httpScheme() const PURE;
+  virtual bool implementsSecureTransport() const PURE;
 
   /**
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.

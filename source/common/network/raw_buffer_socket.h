@@ -29,7 +29,7 @@ class RawBufferSocketFactory : public TransportSocketFactory {
 public:
   // Network::TransportSocketFactory
   TransportSocketPtr createTransportSocket() const override;
-  const std::string& httpScheme() const override;
+  bool implementsSecureTransport() const override;
 };
 
 } // namespace Network

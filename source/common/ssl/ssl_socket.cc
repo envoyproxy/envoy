@@ -312,9 +312,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() cons
   return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Client);
 }
 
-const std::string& ClientSslSocketFactory::httpScheme() const {
-  return Http::Headers::get().SchemeValues.Https;
-}
+bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 } // namespace Ssl
 } // namespace Envoy

@@ -81,8 +81,6 @@ TransportSocketPtr RawBufferSocketFactory::createTransportSocket() const {
   return std::make_unique<RawBufferSocket>();
 }
 
-const std::string& RawBufferSocketFactory::httpScheme() const {
-  return Http::Headers::get().SchemeValues.Http;
-}
+bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
 } // namespace Network
 } // namespace Envoy

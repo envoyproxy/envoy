@@ -35,7 +35,11 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
                                       const Upstream::ClusterInfo& cluster) {
-  headers.insertScheme().value().setReference(cluster.transportSocketFactory().httpScheme());
+  if (cluster.transportSocketFactory().implementsSecureTransport()) {
+    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
+  } else {
+    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
+  }
 }
 
 bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
