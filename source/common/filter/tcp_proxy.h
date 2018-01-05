@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/timer.h"
