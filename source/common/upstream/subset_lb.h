@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
