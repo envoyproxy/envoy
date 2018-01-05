@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 #include "envoy/router/router.h"
 
