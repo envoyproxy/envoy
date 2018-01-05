@@ -36,7 +36,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
     ASSERT(AF_INET6 == sin6->sin6_family);
     if (!v6only && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 #ifndef s6_addr32
-#if defined(__APPLE__) && defined(__MACH__)
+#ifdef __APPLE__
 #define s6_addr32 __u6_addr.__u6_addr32
 #endif
 #endif
