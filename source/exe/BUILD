@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/server/config/http:lua_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
+        "//source/server/config/stats:metrics_service_lib",
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:echo_lib",
         "//source/server/config/network:http_connection_manager_lib",
