@@ -21,15 +21,15 @@ namespace Envoy {
 namespace Stats {
 namespace Metrics {
 
-typedef std::unique_ptr<Grpc::AsyncClient<
-    envoy::api::v2::StreamMetricsMessage,
-    envoy::api::v2::StreamMetricsResponse>> GrpcMetricsServiceClientPtr;
+typedef std::unique_ptr<
+    Grpc::AsyncClient<envoy::api::v2::StreamMetricsMessage, envoy::api::v2::StreamMetricsResponse>>
+    GrpcMetricsServiceClientPtr;
 
 /**
  * Factory for creating a gRPC metrics service streaming client.
  */
 class GrpcMetricsServiceClientFactory {
- public:
+public:
   virtual ~GrpcMetricsServiceClientFactory() {}
 
   /**
@@ -38,8 +38,7 @@ class GrpcMetricsServiceClientFactory {
   virtual GrpcMetricsServiceClientPtr create() PURE;
 };
 
-typedef std::unique_ptr<GrpcMetricsServiceClientFactory>
-    GrpcMetricsServiceClientFactoryPtr;
+typedef std::unique_ptr<GrpcMetricsServiceClientFactory> GrpcMetricsServiceClientFactoryPtr;
 
 /**
  * Interface for metrics streamer. The streamer deals with threading and sends
@@ -47,7 +46,7 @@ typedef std::unique_ptr<GrpcMetricsServiceClientFactory>
  * on the correct stream.
  */
 class GrpcMetricsStreamer {
- public:
+public:
   virtual ~GrpcMetricsStreamer() {}
 
   /**
@@ -63,19 +62,17 @@ typedef std::shared_ptr<GrpcMetricsStreamer> GrpcMetricsStreamerSharedPtr;
  * Production implementation of GrpcAccessLogStreamer that supports per-thread
  * streams
  */
-class GrpcMetricsStreamerImpl : public Singleton::Instance,
-                                public GrpcMetricsStreamer {
- public:
+class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
+public:
   GrpcMetricsStreamerImpl(GrpcMetricsServiceClientFactoryPtr&& factory,
-                          ThreadLocal::SlotAllocator& tls,
-                          const LocalInfo::LocalInfo& local_info);
+                          ThreadLocal::SlotAllocator& tls, const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
   void send(envoy::api::v2::StreamMetricsMessage& message) override {
     tls_slot_->getTyped<ThreadLocalStreamer>().send(message);
   }
 
- private:
+private:
   /**
    * Shared state that is owned by the per-thread streamers. This allows the
    * main streamer/TLS
@@ -97,18 +94,16 @@ class GrpcMetricsStreamerImpl : public Singleton::Instance,
   /**
    * Per-thread stream state.
    */
-  struct ThreadLocalStream : public Grpc::AsyncStreamCallbacks<
-                                 envoy::api::v2::StreamMetricsResponse> {
+  struct ThreadLocalStream
+      : public Grpc::AsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse> {
     ThreadLocalStream(ThreadLocalStreamer& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
-    void onReceiveMessage(
-        std::unique_ptr<envoy::api::v2::StreamMetricsResponse>&&) override {}
+    void onReceiveMessage(std::unique_ptr<envoy::api::v2::StreamMetricsResponse>&&) override {}
     void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
-    void onRemoteClose(Grpc::Status::GrpcStatus status,
-                       const std::string& message) override;
+    void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
     ThreadLocalStreamer& parent_;
     Grpc::AsyncStream<envoy::api::v2::StreamMetricsMessage>* stream_{};
@@ -133,21 +128,17 @@ class GrpcMetricsStreamerImpl : public Singleton::Instance,
  * Per thread implementation of a Metric Service flusher.
  */
 class MetricsServiceSink : public Sink {
- public:
-  MetricsServiceSink(const LocalInfo::LocalInfo& local_info,
-                     const std::string& cluster_name,
-                     ThreadLocal::SlotAllocator& tls,
-                     Upstream::ClusterManager& cluster_manager,
-                     Stats::Scope& scope,
-                     GrpcMetricsStreamerSharedPtr grpc_metrics_streamer);
+public:
+  MetricsServiceSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                     Stats::Scope& scope, GrpcMetricsStreamerSharedPtr grpc_metrics_streamer);
 
   // MetricsService::Sink
   void beginFlush() override { message.clear_envoy_metrics(); }
 
   void flushCounter(const Counter& counter, uint64_t delta) override {
     std::cout << "Delta:" << delta << "\n";
-    io::prometheus::client::MetricFamily* metrics_family =
-        message.add_envoy_metrics();
+    io::prometheus::client::MetricFamily* metrics_family = message.add_envoy_metrics();
     metrics_family->set_name(counter.name());
     auto* metric = metrics_family->add_metric();
     auto* counter_metric = metric->mutable_counter();
@@ -155,8 +146,7 @@ class MetricsServiceSink : public Sink {
   }
 
   void flushGauge(const Gauge& gauge, uint64_t value) override {
-    io::prometheus::client::MetricFamily* metrics_family =
-        message.add_envoy_metrics();
+    io::prometheus::client::MetricFamily* metrics_family = message.add_envoy_metrics();
     metrics_family->set_name(gauge.name());
     auto* metric = metrics_family->add_metric();
     auto* gauage_metric = metric->mutable_gauge();
@@ -165,15 +155,13 @@ class MetricsServiceSink : public Sink {
 
   void endFlush() override { grpc_metrics_streamer_->send(message); }
 
-  void onHistogramComplete(const Histogram& histogram,
-                           uint64_t value) override {
+  void onHistogramComplete(const Histogram& histogram, uint64_t value) override {
     // TODO(ramaraochavali): Need to figure out how map existing histogram to
     // Proto Model
-    std::cout << "Histogram Called" << histogram.name() << "value:" << value
-              << "\n";
+    std::cout << "Histogram Called" << histogram.name() << "value:" << value << "\n";
   }
 
- private:
+private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::api::v2::StreamMetricsMessage message;
 
@@ -184,6 +172,6 @@ class MetricsServiceSink : public Sink {
   Stats::Counter& cx_overflow_stat_;
 };
 
-}  // namespace Metrics
-}  // namespace Stats
-}  // namespace Envoy
+} // namespace Metrics
+} // namespace Stats
+} // namespace Envoy
