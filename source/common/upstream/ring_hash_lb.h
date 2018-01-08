@@ -45,26 +45,29 @@ private:
   struct Ring {
     Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
          const std::vector<HostSharedPtr>& hosts);
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context,
-                                  Runtime::RandomGenerator& random) const;
+    HostConstSharedPtr chooseHost(uint64_t hash) const;
 
     std::vector<RingEntry> ring_;
   };
-
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 
+  struct PerPriorityState {
+    RingConstSharedPtr current_ring_;
+    bool global_panic_{};
+  };
+  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Runtime::RandomGenerator& random,
-                     const RingConstSharedPtr& ring, bool global_panic)
-        : stats_(stats), random_(random), ring_(ring), global_panic_(global_panic) {}
+    LoadBalancerImpl(ClusterStats& stats, Runtime::RandomGenerator& random)
+        : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
-    const RingConstSharedPtr ring_;
-    const bool global_panic_;
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
+    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
@@ -80,8 +83,9 @@ private:
     // TOOD(mattklein123): Added GUARDED_BY(mutex_) to to the following variables. OSX clang
     // seems to not like them with shared mutexes so we need to ifdef them out on OSX. I don't
     // have time to do this right now.
-    RingConstSharedPtr current_ring_;
-    bool global_panic_{};
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
+    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
+    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
 
   void refresh();

@@ -152,7 +152,6 @@ def _envoy_api_deps():
             actual = "@envoy_api//api:" + t + "_cc",
         )
     filter_bind_targets = [
-        "accesslog",
         "fault",
     ]
     for t in filter_bind_targets:
@@ -188,6 +187,10 @@ def _envoy_api_deps():
             name = "envoy_filter_network_" + t,
             actual = "@envoy_api//api/filter/network:" + t + "_cc",
         )
+    native.bind(
+        name = "envoy_filter_accesslog",
+        actual = "@envoy_api//api/filter/accesslog:accesslog_cc",
+    )
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",

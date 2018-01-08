@@ -3,12 +3,14 @@
 #include <functional>
 
 #include "envoy/config/subscription.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "api/base.pb.h"
@@ -42,18 +44,16 @@ public:
     std::unique_ptr<Subscription<ResourceType>> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
-    case envoy::api::v2::ConfigSource::kPath:
+    case envoy::api::v2::ConfigSource::kPath: {
+      Utility::checkFilesystemSubscriptionBackingPath(config.path());
       result.reset(
           new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(), stats));
       break;
+    }
     case envoy::api::v2::ConfigSource::kApiConfigSource: {
-      const auto& api_config_source = config.api_config_source();
-      if (api_config_source.cluster_name().size() != 1) {
-        // TODO(htuch): Add support for multiple clusters, #1170.
-        throw EnvoyException(
-            "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
-      }
-      const auto& cluster_name = api_config_source.cluster_name()[0];
+      const envoy::api::v2::ApiConfigSource& api_config_source = config.api_config_source();
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
+      const std::string& cluster_name = api_config_source.cluster_name()[0];
       switch (api_config_source.api_type()) {
       case envoy::api::v2::ApiConfigSource::REST_LEGACY:
         result.reset(rest_legacy_constructor());

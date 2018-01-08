@@ -150,7 +150,7 @@ public:
   static void exec(const std::vector<std::string>& args);
 
   /**
-   * Dumps the contents of the string into a tempoary file from temporaryDirectory() + filename.
+   * Dumps the contents of the string into a temporary file from temporaryDirectory() + filename.
    *
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.

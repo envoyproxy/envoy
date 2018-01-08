@@ -1,0 +1,51 @@
+admin:
+  access_log_path: "/var/log/envoy/admin_access.log"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 9001
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: auto
+          add_user_agent: true
+          idle_timeout: 0.840s
+          access_log:
+          - name: envoy.file_access_log
+            config:
+              path: "/var/log/envoy/egress_http.log"
+          stat_prefix: egress_http
+          use_remote_address: true
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: grpc
+              domains:
+              - grpc
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: grpc
+          http_filters:
+          - name: envoy.grpc_http1_bridge
+            config: {}
+          - name: envoy.router
+            config: {}
+  clusters:
+  - name: grpc
+    type: logical_dns
+    lb_policy: round_robin
+    connect_timeout: 0.250s
+    http_protocol_options: {}
+    hosts:
+    - socket_address:
+        address: grpc
+        port_value: 9211

@@ -854,7 +854,7 @@ TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   outlier_detector.runCallbacks(test_host);
   health_checker.runCallbacks(test_host, false);
 
-  EXPECT_CALL(*cp1, closeConnections());
+  EXPECT_CALL(*cp1, drainConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
 
@@ -862,8 +862,8 @@ TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
   cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High, nullptr);
 
-  EXPECT_CALL(*cp1, closeConnections());
-  EXPECT_CALL(*cp2, closeConnections());
+  EXPECT_CALL(*cp1, drainConnections());
+  EXPECT_CALL(*cp2, drainConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, true);
 

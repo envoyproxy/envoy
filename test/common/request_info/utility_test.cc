@@ -14,6 +14,8 @@ namespace Envoy {
 namespace RequestInfo {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
+  static_assert(ResponseFlag::LastFlag == 0x800, "A flag has been added. Fix this code.");
+
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
       std::make_pair(ResponseFlag::NoHealthyUpstream, "UH"),
@@ -28,10 +30,10 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::FaultInjected, "FI"),
       std::make_pair(ResponseFlag::RateLimited, "RL")};
 
-  for (const auto& testCase : expected) {
+  for (const auto& test_case : expected) {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(testCase.first)).WillByDefault(Return(true));
-    EXPECT_EQ(testCase.second, ResponseFlagUtils::toShortString(request_info));
+    ON_CALL(request_info, getResponseFlag(test_case.first)).WillByDefault(Return(true));
+    EXPECT_EQ(test_case.second, ResponseFlagUtils::toShortString(request_info));
   }
 
   // No flag is set.

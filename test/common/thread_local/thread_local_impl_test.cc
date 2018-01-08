@@ -1,3 +1,4 @@
+#include "common/event/dispatcher_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -22,7 +23,9 @@ public:
 class ThreadLocalInstanceImplTest : public testing::Test {
 public:
   ThreadLocalInstanceImplTest() {
+    EXPECT_CALL(main_dispatcher_, post(_));
     tls_.registerThread(main_dispatcher_, true);
+    EXPECT_CALL(thread_dispatcher_, post(_));
     tls_.registerThread(thread_dispatcher_, false);
   }
 
@@ -77,6 +80,35 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   EXPECT_CALL(object_ref4, onDestroy());
   EXPECT_CALL(object_ref3, onDestroy());
   tls_.shutdownThread();
+}
+
+// Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
+TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
+  InstanceImpl tls;
+  Event::DispatcherImpl main_dispatcher;
+  Event::DispatcherImpl thread_dispatcher;
+
+  tls.registerThread(main_dispatcher, true);
+  tls.registerThread(thread_dispatcher, false);
+
+  // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+  main_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  // Verify we have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+
+  Thread::Thread([&thread_dispatcher, &tls]() {
+    // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+    thread_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    // Verify we have the expected dispatcher for the new thread thread.
+    EXPECT_EQ(&thread_dispatcher, &tls.dispatcher());
+  })
+      .join();
+
+  // Verify we still have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
 }
 
 } // namespace ThreadLocal

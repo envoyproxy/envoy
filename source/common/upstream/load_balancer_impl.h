@@ -17,6 +17,13 @@ namespace Upstream {
  * Base class for all LB implementations.
  */
 class LoadBalancerBase {
+public:
+  // A utility function to chose a priority level based on a precomputed hash and
+  // a priority vector in the style of per_priority_load_
+  //
+  // Returns the priority, a number between 0 and per_priority_load.size()-1
+  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
+
 protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
@@ -28,7 +35,8 @@ protected:
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random);
 
-  const HostSet& chooseHostSet() { return *best_available_host_set_; }
+  // Choose host set randomly, based on the per_priority_load_;
+  const HostSet& chooseHostSet();
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
 
@@ -38,14 +46,15 @@ protected:
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
 
-private:
-  // The lowest priority host set from priority_set_ with healthy hosts, or the
-  // zero-priority host set if all host sets are fully unhealthy.
-  // This is updated as the hosts and healthy hosts in priority_set_ are updated
-  // but will never be null.
-  const HostSet* best_available_host_set_;
+  // Called when a host set at the given priority level is updated. This updates
+  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
+  // priority levels.
+  void recalculatePerPriorityState(uint32_t priority);
+
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
+  // The health (0-100) for each priority level.
+  std::vector<uint32_t> per_priority_health_;
 };
 
 /**

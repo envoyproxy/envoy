@@ -294,6 +294,7 @@ public:
   uint64_t features() const override { return features_; }
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
+  envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
   const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
@@ -327,6 +328,7 @@ private:
 
   Runtime::Loader& runtime_;
   const std::string name_;
+  const envoy::api::v2::Cluster::DiscoveryType type_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;

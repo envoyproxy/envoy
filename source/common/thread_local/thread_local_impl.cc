@@ -52,6 +52,8 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
     ASSERT(!containsReference(registered_threads_, dispatcher));
     registered_threads_.push_back(dispatcher);
   }
+
+  dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
 }
 
 void InstanceImpl::removeSlot(SlotImpl& slot) {
@@ -146,6 +148,11 @@ void InstanceImpl::shutdownThread() {
     it->reset();
   }
   thread_local_data_.data_.clear();
+}
+
+Event::Dispatcher& InstanceImpl::dispatcher() {
+  ASSERT(thread_local_data_.dispatcher_ != nullptr);
+  return *thread_local_data_.dispatcher_;
 }
 
 } // namespace ThreadLocal
