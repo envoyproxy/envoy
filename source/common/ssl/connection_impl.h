@@ -24,15 +24,5 @@ public:
                  bool connected, Context& ctx, InitialState state);
 };
 
-class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
-public:
-  ClientConnectionImpl(Event::Dispatcher& dispatcher, Context& ctx,
-                       Network::Address::InstanceConstSharedPtr address,
-                       Network::Address::InstanceConstSharedPtr source_address);
-
-  // Network::ClientConnection
-  void connect() override;
-};
-
 } // namespace Ssl
 } // namespace Envoy

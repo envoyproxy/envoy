@@ -13,13 +13,5 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                               Network::TransportSocketPtr{new SslSocket(ctx, state)},
                               using_original_dst, connected) {}
 
-ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher, Context& ctx,
-                                           Network::Address::InstanceConstSharedPtr address,
-                                           Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
-                     nullptr, source_address, false, false, ctx, InitialState::Client) {}
-
-void ClientConnectionImpl::connect() { doConnect(); }
-
 } // namespace Ssl
 } // namespace Envoy
