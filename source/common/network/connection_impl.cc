@@ -538,7 +538,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
-    const Network::Address::InstanceConstSharedPtr source_address,
+    const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket)
     : ConnectionImpl(dispatcher, remote_address->socket(Address::SocketType::Stream),
                      remote_address, nullptr, source_address, std::move(transport_socket), false,

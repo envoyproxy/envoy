@@ -168,7 +168,7 @@ class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnect
 public:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const Address::InstanceConstSharedPtr source_address,
+                       const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket);
 
   // Network::ClientConnection
