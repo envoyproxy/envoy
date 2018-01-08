@@ -66,15 +66,16 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                                Address::InstanceConstSharedPtr bind_to_address,
                                TransportSocketPtr&& transport_socket, bool using_original_dst,
                                bool connected)
-    : filter_manager_(*this, *this), remote_address_(remote_address),
+    : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
+      remote_address_(remote_address),
       local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
                                                 : local_address),
 
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      transport_socket_(std::move(transport_socket)), dispatcher_(dispatcher), fd_(fd),
-      id_(++next_global_id_), using_original_dst_(using_original_dst) {
+      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
+      using_original_dst_(using_original_dst) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -115,11 +116,6 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
-
-  // Filters may care about whether this connection is an SSL connection or not in their
-  // destructors for stat reasons. We destroy the filters here vs. the base class destructors
-  // to make sure they have the chance to still inspect SSL specific data via virtual functions.
-  filter_manager_.destroyFilters();
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {

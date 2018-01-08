@@ -117,6 +117,7 @@ protected:
   void onLowWatermark();
   void onHighWatermark();
 
+  TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
@@ -125,7 +126,6 @@ protected:
   // a generic pointer.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
-  TransportSocketPtr transport_socket_;
 
 private:
   void onFileEvent(uint32_t events);
