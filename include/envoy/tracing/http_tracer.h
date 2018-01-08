@@ -102,7 +102,7 @@ public:
   virtual ~HttpTracer() {}
 
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                            const AccessLog::RequestInfo& request_info) PURE;
+                            const RequestInfo::RequestInfo& request_info) PURE;
 };
 
 typedef std::unique_ptr<HttpTracer> HttpTracerPtr;

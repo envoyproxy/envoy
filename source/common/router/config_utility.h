@@ -11,6 +11,7 @@
 #include "common/common/empty_string.h"
 #include "common/config/rds_json.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "api/rds.pb.h"
@@ -44,20 +45,55 @@ public:
     const bool is_regex_;
   };
 
+  // A QueryParameterMatcher specifies one "name" or "name=value" element
+  // to match in a request's query string. It is the optimized, runtime
+  // equivalent of the QueryParameterMatcher proto in the RDS v2 API.
+  class QueryParameterMatcher {
+  public:
+    QueryParameterMatcher(const envoy::api::v2::QueryParameterMatcher& config)
+        : name_(config.name()), value_(config.value()),
+          regex_pattern_(value_, std::regex::optimize),
+          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {}
+
+    /**
+     * Check if the query parameters for a request contain a match for this
+     * QueryParameterMatcher.
+     * @param request_query_params supplies the parsed query parameters from a request.
+     * @return bool true if a match for this QueryParameterMatcher exists in request_query_params.
+     */
+    bool matches(const Http::Utility::QueryParams& request_query_params) const;
+
+  private:
+    const std::string name_;
+    const std::string value_;
+    const std::regex regex_pattern_;
+    const bool is_regex_;
+  };
+
   /**
    * @return the resource priority parsed from proto.
    */
   static Upstream::ResourcePriority parsePriority(const envoy::api::v2::RoutingPriority& priority);
 
   /**
-   * See if the specified headers are present in the request headers.
-   * @param headers supplies the list of headers to match
-   * @param request_headers supplies the list of request headers to compare against search_list
-   * @return true all the headers (and values) in the search_list set are found in the
-   * request_headers
+   * See if the headers specified in the config are present in a request.
+   * @param request_headers supplies the headers from the request.
+   * @param config_headers supplies the list of configured header conditions on which to match.
+   * @return bool true if all the headers (and values) in the config_headers are found in the
+   *         request_headers
    */
-  static bool matchHeaders(const Http::HeaderMap& headers,
-                           const std::vector<HeaderData>& request_headers);
+  static bool matchHeaders(const Http::HeaderMap& request_headers,
+                           const std::vector<HeaderData>& config_headers);
+
+  /**
+   * See if the query parameters specified in the config are present in a request.
+   * @param query_params supplies the query parameters from the request's query string.
+   * @param config_params supplies the list of configured query param conditions on which to match.
+   * @return bool true if all the query params (and values) in the config_params are found in the
+   *         query_params
+   */
+  static bool matchQueryParams(const Http::Utility::QueryParams& query_params,
+                               const std::vector<QueryParameterMatcher>& config_query_params);
 
   /**
    * Returns the redirect HTTP Status Code enum parsed from proto.

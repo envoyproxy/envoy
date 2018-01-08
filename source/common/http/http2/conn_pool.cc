@@ -19,19 +19,21 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
     : dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
-  closeConnections();
-
-  // Make sure all clients are destroyed before we are destroyed.
-  dispatcher_.clearDeferredDeleteList();
-}
-
-void ConnPoolImpl::ConnPoolImpl::closeConnections() {
   if (primary_client_) {
     primary_client_->client_->close();
   }
 
   if (draining_client_) {
     draining_client_->client_->close();
+  }
+
+  // Make sure all clients are destroyed before we are destroyed.
+  dispatcher_.clearDeferredDeleteList();
+}
+
+void ConnPoolImpl::ConnPoolImpl::drainConnections() {
+  if (primary_client_ != nullptr) {
+    movePrimaryClientToDraining();
   }
 }
 

@@ -77,8 +77,8 @@ public:
   ~MockAdmin();
 
   // Server::Admin
-  MOCK_METHOD4(addHandler, bool(const std::string& prefix, const std::string& help_text,
-                                HandlerCb callback, bool removable));
+  MOCK_METHOD5(addHandler, bool(const std::string& prefix, const std::string& help_text,
+                                HandlerCb callback, bool removable, bool mutates_server_state));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::ListenSocket&());
 };
@@ -163,7 +163,7 @@ public:
   MockListenerManager();
   ~MockListenerManager();
 
-  MOCK_METHOD1(addOrUpdateListener, bool(const envoy::api::v2::Listener& config));
+  MOCK_METHOD2(addOrUpdateListener, bool(const envoy::api::v2::Listener& config, bool modifiable));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Listener>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));

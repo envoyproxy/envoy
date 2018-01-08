@@ -65,6 +65,26 @@ public:
 };
 
 /**
+ * Class used for creating non-copying std::istream's. See InputConstMemoryStream below.
+ */
+class ConstMemoryStreamBuffer : public std::streambuf {
+public:
+  ConstMemoryStreamBuffer(const char* data, size_t size);
+};
+
+/**
+ * std::istream class similar to std::istringstream, except that it provides a view into a region of
+ * constant memory. It can be more efficient than std::istringstream because it doesn't copy the
+ * provided string.
+ *
+ * See https://stackoverflow.com/a/13059195/4447365.
+ */
+class InputConstMemoryStream : public virtual ConstMemoryStreamBuffer, public std::istream {
+public:
+  InputConstMemoryStream(const char* data, size_t size);
+};
+
+/**
  * Utility class for date/time helpers.
  */
 class DateUtil {
@@ -104,10 +124,11 @@ public:
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
-   * @param out_len supplies the length of the output buffer. Must be >= 21.
+   * @param out_len supplies the length of the output buffer. Must be >= MIN_ITOA_OUT_LEN.
    * @param i supplies the number to convert.
    * @return the size of the string, not including the null termination.
    */
+  static constexpr size_t MIN_ITOA_OUT_LEN = 21;
   static uint32_t itoa(char* out, size_t out_len, uint64_t i);
 
   /**

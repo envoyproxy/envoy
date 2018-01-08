@@ -137,6 +137,7 @@ envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
     deps = [
+        "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",

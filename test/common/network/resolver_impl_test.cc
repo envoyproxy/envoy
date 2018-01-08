@@ -51,13 +51,32 @@ TEST(ResolverTest, FromProtoAddress) {
   EXPECT_EQ("1.2.3.4:5", resolveProtoAddress(ipv4_address)->asString());
 
   envoy::api::v2::Address ipv6_address;
-  ipv4_address.mutable_socket_address()->set_address("1::1");
-  ipv4_address.mutable_socket_address()->set_port_value(2);
-  EXPECT_EQ("[1::1]:2", resolveProtoAddress(ipv4_address)->asString());
+  ipv6_address.mutable_socket_address()->set_address("1::1");
+  ipv6_address.mutable_socket_address()->set_port_value(2);
+  EXPECT_EQ("[1::1]:2", resolveProtoAddress(ipv6_address)->asString());
 
   envoy::api::v2::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("/foo/bar");
   EXPECT_EQ("/foo/bar", resolveProtoAddress(pipe_address)->asString());
+}
+
+// Validate correct handling of ipv4_compat field.
+TEST(ResolverTest, FromProtoAddressV4Compat) {
+  {
+    envoy::api::v2::Address ipv6_address;
+    ipv6_address.mutable_socket_address()->set_address("1::1");
+    ipv6_address.mutable_socket_address()->set_port_value(2);
+    auto resolved_addr = resolveProtoAddress(ipv6_address);
+    EXPECT_EQ("[1::1]:2", resolved_addr->asString());
+  }
+  {
+    envoy::api::v2::Address ipv6_address;
+    ipv6_address.mutable_socket_address()->set_address("1::1");
+    ipv6_address.mutable_socket_address()->set_port_value(2);
+    ipv6_address.mutable_socket_address()->set_ipv4_compat(true);
+    auto resolved_addr = resolveProtoAddress(ipv6_address);
+    EXPECT_EQ("[1::1]:2", resolved_addr->asString());
+  }
 }
 
 class TestResolver : public Resolver {

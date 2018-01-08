@@ -20,18 +20,36 @@ using testing::AssertionSuccess;
 namespace Envoy {
 namespace {
 
+const std::string config = R"EOF(
+dynamic_resources:
+  lds_config: {ads: {}}
+  cds_config: {ads: {}}
+  ads_config:
+    api_type: GRPC
+    cluster_name: [ads_cluster]
+static_resources:
+  clusters:
+    name: ads_cluster
+    connect_timeout: { seconds: 5 }
+    type: STATIC
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF";
+
 class AdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
-
-  void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    registerPort("endpoint", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    registerPort("ads_upstream", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_ads.yaml", {"http"});
-  }
+  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), config) {}
 
   void TearDown() override {
     test_server_.reset();
@@ -150,8 +168,9 @@ public:
   }
 
   void initialize() override {
-    BaseIntegrationTest::initialize();
-    ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+    ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
   }

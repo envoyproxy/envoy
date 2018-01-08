@@ -55,13 +55,13 @@ public:
         response_stream_(response_translator_->CreateInputStream()) {}
 
   // Transcoder
-  ::google::grpc::transcoding::TranscoderInputStream* RequestOutput() {
+  ::google::grpc::transcoding::TranscoderInputStream* RequestOutput() override {
     return request_stream_.get();
   }
-  ProtobufUtil::Status RequestStatus() { return request_translator_->Output().Status(); }
+  ProtobufUtil::Status RequestStatus() override { return request_translator_->Output().Status(); }
 
-  ZeroCopyInputStream* ResponseOutput() { return response_stream_.get(); }
-  ProtobufUtil::Status ResponseStatus() { return response_translator_->Status(); }
+  ZeroCopyInputStream* ResponseOutput() override { return response_stream_.get(); }
+  ProtobufUtil::Status ResponseStatus() override { return response_translator_->Status(); }
 
 private:
   std::unique_ptr<JsonRequestTranslator> request_translator_;
@@ -74,10 +74,22 @@ private:
 
 JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config) {
-  const std::string proto_descriptor_file = proto_config.proto_descriptor();
   FileDescriptorSet descriptor_set;
-  if (!descriptor_set.ParseFromString(Filesystem::fileReadToEnd(proto_descriptor_file))) {
-    throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+
+  switch (proto_config.descriptor_set_case()) {
+  case envoy::api::v2::filter::http::GrpcJsonTranscoder::kProtoDescriptor:
+    if (!descriptor_set.ParseFromString(
+            Filesystem::fileReadToEnd(proto_config.proto_descriptor()))) {
+      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+    }
+    break;
+  case envoy::api::v2::filter::http::GrpcJsonTranscoder::kProtoDescriptorBin:
+    if (!descriptor_set.ParseFromString(proto_config.proto_descriptor_bin())) {
+      throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
+    }
+    break;
+  default:
+    NOT_REACHED;
   }
 
   for (const auto& file : descriptor_set.file()) {
@@ -131,7 +143,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     path = path.substr(0, pos);
   }
 
-  RequestInfo request_info;
+  struct RequestInfo request_info;
   std::vector<VariableBinding> variable_bindings;
   method_descriptor =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);

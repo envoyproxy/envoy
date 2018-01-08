@@ -34,13 +34,8 @@ public:
         .WillByDefault(Return("access_token"));
 
     envoy::api::v2::Bootstrap bootstrap;
-    try {
-      MessageUtil::loadFromFile(file_path, bootstrap);
-    } catch (const EnvoyException& e) {
-      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-      Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
-      bootstrap = TestUtility::parseBootstrapFromJson(config_json->asJsonString());
-    }
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_.configPath(),
+                                              options_.v2ConfigOnly());
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 

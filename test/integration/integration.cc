@@ -9,16 +9,17 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -168,11 +169,13 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version)
+BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
+                                         const std::string& config)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
-      version_(version), default_log_level_(TestEnvironment::getOptions().logLevel()) {
+      version_(version), config_helper_(version, config),
+      default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -192,6 +195,52 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr());
+}
+
+void BaseIntegrationTest::initialize() {
+  RELEASE_ASSERT(!initialized_);
+  initialized_ = true;
+
+  createUpstreams();
+  createEnvoy();
+}
+
+void BaseIntegrationTest::createUpstreams() {
+  if (autonomous_upstream_) {
+    fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
+  } else {
+    fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
+  }
+}
+
+void BaseIntegrationTest::createEnvoy() {
+  std::vector<uint32_t> ports;
+  for (auto& upstream : fake_upstreams_) {
+    if (upstream->localAddress()->ip()) {
+      ports.push_back(upstream->localAddress()->ip()->port());
+    }
+  }
+  config_helper_.finalize(ports);
+
+  ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
+                 config_helper_.bootstrap().DebugString());
+
+  const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
+      "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  createGeneratedApiTestServer(bootstrap_path, named_ports_);
+}
+
+void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
+  upstream_protocol_ = protocol;
+  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http2_protocol_options();
+    });
+  } else {
+    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1);
+  }
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
@@ -223,11 +272,14 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_);
-  // Need to ensure we have an LDS update before invoking registerTestServerPorts() below that
-  // needs to know about the bound listener ports.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  registerTestServerPorts(port_names);
+  test_server_ =
+      IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps_);
+  if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
+    // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
+    // needs to know about the bound listener ports.
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    registerTestServerPorts(port_names);
+  }
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
@@ -250,7 +302,7 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_, nullptr);
   registerTestServerPorts(port_names);
 }
 

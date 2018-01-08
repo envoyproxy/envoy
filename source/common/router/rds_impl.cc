@@ -150,7 +150,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
       tls_(tls), admin_(admin) {
   admin_.addHandler("/routes", "print out currently loaded dynamic HTTP route tables",
-                    MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true);
+                    MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true, false);
 }
 
 RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
@@ -205,7 +205,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
-Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url,
+Http::Code RouteConfigProviderManagerImpl::handlerRoutes(const std::string& url, Http::HeaderMap&,
                                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   // If there are no query params, print out all the configured route tables.

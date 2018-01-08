@@ -76,10 +76,11 @@ public:
    * not include a port number. Throws EnvoyException if unable to parse the address.
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
    * @return pointer to the Instance, or nullptr if unable to parse the address.
    */
-  static Address::InstanceConstSharedPtr parseInternetAddress(const std::string& ip_address,
-                                                              uint16_t port = 0);
+  static Address::InstanceConstSharedPtr
+  parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
@@ -91,13 +92,15 @@ public:
   static Address::InstanceConstSharedPtr copyInternetAddressAndPort(const Address::Ip& ip);
 
   /**
-   * Create a new Intance from an internet host address (IPv4 or IPv6) and port.
+   * Create a new Instance from an internet host address (IPv4 or IPv6) and port.
    * @param ip_addr string to be parsed as an internet address and port. Examples:
    *        - "1.2.3.4:80"
    *        - "[1234:5678::9]:443"
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
    * @return pointer to the Instance.
    */
-  static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address);
+  static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address,
+                                                                     bool v6only = true);
 
   /**
    * Get the local address of the first interface address that is of type
@@ -112,7 +115,7 @@ public:
    * Determine whether this is an internal (RFC1918) address.
    * @return bool the address is an RFC1918 address.
    */
-  static bool isInternalAddress(const char* address);
+  static bool isInternalAddress(const Address::Instance& address);
 
   /**
    * Check if address is loopback address.

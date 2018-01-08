@@ -83,7 +83,7 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::api::v2::Listener& config) override;
+  bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) override;
   std::vector<std::reference_wrapper<Listener>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
@@ -164,13 +164,20 @@ public:
    * @param config supplies the configuration proto.
    * @param parent supplies the owning manager.
    * @param name supplies the listener name.
+   * @param modifiable supplies whether the listener can be updated or removed.
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
    */
   ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-               const std::string& name, bool workers_started, uint64_t hash);
+               const std::string& name, bool modifiable, bool workers_started, uint64_t hash);
   ~ListenerImpl();
+
+  /**
+   * Helper functions to determine whether a listener is blocked for update or remove.
+   */
+  bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !modifiable_; }
+  bool blockRemove() { return !modifiable_; }
 
   /**
    * Called when a listener failed to be actually created on a worker.
@@ -184,7 +191,6 @@ public:
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
-  uint64_t hash() const { return hash_; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
@@ -245,6 +251,7 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
+  const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;
   InitManagerImpl dynamic_init_manager_;

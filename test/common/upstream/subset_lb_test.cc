@@ -271,6 +271,21 @@ public:
     }
   }
 
+  void doLbTypeTest(LoadBalancerType type) {
+    EXPECT_CALL(subset_info_, fallbackPolicy())
+        .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+    lb_type_ = type;
+    init({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}});
+
+    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+    HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
+    modifyHosts({added_host}, {host_set_.hosts_.back()});
+
+    EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+  }
+
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
@@ -478,12 +493,12 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
   init({});
   EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
 
-  // Add hosts to the group at priority 1. As no load balancer will select from
-  // failovers yet, this still results in being unable to choose a host.
+  // Add hosts to the group at priority 1.
+  // These hosts should be selected as there are no healthy hosts with priority 0
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
                makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
               {}, {}, 1);
-  EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
+  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
 
   // Finally update the priority 0 hosts. The LB should now select hosts.
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
@@ -691,20 +706,21 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version));
 }
 
-TEST_F(SubsetLoadBalancerTest, LoadBalancerTypes) {
-  EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+// TODO(mattklein123): The following 4 tests verify basic functionality with all sub-LB tests.
+// Optimally these would also be some type of TEST_P, but that is a little bit complicated as
+// modifyHosts() also needs params. Clean this up.
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRoundRobin) {
+  doLbTypeTest(LoadBalancerType::RoundRobin);
+}
 
-  auto types =
-      std::vector<LoadBalancerType>({LoadBalancerType::RoundRobin, LoadBalancerType::LeastRequest,
-                                     LoadBalancerType::Random, LoadBalancerType::RingHash});
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesLeastRequest) {
+  doLbTypeTest(LoadBalancerType::LeastRequest);
+}
 
-  for (const auto& it : types) {
-    lb_type_ = it;
-    init();
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRandom) { doLbTypeTest(LoadBalancerType::Random); }
 
-    EXPECT_NE(nullptr, lb_->chooseHost(nullptr));
-  }
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRingHash) {
+  doLbTypeTest(LoadBalancerType::RingHash);
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
@@ -742,11 +758,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
                      {"tcp://127.0.0.1:92", {{"version", "1.0"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 }
 
@@ -785,11 +801,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
                      {"tcp://127.0.0.1:92", {{"version", "1.0"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_[0]},
@@ -798,11 +814,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}})}, {local_hosts_->at(0)},
                    0);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 }
 
@@ -852,11 +868,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
                      {"tcp://127.0.0.1:95", {{"version", "default"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 }
 
@@ -906,11 +922,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
                      {"tcp://127.0.0.1:95", {{"version", "default"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {host_set_.hosts_[1]},
@@ -919,11 +935,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 }
 
@@ -972,11 +988,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 }
 
@@ -1025,11 +1041,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {host_set_.hosts_[1]},
@@ -1038,11 +1054,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   modifyLocalHosts({local_hosts_->at(1)}, {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}})},
                    0);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 }
 

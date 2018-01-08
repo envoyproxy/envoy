@@ -191,6 +191,18 @@ public:
     runUpdateCallbacks(hosts_added, hosts_removed);
   }
 
+  /**
+   * Install a callback that will be invoked when the host set membership changes.
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* the callback handle.
+   */
+  typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
+                             const std::vector<HostSharedPtr>& hosts_removed)>
+      MemberUpdateCb;
+  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const {
+    return member_update_cb_helper_.add(callback);
+  }
+
   // Upstream::HostSet
   const std::vector<HostSharedPtr>& hosts() const override { return *hosts_; }
   const std::vector<HostSharedPtr>& healthyHosts() const override { return *healthy_hosts_; }
@@ -199,9 +211,6 @@ public:
   }
   const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const override {
     return *healthy_hosts_per_locality_;
-  }
-  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
-    return member_update_cb_helper_.add(callback);
   }
   uint32_t priority() const override { return priority_; }
 
@@ -243,9 +252,9 @@ public:
   HostSet& getOrCreateHostSet(uint32_t priority);
 
 protected:
-  // Allows subclasses of PrioritySetImpl to create their own type of HostSet.
-  virtual HostSetPtr createHostSet(uint32_t priority) {
-    return HostSetPtr{new HostSetImpl(priority)};
+  // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
+  virtual HostSetImplPtr createHostSet(uint32_t priority) {
+    return HostSetImplPtr{new HostSetImpl(priority)};
   }
 
 private:
@@ -285,6 +294,7 @@ public:
   uint64_t features() const override { return features_; }
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
+  envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
   const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
@@ -318,6 +328,7 @@ private:
 
   Runtime::Loader& runtime_;
   const std::string name_;
+  const envoy::api::v2::Cluster::DiscoveryType type_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;

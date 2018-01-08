@@ -95,8 +95,10 @@ public:
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(Const(filter_callbacks_.connection_), ssl())
         .WillByDefault(Return(ssl_connection_.get()));
-    ON_CALL(filter_callbacks_.connection_, remoteAddress())
-        .WillByDefault(ReturnRef(remote_address_));
+    filter_callbacks_.connection_.local_address_ =
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+    filter_callbacks_.connection_.remote_address_ =
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
                                                   local_info_, cluster_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -257,7 +259,6 @@ public:
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
-  Network::Address::Ipv4Instance remote_address_{"0.0.0.0"};
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
@@ -383,7 +384,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
@@ -449,7 +450,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
@@ -510,7 +511,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
@@ -576,7 +577,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
         return span;
@@ -642,7 +643,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const HeaderMap&,
-                           const AccessLog::RequestInfo&) -> Tracing::Span* {
+                           const RequestInfo::RequestInfo&) -> Tracing::Span* {
         EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
         return span;
@@ -708,9 +709,11 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
 
   EXPECT_CALL(*handler, log(_, _, _))
       .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const AccessLog::RequestInfo& request_info) {
+          [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
             EXPECT_TRUE(request_info.responseCode().valid());
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
           }));
 
   StreamDecoder* decoder = nullptr;

@@ -5,35 +5,10 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/request_info/request_info.h"
 
 namespace Envoy {
 namespace AccessLog {
-
-/**
- * Util class for ResponseFlags.
- */
-class ResponseFlagUtils {
-public:
-  static const std::string toShortString(const RequestInfo& request_info);
-
-private:
-  ResponseFlagUtils();
-  static void appendString(std::string& result, const std::string& append);
-
-  const static std::string NONE;
-  const static std::string FAILED_LOCAL_HEALTH_CHECK;
-  const static std::string NO_HEALTHY_UPSTREAM;
-  const static std::string UPSTREAM_REQUEST_TIMEOUT;
-  const static std::string LOCAL_RESET;
-  const static std::string UPSTREAM_REMOTE_RESET;
-  const static std::string UPSTREAM_CONNECTION_FAILURE;
-  const static std::string UPSTREAM_CONNECTION_TERMINATION;
-  const static std::string UPSTREAM_OVERFLOW;
-  const static std::string NO_ROUTE_FOUND;
-  const static std::string DELAY_INJECTED;
-  const static std::string FAULT_INJECTED;
-  const static std::string RATE_LIMITED;
-};
 
 /**
  * Access log format parser.
@@ -71,7 +46,7 @@ public:
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers,
                      const Http::HeaderMap& response_headers,
-                     const RequestInfo& request_info) const override;
+                     const RequestInfo::RequestInfo& request_info) const override;
 
 private:
   std::vector<FormatterPtr> formatters_;
@@ -87,7 +62,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const RequestInfo&) const override;
+                     const RequestInfo::RequestInfo&) const override;
 
 private:
   std::string str_;
@@ -116,7 +91,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                     const RequestInfo&) const override;
+                     const RequestInfo::RequestInfo&) const override;
 };
 
 /**
@@ -129,7 +104,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
-                     const RequestInfo&) const override;
+                     const RequestInfo::RequestInfo&) const override;
 };
 
 /**
@@ -141,10 +116,10 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const RequestInfo& request_info) const override;
+                     const RequestInfo::RequestInfo& request_info) const override;
 
 private:
-  std::function<std::string(const RequestInfo&)> field_extractor_;
+  std::function<std::string(const RequestInfo::RequestInfo&)> field_extractor_;
 };
 
 } // namespace AccessLog

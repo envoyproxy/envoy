@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"

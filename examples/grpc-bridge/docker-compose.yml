@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile-python
     volumes:
-      - ./config/s2s-python-envoy.json:/etc/s2s-python-envoy.json
+      - ./config/s2s-python-envoy.yaml:/etc/s2s-python-envoy.yaml
     expose:
       - "9001"
 
@@ -15,6 +15,6 @@ services:
       context: .
       dockerfile: Dockerfile-grpc
     volumes:
-      - ./config/s2s-grpc-envoy.json:/etc/s2s-grpc-envoy.json
+      - ./config/s2s-grpc-envoy.yaml:/etc/s2s-grpc-envoy.yaml
     expose:
       - "9211"

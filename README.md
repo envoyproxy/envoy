@@ -10,6 +10,7 @@ Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNC
 ## Documentation
 
 * [Official documentation](https://www.envoyproxy.io/).
+* [Unofficial Chinese documentation](https://github.com/lixiangyun/envoyproxy_doc_ZH_CN).
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy.
@@ -54,6 +55,7 @@ have prior experience. To get started:
 * [Beginner issues](https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner)
 * [Build/test quick start using docker](ci#building-and-running-tests-as-a-developer)
 * [Developer guide](DEVELOPER.md)
+* Consider installing the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/master/support/README.md), which helps automate parts of the development process, particularly those involving code review.
 * Please make sure that you let us know if you are working on an issue so we don't duplicate work!
 
 ## Community Meeting

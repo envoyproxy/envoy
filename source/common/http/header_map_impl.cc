@@ -415,6 +415,29 @@ void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
   }
 }
 
+HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
+                                        const HeaderEntry** entry) const {
+  StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
+  if (cb) {
+    // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
+    // even though we don't make any modifications, we need to cast_cast in order to use the
+    // accessor.
+    //
+    // Making this work without const_cast would require managing an additional const accessor
+    // callback for each predefined inline header and add to the complexity of the code.
+    StaticLookupResponse ref_lookup_response = cb(const_cast<HeaderMapImpl&>(*this));
+    *entry = *ref_lookup_response.entry_;
+    if (*entry) {
+      return Lookup::Found;
+    } else {
+      return Lookup::NotFound;
+    }
+  } else {
+    *entry = nullptr;
+    return Lookup::NotSupported;
+  }
+}
+
 void HeaderMapImpl::remove(const LowerCaseString& key) {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {

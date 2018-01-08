@@ -19,7 +19,6 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -141,33 +140,6 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
   }
 }
 
-void HttpIntegrationTest::SetUp() {
-  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
-}
-
-void HttpIntegrationTest::initialize() {
-  BaseIntegrationTest::initialize();
-  createUpstreams();
-
-  config_helper_.finalize(ports_);
-
-  ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
-                 config_helper_.bootstrap().DebugString());
-
-  const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-  createGeneratedApiTestServer(bootstrap_path, named_ports_);
-}
-
-void HttpIntegrationTest::createUpstreams() {
-  if (autonomous_upstream_) {
-    fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
-  } else {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
-  }
-  ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
-}
-
 IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port) {
   return makeHttpConnection(makeClientConnection(port));
 }
@@ -182,8 +154,12 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 }
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                                         Network::Address::IpVersion version)
-    : BaseIntegrationTest(version), downstream_protocol_(downstream_protocol) {}
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
+  named_ports_ = {{"http"}};
+  config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
+}
 
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
@@ -194,19 +170,6 @@ HttpIntegrationTest::~HttpIntegrationTest() {
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
-}
-
-void HttpIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
-  upstream_protocol_ = protocol;
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
-    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
-      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http2_protocol_options();
-    });
-  } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1);
-  }
 }
 
 void HttpIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
@@ -279,7 +242,7 @@ void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
     bool close_upstream, ConnectionCreationFunction* create_connection) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
-  if (!initialized_) {
+  if (!initialized()) {
     initialize();
   }
   codec_client_ = makeHttpConnection(
@@ -470,7 +433,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
   upstream_request_->waitForHeadersComplete();
   codec_client_->close();
 
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     fake_upstream_connection_->waitForDisconnect();
   } else {
     upstream_request_->waitForReset();
@@ -500,7 +463,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   response_->waitForBodyData(512);
   codec_client_->close();
 
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     fake_upstream_connection_->waitForDisconnect();
   } else {
     upstream_request_->waitForReset();
@@ -531,7 +494,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   upstream_request_->encodeData(512, true);
   response_->waitForEndStream();
 
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     fake_upstream_connection_->waitForDisconnect();
   } else {
     upstream_request_->waitForReset();
@@ -1080,7 +1043,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   response_->waitForBodyData(512);
   codec_client_->sendReset(*request_encoder_);
 
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     fake_upstream_connection_->waitForDisconnect();
   } else {
     upstream_request_->waitForReset();

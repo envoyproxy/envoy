@@ -2,6 +2,17 @@
 
 set -e
 
+# The heapchecker outputs some data to stderr on every execution.  This gets intermingled
+# with the output from --hot-restart-version, so disable the heap-checker for these runs.
+disableHeapCheck () {
+  SAVED_HEAPCHECK=${HEAPCHECK}
+  unset HEAPCHECK
+}
+
+enableHeapCheck () {
+  HEAPCHECK=${SAVED_HEAPCHECK}
+}
+
 [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
@@ -65,10 +76,7 @@ do
   kill -SIGHUP ${FIRST_SERVER_PID}
   sleep 3
 
-  # The heapchecker outputs some data to stderr on every execution.  This gets intermingled
-  # with the output from --hot-restart-version, so disable the heap-checker for these runs.
-  SAVED_HEAPCHECK=${HEAPCHECK}
-  unset HEAPCHECK
+  disableHeapCheck
 
   echo "Checking for match of --hot-restart-version and admin /hot_restart_version"
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
@@ -96,7 +104,7 @@ do
       exit 2
   fi
 
-  HEAPCHECK=${SAVED_HEAPCHECK}
+  enableHeapCheck
 
   echo "Starting epoch 1"
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
@@ -152,5 +160,22 @@ do
   [[ $? == 0 ]]
   TEST_INDEX=$((TEST_INDEX+1))
 done
+
+# set -e forces the script to exit on non-zero exit codes. Set +e makes it easier to
+# catch the non-zero exit code.
+set +e
+disableHeapCheck
+
+echo "Launching envoy with no parameters. Check the exit value is 1"
+${ENVOY_BIN}
+EXIT_CODE=$?
+# The test should fail if the Envoy binary exits with anything other than 1.
+if [[ $EXIT_CODE -ne 1 ]]; then
+    echo "Envoy exited with code: ${EXIT_CODE}"
+    exit 1
+fi
+
+enableHeapCheck
+set -e
 
 echo "PASS"

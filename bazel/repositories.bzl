@@ -143,6 +143,8 @@ def _envoy_api_deps():
         "protocol",
         "rds",
         "sds",
+        "stats",
+        "trace",
     ]
     for t in api_bind_targets:
         native.bind(
@@ -150,7 +152,6 @@ def _envoy_api_deps():
             actual = "@envoy_api//api:" + t + "_cc",
         )
     filter_bind_targets = [
-        "accesslog",
         "fault",
     ]
     for t in filter_bind_targets:
@@ -186,6 +187,10 @@ def _envoy_api_deps():
             name = "envoy_filter_network_" + t,
             actual = "@envoy_api//api/filter/network:" + t + "_cc",
         )
+    native.bind(
+        name = "envoy_filter_accesslog",
+        actual = "@envoy_api//api/filter/accesslog:accesslog_cc",
+    )
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
@@ -235,7 +240,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
-    _com_github_lightstep_lightstep_tracer_cpp()
+    _io_opentracing_cpp()
+    _com_lightstep_tracer_cpp()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -309,23 +315,22 @@ def _com_github_gcovr_gcovr():
         actual = "@com_github_gcovr_gcovr//:gcovr",
     )
 
-def _com_github_lightstep_lightstep_tracer_cpp():
-    location = REPOSITORY_LOCATIONS[
-        "com_github_lightstep_lightstep_tracer_cpp"]
-    genrule_repository(
-        name = "com_github_lightstep_lightstep_tracer_cpp",
-        urls = location["urls"],
-        sha256 = location["sha256"],
-        strip_prefix = location["strip_prefix"],
-        patches = [
-            "@envoy//bazel/external:lightstep-missing-header.patch",
-        ],
-        genrule_cmd_file = "@envoy//bazel/external:lightstep.genrule_cmd",
-        build_file = "@envoy//bazel/external:lightstep.BUILD",
+def _io_opentracing_cpp():
+    _repository_impl("io_opentracing_cpp")
+    native.bind(
+        name = "opentracing",
+        actual = "@io_opentracing_cpp//:opentracing",
+    )
+
+def _com_lightstep_tracer_cpp():
+    _repository_impl("com_lightstep_tracer_cpp")
+    _repository_impl(
+        name = "lightstep_vendored_googleapis",
+        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
     )
     native.bind(
         name = "lightstep",
-        actual = "@com_github_lightstep_lightstep_tracer_cpp//:lightstep",
+        actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
     )
 
 def _com_github_tencent_rapidjson():
@@ -360,6 +365,10 @@ def _com_google_absl():
     native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
+    )
+    native.bind(
+        name = "abseil_strings",
+        actual = "@com_google_absl//absl/strings:strings",
     )
 
 def _com_google_protobuf():

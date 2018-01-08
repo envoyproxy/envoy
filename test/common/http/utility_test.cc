@@ -39,29 +39,6 @@ TEST(HttpUtility, getResponseStatus) {
   EXPECT_EQ(200U, Utility::getResponseStatus(TestHeaderMapImpl{{":status", "200"}}));
 }
 
-TEST(HttpUtility, isInternalRequest) {
-  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{}));
-  EXPECT_FALSE(
-      Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "10.0.0.1,10.0.0.2"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "50.0.0.1"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "blah"}}));
-
-  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "10.0.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "10.255.255.255"}}));
-
-  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.0.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.16.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.31.255.255"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.32.0.0"}}));
-
-  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "192.0.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "192.168.0.0"}}));
-  EXPECT_TRUE(
-      Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "192.168.255.255"}}));
-
-  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "127.0.0.1"}}));
-}
-
 TEST(HttpUtility, isWebSocketUpgradeRequest) {
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{}));
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"connection", "upgrade"}}));
@@ -147,30 +124,53 @@ TEST(HttpUtility, parseHttp2Settings) {
   }
 }
 
-TEST(HttpUtility, TwoAddressesInXFF) {
-  const std::string first_address = "34.0.0.1";
-  const std::string second_address = "10.0.0.1";
-  TestHeaderMapImpl request_headers{
-      {"x-forwarded-for", fmt::format("{0}, {0}, {1}", first_address, second_address)}};
-  EXPECT_EQ(second_address, Utility::getLastAddressFromXFF(request_headers));
-}
-
-TEST(HttpUtility, EmptyXFF) {
+TEST(HttpUtility, getLastAddressFromXFF) {
+  {
+    const std::string first_address = "34.0.0.1";
+    const std::string second_address = "10.0.0.1";
+    TestHeaderMapImpl request_headers{
+        {"x-forwarded-for", fmt::format("{0}, {0}, {1}", first_address, second_address)}};
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+  }
   {
     TestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
-    EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
   }
-
+  {
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
+  }
+  {
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
+  }
+  {
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
+  }
   {
     TestHeaderMapImpl request_headers;
-    EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
   }
-}
-
-TEST(HttpUtility, OneAddressInXFF) {
-  const std::string first_address = "34.0.0.1";
-  TestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
-  EXPECT_EQ(first_address, Utility::getLastAddressFromXFF(request_headers));
+  {
+    const std::string first_address = "34.0.0.1";
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
+    EXPECT_TRUE(ret.single_address_);
+  }
 }
 
 TEST(HttpUtility, TestParseCookie) {

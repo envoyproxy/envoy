@@ -135,7 +135,7 @@ void Filter::complete(Envoy::RateLimit::LimitStatus status) {
     state_ = State::Responded;
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getTooManyRequestsHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
-    callbacks_->requestInfo().setResponseFlag(AccessLog::ResponseFlag::RateLimited);
+    callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
   }
@@ -154,7 +154,7 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   headers, callbacks_->downstreamAddress());
+                                   headers, *callbacks_->requestInfo().downstreamRemoteAddress());
   }
 }
 

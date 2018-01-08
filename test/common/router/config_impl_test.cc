@@ -221,7 +221,7 @@ TEST(RouteMatcherTest, TestRoutes) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   // Base routing testing.
@@ -562,7 +562,7 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
 
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
@@ -652,7 +652,7 @@ request_headers_to_add:
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
 
   envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
@@ -751,7 +751,7 @@ response_headers_to_remove: ["x-global-remove"]
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
 
   ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
 
@@ -991,6 +991,99 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_pattern", "customer=test-1223");
     EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+TEST(RouteMatcherTest, QueryParamMatchedRouting) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_multiple_query_parameters",
+          "query_parameters": [
+            {"name": "id", "value": "\\d+[02468]", "regex": true},
+            {"name": "debug"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_query_parameter",
+          "query_parameters": [
+            {"name": "param", "value": "test"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_valueless_query_parameter",
+          "query_parameters": [
+            {"name": "debug"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_without_query_parameters"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=testing", "GET");
+    EXPECT_EQ("local_service_without_query_parameters",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=test", "GET");
+    EXPECT_EQ("local_service_with_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug", "GET");
+    EXPECT_EQ("local_service_with_valueless_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug=2", "GET");
+    EXPECT_EQ("local_service_with_valueless_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=test&debug&id=01", "GET");
+    EXPECT_EQ("local_service_with_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?param=test&debug&id=02", "GET");
+    EXPECT_EQ("local_service_with_multiple_query_parameters",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
@@ -1321,7 +1414,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   EXPECT_EQ(
@@ -2960,14 +3053,12 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
   )EOF";
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
-  const std::string downstream_addr = "127.0.0.1";
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-  ON_CALL(request_info, getDownstreamAddress()).WillByDefault(ReturnRef(downstream_addr));
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   route->finalizeRequestHeaders(headers, request_info);
-  EXPECT_EQ(downstream_addr, headers.get_("x-client-ip"));
+  EXPECT_EQ("127.0.0.1", headers.get_("x-client-ip"));
 }
 
 TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
@@ -3014,7 +3105,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   )EOF";
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  NiceMock<Envoy::AccessLog::MockRequestInfo> request_info;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
       "Incorrect header configuration. Expected variable format %<variable_name>%, actual format "

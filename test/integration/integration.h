@@ -110,13 +110,23 @@ struct ApiFilesystemConfig {
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  BaseIntegrationTest(Network::Address::IpVersion version);
+  BaseIntegrationTest(Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~BaseIntegrationTest() {}
 
-  virtual void initialize() {
-    RELEASE_ASSERT(!initialized_);
-    initialized_ = true;
-  }
+  void SetUp();
+
+  // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
+  virtual void initialize();
+  // Set up the fake upstream connections. This is called by initialize() and
+  // is virtual to allow subclass overrides.
+  virtual void createUpstreams();
+  // Finalize the config and spin up an Envoy instance.
+  virtual void createEnvoy();
+  // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
+  void setUpstreamProtocol(FakeHttpConnection::Type protocol);
+
+  FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
@@ -139,16 +149,32 @@ public:
   void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
 
 protected:
+  bool initialized() const { return initialized_; }
+
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
   // The config for envoy start-up.
-  ConfigHelper config_helper_{version_};
+  ConfigHelper config_helper_;
+  // Steps that should be done prior to the workers starting. E.g., xDS pre-init.
+  std::function<void()> pre_worker_start_test_steps_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
-  bool initialized_{}; // True if initialized() has been called.
+
+  // The named ports for createGeneratedApiTestServer. Used mostly for lookupPort.
+  std::vector<std::string> named_ports_{{"default_port"}};
+  // If true, use AutonomousUpstream for fake upstreams.
+  bool autonomous_upstream_{false};
+
+private:
+  // The codec type for the client-to-Envoy connection
+  Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
+  // The type for the Envoy-to-backend connection
+  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  // True if initialized() has been called.
+  bool initialized_{};
 };
 
 } // namespace Envoy

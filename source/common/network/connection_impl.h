@@ -7,12 +7,12 @@
 #include <string>
 
 #include "envoy/common/optional.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
-#include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 
@@ -47,13 +47,13 @@ class ConnectionImpl : public virtual Connection,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
   // TODO(lizan): Remove the old style constructor when factory is ready.
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
                  bool connected);
 
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                  Address::InstanceConstSharedPtr remote_address,
                  Address::InstanceConstSharedPtr local_address,
                  Address::InstanceConstSharedPtr bind_to_address,
@@ -69,6 +69,7 @@ public:
 
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
+  void addBytesSentCallback(BytesSentCb cb) override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
@@ -77,8 +78,8 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const Address::Instance& remoteAddress() const override { return *remote_address_; }
-  const Address::Instance& localAddress() const override { return *local_address_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   const Ssl::Connection* ssl() const override { return nullptr; }
@@ -126,16 +127,6 @@ protected:
   TransportSocketPtr transport_socket_;
 
 private:
-  // clang-format off
-  struct InternalState {
-    static const uint32_t ReadEnabled              = 0x1;
-    static const uint32_t Connecting               = 0x2;
-    static const uint32_t CloseWithFlush           = 0x4;
-    static const uint32_t ImmediateConnectionError = 0x8;
-    static const uint32_t BindError                = 0x10;
-  };
-  // clang-format on
-
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();
@@ -145,12 +136,20 @@ private:
 
   static std::atomic<uint64_t> next_global_id_;
 
-  Event::DispatcherImpl& dispatcher_;
+  Event::Dispatcher& dispatcher_;
   int fd_{-1};
   Event::FileEventPtr file_event_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
-  uint32_t state_{InternalState::ReadEnabled};
+  std::list<BytesSentCb> bytes_sent_callbacks_;
+  bool read_enabled_{true};
+  bool connecting_{false};
+  bool close_with_flush_{false};
+  bool immediate_connection_error_{false};
+  bool bind_error_{false};
+  const bool using_original_dst_;
+  bool above_high_watermark_{false};
+  bool detect_early_close_{true};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};
@@ -159,9 +158,6 @@ private:
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
-  const bool using_original_dst_;
-  bool above_high_watermark_{false};
-  bool detect_early_close_{true};
 };
 
 /**
@@ -169,9 +165,9 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                       Address::InstanceConstSharedPtr remote_address,
-                       const Address::InstanceConstSharedPtr source_address);
+  ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                       const Address::InstanceConstSharedPtr& remote_address,
+                       const Address::InstanceConstSharedPtr& source_address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

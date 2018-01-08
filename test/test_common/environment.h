@@ -150,7 +150,7 @@ public:
   static void exec(const std::vector<std::string>& args);
 
   /**
-   * Dumps the contents of the string into a tempoary file from temporaryDirectory() + filename.
+   * Dumps the contents of the string into a temporary file from temporaryDirectory() + filename.
    *
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
@@ -158,5 +158,12 @@ public:
    */
   static std::string writeStringToFileForTest(const std::string& filename,
                                               const std::string& contents);
+  /**
+   * Dumps the contents of the file into the string.
+   *
+   * @param filename: the fully qualified name of the file to use
+   * @return string the contents of the file.
+   */
+  static std::string readFileToStringForTest(const std::string& filename);
 };
 } // namespace Envoy

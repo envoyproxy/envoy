@@ -305,9 +305,9 @@ public:
   }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const AccessLog::RequestInfo& request_info) const override;
+                              const RequestInfo::RequestInfo& request_info) const override;
   void finalizeResponseHeaders(Http::HeaderMap& headers,
-                               const AccessLog::RequestInfo& request_info) const override;
+                               const RequestInfo::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -367,11 +367,11 @@ private:
     }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                const AccessLog::RequestInfo& request_info) const override {
+                                const RequestInfo::RequestInfo& request_info) const override {
       return parent_->finalizeRequestHeaders(headers, request_info);
     }
     void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                 const AccessLog::RequestInfo& request_info) const override {
+                                 const RequestInfo::RequestInfo& request_info) const override {
       return parent_->finalizeResponseHeaders(headers, request_info);
     }
 
@@ -476,6 +476,7 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
+  std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
@@ -499,7 +500,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const AccessLog::RequestInfo& request_info) const override;
+                              const RequestInfo::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -518,7 +519,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const AccessLog::RequestInfo& request_info) const override;
+                              const RequestInfo::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -537,7 +538,7 @@ public:
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const AccessLog::RequestInfo& request_info) const override;
+                              const RequestInfo::RequestInfo& request_info) const override;
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;

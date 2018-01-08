@@ -235,6 +235,7 @@ private:
   HEADER_FUNC(AccessControlExposeHeaders)                                                          \
   HEADER_FUNC(AccessControlMaxAge)                                                                 \
   HEADER_FUNC(Authorization)                                                                       \
+  HEADER_FUNC(CacheControl)                                                                        \
   HEADER_FUNC(ClientTraceId)                                                                       \
   HEADER_FUNC(Connection)                                                                          \
   HEADER_FUNC(ContentLength)                                                                       \
@@ -274,6 +275,7 @@ private:
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(Server)                                                                              \
@@ -406,7 +408,7 @@ public:
   /**
    * Get a header by key.
    * @param key supplies the header key.
-   * @return the header entry if it exsits otherwise nullptr.
+   * @return the header entry if it exists otherwise nullptr.
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
 
@@ -434,6 +436,18 @@ public:
    * @param context supplies the context that will be passed to the callback.
    */
   virtual void iterateReverse(ConstIterateCb cb, void* context) const PURE;
+
+  enum class Lookup { Found, NotFound, NotSupported };
+
+  /**
+   * Lookup one of the predefined inline headers (see ALL_INLINE_HEADERS below) by key.
+   * @param key supplies the header key.
+   * @param entry is set to the header entry if it exists and if key is one of the predefined inline
+   * headers; otherwise, nullptr.
+   * @return Lookup::Found if lookup was successful, Lookup::NotFound if the header entry doesn't
+   * exist, or Lookup::NotSupported if key is not one of the predefined inline headers.
+   */
+  virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
 
   /**
    * Remove all instances of a header by key.

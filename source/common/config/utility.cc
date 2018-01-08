@@ -8,6 +8,7 @@
 #include "common/config/json_utility.h"
 #include "common/config/resources.h"
 #include "common/config/well_known_names.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -63,6 +64,36 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(
         fmt::format("{}: setting --service-cluster and --service-node is required", error_prefix));
+  }
+}
+
+void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
+  // TODO(junr03): the file might be deleted between this check and the
+  // watch addition.
+  if (!Filesystem::fileExists(path)) {
+    throw EnvoyException(fmt::format(
+        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
+        path));
+  }
+}
+
+void Utility::checkApiConfigSourceSubscriptionBackingCluster(
+    const Upstream::ClusterManager::ClusterInfoMap& clusters,
+    const envoy::api::v2::ApiConfigSource& api_config_source) {
+  if (api_config_source.cluster_name().size() != 1) {
+    // TODO(htuch): Add support for multiple clusters, #1170.
+    throw EnvoyException(
+        "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
+  }
+
+  const auto& cluster_name = api_config_source.cluster_name()[0];
+  const auto& it = clusters.find(cluster_name);
+  if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
+      it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+    throw EnvoyException(fmt::format(
+        "envoy::api::v2::ConfigSource must have a statically "
+        "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
+        cluster_name));
   }
 }
 

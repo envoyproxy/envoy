@@ -10,11 +10,11 @@ namespace {
 class XdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  }
 
-  void initialize() override {
-    BaseIntegrationTest::initialize();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+  void createEnvoy() override {
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createApiTestServer(
         {

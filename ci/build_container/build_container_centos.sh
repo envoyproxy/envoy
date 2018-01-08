@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
-# scl devtoolset repository
-yum install -y centos-release-scl
+# scl devtoolset and epel repositories
+yum install -y centos-release-scl epel-release
 
 # llvm-5.0.0 repository from copr
 curl -L -o /etc/yum.repos.d/alonid-llvm-5.0.0-epel-7.repo \
@@ -9,9 +9,11 @@ curl -L -o /etc/yum.repos.d/alonid-llvm-5.0.0-epel-7.repo \
 
 # dependencies for bazel and build_recipes
 yum install -y java-1.8.0-openjdk-devel unzip which \
-               cmake devtoolset-4-gcc-c++ git golang libtool make patch rsync wget \
+               cmake3 devtoolset-4-gcc-c++ git golang libtool make patch rsync wget \
                clang-5.0.0 devtoolset-4-libatomic-devel llvm-5.0.0 python-virtualenv
 yum clean all
+
+ln -s /usr/bin/cmake3 /usr/bin/cmake
 
 # latest bazel installer
 BAZEL_VERSION="$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |

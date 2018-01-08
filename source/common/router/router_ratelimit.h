@@ -23,7 +23,7 @@ public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address) const override;
+                          const Network::Address::Instance& remote_address) const override;
 };
 
 /**
@@ -34,7 +34,7 @@ public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address) const override;
+                          const Network::Address::Instance& remote_address) const override;
 };
 
 /**
@@ -48,7 +48,7 @@ public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address) const override;
+                          const Network::Address::Instance& remote_address) const override;
 
 private:
   const Http::LowerCaseString header_name_;
@@ -63,7 +63,7 @@ public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address) const override;
+                          const Network::Address::Instance& remote_address) const override;
 };
 
 /**
@@ -77,7 +77,7 @@ public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address) const override;
+                          const Network::Address::Instance& remote_address) const override;
 
 private:
   const std::string descriptor_value_;
@@ -93,7 +93,7 @@ public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const std::string& remote_address) const override;
+                          const Network::Address::Instance& remote_address) const override;
 
 private:
   const std::string descriptor_value_;
@@ -114,7 +114,7 @@ public:
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
-                           const std::string& remote_address) const override;
+                           const Network::Address::Instance& remote_address) const override;
 
 private:
   const std::string disable_key_;

@@ -8,6 +8,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/request_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -23,46 +24,6 @@ using testing::_;
 namespace Envoy {
 namespace AccessLog {
 
-TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  std::vector<std::pair<ResponseFlag, std::string>> expected = {
-      std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
-      std::make_pair(ResponseFlag::NoHealthyUpstream, "UH"),
-      std::make_pair(ResponseFlag::UpstreamRequestTimeout, "UT"),
-      std::make_pair(ResponseFlag::LocalReset, "LR"),
-      std::make_pair(ResponseFlag::UpstreamRemoteReset, "UR"),
-      std::make_pair(ResponseFlag::UpstreamConnectionFailure, "UF"),
-      std::make_pair(ResponseFlag::UpstreamConnectionTermination, "UC"),
-      std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
-      std::make_pair(ResponseFlag::NoRouteFound, "NR"),
-      std::make_pair(ResponseFlag::DelayInjected, "DI"),
-      std::make_pair(ResponseFlag::FaultInjected, "FI"),
-      std::make_pair(ResponseFlag::RateLimited, "RL")};
-
-  for (const auto& testCase : expected) {
-    NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(testCase.first)).WillByDefault(Return(true));
-    EXPECT_EQ(testCase.second, ResponseFlagUtils::toShortString(request_info));
-  }
-
-  // No flag is set.
-  {
-    NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(false));
-    EXPECT_EQ("-", ResponseFlagUtils::toShortString(request_info));
-  }
-
-  // Test combinations.
-  // These are not real use cases, but are used to cover multiple response flags case.
-  {
-    NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
-        .WillByDefault(Return(true));
-    EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(request_info));
-  }
-}
-
 TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
   EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Http::Protocol::Http11));
@@ -73,7 +34,7 @@ TEST(AccessLogFormatUtilsTest, protocolToString) {
 TEST(AccessLogFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
-  MockRequestInfo request_info;
+  RequestInfo::MockRequestInfo request_info;
 
   EXPECT_EQ("plain", formatter.format(header, header, request_info));
 }
@@ -81,7 +42,7 @@ TEST(AccessLogFormatterTest, plainStringFormatter) {
 TEST(AccessLogFormatterTest, requestInfoFormatter) {
   EXPECT_THROW(RequestInfoFormatter formatter("unknown_field"), EnvoyException);
 
-  NiceMock<MockRequestInfo> request_info;
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
@@ -162,7 +123,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
+    ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::LocalReset))
+        .WillByDefault(Return(true));
     EXPECT_EQ("LR", response_flags_format.format(header, header, request_info));
   }
 
@@ -189,10 +151,30 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
     EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
     EXPECT_EQ("-", upstream_format.format(header, header, request_info));
   }
+
+  {
+    RequestInfoFormatter upstream_format("DOWNSTREAM_LOCAL_ADDRESS");
+    EXPECT_EQ("127.0.0.2:0", upstream_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("DOWNSTREAM_ADDRESS");
+    EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
+    EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("DOWNSTREAM_REMOTE_ADDRESS");
+    EXPECT_EQ("127.0.0.1:0", upstream_format.format(header, header, request_info));
+  }
 }
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
-  MockRequestInfo request_info;
+  RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}};
 
@@ -218,7 +200,7 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
 }
 
 TEST(AccessLogFormatterTest, responseHeaderFormatter) {
-  MockRequestInfo request_info;
+  RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
@@ -244,7 +226,7 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
 }
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
-  MockRequestInfo request_info;
+  RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
 

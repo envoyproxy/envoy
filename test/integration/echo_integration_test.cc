@@ -3,19 +3,36 @@
 #include "test/server/utility.h"
 
 namespace Envoy {
+
+std::string echo_config;
+
 class EchoIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  EchoIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
+
+  // Called once by the gtest framework before any EchoIntegrationTests are run.
+  static void SetUpTestCase() {
+    echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
+    filter_chains:
+      filters:
+        name: envoy.ratelimit
+        config:
+          domain: foo
+          stats_prefix: name
+          descriptors: [{"key": "foo", "value": "bar"}]
+      filters:
+        name: envoy.echo
+        config:
+      )EOF";
+  }
+
   /**
    * Initializer for an individual test.
    */
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-    registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/echo_server.json", {"echo"});
+    named_ports_ = {{"echo"}};
+    BaseIntegrationTest::initialize();
   }
 
   /**
@@ -64,7 +81,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromJson(json)));
+        Server::parseListenerFromJson(json), true));
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();

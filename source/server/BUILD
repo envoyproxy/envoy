@@ -24,6 +24,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_bootstrap",
         "envoy_lds",
+        "envoy_trace",
     ],
     deps = [
         ":lds_api_lib",

@@ -2,6 +2,9 @@
 
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
+#include "common/protobuf/utility.h"
+
+#include "api/sds.pb.validate.h"
 
 namespace Envoy {
 namespace Config {
@@ -17,6 +20,7 @@ void TlsContextJson::translateDownstreamTlsContext(
   for (const std::string& path : paths) {
     downstream_tls_context.mutable_session_ticket_keys()->mutable_keys()->Add()->set_filename(path);
   }
+  MessageUtil::validate(downstream_tls_context);
 }
 
 void TlsContextJson::translateUpstreamTlsContext(
@@ -24,6 +28,7 @@ void TlsContextJson::translateUpstreamTlsContext(
     envoy::api::v2::UpstreamTlsContext& upstream_tls_context) {
   translateCommonTlsContext(json_tls_context, *upstream_tls_context.mutable_common_tls_context());
   upstream_tls_context.set_sni(json_tls_context.getString("sni", ""));
+  MessageUtil::validate(upstream_tls_context);
 }
 
 void TlsContextJson::translateCommonTlsContext(
@@ -40,8 +45,10 @@ void TlsContextJson::translateCommonTlsContext(
   translateTlsCertificate(json_tls_context, *common_tls_context.mutable_tls_certificates()->Add());
 
   auto* validation_context = common_tls_context.mutable_validation_context();
-  validation_context->mutable_trusted_ca()->set_filename(
-      json_tls_context.getString("ca_cert_file", ""));
+  if (json_tls_context.hasObject("ca_cert_file")) {
+    validation_context->mutable_trusted_ca()->set_filename(
+        json_tls_context.getString("ca_cert_file", ""));
+  }
   if (json_tls_context.hasObject("verify_certificate_hash")) {
     validation_context->add_verify_certificate_hash(
         json_tls_context.getString("verify_certificate_hash"));
@@ -64,10 +71,14 @@ void TlsContextJson::translateCommonTlsContext(
 
 void TlsContextJson::translateTlsCertificate(const Json::Object& json_tls_context,
                                              envoy::api::v2::TlsCertificate& tls_certificate) {
-  tls_certificate.mutable_certificate_chain()->set_filename(
-      json_tls_context.getString("cert_chain_file", ""));
-  tls_certificate.mutable_private_key()->set_filename(
-      json_tls_context.getString("private_key_file", ""));
+  if (json_tls_context.hasObject("cert_chain_file")) {
+    tls_certificate.mutable_certificate_chain()->set_filename(
+        json_tls_context.getString("cert_chain_file", ""));
+  }
+  if (json_tls_context.hasObject("private_key_file")) {
+    tls_certificate.mutable_private_key()->set_filename(
+        json_tls_context.getString("private_key_file", ""));
+  }
 }
 
 } // namespace Config

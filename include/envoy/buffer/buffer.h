@@ -19,6 +19,31 @@ struct RawSlice {
 };
 
 /**
+ * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
+ * When the buffer no longer needs the data passed in through a fragment, it calls done() on it.
+ */
+class BufferFragment {
+public:
+  /**
+   * @return const void* a pointer to the referenced data.
+   */
+  virtual const void* data() const PURE;
+
+  /**
+   * @return size_t the size of the referenced data.
+   */
+  virtual size_t size() const PURE;
+
+  /**
+   * Called by a buffer when the refernced data is no longer needed.
+   */
+  virtual void done() PURE;
+
+protected:
+  virtual ~BufferFragment() {}
+};
+
+/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -31,6 +56,13 @@ public:
    * @param size supplies the data size.
    */
   virtual void add(const void* data, uint64_t size) PURE;
+
+  /**
+   * Add externally owned data into the buffer. No copying is done. fragment is not owned. When
+   * the fragment->data() is no longer needed, fragment->done() is called.
+   * @param fragment the externally owned data to add to the buffer.
+   */
+  virtual void addBufferFragment(BufferFragment& fragment) PURE;
 
   /**
    * Copy a string into the buffer.

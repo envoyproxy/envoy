@@ -3,11 +3,11 @@
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements) are typically
 independently sourced, the following steps should be followed:
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements).
+2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
 3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
    to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
    [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
@@ -146,7 +146,7 @@ bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 
 Bazel will by default run all tests inside a sandbox, which disallows access to the
 local filesystem. If you need to break out of the sandbox (for example to run under a
-local script or tool with [`--run_under`](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--run_under)),
+local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#flag--run_under)),
 you can run the test with `--strategy=TestRunner=standalone`, e.g.:
 
 ```
@@ -196,7 +196,7 @@ binaries will not include debugging symbols and GDB will not be very useful.
 # Additional Envoy build and test options
 
 In general, there are 3 [compilation
-modes](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--compilation_mode)
+modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilation_mode)
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
@@ -252,7 +252,7 @@ on the Bazel command line.
 
 The default maximum number of stats in shared memory, and the default
 maximum length of a cluster/route config/listener name, can be
-overriden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
+overridden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
 `ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`, respectively, to the desired
 value. For example:
 

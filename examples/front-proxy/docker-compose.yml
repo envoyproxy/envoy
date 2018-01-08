@@ -6,7 +6,7 @@ services:
       context: ../
       dockerfile: front-proxy/Dockerfile-frontenvoy
     volumes:
-      - ./front-envoy.json:/etc/front-envoy.json
+      - ./front-envoy.yaml:/etc/front-envoy.yaml
     networks:
       - envoymesh
     expose:
@@ -21,7 +21,7 @@ services:
       context: .
       dockerfile: Dockerfile-service
     volumes:
-      - ./service-envoy.json:/etc/service-envoy.json
+      - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
@@ -36,7 +36,7 @@ services:
       context: .
       dockerfile: Dockerfile-service
     volumes:
-      - ./service-envoy.json:/etc/service-envoy.json
+      - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
