@@ -243,9 +243,9 @@ remove log statements of lower importance during compilation to enhance performa
 bazel build --copt=-DNVLOG //source/exe:envoy-static
 ```
 
-## Disabling optional featuers
+## Disabling optional features
 
-The following optional featuers can be disabled on the Bazel build command-line:
+The following optional features can be disabled on the Bazel build command-line:
 
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
