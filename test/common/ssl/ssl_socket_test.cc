@@ -335,7 +335,7 @@ TEST_P(SslSocketTest, NoCert) {
            GetParam());
 }
 
-TEST_P(SslConnectionImplTest, GetUriWithLocalUriSan) {
+TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
@@ -355,7 +355,7 @@ TEST_P(SslConnectionImplTest, GetUriWithLocalUriSan) {
            "ssl.handshake", true, GetParam());
 }
 
-TEST_P(SslConnectionImplTest, GetSubjectsWithBothCerts) {
+TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
