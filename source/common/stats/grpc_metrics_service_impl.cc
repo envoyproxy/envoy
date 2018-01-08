@@ -67,17 +67,12 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
 }
 
 MetricsServiceSink::MetricsServiceSink(const LocalInfo::LocalInfo& local_info,
-                                       const std::string& cluster_name,
-                                       ThreadLocal::SlotAllocator& tls,
-                                       Upstream::ClusterManager& cluster_manager,
-                                       Stats::Scope& scope,
+                                       const std::string& cluster_name, ThreadLocal::SlotAllocator&,
+                                       Upstream::ClusterManager& cluster_manager, Stats::Scope&,
                                        GrpcMetricsStreamerSharedPtr grpc_metrics_streamer)
-    : tls_(tls.allocateSlot()), cluster_manager_(cluster_manager),
-      cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
-  grpc_metrics_streamer_ = grpc_metrics_streamer;
+    : grpc_metrics_streamer_(grpc_metrics_streamer) {
   Config::Utility::checkClusterAndLocalInfo("metrics service", cluster_name, cluster_manager,
                                             local_info);
-  cluster_info_ = cluster_manager.get(cluster_name)->info();
 }
 } // namespace Metrics
 } // namespace Stats

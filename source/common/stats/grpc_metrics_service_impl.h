@@ -136,8 +136,7 @@ public:
   // MetricsService::Sink
   void beginFlush() override { message.clear_envoy_metrics(); }
 
-  void flushCounter(const Counter& counter, uint64_t delta) override {
-    std::cout << "Delta:" << delta << "\n";
+  void flushCounter(const Counter& counter, uint64_t) override {
     io::prometheus::client::MetricFamily* metrics_family = message.add_envoy_metrics();
     metrics_family->set_name(counter.name());
     auto* metric = metrics_family->add_metric();
@@ -155,21 +154,14 @@ public:
 
   void endFlush() override { grpc_metrics_streamer_->send(message); }
 
-  void onHistogramComplete(const Histogram& histogram, uint64_t value) override {
+  void onHistogramComplete(const Histogram&, uint64_t) override {
     // TODO(ramaraochavali): Need to figure out how map existing histogram to
     // Proto Model
-    std::cout << "Histogram Called" << histogram.name() << "value:" << value << "\n";
   }
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::api::v2::StreamMetricsMessage message;
-
-  // TODO(ramaraochavali): check some of these things are not required
-  Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  ThreadLocal::SlotPtr tls_;
-  Upstream::ClusterManager& cluster_manager_;
-  Stats::Counter& cx_overflow_stat_;
 };
 
 } // namespace Metrics
