@@ -1,5 +1,7 @@
 #include "server/lds_api.h"
 
+#include <unordered_map>
+
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"

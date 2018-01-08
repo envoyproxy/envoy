@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
