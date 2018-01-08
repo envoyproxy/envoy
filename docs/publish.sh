@@ -23,7 +23,7 @@ cd data-plane-api
 git checkout "${GIT_INFO[1]}"
 # Check the git tag matches the version number in the VERSION file.
 VERSION_NUMBER=$(cat VERSION)
-if [ "v${VERSION_NUMBER}" != $CIRCLE_TAG ]; then
+if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
   echo "Given git tag does not match the VERSION file content:"
   echo "${CIRCLE_TAG} vs $(cat VERSION)"
   exit 1
