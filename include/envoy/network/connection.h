@@ -227,7 +227,7 @@ class ClientConnection : public virtual Connection {
 public:
   /**
    * Connect to a remote host. Errors or connection events are reported via the event callback
-   * registered via setConnectionEventCb().
+   * registered via addConnectionCallbacks().
    */
   virtual void connect() PURE;
 };

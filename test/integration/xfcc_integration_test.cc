@@ -1,6 +1,7 @@
 #include "xfcc_integration_test.h"
 
 #include <regex>
+#include <unordered_map>
 
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
