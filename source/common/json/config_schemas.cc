@@ -963,13 +963,19 @@ const std::string Json::Schema::SQUASH_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "object"
       },
       "attachment_timeout_ms": {
-        "type" : "number"
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       },
       "attachment_poll_period_ms": {
-        "type" : "number"
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       },
       "request_timeout_ms": {
-        "type" : "number"
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["cluster", "attachment_template"],

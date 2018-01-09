@@ -82,6 +82,7 @@ public:
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
   const LowerCaseString XB3Sampled{"x-b3-sampled"};
   const LowerCaseString XB3Flags{"x-b3-flags"};
+  const LowerCaseString XSquashDebug{"x-squash-debug"};
 
   struct {
     const std::string Close{"close"};

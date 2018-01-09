@@ -4,7 +4,6 @@
 
 #include "envoy/registry/registry.h"
 
-#include "common/common/logger.h"
 #include "common/config/filter_json.h"
 #include "common/config/json_utility.h"
 #include "common/http/filter/squash_filter.h"

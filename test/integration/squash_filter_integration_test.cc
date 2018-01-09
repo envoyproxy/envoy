@@ -29,8 +29,8 @@ public:
       request_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", status}}, true);
     } else {
       request_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", status}}, false);
-      Buffer::OwnedImpl creatrespbuffer(body);
-      request_stream->encodeData(creatrespbuffer, true);
+      Buffer::OwnedImpl responseBuffer(body);
+      request_stream->encodeData(responseBuffer, true);
     }
     return request_stream;
   }
@@ -87,7 +87,6 @@ INSTANTIATE_TEST_CASE_P(IpVersions, SquashFilterIntegrationTestV1,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(SquashFilterIntegrationTestV1, TestHappyPath) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
 
   FakeHttpConnectionPtr fake_squash_connection =
@@ -160,7 +159,6 @@ INSTANTIATE_TEST_CASE_P(IpVersions, SquashFilterIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
 
   FakeHttpConnectionPtr fake_squash_connection =
@@ -193,7 +191,7 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
 
   EXPECT_TRUE(MessageDifferencer::Equals(expectedbody, actualbody));
 
-  // The second request should be fore the created object
+  // The second request should be for the created object
   EXPECT_STREQ("GET", get_stream->headers().Method()->value().c_str());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
@@ -203,7 +201,6 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
 }
 
 TEST_P(SquashFilterIntegrationTest, ErrorAttaching) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
   FakeHttpConnectionPtr fake_squash_connection =
       fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
@@ -230,7 +227,6 @@ TEST_P(SquashFilterIntegrationTest, ErrorAttaching) {
 }
 
 TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
   FakeHttpConnectionPtr fake_squash_connection =
       fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
@@ -241,8 +237,9 @@ TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
                                                "\"spec\":{\"attachment\":{\"a\":\"b\"},"
                                                "\"image\":\"debug\",\"node\":\"debug-node\"},"
                                                "\"status\":{\"state\":\"none\"}}");
-  // respond to read attachment. since attachment_timeout is smaller than the squash
-  // attachment_poll_every  config, just one response is enough
+  // respond to read attachment. since attachment_timeout is smaller than attachment_poll_period
+  // config, just one response is enough, as the filter will timeout (and continue the iteration)
+  // before issuing another get attachment request.
   FakeStreamPtr get_stream = sendSquashOk(
       fake_squash_connection, "{\"metadata\":{\"name\":\"oF8iVdiJs5\"},\"spec\":{"
                               "\"attachment\":{\"a\":\"b\"},\"image\":\"debug\",\"node\":"
@@ -258,7 +255,6 @@ TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
 }
 
 TEST_P(SquashFilterIntegrationTest, ErrorNoSquashServer) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
 
   // Don't respond to anything. squash filter should timeout within
@@ -271,7 +267,6 @@ TEST_P(SquashFilterIntegrationTest, ErrorNoSquashServer) {
 }
 
 TEST_P(SquashFilterIntegrationTest, BadCreateResponse) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
   FakeHttpConnectionPtr fake_squash_connection =
       fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
@@ -289,7 +284,6 @@ TEST_P(SquashFilterIntegrationTest, BadCreateResponse) {
 }
 
 TEST_P(SquashFilterIntegrationTest, BadGetResponse) {
-
   IntegrationStreamDecoderPtr response = sendDebugRequest(codec_client_);
   FakeHttpConnectionPtr fake_squash_connection =
       fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);

@@ -95,6 +95,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )

@@ -5,7 +5,6 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 
 #include "api/filter/http/squash.pb.h"
@@ -17,8 +16,7 @@ namespace Configuration {
 /**
  * Config registration for the squash filter. @see NamedHttpFilterConfigFactory.
  */
-class SquashFilterConfig : public NamedHttpFilterConfigFactory,
-                           protected Logger::Loggable<Logger::Id::config> {
+class SquashFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config, const std::string&,
                                           FactoryContext& context) override;
@@ -27,11 +25,11 @@ public:
                                                    const std::string&,
                                                    FactoryContext& context) override;
 
-  std::string name() override { return Config::HttpFilterNames::get().SQUASH; }
-
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::Squash()};
   }
+
+  std::string name() override { return Config::HttpFilterNames::get().SQUASH; }
 
 private:
   HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Squash& proto_config,

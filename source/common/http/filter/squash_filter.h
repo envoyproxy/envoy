@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <regex>
 #include <string>
 
 #include "envoy/common/optional.h"
@@ -20,11 +21,11 @@ class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
   SquashFilterConfig(const envoy::api::v2::filter::http::Squash& proto_config,
                      Upstream::ClusterManager& clusterManager);
-  const std::string& cluster_name() { return cluster_name_; }
-  const std::string& attachment_json() { return attachment_json_; }
-  const std::chrono::milliseconds& attachment_timeout() { return attachment_timeout_; }
-  const std::chrono::milliseconds& attachment_poll_period() { return attachment_poll_period_; }
-  const std::chrono::milliseconds& request_timeout() { return request_timeout_; }
+  const std::string& clusterName() { return cluster_name_; }
+  const std::string& attachmentJson() { return attachment_json_; }
+  const std::chrono::milliseconds& attachmentTimeout() { return attachment_timeout_; }
+  const std::chrono::milliseconds& attachmentPollPeriod() { return attachment_poll_period_; }
+  const std::chrono::milliseconds& requestTimeout() { return request_timeout_; }
 
 private:
   static std::string getAttachment(const ProtobufWkt::Struct& attachment_template);
@@ -37,6 +38,8 @@ private:
   std::chrono::milliseconds attachment_timeout_;
   std::chrono::milliseconds attachment_poll_period_;
   std::chrono::milliseconds request_timeout_;
+
+  const static std::regex ENV_REGEX;
 };
 
 typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
@@ -84,6 +87,11 @@ private:
 
   Upstream::ClusterManager& cm_;
   StreamDecoderFilterCallbacks* decoder_callbacks_;
+
+  const static std::string POST_ATTACHMENT_PATH;
+  const static std::string SERVER_AUTHORITY;
+  const static std::string ATTACHED_STATE;
+  const static std::string ERROR_STATE;
 };
 
 } // namespace Http

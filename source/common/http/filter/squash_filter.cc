@@ -1,6 +1,5 @@
 #include "common/http/filter/squash_filter.h"
 
-#include <regex>
 #include <string>
 
 #include "envoy/http/codes.h"
@@ -8,30 +7,21 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
-#include "common/common/utility.h"
+#include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Http {
 
-namespace {
-// The functions below are needed due to the "C++ static initialization order fiasco."
+const std::regex SquashFilterConfig::ENV_REGEX("\\{\\{ (\\w+) \\}\\}");
 
-static const LowerCaseString& squashHeaderKey() {
-  CONSTRUCT_ON_FIRST_USE(LowerCaseString, "x-squash-debug");
-}
-static const std::string& postAttachmentPath() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "/api/v2/debugattachment/");
-}
-static const std::string& severAuthority() { CONSTRUCT_ON_FIRST_USE(std::string, "squash-server"); }
-static const std::string& createdCode() {
-  CONSTRUCT_ON_FIRST_USE(std::string, std::to_string(enumToInt(Code::Created)));
-}
-static const std::string& attachedState() { CONSTRUCT_ON_FIRST_USE(std::string, "attached"); }
-static const std::string& errorState() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
-} // namespace
+const std::string SquashFilter::POST_ATTACHMENT_PATH = "/api/v2/debugattachment/";
+const std::string SquashFilter::SERVER_AUTHORITY = "squash-server";
+const std::string SquashFilter::ATTACHED_STATE = "attached";
+const std::string SquashFilter::ERROR_STATE = "error";
 
 SquashFilterConfig::SquashFilterConfig(const envoy::api::v2::filter::http::Squash& proto_config,
                                        Upstream::ClusterManager& clusterManager)
@@ -91,31 +81,39 @@ void SquashFilterConfig::getAttachmentFromValue(ProtobufWkt::Value& curvalue) {
   }
 }
 
+/*
+ This function interpolates environment variables in a string template.
+ To interpolate an environment variable named ENV, add '{{ ENV }}' (without the
+  quotes, with the spaces) to the template string.
+
+  See https://github.com/envoyproxy/data-plane-api/blob/master/api/filter/http/squash.proto#L36 for
+  the motivation on why this is needed.
+*/
 std::string SquashFilterConfig::replaceEnv(const std::string& attachment_template) {
   std::string s;
 
-  const std::regex env_regex("\\{\\{ ([a-zA-Z_]+) \\}\\}");
   auto end_last_match = attachment_template.begin();
 
-  auto callback = [&s, &attachment_template,
-                   &end_last_match](const std::match_results<std::string::const_iterator>& match) {
-    auto start_match = attachment_template.begin() + match.position(0);
+  auto replaceEnvVarInTemplateCallback =
+      [&s, &attachment_template,
+       &end_last_match](const std::match_results<std::string::const_iterator>& match) {
+        auto start_match = attachment_template.begin() + match.position(0);
 
-    s.append(end_last_match, start_match);
+        s.append(end_last_match, start_match);
 
-    std::string envar_name = match[1].str();
-    const char* envar_value = std::getenv(envar_name.c_str());
-    if (envar_value == nullptr) {
-      ENVOY_LOG(warn, "Squash: no environment variable named {}.", envar_name);
-    } else {
-      s.append(envar_value);
-    }
-    end_last_match = start_match + match.length(0);
-  };
+        std::string envar_name = match[1].str();
+        const char* envar_value = std::getenv(envar_name.c_str());
+        if (envar_value == nullptr) {
+          ENVOY_LOG(warn, "Squash: no environment variable named {}.", envar_name);
+        } else {
+          s.append(envar_value);
+        }
+        end_last_match = start_match + match.length(0);
+      };
 
-  std::sregex_iterator begin(attachment_template.begin(), attachment_template.end(), env_regex),
+  std::sregex_iterator begin(attachment_template.begin(), attachment_template.end(), ENV_REGEX),
       end;
-  std::for_each(begin, end, callback);
+  std::for_each(begin, end, replaceEnvVarInTemplateCallback);
   s.append(end_last_match, attachment_template.end());
 
   return s;
@@ -133,7 +131,7 @@ void SquashFilter::onDestroy() { cleanup(); }
 FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   // check for squash header
-  if (!headers.get(squashHeaderKey())) {
+  if (!headers.get(Headers::get().XSquashDebug)) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -142,24 +140,24 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
   MessagePtr request(new RequestMessageImpl());
   request->headers().insertContentType().value().setReference(
       Headers::get().ContentTypeValues.Json);
-  request->headers().insertPath().value().setReference(postAttachmentPath());
-  request->headers().insertHost().value().setReference(severAuthority());
+  request->headers().insertPath().value().setReference(POST_ATTACHMENT_PATH);
+  request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
   request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Post);
-  request->body().reset(new Buffer::OwnedImpl(config_->attachment_json()));
+  request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
 
   state_ = State::CREATE_CONFIG;
-  in_flight_request_ = cm_.httpAsyncClientForCluster(config_->cluster_name())
-                           .send(std::move(request), *this, config_->request_timeout());
+  in_flight_request_ = cm_.httpAsyncClientForCluster(config_->clusterName())
+                           .send(std::move(request), *this, config_->requestTimeout());
 
   if (in_flight_request_ == nullptr) {
-    ENVOY_LOG(info, "Squash: can't created request for squash server");
+    ENVOY_LOG(info, "Squash: can't create request for squash server");
     state_ = State::INITIAL;
     return FilterHeadersStatus::Continue;
   }
 
   attachment_timeout_timer_ =
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
-  attachment_timeout_timer_->enableTimer(config_->attachment_timeout());
+  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
   // check if the timer expired inline.
   if (state_ == State::INITIAL) {
     return FilterHeadersStatus::Continue;
@@ -200,7 +198,7 @@ void SquashFilter::onSuccess(MessagePtr&& m) {
   }
   case State::CREATE_CONFIG: {
     // get the config object that was created
-    if (m->headers().Status()->value() != createdCode().c_str()) {
+    if (Utility::getResponseStatus(m->headers()) != enumToInt(Code::Created)) {
       ENVOY_LOG(info, "Squash: can't create attachment object. status {} - not squashing",
                 m->headers().Status()->value().c_str());
       doneSquashing();
@@ -220,7 +218,7 @@ void SquashFilter::onSuccess(MessagePtr&& m) {
         ENVOY_LOG(info, "Squash: failed to parse debug attachment object - check server settings.");
         doneSquashing();
       } else {
-        debugAttachmentPath_ = postAttachmentPath() + debugAttachmentId;
+        debugAttachmentPath_ = POST_ATTACHMENT_PATH + debugAttachmentId;
         pollForAttachment();
       }
     }
@@ -237,8 +235,8 @@ void SquashFilter::onSuccess(MessagePtr&& m) {
       // no state yet.. leave it empty for the retry logic.
     }
 
-    bool attached = attachmentstate == attachedState();
-    bool error = attachmentstate == errorState();
+    bool attached = attachmentstate == ATTACHED_STATE;
+    bool error = attachmentstate == ERROR_STATE;
     bool finalstate = attached || error;
 
     if (finalstate) {
@@ -283,17 +281,17 @@ void SquashFilter::retry() {
     delay_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
-  delay_timer_->enableTimer(config_->attachment_poll_period());
+  delay_timer_->enableTimer(config_->attachmentPollPeriod());
 }
 
 void SquashFilter::pollForAttachment() {
   MessagePtr request(new RequestMessageImpl());
   request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Get);
   request->headers().insertPath().value().setReference(debugAttachmentPath_);
-  request->headers().insertHost().value().setReference(severAuthority());
+  request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
 
-  in_flight_request_ = cm_.httpAsyncClientForCluster(config_->cluster_name())
-                           .send(std::move(request), *this, config_->request_timeout());
+  in_flight_request_ = cm_.httpAsyncClientForCluster(config_->clusterName())
+                           .send(std::move(request), *this, config_->requestTimeout());
   // no need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }

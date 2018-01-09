@@ -13,6 +13,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -60,13 +61,14 @@ TEST(SoloFilterConfigTest, V1ApiConversion) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).Times(1);
 
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
-  EXPECT_EQ("fake_cluster", config.cluster_name());
-  EXPECT_JSON_EQ("{\"a\":\"b\"}", config.attachment_json());
-  EXPECT_EQ(std::chrono::milliseconds(1001), config.request_timeout());
-  EXPECT_EQ(std::chrono::milliseconds(2002), config.attachment_poll_period());
-  EXPECT_EQ(std::chrono::milliseconds(3003), config.attachment_timeout());
+  EXPECT_EQ("fake_cluster", config.clusterName());
+  EXPECT_JSON_EQ("{\"a\":\"b\"}", config.attachmentJson());
+  EXPECT_EQ(std::chrono::milliseconds(1001), config.requestTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(2002), config.attachmentPollPeriod());
+  EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
 }
 
 TEST(SoloFilterConfigTest, NoCluster) {
@@ -82,8 +84,9 @@ TEST(SoloFilterConfigTest, NoCluster) {
 
   EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).WillOnce(Return(nullptr));
 
-  EXPECT_THROW(constructSquashFilterConfigFromJson(*config, factory_context),
-               Envoy::EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromJson(*config, factory_context),
+                            Envoy::EnvoyException,
+                            "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironment) {
@@ -97,8 +100,10 @@ TEST(SoloFilterConfigTest, ParsesEnvironment) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_CALL(factory_context.cluster_manager_, get("squash")).Times(1);
+
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachment_json());
+  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
@@ -115,8 +120,27 @@ TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_CALL(factory_context.cluster_manager_, get("squash")).Times(1);
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachment_json());
+  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+}
+TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
+  ::setenv("ENV1", "1", 1);
+  ::setenv("ENV2", "2", 1);
+
+  std::string json = R"EOF(
+    {
+      "cluster" : "squash",
+      "attachment_template" : {"a":"{{ ENV1 }}-{{ ENV2 }}"}
+    }
+    )EOF";
+
+  std::string expected_json = "{\"a\":\"1-2\"}";
+
+  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
@@ -133,8 +157,9 @@ TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_CALL(factory_context.cluster_manager_, get("squash")).Times(1);
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachment_json());
+  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 class SquashFilterTest : public testing::Test {
@@ -153,26 +178,22 @@ protected:
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
-  Envoy::Http::AsyncClient::Callbacks* startRequest() {
+  // start a downstream request marked with the squash header.
+  // note that a side effect of this is that
+  // a call to the squash server will be made.
+  // use popPendingCallback() to reply to that call.
+  void startDownstreamRequest() {
     initFilter();
 
-    attachment_timeout_timer_ =
+    attachmentTimeout_timer_ =
         new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
     EXPECT_CALL(cm_, httpAsyncClientForCluster("squash"))
         .WillRepeatedly(ReturnRef(cm_.async_client_));
 
-    Envoy::Http::AsyncClient::Callbacks* callbacks;
+    expectAsyncClientSend();
 
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
-
-    EXPECT_CALL(*attachment_timeout_timer_, enableTimer(config_->attachment_timeout()));
+    EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()));
 
     Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
                                            {":authority", "www.solo.io"},
@@ -180,11 +201,10 @@ protected:
                                            {":path", "/getsomething"}};
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(headers, false));
-    return callbacks;
   }
 
-  Envoy::Http::AsyncClient::Callbacks* startCompleteRequest() {
-    auto callbacks = startRequest();
+  void doDownstreamRequest() {
+    startDownstreamRequest();
 
     Envoy::Http::TestHeaderMapImpl trailers{};
     // Complete a full request cycle
@@ -192,24 +212,53 @@ protected:
     EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationAndBuffer,
               filter_->decodeData(buffer, false));
     EXPECT_EQ(Envoy::Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers));
+  }
 
+  void expectAsyncClientSend() {
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
+                             const Envoy::Optional<std::chrono::milliseconds>&)
+                             -> Envoy::Http::AsyncClient::Request* {
+          callbacks_.push_back(&cb);
+          return &request_;
+        }));
+  }
+
+  void completeCreateRequest() {
+    // return the create request
+    Http::MessagePtr msg(new Http::ResponseMessageImpl(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "201"}}}));
+    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"metadata":{"name":"a"}})EOF"));
+    popPendingCallback()->onSuccess(std::move(msg));
+  }
+
+  void completeGetStatusRequest(const std::string& status) {
+    Http::MessagePtr msg(new Http::ResponseMessageImpl(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+    msg->body().reset(
+        new Buffer::OwnedImpl(fmt::format(R"EOF({{"status":{{"state":"{}"}}}})EOF", status)));
+    popPendingCallback()->onSuccess(std::move(msg));
+  }
+
+  Envoy::Http::AsyncClient::Callbacks* popPendingCallback() {
+    auto callbacks = callbacks_.front();
+    callbacks_.pop_front();
     return callbacks;
   }
 
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context_;
-  NiceMock<Envoy::Event::MockTimer>* attachment_timeout_timer_{};
+  NiceMock<Envoy::Event::MockTimer>* attachmentTimeout_timer_{};
   NiceMock<Envoy::Upstream::MockClusterManager> cm_;
   Envoy::Http::MockAsyncClientRequest request_;
   SquashFilterConfigSharedPtr config_;
   std::shared_ptr<SquashFilter> filter_;
+  std::deque<Envoy::Http::AsyncClient::Callbacks*> callbacks_;
 };
 
 TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
+  initFilter();
 
-  envoy::api::v2::filter::http::Squash p;
-  p.set_cluster("squash");
-  SquashFilterConfigSharedPtr config(new SquashFilterConfig(p, factory_context_.cluster_manager_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("squash")).WillOnce(ReturnRef(cm_.async_client_));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
@@ -220,23 +269,23 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
         return nullptr;
       }));
 
-  SquashFilter filter(config, cm_);
-
   Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-squash-debug", "true"},
                                          {":path", "/getsomething"}};
 
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter.decodeHeaders(headers, false));
-  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter.decodeTrailers(headers));
+  Envoy::Buffer::OwnedImpl data("nothing here");
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
 TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
-  auto callbacks = startRequest();
+  startDownstreamRequest();
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_CALL(*attachment_timeout_timer_, disableTimer());
-  callbacks->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+  EXPECT_CALL(*attachmentTimeout_timer_, disableTimer());
+  popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
 
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
@@ -245,13 +294,8 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 }
 
 TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
-
-  envoy::api::v2::filter::http::Squash p;
-  p.set_cluster("squash");
-  SquashFilterConfigSharedPtr config(new SquashFilterConfig(p, factory_context_.cluster_manager_));
+  initFilter();
   EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-
-  SquashFilter filter(config, cm_);
 
   Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
@@ -259,13 +303,13 @@ TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
                                          {":path", "/getsomething"}};
 
   Envoy::Buffer::OwnedImpl data("nothing here");
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter.decodeHeaders(headers, false));
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter.decodeData(data, false));
-  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter.decodeTrailers(headers));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
 TEST_F(SquashFilterTest, Timeout) {
-  startRequest();
+  startDownstreamRequest();
 
   // invoke timeout
   Envoy::Buffer::OwnedImpl buffer("nothing here");
@@ -276,186 +320,82 @@ TEST_F(SquashFilterTest, Timeout) {
   EXPECT_CALL(request_, cancel());
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
-  attachment_timeout_timer_->callback_();
+  attachmentTimeout_timer_->callback_();
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
 }
 
 TEST_F(SquashFilterTest, HappyPathWithTrailers) {
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
 
-  Envoy::Http::AsyncClient::Callbacks* callbacks = startCompleteRequest();
-
-  {
-    // Expect the get attachment request
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
-
-    // return the create request
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "201"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"metadata":{"name":"a"}})EOF"));
-    callbacks->onSuccess(std::move(msg));
-  }
-  {
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"status":{"state":"attached"}})EOF"));
-
-    EXPECT_CALL(filter_callbacks_, continueDecoding());
-
-    callbacks->onSuccess(std::move(msg));
-  }
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  completeGetStatusRequest("attached");
 }
 
 TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
-  Envoy::Http::AsyncClient::Callbacks* callbacks = startCompleteRequest();
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
 
-  {
-    // Expect the get attachment request
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
-
-    // return the create request
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "201"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"metadata":{"name":"a"}})EOF"));
-    callbacks->onSuccess(std::move(msg));
-  }
   NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  {
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"status":{"state":"attaching"}})EOF"));
+  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
-    retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  completeGetStatusRequest("attaching");
 
-    EXPECT_CALL(*retry_timer, enableTimer(config_->attachment_poll_period()));
-    callbacks->onSuccess(std::move(msg));
-    callbacks = nullptr;
-  }
-
-  {
-    // Expect the second get attachment request
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
-
-    retry_timer->callback_();
-
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"status":{"state":"attached"}})EOF"));
-
-    EXPECT_CALL(filter_callbacks_, continueDecoding());
-    callbacks->onSuccess(std::move(msg));
-  }
+  // Expect the second get attachment request
+  expectAsyncClientSend();
+  retry_timer->callback_();
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  completeGetStatusRequest("attached");
 }
 
 TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
-  Envoy::Http::AsyncClient::Callbacks* callbacks = startCompleteRequest();
+  doDownstreamRequest();
+  // Expect the first get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
 
-  {
-    // Expect the get attachment request
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
-
-    // return the create request
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "201"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"metadata":{"name":"a"}})EOF"));
-    callbacks->onSuccess(std::move(msg));
-  }
   NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  {
-    retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
-    EXPECT_CALL(*retry_timer, enableTimer(config_->attachment_poll_period()));
-    callbacks->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
-    callbacks = nullptr;
-  }
+  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
 
-  {
-    // Expect the second get attachment request
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
+  // Expect the second get attachment request
+  expectAsyncClientSend();
 
-    retry_timer->callback_();
+  retry_timer->callback_();
 
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"status":{"state":"attached"}})EOF"));
-
-    EXPECT_CALL(filter_callbacks_, continueDecoding());
-    callbacks->onSuccess(std::move(msg));
-  }
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  completeGetStatusRequest("attached");
 }
 
 TEST_F(SquashFilterTest, DestroyedInTheMiddle) {
-  Envoy::Http::AsyncClient::Callbacks* callbacks = startCompleteRequest();
-
-  {
-    // Expect the get attachment request
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const Envoy::Optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks = &cb;
-          return &request_;
-        }));
-
-    // return the create request
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "201"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"metadata":{"name":"a"}})EOF"));
-    callbacks->onSuccess(std::move(msg));
-  }
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
   NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  {
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"status":{"state":"attaching"}})EOF"));
 
-    retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  completeGetStatusRequest("attaching");
 
-    EXPECT_CALL(*retry_timer, enableTimer(config_->attachment_poll_period()));
-    callbacks->onSuccess(std::move(msg));
-    callbacks = nullptr;
-  }
-
-  EXPECT_CALL(*attachment_timeout_timer_, disableTimer());
+  EXPECT_CALL(*attachmentTimeout_timer_, disableTimer());
   EXPECT_CALL(*retry_timer, disableTimer());
 
   filter_->onDestroy();
 }
 
 TEST_F(SquashFilterTest, DestroyedInFlight) {
-  startCompleteRequest();
+  doDownstreamRequest();
 
   EXPECT_CALL(request_, cancel());
-  EXPECT_CALL(*attachment_timeout_timer_, disableTimer());
+  EXPECT_CALL(*attachmentTimeout_timer_, disableTimer());
 
   filter_->onDestroy();
 }
@@ -463,11 +403,11 @@ TEST_F(SquashFilterTest, DestroyedInFlight) {
 TEST_F(SquashFilterTest, TimerExpiresInline) {
   initFilter();
 
-  attachment_timeout_timer_ = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*attachment_timeout_timer_, enableTimer(config_->attachment_timeout()))
+  attachmentTimeout_timer_ = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()))
       .WillOnce(Invoke([&](const std::chrono::milliseconds&) {
         // timer expires inline
-        attachment_timeout_timer_->callback_();
+        attachmentTimeout_timer_->callback_();
       }));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
