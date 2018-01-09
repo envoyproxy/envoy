@@ -1,8 +1,8 @@
 #include "common/stats/grpc_metrics_service_impl.h"
 
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
 using namespace std::chrono_literals;
