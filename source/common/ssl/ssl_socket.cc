@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
+#include "common/http/headers.h"
 
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
@@ -316,6 +317,17 @@ std::string SslSocket::subjectLocalCertificate() const {
   }
   return getSubjectFromCertificate(cert);
 }
+
+ClientSslSocketFactory::ClientSslSocketFactory(const ClientContextConfig& config,
+                                               Ssl::ContextManager& manager,
+                                               Stats::Scope& stats_scope)
+    : ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
+
+Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
+  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Client);
+}
+
+bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 } // namespace Ssl
 } // namespace Envoy

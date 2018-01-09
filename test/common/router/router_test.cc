@@ -1560,16 +1560,19 @@ TEST(RouterFilterUtilityTest, setUpstreamScheme) {
   {
     Upstream::MockClusterInfo cluster;
     Http::TestHeaderMapImpl headers;
-    EXPECT_CALL(cluster, sslContext()).WillOnce(Return(nullptr));
+    Network::MockTransportSocketFactory transport_socket_factory;
+    EXPECT_CALL(cluster, transportSocketFactory()).WillOnce(ReturnRef(transport_socket_factory));
+    EXPECT_CALL(transport_socket_factory, implementsSecureTransport()).WillOnce(Return(false));
     FilterUtility::setUpstreamScheme(headers, cluster);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
-
   {
     Upstream::MockClusterInfo cluster;
     Ssl::MockClientContext context;
     Http::TestHeaderMapImpl headers;
-    EXPECT_CALL(cluster, sslContext()).WillOnce(Return(&context));
+    Network::MockTransportSocketFactory transport_socket_factory;
+    EXPECT_CALL(cluster, transportSocketFactory()).WillOnce(ReturnRef(transport_socket_factory));
+    EXPECT_CALL(transport_socket_factory, implementsSecureTransport()).WillOnce(Return(true));
     FilterUtility::setUpstreamScheme(headers, cluster);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }

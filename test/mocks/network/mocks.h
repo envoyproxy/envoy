@@ -289,6 +289,17 @@ public:
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD1(doWrite, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD0(onConnected, void());
+  MOCK_METHOD0(ssl, Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+};
+
+class MockTransportSocketFactory : public TransportSocketFactory {
+public:
+  MockTransportSocketFactory();
+  ~MockTransportSocketFactory();
+
+  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
+  MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
 };
 
 } // namespace Network

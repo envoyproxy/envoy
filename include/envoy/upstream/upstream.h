@@ -12,6 +12,7 @@
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
@@ -395,9 +396,10 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * @return the SSL context to use when communicating with the cluster.
+   * @return Network::TransportSocketFactory& the factory of transport socket to use when
+   *         communicating with the cluster.
    */
-  virtual Ssl::ClientContext* sslContext() const PURE;
+  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.

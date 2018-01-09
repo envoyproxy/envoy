@@ -37,6 +37,8 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer) override;
   void onConnected() override;
+  Ssl::Connection* ssl() override { return this; }
+  const Ssl::Connection* ssl() const override { return this; }
 
   SSL* rawSslForTest() { return ssl_.get(); }
 
@@ -50,6 +52,17 @@ private:
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
+};
+
+class ClientSslSocketFactory : public Network::TransportSocketFactory {
+public:
+  ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
+                         Stats::Scope& stats_scope);
+  Network::TransportSocketPtr createTransportSocket() const override;
+  bool implementsSecureTransport() const override;
+
+private:
+  ClientContextPtr ssl_ctx_;
 };
 
 } // namespace Ssl

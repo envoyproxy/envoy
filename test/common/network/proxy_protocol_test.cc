@@ -36,7 +36,8 @@ public:
                                               .use_original_dst_ = false,
                                               .per_connection_buffer_limit_bytes_ = 0})) {
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
-                                               Network::Address::InstanceConstSharedPtr());
+                                               Network::Address::InstanceConstSharedPtr(),
+                                               Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
@@ -295,7 +296,8 @@ public:
                                               .use_original_dst_ = false,
                                               .per_connection_buffer_limit_bytes_ = 0})) {
     conn_ = dispatcher_.createClientConnection(local_dst_address_,
-                                               Network::Address::InstanceConstSharedPtr());
+                                               Network::Address::InstanceConstSharedPtr(),
+                                               Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
