@@ -145,6 +145,7 @@ http_logs:
   envoy::api::v2::filter::accesslog::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
+  test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);
