@@ -29,6 +29,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
         remote = "https://github.com/gcovr/gcovr",
     ),
+    com_github_grpc_grpc = dict(
+        commit = "f526a2164f9c1eb816eea420f7201b8dfa278a8f", # v1.8.3
+        remote = "https://github.com/grpc/grpc.git",
+    ),
     io_opentracing_cpp = dict(
         commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
         remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0

@@ -72,4 +72,5 @@ cc_library(
         "thirdparty_build/include/zconf.h",
         "thirdparty_build/include/zlib.h",
     ],
+    includes = ["thirdparty_build/include"],
 )
