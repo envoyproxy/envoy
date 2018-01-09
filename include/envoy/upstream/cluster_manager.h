@@ -200,7 +200,7 @@ public:
   virtual Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                              HostConstSharedPtr host,
                                                              ResourcePriority priority,
-                                                             enum Http::Protocol protocol) PURE;
+                                                             Http::Protocol protocol) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

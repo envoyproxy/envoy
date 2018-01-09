@@ -625,9 +625,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
       container.drains_remaining_--;
       if (container.drains_remaining_ == 0) {
         for (Http::ConnectionPool::InstancePtr& pool : container.pools_) {
-	  if (pool) {
-	    thread_local_dispatcher_.deferredDelete(std::move(pool));
-	  }
+          if (pool) {
+            thread_local_dispatcher_.deferredDelete(std::move(pool));
+          }
         }
         host_http_conn_pool_map_.erase(old_host);
       }

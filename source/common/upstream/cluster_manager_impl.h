@@ -196,10 +196,12 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::array<Http::ConnectionPool::InstancePtr, NumResourcePriorities * Http::NumProtocols> ConnPools;
+      typedef std::array<Http::ConnectionPool::InstancePtr,
+                         NumResourcePriorities * Http::NumProtocols>
+          ConnPools;
 
       size_t index(ResourcePriority priority, Http::Protocol protocol) {
-	ASSERT(NumResourcePriorities == 2); // One bit needed for priority
+        ASSERT(NumResourcePriorities == 2); // One bit needed for priority
         return enumToInt(protocol) << 1 | enumToInt(priority);
       }
 
@@ -212,8 +214,7 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry();
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
-                                               enum Http::Protocol protocol,
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
