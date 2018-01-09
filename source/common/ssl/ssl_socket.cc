@@ -226,26 +226,6 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string SslSocket::subjectPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return "";
-  }
-
-  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr);
-
-  // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
-  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert.get()), 0 /* indent */, XN_FLAG_RFC2253);
-
-  const uint8_t* data;
-  size_t data_len;
-  int rc = BIO_mem_contents(buf.get(), &data, &data_len);
-  ASSERT(rc == 1);
-  UNREFERENCED_PARAMETER(rc);
-  return std::string(reinterpret_cast<const char*>(data), data_len);
-}
-
 std::string SslSocket::uriSanPeerCertificate() {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
@@ -300,6 +280,41 @@ std::string SslSocket::protocol() const {
   unsigned int proto_len;
   SSL_get0_alpn_selected(ssl_.get(), &proto, &proto_len);
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
+}
+
+std::string SslSocket::getSubjectFromCertificate(X509* cert) const {
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr);
+
+  // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
+  // Example from the RFC:
+  //   * Single value per Relative Distinguished Name (RDN): CN=Steve Kille,O=Isode Limited,C=GB
+  //   * Multivalue output in first RDN: OU=Sales+CN=J. Smith,O=Widget Inc.,C=US
+  //   * Quoted comma in Organization: CN=L. Eagle,O=Sue\, Grabbit and Runn,C=GB
+  X509_NAME_print_ex(buf.get(), X509_get_subject_name(cert), 0 /* indent */, XN_FLAG_RFC2253);
+
+  const uint8_t* data;
+  size_t data_len;
+  int rc = BIO_mem_contents(buf.get(), &data, &data_len);
+  ASSERT(rc == 1);
+  UNREFERENCED_PARAMETER(rc);
+  return std::string(reinterpret_cast<const char*>(data), data_len);
+}
+
+std::string SslSocket::subjectPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+  return getSubjectFromCertificate(cert.get());
+}
+
+std::string SslSocket::subjectLocalCertificate() const {
+  X509* cert = SSL_get_certificate(ssl_.get());
+  if (!cert) {
+    return "";
+  }
+  return getSubjectFromCertificate(cert);
 }
 
 } // namespace Ssl
