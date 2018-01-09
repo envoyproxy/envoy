@@ -36,3 +36,5 @@ final version.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
 * Added `/runtime` admin endpoint to read the current runtime values.
 * Added `gateway-error` retry-on policy.
+* Added support for building envoy with exported symbols
+  This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.

@@ -60,7 +60,7 @@ def envoy_linkopts():
             "-static-libstdc++",
             "-static-libgcc",
         ],
-    })
+    }) + envoy_select_exported_symbols(["-Wl,-E"])
 
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
@@ -169,7 +169,11 @@ def envoy_cc_binary(name,
                     repository = "",
                     stamped = False,
                     deps = [],
-                    linkopts = envoy_linkopts()):
+                    linkopts = []):
+
+    if not linkopts:
+        linkopts = envoy_linkopts()
+
     # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
     if stamped:
         _git_stamped_genrule(repository, name)
@@ -370,4 +374,11 @@ def envoy_select_google_grpc(xs, repository = ""):
     return select({
         repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
+    })
+
+# Select the given values if exporting is enabled in the current build.
+def envoy_select_exported_symbols(xs):
+    return select({
+        "@envoy//bazel:enable_exported_symbols": xs,
+        "//conditions:default": [],
     })
