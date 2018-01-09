@@ -181,12 +181,7 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
                                                 *cluster.mutable_tls_context());
   }
 
-  if (json_cluster.getString("features", "") == "use_downstream_protocol") {
-    cluster.set_protocol_selection(envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL);
-  }
-
   if (json_cluster.getString("features", "") == "http2" ||
-      json_cluster.getString("features", "") == "use_downstream_protocol" ||
       json_cluster.hasObject("http2_settings")) {
     ProtocolJson::translateHttp2ProtocolOptions(*json_cluster.getObject("http2_settings", true),
                                                 *cluster.mutable_http2_protocol_options());

@@ -1505,7 +1505,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "ssl_context" : {"$ref" : "#/definitions/ssl_context"},
       "features" : {
         "type" : "string",
-        "enum" : ["http2", "use_downstream_protocol"]
+        "enum" : ["http2"]
       },
       "http2_settings" : {
         "type" : "object",
