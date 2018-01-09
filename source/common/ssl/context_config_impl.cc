@@ -110,8 +110,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
               validateAndAppendKey(ret, Filesystem::fileReadToEnd(datasource.filename()));
               break;
             }
-            case envoy::api::v2::DataSource::kInline: {
-              validateAndAppendKey(ret, datasource.inline_());
+            case envoy::api::v2::DataSource::kInlineBytes: {
+              validateAndAppendKey(ret, datasource.inline_bytes());
               break;
             }
             default:
