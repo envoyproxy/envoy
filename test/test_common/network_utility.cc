@@ -8,6 +8,7 @@
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -160,6 +161,8 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
   ADD_FAILURE() << msg;
   throw EnvoyException(msg);
 }
+
+TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
 
 } // namespace Test
 } // namespace Network

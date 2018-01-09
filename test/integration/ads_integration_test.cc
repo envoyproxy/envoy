@@ -26,7 +26,7 @@ dynamic_resources:
   cds_config: {ads: {}}
   ads_config:
     api_type: GRPC
-    cluster_name: [ads_cluster]
+    cluster_names: [ads_cluster]
 static_resources:
   clusters:
     name: ads_cluster

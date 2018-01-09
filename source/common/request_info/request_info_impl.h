@@ -77,8 +77,8 @@ struct RequestInfoImpl : public RequestInfo {
   Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
-  Optional<std::chrono::microseconds> request_received_duration_{};
-  Optional<std::chrono::microseconds> response_received_duration_{};
+  Optional<std::chrono::microseconds> request_received_duration_;
+  Optional<std::chrono::microseconds> response_received_duration_;
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};

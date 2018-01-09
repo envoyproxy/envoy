@@ -41,9 +41,14 @@ public:
   SystemTime start_time_;
   Optional<std::chrono::microseconds> request_received_duration_;
   Optional<std::chrono::microseconds> response_received_duration_;
+  std::chrono::microseconds duration_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  Optional<Http::Protocol> protocol_;
+  Optional<uint32_t> response_code_;
+  uint64_t bytes_received_{};
+  uint64_t bytes_sent_{};
 };
 
 } // namespace RequestInfo

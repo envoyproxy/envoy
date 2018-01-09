@@ -11,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 
@@ -77,8 +78,8 @@ public:
   ~MockAdmin();
 
   // Server::Admin
-  MOCK_METHOD4(addHandler, bool(const std::string& prefix, const std::string& help_text,
-                                HandlerCb callback, bool removable));
+  MOCK_METHOD5(addHandler, bool(const std::string& prefix, const std::string& help_text,
+                                HandlerCb callback, bool removable, bool mutates_server_state));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::ListenSocket&());
 };
@@ -163,7 +164,7 @@ public:
   MockListenerManager();
   ~MockListenerManager();
 
-  MOCK_METHOD1(addOrUpdateListener, bool(const envoy::api::v2::Listener& config));
+  MOCK_METHOD2(addOrUpdateListener, bool(const envoy::api::v2::Listener& config, bool modifiable));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Listener>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
@@ -360,6 +361,15 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
+};
+
+class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
+public:
+  MockTransportSocketFactoryContext();
+  ~MockTransportSocketFactoryContext();
+
+  MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
+  MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 };
 
 } // namespace Configuration

@@ -1,0 +1,96 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 80
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          tracing:
+            operation_name: ingress
+          codec_type: auto
+          stat_prefix: ingress_http
+          route_config:
+            name: service1_route
+            virtual_hosts:
+            - name: service1
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: local_service
+                decorator:
+                  operation: checkAvailability
+          http_filters:
+          - name: envoy.router
+            config: {}
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9000
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          tracing:
+            operation_name: egress
+          codec_type: auto
+          stat_prefix: egress_http
+          route_config:
+            name: service2_route
+            virtual_hosts:
+            - name: service2
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/trace/2"
+                route:
+                  cluster: service2
+                decorator:
+                  operation: checkStock
+          http_filters:
+          - name: envoy.router
+            config: {}
+  clusters:
+  - name: local_service
+    connect_timeout: 0.250s
+    type: strict_dns
+    lb_policy: round_robin
+    hosts:
+    - socket_address:
+        address: 127.0.0.1
+        port_value: 8080
+  - name: service2
+    connect_timeout: 0.250s
+    type: strict_dns
+    lb_policy: round_robin
+    http2_protocol_options: {}
+    hosts:
+    - socket_address:
+        address: service2
+        port_value: 80
+  - name: jaeger
+    connect_timeout: 1s
+    type: strict_dns
+    lb_policy: round_robin
+    hosts:
+    - socket_address:
+        address: jaeger
+        port_value: 9411
+tracing:
+  http:
+    name: envoy.zipkin
+    config:
+      collector_cluster: jaeger
+      collector_endpoint: "/api/v1/spans"
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001

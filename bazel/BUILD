@@ -36,3 +36,8 @@ config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
 )
+
+config_setting(
+    name = "disable_google_grpc",
+    values = {"define": "google_grpc=disabled"},
+)

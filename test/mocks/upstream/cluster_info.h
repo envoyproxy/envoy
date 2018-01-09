@@ -46,13 +46,14 @@ public:
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
+  MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const Optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
-  MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
@@ -64,12 +65,14 @@ public:
   uint64_t max_requests_per_connection_{};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
+  envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
 };

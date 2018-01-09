@@ -36,15 +36,25 @@ TcpProxyConfig::Route::Route(
   }
 }
 
-TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
-                               Server::Configuration::FactoryContext& context)
-    : stats_(generateStats(config.stat_prefix(), context.scope())),
-      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)) {
-
+TcpProxyConfig::SharedConfig::SharedConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                                           Server::Configuration::FactoryContext& context)
+    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
+      stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     idle_timeout_.value(std::chrono::milliseconds(
         Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
   }
+}
+
+TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
+                               Server::Configuration::FactoryContext& context)
+    : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
+      upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
+      shared_config_(std::make_shared<SharedConfig>(config, context)) {
+
+  upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
+    return ThreadLocal::ThreadLocalObjectSharedPtr(new TcpProxyUpstreamDrainManager());
+  });
 
   if (config.has_deprecated_v1()) {
     for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
@@ -99,10 +109,14 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
   return EMPTY_STRING;
 }
 
+TcpProxyUpstreamDrainManager& TcpProxyConfig::drainManager() {
+  return upstream_drain_manager_slot_->getTyped<TcpProxyUpstreamDrainManager>();
+}
+
 // TODO(ggreenway): refactor this and websocket code so that config_ is always non-null.
 TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(*this)) {}
+      upstream_callbacks_(new UpstreamCallbacks(this)) {}
 
 TcpProxy::~TcpProxy() {
   if (config_ != nullptr) {
@@ -116,22 +130,23 @@ TcpProxy::~TcpProxy() {
   }
 }
 
-TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Scope& scope) {
-  std::string final_prefix = fmt::format("tcp.{}.", name);
-  return {ALL_TCP_PROXY_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                              POOL_GAUGE_PREFIX(scope, final_prefix))};
+TcpProxyStats TcpProxyConfig::SharedConfig::generateStats(Stats::Scope& scope) {
+  return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
+namespace {
+void finalizeConnectionStats(const Upstream::HostDescription& host,
+                             Stats::Timespan connected_timespan) {
+  host.cluster().stats().upstream_cx_destroy_.inc();
+  host.cluster().stats().upstream_cx_active_.dec();
+  host.stats().cx_active_.dec();
+  host.cluster().resourceManager(Upstream::ResourcePriority::Default).connections().dec();
+  connected_timespan.complete();
+}
+} // namespace
+
 void TcpProxy::finalizeUpstreamConnectionStats() {
-  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_.inc();
-  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.dec();
-  read_callbacks_->upstreamHost()->stats().cx_active_.dec();
-  read_callbacks_->upstreamHost()
-      ->cluster()
-      .resourceManager(Upstream::ResourcePriority::Default)
-      .connections()
-      .dec();
-  connected_timespan_->complete();
+  finalizeConnectionStats(*read_callbacks_->upstreamHost(), *connected_timespan_);
 }
 
 void TcpProxy::closeUpstreamConnection() {
@@ -214,18 +229,59 @@ void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
   parent_.readDisableUpstream(false);
 }
 
+void TcpProxy::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (drainer_ == nullptr) {
+    parent_->onUpstreamEvent(event);
+  } else {
+    drainer_->onEvent(event);
+  }
+}
+
 void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
   ASSERT(!on_high_watermark_called_);
   on_high_watermark_called_ = true;
-  // There's too much data buffered in the upstream write buffer, so stop reading.
-  parent_.readDisableDownstream(true);
+
+  if (parent_ != nullptr) {
+    // There's too much data buffered in the upstream write buffer, so stop reading.
+    parent_->readDisableDownstream(true);
+  }
 }
 
 void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
-  // The upstream write buffer is drained. Resume reading.
-  parent_.readDisableDownstream(false);
+
+  if (parent_ != nullptr) {
+    // The upstream write buffer is drained. Resume reading.
+    parent_->readDisableDownstream(false);
+  }
+}
+
+Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data) {
+  parent_->onUpstreamData(data);
+  return Network::FilterStatus::StopIteration;
+}
+
+void TcpProxy::UpstreamCallbacks::onBytesSent() {
+  if (drainer_ == nullptr) {
+    parent_->resetIdleTimer();
+  } else {
+    drainer_->onBytesSent();
+  }
+}
+
+void TcpProxy::UpstreamCallbacks::onIdleTimeout() {
+  if (drainer_ == nullptr) {
+    parent_->onIdleTimeout();
+  } else {
+    drainer_->onIdleTimeout();
+  }
+}
+
+void TcpProxy::UpstreamCallbacks::drain(TcpProxyDrainer& drainer) {
+  ASSERT(drainer_ == nullptr); // This should only get set once.
+  drainer_ = &drainer;
+  parent_ = nullptr;
 }
 
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
@@ -324,15 +380,25 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
 }
 
 void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
-  if ((event == Network::ConnectionEvent::RemoteClose ||
-       event == Network::ConnectionEvent::LocalClose) &&
-      upstream_connection_) {
-    // TODO(mattklein123): If we close without flushing here we may drop some data. The downstream
-    // connection is about to go away. So to support this we need to either have a way for the
-    // downstream connection to stick around, or, we need to be able to pass this connection to a
-    // flush worker which will attempt to flush the remaining data with a timeout.
-    upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
-    disableIdleTimer();
+  if (upstream_connection_) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
+
+      if (upstream_connection_->state() != Network::Connection::State::Closed) {
+        if (config_ != nullptr) {
+          config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
+                                      std::move(upstream_callbacks_), std::move(idle_timer_),
+                                      read_callbacks_->upstreamHost(),
+                                      std::move(connected_timespan_));
+        } else {
+          upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+          disableIdleTimer();
+        }
+      }
+    } else if (event == Network::ConnectionEvent::LocalClose) {
+      upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+      disableIdleTimer();
+    }
   }
 }
 
@@ -387,12 +453,18 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     onConnectionSuccess();
 
     if (config_ != nullptr && config_->idleTimeout().valid()) {
-      idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-          [this]() -> void { onIdleTimeout(); });
+      // The idle_timer_ can be moved to a TcpProxyDrainer, so related callbacks call into
+      // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
+      // the call to either TcpProxy or to TcpProxyDrainer, depending on the current state.
+      idle_timer_ =
+          read_callbacks_->connection().dispatcher().createTimer([upstream_callbacks =
+                                                                      upstream_callbacks_]() {
+            upstream_callbacks->onIdleTimeout();
+          });
       resetIdleTimer();
-      Network::Connection::BytesSentCb cb = [this](uint64_t) { resetIdleTimer(); };
-      read_callbacks_->connection().addBytesSentCallback(cb);
-      upstream_connection_->addBytesSentCallback(cb);
+      read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
+      upstream_connection_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](
+          uint64_t) { upstream_callbacks->onBytesSent(); });
     }
   }
 }
@@ -415,6 +487,86 @@ void TcpProxy::disableIdleTimer() {
     idle_timer_->disableTimer();
     idle_timer_.reset();
   }
+}
+
+TcpProxyUpstreamDrainManager::~TcpProxyUpstreamDrainManager() {
+  // If connections aren't closed before they are destructed an ASSERT fires,
+  // so cancel all pending drains, which causes the connections to be closed.
+  while (!drainers_.empty()) {
+    auto begin = drainers_.begin();
+    TcpProxyDrainer* key = begin->first;
+    begin->second->cancelDrain();
+
+    // cancelDrain() should cause that drainer to be removed from drainers_.
+    // ASSERT so that we don't end up in an infinite loop.
+    ASSERT(drainers_.find(key) == drainers_.end());
+    UNREFERENCED_PARAMETER(key);
+  }
+}
+
+void TcpProxyUpstreamDrainManager::add(
+    const TcpProxyConfig::SharedConfigSharedPtr& config,
+    Network::ClientConnectionPtr&& upstream_connection,
+    const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks, Event::TimerPtr&& idle_timer,
+    const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+    Stats::TimespanPtr&& connected_timespan) {
+  TcpProxyDrainerPtr drainer(
+      new TcpProxyDrainer(*this, config, callbacks, std::move(upstream_connection),
+                          std::move(idle_timer), upstream_host, std::move(connected_timespan)));
+  callbacks->drain(*drainer);
+
+  // Use temporary to ensure we get the pointer before we move it out of drainer
+  TcpProxyDrainer* ptr = drainer.get();
+  drainers_[ptr] = std::move(drainer);
+}
+
+void TcpProxyUpstreamDrainManager::remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher) {
+  auto it = drainers_.find(&drainer);
+  ASSERT(it != drainers_.end());
+  dispatcher.deferredDelete(std::move(it->second));
+  drainers_.erase(it);
+}
+
+TcpProxyDrainer::TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
+                                 const TcpProxyConfig::SharedConfigSharedPtr& config,
+                                 const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+                                 Network::ClientConnectionPtr&& connection,
+                                 Event::TimerPtr&& idle_timer,
+                                 const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+                                 Stats::TimespanPtr&& connected_timespan)
+    : parent_(parent), callbacks_(callbacks), upstream_connection_(std::move(connection)),
+      timer_(std::move(idle_timer)), connected_timespan_(std::move(connected_timespan)),
+      upstream_host_(upstream_host), config_(config) {
+  config_->stats().upstream_flush_total_.inc();
+  config_->stats().upstream_flush_active_.inc();
+}
+
+void TcpProxyDrainer::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    if (timer_ != nullptr) {
+      timer_->disableTimer();
+    }
+    config_->stats().upstream_flush_active_.dec();
+    finalizeConnectionStats(*upstream_host_, *connected_timespan_);
+    parent_.remove(*this, upstream_connection_->dispatcher());
+  }
+}
+
+void TcpProxyDrainer::onIdleTimeout() {
+  config_->stats().idle_timeout_.inc();
+  cancelDrain();
+}
+
+void TcpProxyDrainer::onBytesSent() {
+  if (timer_ != nullptr) {
+    timer_->enableTimer(config_->idleTimeout().value());
+  }
+}
+
+void TcpProxyDrainer::cancelDrain() {
+  // This sends onEvent(LocalClose).
+  upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace Filter

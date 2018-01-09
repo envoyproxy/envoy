@@ -132,11 +132,14 @@ public:
    * will be gracefully drained once the new listener is ready to take traffic (e.g. when RDS has
    * been initialized).
    * @param config supplies the configuration proto.
+   * @param modifiable supplies whether the added listener can be updated or removed. If the
+   *        listener is not modifiable, future calls to this function or removeListener() on behalf
+   *        of this listener will return false.
    * @return TRUE if a listener was added or FALSE if the listener was not updated because it is
    *         a duplicate of the existing listener. This routine will throw an EnvoyException if
    *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config) PURE;
+  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Listener>> a list of the currently loaded listeners.

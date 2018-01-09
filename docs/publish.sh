@@ -21,6 +21,15 @@ pushd "${DOCS_BUILD_DIR}"
 git clone "${GIT_INFO[0]}"
 cd data-plane-api
 git checkout "${GIT_INFO[1]}"
+# Check the git tag matches the version number in the VERSION file.
+VERSION_NUMBER=$(cat VERSION)
+if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
+  echo "Given git tag does not match the VERSION file content:"
+  echo "${CIRCLE_TAG} vs $(cat VERSION)"
+  exit 1
+fi
+# Check the version_history.rst contains current release version.
+grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst
 ./docs/build.sh
 popd
 rsync -av "${DOCS_BUILD_DIR}"/data-plane-api/generated/* generated/
