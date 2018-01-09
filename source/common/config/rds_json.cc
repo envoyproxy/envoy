@@ -236,15 +236,23 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       throw EnvoyException("Redirect route entries must not have WebSockets set");
     }
   }
+  bool has_direct_response = false;
+  if (json_route.hasObject("status") || json_route.hasObject("body")) {
+    has_direct_response = true;
+    auto* direct_response = route.mutable_direct_response();
+    direct_response->set_status(json_route.getInteger("status"));
+  }
   const bool has_cluster = json_route.hasObject("cluster") ||
                            json_route.hasObject("cluster_header") ||
                            json_route.hasObject("weighted_clusters");
 
-  if (has_cluster && has_redirect) {
-    throw EnvoyException("routes must be either redirects or cluster targets");
-  } else if (!has_cluster && !has_redirect) {
+  if ((has_cluster && (has_redirect || has_direct_response)) ||
+      (has_redirect && has_direct_response)) {
+    throw EnvoyException("routes must be either redirects, direct responses, or cluster targets");
+  } else if (!has_cluster && !has_redirect && !has_direct_response) {
     throw EnvoyException(
-        "routes must have redirect or one of cluster/cluster_header/weighted_clusters");
+        "routes must have redirect, direct response, or one of "
+        "cluster/cluster_header/weighted_clusters");
   } else if (has_cluster) {
     auto* action = route.mutable_route();
 

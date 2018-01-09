@@ -17,6 +17,9 @@ namespace Router {
 MockRedirectEntry::MockRedirectEntry() {}
 MockRedirectEntry::~MockRedirectEntry() {}
 
+MockDirectResponseEntry::MockDirectResponseEntry() {}
+MockDirectResponseEntry::~MockDirectResponseEntry() {}
+
 MockRetryState::MockRetryState() {}
 
 void MockRetryState::expectRetry() {

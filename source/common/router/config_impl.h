@@ -60,6 +60,7 @@ class SslRedirectRoute : public Route {
 public:
   // Router::Route
   const RedirectEntry* redirectEntry() const override { return &SSL_REDIRECTOR; }
+  const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
 
@@ -287,6 +288,7 @@ private:
 class RouteEntryImplBase : public RouteEntry,
                            public Matchable,
                            public RedirectEntry,
+                           public DirectResponseEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
@@ -294,6 +296,7 @@ public:
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
+  bool isDirectResponse() const { return static_cast<int>(direct_response_code_) != 0; }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
@@ -333,8 +336,12 @@ public:
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code redirectResponseCode() const override { return redirect_response_code_; }
 
+  // Router::DirectResponseEntry
+  Http::Code responseCode() const override { return direct_response_code_; }
+
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
+  const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
 
@@ -403,6 +410,7 @@ private:
 
     // Router::Route
     const RedirectEntry* redirectEntry() const override { return nullptr; }
+    const DirectResponseEntry *directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return nullptr; }
 
@@ -488,6 +496,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const Http::Code redirect_response_code_;
+  const Http::Code direct_response_code_;
 };
 
 /**

@@ -217,6 +217,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Determine if there is a direct response for the request.
+  if (route_->directResponseEntry()) {
+    Http::Utility::sendLocalReply(
+        [this](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+          // TODO(brian-pane) add response_headers_to_add to the headers here
+          callbacks_->encodeHeaders(std::move(headers), end_stream);
+        },
+        [this](Buffer::Instance& data, bool end_stream) -> void {
+          callbacks_->encodeData(data, end_stream);
+        },
+        stream_destroyed_, route_->directResponseEntry()->responseCode(), "");
+    // TODO(brian-pane) support sending a response body.
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());

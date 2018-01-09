@@ -44,6 +44,20 @@ public:
 };
 
 /**
+ * A routing primitive that specifies a direct (non-proxied) HTTP response .
+ */
+class DirectResponseEntry {
+public:
+  virtual ~DirectResponseEntry() {}
+
+  /**
+   * Returns the HTTP status code to return.
+   * @return Http::Code the response Code.
+   */
+  virtual Http::Code responseCode() const PURE;
+};
+
+/**
  * CorsPolicy for Route and VirtualHost.
  */
 class CorsPolicy {
@@ -416,7 +430,7 @@ public:
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
 
 /**
- * An interface that holds a RedirectEntry or a RouteEntry for a request.
+ * An interface that holds a RedirectEntry, DirectResponseEntry, or RouteEntry for a request.
  */
 class Route {
 public:
@@ -426,6 +440,11 @@ public:
    * @return the redirect entry or nullptr if there is no redirect needed for the request.
    */
   virtual const RedirectEntry* redirectEntry() const PURE;
+
+  /**
+   * @return the direct response entry or nullptr if there is no direct response for the request.
+   */
+  virtual const DirectResponseEntry* directResponseEntry() const PURE;
 
   /**
    * @return the route entry or nullptr if there is no matching route for the request.

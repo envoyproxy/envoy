@@ -1476,6 +1476,19 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
+TEST_F(RouterTest, DirectResponse) {
+  MockDirectResponseEntry direct_response;
+  EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::OK));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST(RouterFilterUtilityTest, finalTimeout) {
   {
     NiceMock<MockRouteEntry> route;

@@ -331,6 +331,16 @@ void HttpIntegrationTest::testRouterRedirect() {
                response->headers().get(Http::Headers::get().Location)->value().c_str());
 }
 
+void HttpIntegrationTest::testRouterDirectResponse() {
+  config_helper_.addDirectResponse("direct.example.com", "/", Http::Code::NoContent, "");
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("204", response->headers().Status()->value().c_str());
+}
+
 // Add a health check filter and verify correct behavior when draining.
 void HttpIntegrationTest::testDrainClose() {
   config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);

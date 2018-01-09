@@ -191,6 +191,7 @@ private:
 
     // Router::Route
     const Router::RedirectEntry* redirectEntry() const override { return nullptr; }
+    const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
 

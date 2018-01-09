@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/network/address_impl.h"
+#include "envoy/http/codes.h"
 
 #include "api/base.pb.h"
 #include "api/bootstrap.pb.h"
@@ -66,6 +67,10 @@ public:
       const std::string& host, const std::string& route, const std::string& cluster,
       bool validate_clusters, envoy::api::v2::RouteAction::ClusterNotFoundResponseCode code,
       envoy::api::v2::VirtualHost::TlsRequirementType type = envoy::api::v2::VirtualHost::NONE);
+
+  // Add an additional route with a direct (non-proxied) response.
+  void addDirectResponse(const std::string& domains, const std::string& prefix,
+                         Http::Code responseCode, const std::string& body);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);

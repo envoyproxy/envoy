@@ -238,7 +238,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                        route.route().response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       redirect_response_code_(
-          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())) {
+          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())),
+      direct_response_code_(static_cast<Http::Code>(route.direct_response().status())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -426,7 +427,8 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route
 }
 
 const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
-  // A route for a request can exclusively be a route entry or a redirect entry.
+  // A route for a request can exclusively be a route entry, a direct response entry,
+  // or a redirect entry.
   if (isRedirect()) {
     return this;
   } else {
@@ -434,9 +436,20 @@ const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
   }
 }
 
+const DirectResponseEntry* RouteEntryImplBase::directResponseEntry() const {
+  // A route for a request can exclusively be a route entry, a direct response entry,
+  // or a redirect entry.
+  if (isDirectResponse()) {
+    return this;
+  } else {
+    return nullptr;
+  }
+}
+
 const RouteEntry* RouteEntryImplBase::routeEntry() const {
-  // A route for a request can exclusively be a route entry or a redirect entry.
-  if (isRedirect()) {
+  // A route for a request can exclusively be a route entry, a direct response entry,
+  // or a redirect entry.
+  if (isRedirect() || isDirectResponse()) {
     return nullptr;
   } else {
     return this;
@@ -448,7 +461,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
-    if (!cluster_name_.empty() || isRedirect()) {
+    if (!cluster_name_.empty() || isRedirect() || isDirectResponse()) {
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
@@ -489,7 +502,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
-  if (isRedirect()) {
+  if (isRedirect() || isDirectResponse()) {
     return;
   }
 
