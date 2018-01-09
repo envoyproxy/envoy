@@ -250,19 +250,19 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineSuccess) {
   envoy::api::v2::DownstreamTlsContext cfg;
-  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_(std::string(80, '\0'));
+  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, '\0'));
   EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineFailTooBig) {
   envoy::api::v2::DownstreamTlsContext cfg;
-  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_(std::string(81, '\0'));
+  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(81, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineFailTooSmall) {
   envoy::api::v2::DownstreamTlsContext cfg;
-  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_(std::string(79, '\0'));
+  cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(79, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
