@@ -1,10 +1,14 @@
 #include <fstream>
+#include <unordered_map>
+
+#include "envoy/runtime/runtime.h"
 
 #include "common/http/message_impl.h"
 #include "common/profiler/profiler.h"
 
 #include "server/http/admin.h"
 
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -194,6 +198,81 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+}
+
+TEST_P(AdminInstanceTest, Runtime) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  Runtime::MockSnapshot snapshot{};
+  Runtime::MockLoader loader{};
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
+
+  const std::string std_format{"int_key: 1\nother_key: bar\nstring_key: foo\n"};
+  EXPECT_NE(-1, response.search(std_format.data(), std_format.size(), 0));
+  EXPECT_EQ(std_format.size(), response.length());
+}
+
+TEST_P(AdminInstanceTest, RuntimeJSON) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  Runtime::MockSnapshot snapshot{};
+  Runtime::MockLoader loader{};
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime?format=json", header_map, response));
+
+  const std::string json_format{
+      R"({
+    "runtime": [
+        {
+            "name": "int_key",
+            "value": 1
+        },
+        {
+            "name": "other_key",
+            "value": "bar"
+        },
+        {
+            "name": "string_key",
+            "value": "foo"
+        }
+    ]
+}
+)"};
+
+  EXPECT_NE(-1, response.search(json_format.data(), json_format.size(), 0));
+  EXPECT_EQ(json_format.size(), response.length());
+}
+
+TEST_P(AdminInstanceTest, RuntimeBadFormat) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  Runtime::MockSnapshot snapshot{};
+  Runtime::MockLoader loader{};
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  EXPECT_EQ(Http::Code::BadRequest,
+            admin_.runCallback("/runtime?format=foo", header_map, response));
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {
