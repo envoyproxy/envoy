@@ -42,8 +42,7 @@ typedef std::unique_ptr<GrpcMetricsServiceClientFactory> GrpcMetricsServiceClien
 
 /**
  * Interface for metrics streamer. The streamer deals with threading and sends
- * metrics
- * on the correct stream.
+ * metrics on the correct stream.
  */
 class GrpcMetricsStreamer {
 public:

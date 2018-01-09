@@ -82,9 +82,19 @@ public:
   MOCK_METHOD1(send, void(envoy::api::v2::StreamMetricsMessage& message));
 };
 
+class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
+public:
+  int metric_count;
+  // GrpcMetricsStreamer
+  void send(envoy::api::v2::StreamMetricsMessage& message){
+    metric_count = message.envoy_metrics_size();
+  }
+
+};
+
 class MetricsServiceSinkTest : public testing::Test {};
 
-TEST(MetricsServiceSinkTest, CheckCall) {
+TEST(MetricsServiceSinkTest, CheckSendCall) {
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
   MetricsServiceSink sink(streamer_);
@@ -101,6 +111,25 @@ TEST(MetricsServiceSinkTest, CheckCall) {
   EXPECT_CALL(*streamer_, send(_));
 
   sink.endFlush();
+}
+
+TEST(MetricsServiceSinkTest, CheckStatsCount) {
+  std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
+
+  MetricsServiceSink sink(streamer_);
+
+  sink.beginFlush();
+
+  NiceMock<MockCounter> counter;
+  counter.name_ = "test_counter";
+  sink.flushCounter(counter, 1);
+
+  NiceMock<MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  sink.flushGauge(gauge, 1);
+
+  sink.endFlush();
+  EXPECT_EQ(2, (*streamer_).metric_count);
 }
 
 } // namespace Metrics

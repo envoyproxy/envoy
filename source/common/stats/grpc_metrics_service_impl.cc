@@ -53,6 +53,8 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                            "envoy.api.v2.MetricsService.StreamMetrics"),
                        *thread_local_stream_);
+     auto* identifier = message.mutable_identifier();
+     *identifier->mutable_node() = shared_state_->local_info_.node();
   }
 
   if (thread_local_stream_->stream_ != nullptr) {
