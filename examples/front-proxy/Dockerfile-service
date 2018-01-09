@@ -1,15 +1,8 @@
-FROM envoyproxy/envoy:latest
+FROM envoyproxy/envoy-alpine:latest
 
-RUN apt-get update && apt-get -q install -y \
-    curl \
-    software-properties-common \
-    python-software-properties
-RUN add-apt-repository ppa:deadsnakes/ppa
-RUN apt-get update && apt-get -q install -y \
-    python3 \
-    python3-pip
+RUN apk update && apk add python3 bash
 RUN python3 --version && pip3 --version
-RUN pip3 install -q Flask==0.11.1
+RUN pip3 install -q Flask==0.11.1 requests==2.18.4
 RUN mkdir /code
 ADD ./service.py /code
 ADD ./start_service.sh /usr/local/bin/start_service.sh
