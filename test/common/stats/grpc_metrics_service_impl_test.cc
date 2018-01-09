@@ -56,6 +56,7 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   MockMetricsStream stream1;
   MetricsServiceCallbacks* callbacks1;
   expectStreamStart(stream1, &callbacks1);
+  EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream1, sendMessage(_, false));
   envoy::api::v2::StreamMetricsMessage message_metrics1;
   streamer_.send(message_metrics1);
@@ -72,6 +73,7 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
         callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
         return nullptr;
       }));
+  EXPECT_CALL(local_info_, node());
   envoy::api::v2::StreamMetricsMessage message_metrics1;
   streamer_.send(message_metrics1);
 }
@@ -86,10 +88,9 @@ class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   int metric_count;
   // GrpcMetricsStreamer
-  void send(envoy::api::v2::StreamMetricsMessage& message){
+  void send(envoy::api::v2::StreamMetricsMessage& message) {
     metric_count = message.envoy_metrics_size();
   }
-
 };
 
 class MetricsServiceSinkTest : public testing::Test {};
@@ -130,6 +131,16 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
 
   sink.endFlush();
   EXPECT_EQ(2, (*streamer_).metric_count);
+
+  // Verify only newly added metrics come after endFlush call.
+  sink.beginFlush();
+
+  NiceMock<MockCounter> counter1;
+  counter1.name_ = "test_counter";
+  sink.flushCounter(counter1, 1);
+
+  sink.endFlush();
+  EXPECT_EQ(1, (*streamer_).metric_count);
 }
 
 } // namespace Metrics
