@@ -51,9 +51,7 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
                                                                       sink_config.cluster_name()),
                 server.threadLocal(), server.localInfo());
           });
-  return Stats::SinkPtr(new Stats::Metrics::MetricsServiceSink(
-      server.localInfo(), cluster_name, server.threadLocal(), server.clusterManager(),
-      server.stats(), grpc_metrics_streamer));
+  return Stats::SinkPtr(new Stats::Metrics::MetricsServiceSink(grpc_metrics_streamer));
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {

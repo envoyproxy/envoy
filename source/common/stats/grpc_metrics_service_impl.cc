@@ -31,12 +31,10 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(GrpcMetricsServiceClientFactory
 
 void GrpcMetricsStreamerImpl::ThreadLocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
                                                                const std::string&) {
-  auto it = parent_.stream_map_.find("metrics");
-  ASSERT(it != parent_.stream_map_.end());
-  if (it->second.stream_ != nullptr) {
-    // Only erase if we have a stream. Otherwise we had an inline failure and we will clear the
-    // stream data in send().
-    parent_.stream_map_.erase(it);
+  // Only erase if we have a stream. Otherwise we had an inline failure and we will clear the
+  // stream data in send().
+  if (parent_.thread_local_stream_->stream_ != nullptr) {
+    parent_.thread_local_stream_ = nullptr;
   }
 }
 
@@ -46,33 +44,26 @@ GrpcMetricsStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
 
 void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
     envoy::api::v2::StreamMetricsMessage& message) {
-  auto stream_it = stream_map_.find("metrics");
-  if (stream_it == stream_map_.end()) {
-    stream_it = stream_map_.emplace("metrics", ThreadLocalStream(*this)).first;
+  if (thread_local_stream_ == nullptr) {
+    thread_local_stream_ = std::make_shared<ThreadLocalStream>(*this);
   }
 
-  auto& stream_entry = stream_it->second;
-  if (stream_entry.stream_ == nullptr) {
-    stream_entry.stream_ =
+  if (thread_local_stream_->stream_ == nullptr) {
+    thread_local_stream_->stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                            "envoy.api.v2.MetricsService.StreamMetrics"),
-                       stream_entry);
+                       *thread_local_stream_);
   }
 
-  if (stream_entry.stream_ != nullptr) {
-    stream_entry.stream_->sendMessage(message, false);
+  if (thread_local_stream_->stream_ != nullptr) {
+    thread_local_stream_->stream_->sendMessage(message, false);
   } else {
-    stream_map_.erase(stream_it);
+    thread_local_stream_ = nullptr;
   }
 }
 
-MetricsServiceSink::MetricsServiceSink(const LocalInfo::LocalInfo& local_info,
-                                       const std::string& cluster_name, ThreadLocal::SlotAllocator&,
-                                       Upstream::ClusterManager& cluster_manager, Stats::Scope&,
-                                       GrpcMetricsStreamerSharedPtr grpc_metrics_streamer)
+MetricsServiceSink::MetricsServiceSink(GrpcMetricsStreamerSharedPtr grpc_metrics_streamer)
     : grpc_metrics_streamer_(grpc_metrics_streamer) {
-  Config::Utility::checkClusterAndLocalInfo("metrics service", cluster_name, cluster_manager,
-                                            local_info);
 }
 } // namespace Metrics
 } // namespace Stats

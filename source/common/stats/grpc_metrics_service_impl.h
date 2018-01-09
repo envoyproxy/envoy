@@ -109,6 +109,8 @@ private:
     Grpc::AsyncStream<envoy::api::v2::StreamMetricsMessage>* stream_{};
   };
 
+  typedef std::shared_ptr<ThreadLocalStream> ThreadLocalStreamSharedPtr;
+
   /**
    * Per-thread multi-stream state.
    */
@@ -117,8 +119,7 @@ private:
     void send(envoy::api::v2::StreamMetricsMessage& message);
 
     GrpcMetricsServiceClientPtr client_;
-    // TODO(ramachavali): Map is not required as there is only one entry.
-    std::unordered_map<std::string, ThreadLocalStream> stream_map_;
+    ThreadLocalStreamSharedPtr thread_local_stream_ = nullptr;
     SharedStateSharedPtr shared_state_;
   };
 
@@ -129,15 +130,13 @@ private:
  */
 class MetricsServiceSink : public Sink {
 public:
-  MetricsServiceSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
-                     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                     Stats::Scope& scope, GrpcMetricsStreamerSharedPtr grpc_metrics_streamer);
-
   // MetricsService::Sink
-  void beginFlush() override { message.clear_envoy_metrics(); }
+  MetricsServiceSink(GrpcMetricsStreamerSharedPtr grpc_metrics_streamer);
+
+  void beginFlush() override { message_.clear_envoy_metrics(); }
 
   void flushCounter(const Counter& counter, uint64_t) override {
-    io::prometheus::client::MetricFamily* metrics_family = message.add_envoy_metrics();
+    io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
     metrics_family->set_name(counter.name());
     auto* metric = metrics_family->add_metric();
     auto* counter_metric = metric->mutable_counter();
@@ -145,14 +144,14 @@ public:
   }
 
   void flushGauge(const Gauge& gauge, uint64_t value) override {
-    io::prometheus::client::MetricFamily* metrics_family = message.add_envoy_metrics();
+    io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
     metrics_family->set_name(gauge.name());
     auto* metric = metrics_family->add_metric();
     auto* gauage_metric = metric->mutable_gauge();
     gauage_metric->set_value(value);
   }
 
-  void endFlush() override { grpc_metrics_streamer_->send(message); }
+  void endFlush() override { grpc_metrics_streamer_->send(message_); }
 
   void onHistogramComplete(const Histogram&, uint64_t) override {
     // TODO(ramaraochavali): Need to figure out how map existing histogram to
@@ -161,7 +160,7 @@ public:
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
-  envoy::api::v2::StreamMetricsMessage message;
+  envoy::api::v2::StreamMetricsMessage message_;
 };
 
 } // namespace Metrics
