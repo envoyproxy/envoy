@@ -1614,7 +1614,7 @@ public:
     connection_index_.push_back(index);
     codec_index_.push_back(index);
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
           uint32_t index = connection_index_.front();

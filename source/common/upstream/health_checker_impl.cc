@@ -735,10 +735,10 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason) {
-  const bool expect_reset = expect_reset_;
+  const bool expected_reset = expect_reset_;
   resetState();
 
-  if (expect_reset) {
+  if (expected_reset) {
     // Stream reset was initiated by us (bogus gRPC response, timeout or cluster host is going
     // away). In these cases health check failure has already been reported, so just return.
     return;
