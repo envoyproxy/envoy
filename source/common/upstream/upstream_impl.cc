@@ -141,6 +141,14 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   default:
     NOT_REACHED;
   }
+
+  if (config.protocol_selection() == envoy::api::v2::Cluster::EXCLUSIVE_AS_CONFIGURED) {
+    // Make sure multiple protocol configurations are not present
+    if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
+      throw EnvoyException(fmt::format(
+          "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default 'protocol_selection' values."));
+    }
+  }
 }
 
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{

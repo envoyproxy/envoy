@@ -130,6 +130,36 @@ envoy::api::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
   return bootstrap;
 }
 
+TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: http12_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {}
+      http_protocol_options: {}
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(
+      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+      "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
+      "'protocol_selection' values.");
+}
+
+TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: http12_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {}
+      http_protocol_options: {}
+      protocol_selection: USE_DOWNSTREAM_PROTOCOL
+  )EOF";
+  create(parseBootstrapFromV2Yaml(yaml));
+}
+
 TEST_F(ClusterManagerImplTest, VersionInfoStatic) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
