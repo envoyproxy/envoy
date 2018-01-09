@@ -17,7 +17,7 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
                                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)
-    : RestApiFetcher(cm, lds_config.api_config_source().cluster_name()[0], dispatcher, random,
+    : RestApiFetcher(cm, lds_config.api_config_source().cluster_names()[0], dispatcher, random,
                      Config::Utility::apiConfigSourceRefreshDelay(lds_config.api_config_source())),
       local_info_(local_info), stats_(stats) {
   const auto& api_config_source = lds_config.api_config_source();
@@ -25,9 +25,9 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
   // If we are building an LdsSubscription, the ConfigSource should be REST_LEGACY.
   ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::REST_LEGACY);
   // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_name().size() == 1);
+  ASSERT(api_config_source.cluster_names().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());
-  Envoy::Config::Utility::checkClusterAndLocalInfo("lds", api_config_source.cluster_name()[0], cm,
+  Envoy::Config::Utility::checkClusterAndLocalInfo("lds", api_config_source.cluster_names()[0], cm,
                                                    local_info);
 }
 

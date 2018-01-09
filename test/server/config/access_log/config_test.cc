@@ -24,7 +24,7 @@ TEST(AccessLogConfigTest, HttpGrpcAccessLogTest) {
   envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig http_grpc_access_log;
   auto* common_config = http_grpc_access_log.mutable_common_config();
   common_config->set_log_name("foo");
-  common_config->mutable_cluster()->set_cluster_name("bar");
+  common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
   MessageUtil::jsonConvert(http_grpc_access_log, *message);
 
   AccessLog::FilterPtr filter;

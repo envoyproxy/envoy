@@ -47,7 +47,8 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
             return std::make_shared<AccessLog::GrpcAccessLogStreamerImpl>(
                 std::make_unique<GrpcAccessLogClientFactoryImpl>(
                     context.clusterManager(),
-                    proto_config.common_config().cluster().cluster_name()),
+                    // TODO(htuch): Support Google gRPC client.
+                    proto_config.common_config().grpc_service().envoy_grpc().cluster_name()),
                 context.threadLocal(), context.localInfo());
           });
 
