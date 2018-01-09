@@ -459,6 +459,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
+    void onGoAway();
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -472,12 +473,26 @@ private:
       GrpcActiveHealthCheckSession& parent_;
     };
 
+    class HttpConnectionCallbackImpl : public Http::ConnectionCallbacks {
+    public:
+      HttpConnectionCallbackImpl(GrpcActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Http::ConnectionCallbacks
+      void onGoAway() override { parent_.onGoAway(); }
+
+    private:
+      GrpcActiveHealthCheckSession& parent_;
+    };
+
     ConnectionCallbackImpl connection_callback_impl_{*this};
+    HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     GrpcHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::StreamEncoder* request_encoder_;
     Grpc::Decoder decoder_;
     std::unique_ptr<grpc::health::v1::HealthCheckResponse> health_check_response_;
+    // If true, stream reset was initiated by us (GrpcActiveHealthCheckSession), not by HTTP stack,
+    // e.g. remote reset. In this case healthcheck status has already been reported, only state
+    // cleanup is required.
     bool expect_reset_ = false;
   };
 

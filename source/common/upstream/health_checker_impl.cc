@@ -45,7 +45,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(const envoy::api::v2::Health
                                                     Redis::ConnPool::ClientFactoryImpl::instance_);
   case envoy::api::v2::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
-      throw EnvoyException(fmt::format("{} cluster must support http2 for gRPC healthchecking",
+      throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
                                        cluster.info()->name()));
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
@@ -627,7 +627,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream) {
-      auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
+      const auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
       if (grpc_status.valid()) {
         onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
         return;
@@ -644,19 +644,21 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
   if (end_stream) {
     // This is how, for instance, grpc-go signals about missing service - HTTP/2 200 OK with
     // 'unimplemented' gRPC status.
-    auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
+    const auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
     if (grpc_status.valid()) {
       onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
       return;
     }
-    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "unexpected stream end", true);
+    onRpcComplete(Grpc::Status::GrpcStatus::Internal,
+                  "gRPC protocol violation: unexpected stream end", true);
   }
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
   if (end_stream) {
-    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "unexpected stream end", true);
+    onRpcComplete(Grpc::Status::GrpcStatus::Internal,
+                  "gRPC protocol violation: unexpected stream end", true);
     return;
   }
 
@@ -710,6 +712,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
     Upstream::Host::CreateConnectionData conn = host_->createConnection(parent_.dispatcher_);
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
+    client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
   }
 
   request_encoder_ = &client_->newStream(*this);
@@ -723,27 +726,25 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
-  if (request_encoder_ == nullptr) {
-    // Stream was synchronously reset inside encodeHeaders() - this can happen if GOAWAY has been
-    // received. Healthcheck error has already been reported by onResetStream() callback.
-    return;
-  }
-
   grpc::health::v1::HealthCheckRequest request;
-  if (parent_.service_name_.valid())
+  if (parent_.service_name_.valid()) {
     request.set_service(parent_.service_name_.value());
+  }
 
   request_encoder_->encodeData(*Grpc::Common::serializeBody(request), true);
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::StreamResetReason) {
-  bool expect_reset = expect_reset_;
+  const bool expect_reset = expect_reset_;
   resetState();
 
-  if (expect_reset)
+  if (expect_reset) {
+    // Stream reset was initiated by us (bogus gRPC response, timeout or cluster host is going
+    // away). In these cases health check failure has already been reported, so just return.
     return;
+  }
 
-  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
+  ENVOY_CONN_LOG(error, "connection/stream error health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
   // TODO(baranov1ch): according to all HTTP standards, we should check if reason is one of
@@ -752,26 +753,25 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
   // mean connection close), check if connection is not fresh (was used for at least 1 request)
   // and silently retry request on the fresh connection. This is also true for HTTP/1.1 healthcheck.
   handleFailure(FailureType::Network);
+}
 
-  if (client_) {
-    // Force connection close on healthcheck errors and timeouts.
-    // Rationale: healthcheck error may mean cluster host is going down gracefully. Technically (
-    // for google-written gRPC server libs), it means that host sends us GOAWAY and PING, waiting
-    // PING ACK to initiate real connection close. But nghttp2 does not respond to pings received
-    // after GOAWAY, and envoy does not handle remote-initiated GOAWAYs yet
-    // (https://github.com/nghttp2/nghttp2/issues/1103).
-    // Altogether, this results in us holding the connection, preventing gRPC server graceful
-    // shutdown until server close timeout expires (typically 1 minute). This is bad. It's better to
-    // drop connection in case of errors than to mess up backend graceful shutdown. Still, all
-    // successful checks will be performed on a single HTTP/2 connection.
-    client_->close();
+void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
+  ENVOY_CONN_LOG(error, "connection going away health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
+  // Even if we have active health check probe, fail it on GOAWAY and schedule new one.
+  if (request_encoder_) {
+    handleFailure(FailureType::Network);
+    expect_reset_ = true;
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
+  client_->close();
 }
 
 bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
     Grpc::Status::GrpcStatus grpc_status) const {
-  if (grpc_status != Grpc::Status::GrpcStatus::Ok)
+  if (grpc_status != Grpc::Status::GrpcStatus::Ok) {
     return false;
+  }
 
   if (!health_check_response_ ||
       health_check_response_->status() != grpc::health::v1::HealthCheckResponse::SERVING) {
@@ -798,8 +798,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
-  if (!parent_.reuse_connection_)
+  if (!parent_.reuse_connection_) {
     client_->close();
+  }
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
@@ -810,43 +811,10 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
-  // There is a slight chance that |client_| will be null here - onInterval() did sync stream reset,
-  // and healthcheck failure, but the healthcheck timeout timer will still be started. If network
-  // connection will be closed during this time, GrpcActiveHealthCheckSession::onEvent will
-  // reset |client_|.
-  //
-  // The right thing to do in to make onInterval() signal to the caller that healthcheck has failed
-  // synchronously, so that timer is not even started.
-  //
-  // Background: before gRPC this was not a problem for HTTP/1.1 healthcheck - it was really hard
-  // to get sync stream reset before connection close. But in gRPC (i.e. HTTP/2) it is very simple -
-  // server signals GOAWAY, preventing well-behaving client from creating new streams. For envoy,
-  // (nghttp2) this practically means sync reset of all Http::StreamEncoder actions. But physically,
-  // HTTP/2 connection is going to be alive for some time.
-  //
-  // Bright side: as long as we drop the connection on healthcheck failures, this case should not
-  // fire.
-  if (client_) {
-    ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
-                   HostUtility::healthFlagsToString(*host_));
-  }
-
-  // Someone might guess, how it is possible not to have |request_encoder_| alive (which means there
-  // is no outstanding request) and still hit the timeout. Well, its *possible*. When calling
-  // onInterval(), any of Http::StreamEncoder::encodeHeaders/encodeData may synchronously reset
-  // stream, calling to our onResetStream, which will set |request_encoder_| to null. But as per
-  // above (about |client_| being null), the timeout timer will be started anyway.
-  if (request_encoder_) {
-    // resetState() will be called by onResetStream().
-    expect_reset_ = true;
-    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
-  }
-
-  if (client_) {
-    // Force connection close on healthcheck errors and timeouts.
-    // See onResetStream() for rationale.
-    client_->close();
-  }
+  ENVOY_CONN_LOG(error, "connection/stream timeout health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
+  expect_reset_ = true;
+  request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
@@ -877,7 +845,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
   } else {
     grpc_status_message = fmt::format("{}", grpc_status);
   }
-  ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,
+  ENVOY_CONN_LOG(error, "hc grpc_status={} service_status={} health_flags={}", *client_,
                  grpc_status_message, service_status, HostUtility::healthFlagsToString(*host_));
 }
 
