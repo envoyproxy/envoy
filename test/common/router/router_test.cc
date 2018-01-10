@@ -176,6 +176,83 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+TEST_F(RouterTest, Http1Upstream) {
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
+  EXPECT_CALL(callbacks_.request_info_, protocol());
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, Http2Upstream) {
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
+  EXPECT_CALL(callbacks_.request_info_, protocol());
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, UseDownstreamProtocol1) {
+  Optional<Http::Protocol> downstream_protocol{Http::Protocol::Http11};
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnRef(downstream_protocol));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, UseDownstreamProtocol2) {
+  Optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnRef(downstream_protocol));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
@@ -183,7 +260,7 @@ TEST_F(RouterTest, HashPolicy) {
       .WillOnce(Return(Optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, enum Http::Protocol,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
