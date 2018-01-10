@@ -114,6 +114,10 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
               validateAndAppendKey(ret, datasource.inline_bytes());
               break;
             }
+            case envoy::api::v2::DataSource::kInlineString: {
+              validateAndAppendKey(ret, datasource.inline_string());
+              break;
+            }
             default:
               throw EnvoyException(fmt::format("Unexpected DataSource::specifier_case(): {}",
                                                datasource.specifier_case()));
