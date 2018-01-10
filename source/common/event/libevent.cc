@@ -10,14 +10,14 @@ namespace Envoy {
 namespace Event {
 namespace Libevent {
 
-bool Global::is_initialized = false;
+bool Global::initialized_ = false;
 
 void Global::initialize() {
   evthread_use_pthreads();
 
   // Ignore SIGPIPE and allow errors to propagate through error codes.
   signal(SIGPIPE, SIG_IGN);
-  is_initialized = true;
+  initialized_ = true;
 }
 
 } // namespace Libevent
