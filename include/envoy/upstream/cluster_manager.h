@@ -75,7 +75,7 @@ public:
    */
   virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                                  ResourcePriority priority,
-                                                                 enum Http::Protocol protocol,
+                                                                 Http::Protocol protocol,
                                                                  LoadBalancerContext* context) PURE;
 
   /**

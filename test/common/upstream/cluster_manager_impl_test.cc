@@ -143,7 +143,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
-      "'protocol_selection' values.");
+      "'protocol_selection' values");
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {

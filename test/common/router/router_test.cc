@@ -178,7 +178,6 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 
 TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
-  EXPECT_CALL(callbacks_.request_info_, protocol());
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -197,7 +196,6 @@ TEST_F(RouterTest, Http1Upstream) {
 TEST_F(RouterTest, Http2Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
-  EXPECT_CALL(callbacks_.request_info_, protocol());
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
