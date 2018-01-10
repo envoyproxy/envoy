@@ -31,8 +31,11 @@ namespace Libevent {
  */
 class Global {
 public:
-  // Returns true if initialized() has been called.
-  static bool initialized();
+  // True if initialized() has been called.
+  static bool INITIALIZED;
+
+  static bool initialized() { return INITIALIZED; }
+
   /**
    * Initialize the library globally.
    */

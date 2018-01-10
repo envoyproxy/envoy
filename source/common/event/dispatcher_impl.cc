@@ -28,7 +28,7 @@ namespace Event {
 DispatcherImpl::DispatcherImpl()
     : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
-  ASSERT(Libevent::Global::initialized());
+  RELEASE_ASSERT(Libevent::Global::initialized());
 }
 
 DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
