@@ -11,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 
@@ -360,6 +361,15 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
+};
+
+class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
+public:
+  MockTransportSocketFactoryContext();
+  ~MockTransportSocketFactoryContext();
+
+  MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
+  MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 };
 
 } // namespace Configuration

@@ -28,7 +28,8 @@ def envoy_copts(repository, test = False):
         # TCLAP command line parser needs this to support int64_t/uint64_t
         "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
         "//conditions:default": [],
-    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository)
+    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
+        envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
@@ -359,5 +360,12 @@ def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
         "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if Google gRPC is enabled in the current build.
+def envoy_select_google_grpc(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_google_grpc": [],
         "//conditions:default": xs,
     })

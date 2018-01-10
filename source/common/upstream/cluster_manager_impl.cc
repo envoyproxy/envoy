@@ -173,17 +173,17 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   const auto& ads_config = bootstrap.dynamic_resources().ads_config();
-  if (ads_config.cluster_name().empty()) {
+  if (ads_config.cluster_names().empty()) {
     ENVOY_LOG(debug, "No ADS clusters defined, ADS will not be initialized.");
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   } else {
-    if (ads_config.cluster_name().size() != 1) {
+    if (ads_config.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
     }
     ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(), *this, ads_config.cluster_name()[0], primary_dispatcher,
+        bootstrap.node(), *this, ads_config.cluster_names()[0], primary_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   }
@@ -251,7 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
           "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
     }
   }
-  if (!ads_config.cluster_name().empty()) {
+  if (!ads_config.cluster_names().empty()) {
     Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, ads_config);
   }
 
@@ -295,13 +295,13 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    if (load_stats_config.cluster_name().size() != 1) {
+    if (load_stats_config.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
     }
     load_stats_reporter_.reset(new LoadStatsReporter(
-        bootstrap.node(), *this, stats, load_stats_config.cluster_name()[0], primary_dispatcher));
+        bootstrap.node(), *this, stats, load_stats_config.cluster_names()[0], primary_dispatcher));
   }
 }
 

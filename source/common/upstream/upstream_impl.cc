@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -18,8 +19,10 @@
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
 #include "common/config/tls_context_json.h"
+#include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -57,10 +60,8 @@ Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatc
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address) {
-  Network::ClientConnectionPtr connection =
-      cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address,
-                                                                  cluster.sourceAddress())
-                           : dispatcher.createClientConnection(address, cluster.sourceAddress());
+  Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
+      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -110,13 +111,24 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, source_address)),
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
-      added_via_api_(added_via_api),
+      ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())) {
-  ssl_ctx_ = nullptr;
-  if (config.has_tls_context()) {
-    Ssl::ClientContextConfigImpl context_config(config.tls_context());
-    ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, context_config);
+
+  auto transport_socket = config.transport_socket();
+  if (!config.has_transport_socket()) {
+    if (config.has_tls_context()) {
+      transport_socket.set_name(Config::TransportSocketNames::get().SSL);
+      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
+    } else {
+      transport_socket.set_name(Config::TransportSocketNames::get().RAW_BUFFER);
+    }
   }
+
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+  transport_socket_factory_ = config_factory.createTransportSocketFactory(*message, *this);
 
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:

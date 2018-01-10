@@ -66,8 +66,8 @@ TEST_F(SubscriptionFactoryTest, WrongClusterNameLength) {
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
-  config.mutable_api_config_source()->add_cluster_name("foo");
-  config.mutable_api_config_source()->add_cluster_name("bar");
+  config.mutable_api_config_source()->add_cluster_names("foo");
+  config.mutable_api_config_source()->add_cluster_names("bar");
   EXPECT_CALL(cm_, clusters());
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
@@ -98,7 +98,7 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
-  api_config_source->add_cluster_name("eds_cluster");
+  api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);
@@ -113,7 +113,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST);
-  api_config_source->add_cluster_name("eds_cluster");
+  api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);
@@ -141,7 +141,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
-  api_config_source->add_cluster_name("eds_cluster");
+  api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);
@@ -173,7 +173,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
-  api_config_source->add_cluster_name("eds_cluster");
+  api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
@@ -186,7 +186,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
-  api_config_source->add_cluster_name("eds_cluster");
+  api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);
@@ -203,7 +203,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
-  api_config_source->add_cluster_name("eds_cluster");
+  api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);

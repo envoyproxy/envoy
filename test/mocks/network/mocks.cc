@@ -160,5 +160,8 @@ MockConnectionHandler::~MockConnectionHandler() {}
 MockTransportSocket::MockTransportSocket() {}
 MockTransportSocket::~MockTransportSocket() {}
 
+MockTransportSocketFactory::MockTransportSocketFactory() {}
+MockTransportSocketFactory::~MockTransportSocketFactory() {}
+
 } // namespace Network
 } // namespace Envoy

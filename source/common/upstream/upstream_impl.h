@@ -15,6 +15,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -275,7 +276,8 @@ private:
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
-class ClusterInfoImpl : public ClusterInfo {
+class ClusterInfoImpl : public ClusterInfo,
+                        public Server::Configuration::TransportSocketFactoryContext {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const Network::Address::InstanceConstSharedPtr source_address,
@@ -302,7 +304,9 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
-  Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
+  Network::TransportSocketFactory& transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -310,6 +314,9 @@ public:
     return source_address_;
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
+
+  // Server::Configuration::TransportSocketFactoryContext
+  Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
 
 private:
   struct ResourceManagers {
@@ -336,7 +343,7 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
-  Ssl::ClientContextPtr ssl_ctx_;
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
@@ -344,6 +351,7 @@ private:
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
 };

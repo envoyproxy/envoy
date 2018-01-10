@@ -1,6 +1,7 @@
 #include "common/network/raw_buffer_socket.h"
 
 #include "common/common/empty_string.h"
+#include "common/http/headers.h"
 
 namespace Envoy {
 namespace Network {
@@ -76,5 +77,10 @@ std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }
 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
+TransportSocketPtr RawBufferSocketFactory::createTransportSocket() const {
+  return std::make_unique<RawBufferSocket>();
+}
+
+bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
 } // namespace Network
 } // namespace Envoy
