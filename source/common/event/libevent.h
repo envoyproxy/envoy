@@ -31,15 +31,16 @@ namespace Libevent {
  */
 class Global {
 public:
-  // True if initialized() has been called.
-  static bool INITIALIZED;
-
-  static bool initialized() { return INITIALIZED; }
+  static bool initialized() { return is_initialized; }
 
   /**
    * Initialize the library globally.
    */
   static void initialize();
+
+private:
+  // True if initialized() has been called.
+  static bool is_initialized;
 };
 
 typedef CSmartPtr<event_base, event_base_free> BasePtr;

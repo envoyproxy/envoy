@@ -36,7 +36,7 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
-  ASSERT(Libevent::Global::initialized());
+  RELEASE_ASSERT(Libevent::Global::initialized());
 }
 
 DispatcherImpl::~DispatcherImpl() {}
