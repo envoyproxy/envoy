@@ -2140,12 +2140,12 @@ TEST(RouteMatcherTest, DirectResponse) {
   ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true);
 
   EXPECT_EQ("www", config.route(genHeaders("www.example.com", "/example", "GET"), 0)
-            ->routeEntry()
-            ->clusterName());
+                       ->routeEntry()
+                       ->clusterName());
   EXPECT_EQ(static_cast<Http::Code>(200),
             config.route(genHeaders("www.example.com", "/direct", "GET"), 0)
-            ->directResponseEntry()
-            ->responseCode());
+                ->directResponseEntry()
+                ->responseCode());
 }
 
 TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
@@ -2761,10 +2761,10 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoRedirectNoClusters) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
-        "routes must have redirect, direct response, or "
-        "one of cluster/cluster_header/weighted_clusters")
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromJson(json), runtime, cm, true),
+                            EnvoyException,
+                            "routes must have redirect, direct response, or "
+                            "one of cluster/cluster_header/weighted_clusters")
 }
 
 TEST(RouteMatcherTest, TestOpaqueConfig) {

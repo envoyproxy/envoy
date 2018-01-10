@@ -250,9 +250,8 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::Rou
       (has_redirect && has_direct_response)) {
     throw EnvoyException("routes must be either redirects, direct responses, or cluster targets");
   } else if (!has_cluster && !has_redirect && !has_direct_response) {
-    throw EnvoyException(
-        "routes must have redirect, direct response, or one of "
-        "cluster/cluster_header/weighted_clusters");
+    throw EnvoyException("routes must have redirect, direct response, or one of "
+                         "cluster/cluster_header/weighted_clusters");
   } else if (has_cluster) {
     auto* action = route.mutable_route();
 

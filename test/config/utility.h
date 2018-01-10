@@ -5,8 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "common/network/address_impl.h"
 #include "envoy/http/codes.h"
+
+#include "common/network/address_impl.h"
 
 #include "api/base.pb.h"
 #include "api/bootstrap.pb.h"
