@@ -162,6 +162,7 @@ public:
 
   struct {
     const std::string Chunked{"chunked"};
+    const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
   } TransferEncodingValues;
 
@@ -192,8 +193,9 @@ public:
   } ProtocolStrings;
 
   struct {
-    const std::string Wildcard{"*"};
     const std::string Gzip{"gzip"};
+    const std::string Identity{"identity"};
+    const std::string Wildcard{"*"};
   } AcceptEncodingValues;
 
   struct {
@@ -202,6 +204,7 @@ public:
 
   struct {
     const std::string AcceptEncoding{"accept-encoding"};
+    const std::string Wildcard{"*"};
   } VaryValues;
 };
 

@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
-#include <vector>
 
 #include "envoy/common/exception.h"
 

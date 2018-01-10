@@ -33,7 +33,6 @@ public:
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtag() const { return disable_on_etag_; }
   bool disableOnLastModified() const { return disable_on_last_modified_; }
-  bool disableVary() const { return disable_vary_; }
   uint64_t memoryLevel() const { return memory_level_; }
   uint64_t minimumLength() const { return content_length_; }
   uint64_t windowBits() const { return window_bits_; }
@@ -61,7 +60,6 @@ private:
 
   bool disable_on_etag_;
   bool disable_on_last_modified_;
-  bool disable_vary_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -99,12 +97,15 @@ public:
   }
 
 private:
+  bool isAcceptEncodingAllowed(HeaderMap& headers) const;
   bool isCacheControlAllowed(HeaderMap& headers) const;
   bool isContentTypeAllowed(HeaderMap& headers) const;
-  bool isMinimumContentLength(HeaderMap& headers) const;
   bool isEtagAllowed(HeaderMap& headers) const;
   bool isLastModifiedAllowed(HeaderMap& headers) const;
+  bool isMinimumContentLength(HeaderMap& headers) const;
   bool isTransferEncodingAllowed(HeaderMap& headers) const;
+
+  void insertVary(HeaderMap& headers);
 
   bool skip_compression_;
 

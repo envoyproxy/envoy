@@ -120,7 +120,7 @@ public:
   // GRPC web filter
   const std::string GRPC_WEB = "envoy.grpc_web";
   // Gzip filter
-  const std::string GZIP = "envoy.gzip";
+  const std::string ENVOY_GZIP = "envoy.gzip";
   // IP tagging filter
   const std::string IP_TAGGING = "envoy.ip_tagging";
   // Rate limit filter
@@ -139,7 +139,7 @@ public:
 
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, GZIP, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA}) {}
+                       GRPC_WEB, ENVOY_GZIP, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

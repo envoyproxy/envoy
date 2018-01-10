@@ -26,7 +26,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::Gzip()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().GZIP; }
+  std::string name() override { return Config::HttpFilterNames::get().ENVOY_GZIP; }
 
 private:
   HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Gzip& gzip);

@@ -436,7 +436,6 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_etag);
   JSON_UTIL_SET_BOOL(json_config, proto_config, disable_on_last_modified);
-  JSON_UTIL_SET_BOOL(json_config, proto_config, disable_vary);
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, content_length);
   JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);

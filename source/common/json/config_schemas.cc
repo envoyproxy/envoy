@@ -1111,8 +1111,7 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
         }
       },
       "disable_on_etag" : {"type" : "boolean"},
-      "disable_on_last_modified" : {"type" : "boolean"},
-      "disable_vary" : {"type" : "boolean"}
+      "disable_on_last_modified" : {"type" : "boolean"}
     },
     "additionalProperties" : false
   }
