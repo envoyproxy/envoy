@@ -15,6 +15,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -199,6 +200,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
 
 void BaseIntegrationTest::initialize() {
   RELEASE_ASSERT(!initialized_);
+  RELEASE_ASSERT(Event::Libevent::Global::initialized());
   initialized_ = true;
 
   createUpstreams();
