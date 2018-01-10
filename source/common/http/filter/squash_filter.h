@@ -66,9 +66,9 @@ public:
 
 private:
   enum class State {
-    INITIAL,
-    CREATE_CONFIG,
-    CHECK_ATTACHMENT,
+    Initial,
+    CreateConfig,
+    CheckAttachment,
   };
 
   void retry();

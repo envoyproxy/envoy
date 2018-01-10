@@ -120,7 +120,7 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
 }
 
 SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
-    : config_(config), state_(State::INITIAL), debugAttachmentPath_(), delay_timer_(nullptr),
+    : config_(config), state_(State::Initial), debugAttachmentPath_(), delay_timer_(nullptr),
       attachment_timeout_timer_(nullptr), in_flight_request_(nullptr), cm_(cm),
       decoder_callbacks_(nullptr) {}
 
@@ -145,13 +145,13 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
   request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Post);
   request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
 
-  state_ = State::CREATE_CONFIG;
+  state_ = State::CreateConfig;
   in_flight_request_ = cm_.httpAsyncClientForCluster(config_->clusterName())
                            .send(std::move(request), *this, config_->requestTimeout());
 
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(info, "Squash: can't create request for squash server");
-    state_ = State::INITIAL;
+    state_ = State::Initial;
     return FilterHeadersStatus::Continue;
   }
 
@@ -159,7 +159,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
   attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
   // check if the timer expired inline.
-  if (state_ == State::INITIAL) {
+  if (state_ == State::Initial) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -167,7 +167,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 }
 
 FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
-  if (state_ == State::INITIAL) {
+  if (state_ == State::Initial) {
     return FilterDataStatus::Continue;
   } else {
     return FilterDataStatus::StopIterationAndBuffer;
@@ -175,7 +175,7 @@ FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
 }
 
 FilterTrailersStatus SquashFilter::decodeTrailers(HeaderMap&) {
-  if (state_ == State::INITIAL) {
+  if (state_ == State::Initial) {
     return FilterTrailersStatus::Continue;
   } else {
     return FilterTrailersStatus::StopIteration;
@@ -191,19 +191,19 @@ void SquashFilter::onSuccess(MessagePtr&& m) {
 
   switch (state_) {
 
-  case State::INITIAL: {
+  case State::Initial: {
     // Should never happen.
     ENVOY_LOG(info, "Squash: received send success callback when no request is in progress");
     break;
   }
-  case State::CREATE_CONFIG: {
+  case State::CreateConfig: {
     // get the config object that was created
     if (Utility::getResponseStatus(m->headers()) != enumToInt(Code::Created)) {
       ENVOY_LOG(info, "Squash: can't create attachment object. status {} - not squashing",
                 m->headers().Status()->value().c_str());
       doneSquashing();
     } else {
-      state_ = State::CHECK_ATTACHMENT;
+      state_ = State::CheckAttachment;
 
       std::string debugAttachmentId;
       try {
@@ -225,7 +225,7 @@ void SquashFilter::onSuccess(MessagePtr&& m) {
 
     break;
   }
-  case State::CHECK_ATTACHMENT: {
+  case State::CheckAttachment: {
 
     std::string attachmentstate;
     try {
@@ -254,12 +254,12 @@ void SquashFilter::onFailure(AsyncClient::FailureReason) {
   bool request_created = in_flight_request_ != nullptr;
   in_flight_request_ = nullptr;
   switch (state_) {
-  case State::INITIAL: {
+  case State::Initial: {
     // Should never happen.
     ENVOY_LOG(info, "Squash: received send failure callback when no request is in progress");
     break;
   }
-  case State::CREATE_CONFIG: {
+  case State::CreateConfig: {
     // no retries here, as we couldnt create the attachment object.
     if (request_created) {
       // cleanup not needed if onFailure called inline in async client send.
@@ -268,7 +268,7 @@ void SquashFilter::onFailure(AsyncClient::FailureReason) {
     }
     break;
   }
-  case State::CHECK_ATTACHMENT: {
+  case State::CheckAttachment: {
     retry();
     break;
   }
@@ -302,7 +302,7 @@ void SquashFilter::doneSquashing() {
 }
 
 void SquashFilter::cleanup() {
-  state_ = State::INITIAL;
+  state_ = State::Initial;
 
   if (delay_timer_) {
     delay_timer_->disableTimer();
