@@ -2080,36 +2080,36 @@ TEST(RouteMatcherTest, Redirect) {
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
     EXPECT_EQ("https://www.lyft.com/foo",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
     EXPECT_EQ("https://api.lyft.com/foo",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/bar", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new_bar",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
     EXPECT_EQ("https://new.lyft.com/new_baz",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
 }
 
@@ -2148,7 +2148,7 @@ TEST(RouteMatcherTest, DirectResponse) {
                 ->responseCode());
 }
 
-TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
+TEST(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
   std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -2182,18 +2182,18 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
     EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
     EXPECT_EQ(nullptr, config.route(headers, 0)->routeEntry());
   }
 }
 
-TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
+TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
   std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -2229,14 +2229,14 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
     EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
     EXPECT_EQ(nullptr, config.route(headers, 0)->routeEntry());
   }
 }
@@ -2288,7 +2288,7 @@ TEST(RouteMatcherTest, WeightedClusters) {
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www1.lyft.com", "/foo", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
   }
 
   // Weighted Cluster with no runtime
@@ -3289,7 +3289,7 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/both", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
     auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www1", route_entry->clusterName());
@@ -3303,7 +3303,7 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
   {
     Http::TestHeaderMapImpl headers =
         genRedirectHeaders("www.lyft.com", "/cluster-only", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
     auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www2", route_entry->clusterName());
@@ -3315,7 +3315,7 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/route-only", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
     auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www3", route_entry->clusterName());
@@ -3328,7 +3328,7 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
   {
     Http::TestHeaderMapImpl headers =
         genRedirectHeaders("www.lyft.com", "/cluster-passthrough", true, true);
-    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
 
     auto* route_entry = config.route(headers, 0)->routeEntry();
     EXPECT_EQ("www4", route_entry->clusterName());
@@ -3375,9 +3375,9 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
-              config.route(headers, 0)->redirectEntry()->newPath(headers));
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
     EXPECT_EQ(Http::Code::TemporaryRedirect,
-              config.route(headers, 0)->redirectEntry()->redirectResponseCode());
+              config.route(headers, 0)->directResponseEntry()->responseCode());
   }
 }
 

@@ -237,9 +237,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       response_headers_parser_(HeaderParser::configure(route.route().response_headers_to_add(),
                                                        route.route().response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
-      redirect_response_code_(
-          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())),
-      direct_response_code_(static_cast<Http::Code>(route.direct_response().status())) {
+      direct_response_code_(ConfigUtility::parseDirectResponseCode(route)) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -424,16 +422,6 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route
     ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
   }
   return ret;
-}
-
-const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
-  // A route for a request can exclusively be a route entry, a direct response entry,
-  // or a redirect entry.
-  if (isRedirect()) {
-    return this;
-  } else {
-    return nullptr;
-  }
 }
 
 const DirectResponseEntry* RouteEntryImplBase::directResponseEntry() const {

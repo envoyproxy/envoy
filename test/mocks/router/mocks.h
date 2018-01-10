@@ -27,22 +27,13 @@
 namespace Envoy {
 namespace Router {
 
-class MockRedirectEntry : public RedirectEntry {
-public:
-  MockRedirectEntry();
-  ~MockRedirectEntry();
-
-  // Router::Config
-  MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
-  MOCK_CONST_METHOD0(redirectResponseCode, Http::Code());
-};
-
 class MockDirectResponseEntry : public DirectResponseEntry {
 public:
   MockDirectResponseEntry();
   ~MockDirectResponseEntry();
 
   // DirectResponseEntry
+  MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
 };
 
@@ -252,7 +243,6 @@ public:
   ~MockRoute();
 
   // Router::Route
-  MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
   MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
   MOCK_CONST_METHOD0(decorator, const Decorator*());

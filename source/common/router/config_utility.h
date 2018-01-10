@@ -104,6 +104,15 @@ public:
   parseRedirectResponseCode(const envoy::api::v2::RedirectAction::RedirectResponseCode& code);
 
   /**
+   * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
+   * @param route supplies the Route configuration.
+   * @return Http::Code the HTTP status from the route's direct_response if specified,
+   *         or the HTTP status code from the route's redirect if specified,
+   *         or zero by default.
+   */
+  static Http::Code parseDirectResponseCode(const envoy::api::v2::Route& route);
+
+  /**
    * Returns the HTTP Status Code enum parsed from proto.
    * @param code supplies the ClusterNotFoundResponseCode enum.
    * @return Returns the Http::Code version of the ClusterNotFoundResponseCode enum.

@@ -14,9 +14,6 @@ using testing::_;
 namespace Envoy {
 namespace Router {
 
-MockRedirectEntry::MockRedirectEntry() {}
-MockRedirectEntry::~MockRedirectEntry() {}
-
 MockDirectResponseEntry::MockDirectResponseEntry() {}
 MockDirectResponseEntry::~MockDirectResponseEntry() {}
 

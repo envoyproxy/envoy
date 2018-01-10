@@ -209,16 +209,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Determine if there is a redirect for the request.
-  if (route_->redirectEntry()) {
-    config_.stats_.rq_redirect_.inc();
-    Http::Utility::sendRedirect(*callbacks_, route_->redirectEntry()->newPath(headers),
-                                route_->redirectEntry()->redirectResponseCode());
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
   // Determine if there is a direct response for the request.
   if (route_->directResponseEntry()) {
+    auto response_code = route_->directResponseEntry()->responseCode();
+    if (response_code >= Http::Code::MultipleChoices && response_code < Http::Code::BadRequest) {
+      config_.stats_.rq_redirect_.inc();
+      Http::Utility::sendRedirect(*callbacks_, route_->directResponseEntry()->newPath(headers),
+                                  response_code);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
     Http::Utility::sendLocalReply(
         [this](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
           // TODO(brian-pane) add response_headers_to_add to the headers here
