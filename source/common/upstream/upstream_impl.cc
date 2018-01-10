@@ -112,7 +112,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       source_address_(getSourceAddress(config, source_address)),
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())) {
+      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
+      metadata_(config.metadata()) {
 
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
