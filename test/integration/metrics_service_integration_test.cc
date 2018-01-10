@@ -1,4 +1,3 @@
-#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -6,7 +5,6 @@
 #include "test/integration/http_integration.h"
 
 #include "api/metrics_service.pb.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
