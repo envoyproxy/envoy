@@ -106,9 +106,10 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
 
-  EXPECT_THROW(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, random,
-                                            dispatcher),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
+                                                         runtime, random, dispatcher),
+                            EnvoyException,
+                            "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
 TEST(HealthCheckerFactoryTest, createGrpc) {
@@ -1526,17 +1527,31 @@ public:
   struct ResponseSpec {
     struct ChunkSpec {
       bool valid;
-      grpc::health::v1::HealthCheckResponse::ServingStatus status;
+      std::vector<uint8_t> data;
     };
     static ChunkSpec invalidChunk() {
       ChunkSpec spec;
       spec.valid = false;
       return spec;
     }
+    static ChunkSpec invalidPayload(uint8_t flags, bool valid_message) {
+      ChunkSpec spec;
+      spec.valid = true;
+      spec.data = serializeResponse(grpc::health::v1::HealthCheckResponse::SERVING);
+      spec.data[0] = flags;
+      if (!valid_message) {
+        const size_t kGrpcHeaderSize = 5;
+        for (size_t i = kGrpcHeaderSize; i < spec.data.size(); i++) {
+          // Fill payload with some random data.
+          spec.data[i] = i % 256;
+        }
+      }
+      return spec;
+    }
     static ChunkSpec validChunk(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
       ChunkSpec spec;
       spec.valid = true;
-      spec.status = status;
+      spec.data = serializeResponse(status);
       return spec;
     }
 
@@ -1546,6 +1561,16 @@ public:
 
     static ChunkSpec notServingResponse() {
       return validChunk(grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+    }
+
+    static std::vector<uint8_t>
+    serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
+      grpc::health::v1::HealthCheckResponse response;
+      response.set_status(status);
+      auto data = Grpc::Common::serializeBody(response);
+      auto ret = std::vector<uint8_t>(data->length(), 0);
+      data->copyOut(0, data->length(), &ret[0]);
+      return ret;
     }
 
     std::vector<std::pair<std::string, std::string>> response_headers;
@@ -1661,10 +1686,8 @@ public:
       bool end_stream = i == spec.body_chunks.size() - 1 && trailers_empty;
       const auto& chunk = spec.body_chunks[i];
       if (chunk.valid) {
-        grpc::health::v1::HealthCheckResponse response;
-        response.set_status(chunk.status);
-        test_sessions_[index]->stream_response_callbacks_->decodeData(
-            *Grpc::Common::serializeBody(response), end_stream);
+        auto data = std::make_unique<Buffer::OwnedImpl>(chunk.data.data(), chunk.data.size());
+        test_sessions_[index]->stream_response_callbacks_->decodeData(*data, end_stream);
       } else {
         Buffer::OwnedImpl incorrect_data("incorrect");
         test_sessions_[index]->stream_response_callbacks_->decodeData(incorrect_data, end_stream);
@@ -1730,6 +1753,48 @@ TEST_F(GrpcHealthCheckerImplTest, Success) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
+  setupServiceNameHC();
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  std::initializer_list<std::pair<std::string, std::string>> il = {
+      {":status", "200"}, {"content-type", "application/grpc"}};
+  auto response_headers = std::make_unique<Http::TestHeaderMapImpl>(il);
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), false);
+
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  auto data = Grpc::Common::serializeBody(response);
+
+  char* raw_data = static_cast<char*>(data->linearize(data->length()));
+  const uint64_t chunk_size = data->length() / 5;
+  for (uint64_t offset = 0; offset < data->length(); offset += chunk_size) {
+    uint64_t effective_size = std::min(chunk_size, data->length() - offset);
+    auto chunk = std::make_unique<Buffer::OwnedImpl>(raw_data + offset, effective_size);
+    test_sessions_[0]->stream_response_callbacks_->decodeData(*chunk, false);
+  }
+
+  il = {{"grpc-status", "0"}};
+  auto trailers = std::make_unique<Http::TestHeaderMapImpl>(il);
+  test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(trailers));
+
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
 
@@ -2176,9 +2241,33 @@ class BadResponseGrpcHealthCheckerImplTest
 INSTANTIATE_TEST_CASE_P(
     BadResponse, BadResponseGrpcHealthCheckerImplTest,
     testing::ValuesIn(std::vector<GrpcHealthCheckerImplTest::ResponseSpec>{
+        // Non-200 response.
+        {
+            {{":status", "500"}},
+            {},
+            {},
+        },
+        // Non-200 response with gRPC status.
+        {
+            {{":status", "500"}, {"grpc-status", "2"}},
+            {},
+            {},
+        },
         // Missing content-type.
         {
             {{":status", "200"}},
+            {},
+            {},
+        },
+        // End stream on response headers.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {},
+            {},
+        },
+        // Non-OK gRPC status in headers.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}, {"grpc-status", "2"}},
             {},
             {},
         },
@@ -2192,6 +2281,19 @@ INSTANTIATE_TEST_CASE_P(
         {
             {{":status", "200"}, {"content-type", "application/grpc"}, {"grpc-status", "0"}},
             {},
+            {},
+        },
+        // Compressed body.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::invalidPayload(Grpc::GRPC_FH_COMPRESSED,
+                                                                     true)},
+            {},
+        },
+        // Invalid proto message.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::invalidPayload(Grpc::GRPC_FH_DEFAULT, false)},
             {},
         },
         // Duplicate response.
@@ -2218,6 +2320,12 @@ INSTANTIATE_TEST_CASE_P(
             {{":status", "200"}, {"content-type", "application/grpc"}},
             {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
             {{"some-header", "1"}},
+        },
+        // Invalid gRPC status.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
+            {{"grpc-status", "invalid"}},
         },
     }));
 

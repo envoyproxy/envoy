@@ -290,7 +290,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
-    HttpHealthCheckerImpl& parent, HostSharedPtr host)
+    HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
@@ -529,7 +529,7 @@ RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
       client_factory_(client_factory) {}
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
-    RedisHealthCheckerImpl& parent, HostSharedPtr host)
+    RedisHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
@@ -609,7 +609,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
 }
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSession(
-    GrpcHealthCheckerImpl& parent, HostSharedPtr host)
+    GrpcHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
@@ -744,7 +744,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
     return;
   }
 
-  ENVOY_CONN_LOG(error, "connection/stream error health_flags={}", *client_,
+  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
   // TODO(baranov1ch): according to all HTTP standards, we should check if reason is one of
@@ -756,7 +756,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
-  ENVOY_CONN_LOG(error, "connection going away health_flags={}", *client_,
+  ENVOY_CONN_LOG(debug, "connection going away health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   // Even if we have active health check probe, fail it on GOAWAY and schedule new one.
   if (request_encoder_) {
@@ -790,6 +790,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     handleFailure(FailureType::Active);
   }
 
+  // |end_stream| will be false if we decided to stop healthcheck before HTTP stream has ended -
+  // invalid gRPC payload, unexpected message stream or wrong content-type.
   if (end_stream) {
     resetState();
   } else {
@@ -811,7 +813,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
-  ENVOY_CONN_LOG(error, "connection/stream timeout health_flags={}", *client_,
+  ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   expect_reset_ = true;
   request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
@@ -845,7 +847,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
   } else {
     grpc_status_message = fmt::format("{}", grpc_status);
   }
-  ENVOY_CONN_LOG(error, "hc grpc_status={} service_status={} health_flags={}", *client_,
+  ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,
                  grpc_status_message, service_status, HostUtility::healthFlagsToString(*host_));
 }
 

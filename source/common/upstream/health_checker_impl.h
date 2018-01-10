@@ -177,7 +177,7 @@ private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
-    HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, HostSharedPtr host);
+    HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
@@ -229,7 +229,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return ActiveHealthCheckSessionPtr{new HttpActiveHealthCheckSession(*this, host)};
+    return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
   }
 
   const std::string path_;
@@ -330,7 +330,7 @@ private:
   };
 
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
-    TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, HostSharedPtr host)
+    TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, const HostSharedPtr& host)
         : ActiveHealthCheckSession(parent, host), parent_(parent) {}
     ~TcpActiveHealthCheckSession();
 
@@ -350,7 +350,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return ActiveHealthCheckSessionPtr{new TcpActiveHealthCheckSession(*this, host)};
+    return std::make_unique<TcpActiveHealthCheckSession>(*this, host);
   }
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
@@ -377,7 +377,7 @@ private:
                                          public Redis::ConnPool::Config,
                                          public Redis::ConnPool::PoolCallbacks,
                                          public Network::ConnectionCallbacks {
-    RedisActiveHealthCheckSession(RedisHealthCheckerImpl& parent, HostSharedPtr host);
+    RedisActiveHealthCheckSession(RedisHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
 
     // ActiveHealthCheckSession
@@ -415,7 +415,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return ActiveHealthCheckSessionPtr{new RedisActiveHealthCheckSession(*this, host)};
+    return std::make_unique<RedisActiveHealthCheckSession>(*this, host);
   }
 
   Redis::ConnPool::ClientFactory& client_factory_;
@@ -434,7 +434,7 @@ private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
-    GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, HostSharedPtr host);
+    GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~GrpcActiveHealthCheckSession();
 
     void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
@@ -500,7 +500,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return ActiveHealthCheckSessionPtr{new GrpcActiveHealthCheckSession(*this, host)};
+    return std::make_unique<GrpcActiveHealthCheckSession>(*this, host);
   }
 
   const Protobuf::MethodDescriptor& service_method_;
