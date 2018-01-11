@@ -74,8 +74,8 @@ envoy_cc_test(
 
 # This is broken out as a separate library because envoy_cc_binary does
 # not allow for external_deps.
-envoy_cc_library(
-    name = "utility_speed_test_lib",
+envoy_cc_binary(
+    name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
     external_deps = [
         "abseil_strings",
@@ -84,9 +84,4 @@ envoy_cc_library(
     deps = [
         "//source/common/common:utility_lib",
     ],
-)
-
-envoy_cc_binary(
-    name = "utility_speed_test",
-    deps = ["utility_speed_test_lib"],
 )
