@@ -20,11 +20,6 @@ namespace LcTrie {
 
 /**
  * Level Compressed Trie implemenation for IP(Ipv4 or IPv6) Prefixes.
- *
- * Note: The C++ implementation of the LcTrie found at
- * https://github.com/beevek/libkrb/blob/master/krb/lc_trie.hpp was used as a reference for this
- * file. The C++ implementation was based off of S. Nilson's code at
- * http://www.csc.kth.se/~snilsson/software/router/C/
  */
 class LcTrie {
 public:
@@ -91,9 +86,14 @@ private:
   template <class IpType, uint32_t address_size = 8 * sizeof(IpType)> class LcTrieInternal {
   public:
     /**
-     * Level Compress Trie (LC-Trie) implementation for IP(IPv4 or IPv6) prefixes. Note: this trie
-     * can handle Ipv4/Ipv6 separately.
+     * Level Compressed Trie (LC-Trie) implementation for IP(IPv4 or IPv6) prefixes.
      *
+     * The C++ implementation of the LcTrie found at
+     * https://github.com/beevek/libkrb/blob/master/krb/lc_trie.hpp was used as a reference.
+     * The implemenation above is based off of S. Nilson's code at
+     * http://www.csc.kth.se/~snilsson/software/router/C/
+     *
+     * Note: This trie handles Ipv4 and Ipv6 separately.
      * Note: The trie can only support up 524288(2^19) nodes. Please see LcNode for further
      * explanation.
      *
@@ -116,7 +116,6 @@ private:
 
   private:
     /**
-     * // fIXME Duplicate
      * Extract n bits from input starting at position p.
      * @param position supplies the position.
      * @param n supplies the number of bits to extract.
@@ -139,7 +138,6 @@ private:
      * Builds the Level Compresesed Trie, by first sorting the base vector, removing nested prefixes
      * and duplicated and then recursively builds the trie by invoking buildRecursively().
      */
-    // this will take the ip_prefixes.
     void buildLcTrie(std::vector<IpPrefixes<IpType>>& tag_data) {
       if (tag_data.empty()) {
         return;
@@ -234,7 +232,6 @@ private:
       // patterns (b=2 {00, 01, 10, 11}; b=3 {000,001,010,011,100,101,110,111}, etc)
       // are covered in the set.
       branch = 1;
-      // FIXME bad while loop
       do {
         ++branch;
 
@@ -287,7 +284,6 @@ private:
      * @param pos supplies the root for this trie..
      * @param nextfree supplies the next available index in the trie_.
      */
-    // FIXME make this return a value instead of c style.
     void buildRecursive(uint32_t prefix, uint32_t first, uint32_t n, uint32_t pos,
                         uint32_t* nextfree) {
       uint32_t p, address, bits;
@@ -311,7 +307,7 @@ private:
       *nextfree += 1 << output.branch_;
       p = first;
 
-      // build the subtrees
+      // Build the subtrees.
       for (bit_pattern = 0; bit_pattern < static_cast<uint32_t>(1 << output.branch_);
            ++bit_pattern) {
 
