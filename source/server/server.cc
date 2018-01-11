@@ -192,6 +192,8 @@ void InstanceImpl::initialize(Options& options,
   // stats.
   tag_extractors_ = Config::Utility::createTagExtractors(bootstrap);
   stats_store_.setTagExtractors(tag_extractors_);
+  default_tags_ = Config::Utility::createTags(bootstrap);
+  stats_store_.setDefaultTags(default_tags_);
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});

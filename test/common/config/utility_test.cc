@@ -81,6 +81,31 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_names(0));
 }
 
+TEST(UtilityTest, DetectTagNameConflict) {
+  envoy::api::v2::Bootstrap bootstrap;
+  auto& stats_config = *bootstrap.mutable_stats_config();
+
+  // Should pass there were no conflict.
+  auto& tag_specifier1 = *stats_config.mutable_stats_tags()->Add();
+  tag_specifier1.set_tag_name("test.x");
+  Utility::detectTagNameConflict(bootstrap);
+
+  // Should raise an error when duplicate tag names are specified.
+  auto& tag_specifier2 = *stats_config.mutable_stats_tags()->Add();
+  tag_specifier2.set_tag_name("test.x");
+  EXPECT_THROW_WITH_MESSAGE(Utility::detectTagNameConflict(bootstrap), EnvoyException,
+                            fmt::format("Tag name '{}' specified twice.", "test.x"));
+
+  // Also should raise an error When user defined tag name conflicts with Envoy's default tag names.
+  stats_config.clear_stats_tags();
+  stats_config.mutable_use_all_default_tags()->set_value(true);
+  auto& tag_specifier_with_dup = *stats_config.mutable_stats_tags()->Add();
+  tag_specifier_with_dup.set_tag_name(TagNames::get().CLUSTER_NAME);
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::detectTagNameConflict(bootstrap), EnvoyException,
+      fmt::format("Tag name '{}' specified twice.", TagNames::get().CLUSTER_NAME));
+}
+
 TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
   envoy::api::v2::Bootstrap bootstrap;
   const auto& tag_names = TagNames::get();
@@ -100,11 +125,8 @@ TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
   tag_extractors = Utility::createTagExtractors(bootstrap);
   EXPECT_EQ(tag_names.name_regex_pairs_.size(), tag_extractors.size());
 
-  // Create a duplicate name by adding a default name with all the defaults enabled.
   auto& custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
   custom_tag_extractor.set_tag_name(tag_names.CLUSTER_NAME);
-  EXPECT_THROW_WITH_MESSAGE(Utility::createTagExtractors(bootstrap), EnvoyException,
-                            fmt::format("Tag name '{}' specified twice.", tag_names.CLUSTER_NAME));
 
   // Remove the defaults and ensure the manually added default gets the correct regex.
   stats_config.mutable_use_all_default_tags()->set_value(false);
@@ -148,6 +170,28 @@ TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
   EXPECT_THROW_WITH_MESSAGE(
       Utility::createTagExtractors(bootstrap), EnvoyException,
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+}
+
+TEST(UtilityTest, GetDefaultTagsFromBootstrap) {
+  envoy::api::v2::Bootstrap bootstrap;
+  auto& stats_config = *bootstrap.mutable_stats_config();
+
+  // Default configuration should produce empty tags.
+  std::vector<Stats::Tag> tags = Utility::createTags(bootstrap);
+  EXPECT_EQ(0, tags.size());
+
+  // Should ignore tag_specifiers which has empty tag_value.
+  auto& tag_specifier = *stats_config.mutable_stats_tags()->Add();
+  tag_specifier.set_tag_name("test.service_cluster");
+  tags = Utility::createTags(bootstrap);
+  EXPECT_EQ(0, tags.size());
+
+  // Should build Stats::Tag when given TagSpecifier has fixed_value.
+  tag_specifier.set_fixed_value("test_cluster");
+  tags = Utility::createTags(bootstrap);
+  EXPECT_EQ(1, tags.size());
+  EXPECT_EQ("test.service_cluster", tags[0].name_);
+  EXPECT_EQ("test_cluster", tags[0].value_);
 }
 
 TEST(UtilityTest, ObjNameLength) {
