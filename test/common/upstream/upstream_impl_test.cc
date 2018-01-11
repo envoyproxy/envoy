@@ -726,9 +726,8 @@ TEST(ClusterMetadataTest, Metadata) {
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
   )EOF";
 
-  auto cluster_config = parseClusterFromV2Yaml(yaml);
-  StrictDnsClusterImpl cluster(cluster_config, runtime, stats, ssl_context_manager, dns_resolver,
-                               cm, dispatcher, false);
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
