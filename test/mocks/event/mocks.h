@@ -30,7 +30,7 @@ public:
   ~MockDispatcher();
 
   Network::ConnectionPtr createConnection(Network::AcceptSocketPtr&& accept_socket,
-                                          Ssl::Context* ssl_ctx) {
+                                          Ssl::Context* ssl_ctx) override {
     return Network::ConnectionPtr{createConnection_(accept_socket.get(), ssl_ctx)};
   }
 
