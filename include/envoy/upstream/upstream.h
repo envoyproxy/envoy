@@ -19,6 +19,8 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "api/base.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -431,6 +433,11 @@ public:
    * @return the configuration for load balancer subsets.
    */
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
+
+  /**
+   * @return const envoy::api::v2::Metadata& the configuration metadata for this cluster.
+   */
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

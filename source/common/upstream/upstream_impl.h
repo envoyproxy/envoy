@@ -314,6 +314,7 @@ public:
     return source_address_;
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
+  const envoy::api::v2::Metadata& metadata() const override { return metadata_; }
 
   // Server::Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
@@ -354,6 +355,7 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
+  const envoy::api::v2::Metadata metadata_;
 };
 
 /**
