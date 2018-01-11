@@ -309,14 +309,12 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   auto features = cluster_->features();
 
-  Http::Protocol protocol = (features & Upstream::ClusterInfo::Features::HTTP2)
-                                ? Http::Protocol::Http2
-                                : Http::Protocol::Http11;
+  Http::Protocol protocol;
   if (features & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
-    const Optional<Http::Protocol>& downstream_protocol = callbacks_->requestInfo().protocol();
-    if (downstream_protocol.valid()) {
-      protocol = downstream_protocol.value();
-    }
+    protocol = callbacks_->requestInfo().protocol().value();
+  } else {
+    protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                                   : Http::Protocol::Http11;
   }
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
