@@ -10,6 +10,8 @@
 
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 /**
  * Utility class for formatting dates given a strftime style format string.
@@ -135,6 +137,11 @@ public:
    * Trim trailing whitespace from a string in place.
    */
   static void rtrim(std::string& source);
+
+  /**
+   * Trim trailing whitespace from a string_view, returning result.
+   */
+  static absl::string_view rightTrim(const absl::string_view& source);
 
   /**
    * Size-bounded string copying and concatenation
