@@ -141,7 +141,7 @@ public:
   /**
    * Trim trailing whitespace from a string_view, returning result.
    */
-  static absl::string_view rightTrim(const absl::string_view& source);
+  static absl::string_view rightTrim(absl::string_view source);
 
   /**
    * Size-bounded string copying and concatenation

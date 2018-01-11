@@ -98,12 +98,9 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
-absl::string_view StringUtil::rightTrim(const absl::string_view& source) {
-  std::size_t pos = source.find_last_not_of(" \t\f\v\n\r");
-  if (pos != absl::string_view::npos) {
-    return absl::string_view(source.data(), pos + 1);
-  }
-  return absl::string_view("");
+absl::string_view StringUtil::rightTrim(absl::string_view source) {
+  source.remove_suffix(source.size() - source.find_last_not_of(" \t\f\v\n\r") - 1);
+  return source;
 }
 
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
