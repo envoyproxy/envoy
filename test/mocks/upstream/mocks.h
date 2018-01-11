@@ -155,8 +155,7 @@ public:
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
   MOCK_METHOD4(httpConnPoolForCluster,
                Http::ConnectionPool::Instance*(const std::string& cluster,
-                                               ResourcePriority priority,
-                                               enum Http::Protocol protocol,
+                                               ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context));
   MOCK_METHOD2(tcpConnForCluster_,
                MockHost::MockCreateConnectionData(const std::string& cluster,
