@@ -248,7 +248,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
   EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
-TEST_F(SslServerContextImplTicketTest, TicketKeyInlineuccess) {
+TEST_F(SslServerContextImplTicketTest, TicketKeyInlineSuccess) {
   envoy::api::v2::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, '\0'));
   EXPECT_NO_THROW(loadConfigV2(cfg));
