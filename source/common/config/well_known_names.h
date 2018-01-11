@@ -60,12 +60,11 @@ public:
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 
-  ListenerFilterNameValues()
-    : v1_converter_({ORIGINAL_DST, PROXY_PROTOCOL}) {}
+  ListenerFilterNameValues() : v1_converter_({ORIGINAL_DST, PROXY_PROTOCOL}) {}
 };
 
 typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
- 
+
 /**
  * Well-known network filter names.
  */

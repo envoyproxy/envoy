@@ -137,7 +137,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
 
   if (config.listener_filters().size()) {
     listener_filter_factories_ =
-      parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+        parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
   }
 
   // Skip lookup and update of the SSL Context if there is only one filter chain

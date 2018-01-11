@@ -158,9 +158,9 @@ private:
 
   class AdminListener : public Server::Listener {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope) : parent_(parent),
-      name_("admin"), scope_(std::move(listener_scope)),
-      stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
+    AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
+        : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
 
     // Server::Listener
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }

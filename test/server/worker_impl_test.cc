@@ -10,8 +10,8 @@
 #include "gtest/gtest.h"
 
 using testing::InSequence;
-using testing::InvokeWithoutArgs;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::Throw;

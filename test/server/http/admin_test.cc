@@ -70,7 +70,7 @@ public:
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-	       listener_scope_.createScope("listener.admin.")) {
+               listener_scope_.createScope("listener.admin.")) {
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
   }
@@ -102,10 +102,10 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path(
-      "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-      listener_scope_.createScope("listener.admin."));
+  AdminImpl admin_bad_profile_path("/dev/null",
+                                   TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
+                                   "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                   server_, listener_scope_.createScope("listener.admin."));
   Http::HeaderMapImpl header_map;
   admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
