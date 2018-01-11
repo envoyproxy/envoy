@@ -195,7 +195,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();
 
-  // Determine if there is a route entry or a redirect for the request.
+  // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
@@ -218,16 +218,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                                   response_code);
       return Http::FilterHeadersStatus::StopIteration;
     }
-    Http::Utility::sendLocalReply(
-        [this](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-          // TODO(brian-pane) add response_headers_to_add to the headers here
-          callbacks_->encodeHeaders(std::move(headers), end_stream);
-        },
-        [this](Buffer::Instance& data, bool end_stream) -> void {
-          callbacks_->encodeData(data, end_stream);
-        },
-        stream_destroyed_, route_->directResponseEntry()->responseCode(), "");
-    // TODO(brian-pane) support sending a response body.
+    config_.stats_.rq_direct_response_.inc();
+    sendLocalReply(route_->directResponseEntry()->responseCode(), "", false);
+    // TODO(brian-pane) support sending a response body and response_headers_to_add.
     return Http::FilterHeadersStatus::StopIteration;
   }
 
