@@ -332,7 +332,19 @@ void HttpIntegrationTest::testRouterRedirect() {
 }
 
 void HttpIntegrationTest::testRouterDirectResponse() {
-  config_helper_.addDirectResponse("direct.example.com", "/", Http::Code::NoContent, "");
+  static const std::string domain("direct.example.com");
+  static const std::string prefix("/");
+  static const Http::Code status(Http::Code::NoContent);
+  config_helper_.addConfigModifier(
+      [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->add_virtual_hosts();
+        virtual_host->set_name(domain);
+        virtual_host->add_domains(domain);
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
+            static_cast<uint32_t>(status));
+      });
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(

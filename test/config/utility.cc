@@ -226,23 +226,6 @@ void ConfigHelper::addRoute(const std::string& domains, const std::string& prefi
   storeHttpConnectionManager(hcm_config);
 }
 
-void ConfigHelper::addDirectResponse(const std::string& domains, const std::string& prefix,
-                                     Http::Code status, const std::string&) {
-  RELEASE_ASSERT(!finalized_);
-  envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
-  loadHttpConnectionManager(hcm_config);
-
-  auto* route_config = hcm_config.mutable_route_config();
-  auto* virtual_host = route_config->add_virtual_hosts();
-  virtual_host->set_name(domains);
-  virtual_host->add_domains(domains);
-  virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-  virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
-      static_cast<uint32_t>(status));
-
-  storeHttpConnectionManager(hcm_config);
-}
-
 void ConfigHelper::addFilter(const std::string& config) {
   RELEASE_ASSERT(!finalized_);
   envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
