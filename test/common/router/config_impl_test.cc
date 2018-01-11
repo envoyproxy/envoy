@@ -1798,7 +1798,7 @@ TEST(RouteMatcherTest, Retry) {
           "retry_policy": {
             "per_try_timeout_ms" : 1000,
             "num_retries": 3,
-            "retry_on": "5xx,connect-failure"
+            "retry_on": "5xx,gateway-error,connect-failure"
           }
         }
       ]
@@ -1849,7 +1849,8 @@ TEST(RouteMatcherTest, Retry) {
                     ->routeEntry()
                     ->retryPolicy()
                     .numRetries());
-  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX,
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
