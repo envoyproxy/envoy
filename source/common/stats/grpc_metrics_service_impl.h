@@ -25,7 +25,7 @@ typedef std::unique_ptr<
     Grpc::AsyncClient<envoy::api::v2::StreamMetricsMessage, envoy::api::v2::StreamMetricsResponse>>
     GrpcMetricsServiceClientPtr;
 
-// TODO : Move the common code base class so that Accesslog and Metrics Service can reuse.
+// TODO : Move the common code to a base class so that Accesslog and Metrics Service can reuse.
 
 /**
  * Factory for creating a gRPC metrics service streaming client.
@@ -160,7 +160,7 @@ public:
   }
 
   void onHistogramComplete(const Histogram&, uint64_t) override {
-    // TODO : Need to figure out how map existing histogram to Proto Model
+    // TODO : Need to figure out how to map existing histogram to Proto Model
   }
 
 private:
