@@ -1,6 +1,7 @@
 #include "common/ssl/context_impl.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@
 #include "common/common/hex.h"
 
 #include "fmt/format.h"
+#include <openssl/err.h>
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
@@ -44,11 +46,13 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
   RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
+    ERR_print_errors_fp(stdout);
     throw EnvoyException(
         fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
   }
 
   if (!SSL_CTX_set1_curves_list(ctx_.get(), ecdh_curves_.c_str())) {
+    ERR_print_errors_fp(stdout);
     throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", ecdh_curves_));
   }
 
@@ -60,6 +64,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     // set CA certificate
     int rc = SSL_CTX_load_verify_locations(ctx_.get(), config.caCertFile().c_str(), nullptr);
     if (0 == rc) {
+      ERR_print_errors_fp(stdout);
       throw EnvoyException(
           fmt::format("Failed to load verify locations file {}", config.caCertFile()));
     }
@@ -89,12 +94,14 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     cert_chain_file_path_ = config.certChainFile();
     int rc = SSL_CTX_use_certificate_chain_file(ctx_.get(), config.certChainFile().c_str());
     if (0 == rc) {
+      ERR_print_errors_fp(stdout);
       throw EnvoyException(
           fmt::format("Failed to load certificate chain file {}", config.certChainFile()));
     }
 
     rc = SSL_CTX_use_PrivateKey_file(ctx_.get(), config.privateKeyFile().c_str(), SSL_FILETYPE_PEM);
     if (0 == rc) {
+      ERR_print_errors_fp(stdout);
       throw EnvoyException(
           fmt::format("Failed to load private key file {}", config.privateKeyFile()));
     }
