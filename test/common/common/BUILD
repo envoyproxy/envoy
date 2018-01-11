@@ -72,6 +72,8 @@ envoy_cc_test(
     deps = ["//source/common/common:callback_impl_lib"],
 )
 
+# This is broken out as a separate library because envoy_cc_binary does
+# not allow for external_deps.
 envoy_cc_library(
     name = "utility_speed_test_lib",
     srcs = ["utility_speed_test.cc"],

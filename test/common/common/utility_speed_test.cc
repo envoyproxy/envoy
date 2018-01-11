@@ -1,9 +1,9 @@
-// Note: this should be run with --compilation_mode=opt.
-
-#include <iostream>
+// Note: this should be run with --compilation_mode=opt, and would benefit from a
+// quiescent system with disabled cstate power management.
 
 #include "common/common/utility.h"
 
+#include "absl/strings/string_view.h"
 #include "testing/base/public/benchmark.h"
 
 static const char TextToTrim[] = "\t  the quick brown fox jumps over the lazy dog\n\r\n";
@@ -14,34 +14,25 @@ static size_t AlreadyTrimmedLength = sizeof(AlreadyTrimmed) - 1;
 
 // NOLINT(namespace-envoy)
 
-static void printResults(int accum, int iters) {
-  std::cout << "avg trimmed=" << static_cast<float>(accum) / iters << " of " << iters << " iters."
-            << std::endl;
-}
-
 static void BM_RTrimString(benchmark::State& state) {
   int accum = 0;
-  int iters = 0;
   for (auto _ : state) {
     std::string text(TextToTrim, TextToTrimLength);
     Envoy::StringUtil::rtrim(text);
     accum += TextToTrimLength - text.size();
-    ++iters;
   }
-  printResults(accum, iters);
+  benchmark::DoNotOptimize(accum);
 }
 BENCHMARK(BM_RTrimString);
 
 static void BM_RTrimStringAlreadyTrimmed(benchmark::State& state) {
   int accum = 0;
-  int iters = 0;
   for (auto _ : state) {
     std::string text(AlreadyTrimmed, AlreadyTrimmedLength);
     Envoy::StringUtil::rtrim(text);
     accum += AlreadyTrimmedLength - text.size();
-    ++iters;
   }
-  printResults(accum, iters);
+  benchmark::DoNotOptimize(accum);
 }
 BENCHMARK(BM_RTrimStringAlreadyTrimmed);
 
@@ -55,46 +46,42 @@ static absl::string_view rightTrim(absl::string_view source) {
 
 static void BM_RTrimStringView(benchmark::State& state) {
   int accum = 0;
-  int iters = 0;
   for (auto _ : state) {
     absl::string_view text(TextToTrim, TextToTrimLength);
     text = rightTrim(text);
     accum += TextToTrimLength - text.size();
-    ++iters;
   }
-  printResults(accum, iters);
+  benchmark::DoNotOptimize(accum);
 }
 BENCHMARK(BM_RTrimStringView);
 
 static void BM_RTrimStringViewAlreadyTrimmed(benchmark::State& state) {
   int accum = 0;
-  int iters = 0;
   for (auto _ : state) {
     absl::string_view text(AlreadyTrimmed, AlreadyTrimmedLength);
     text = rightTrim(text);
     accum += AlreadyTrimmedLength - text.size();
-    ++iters;
   }
-  printResults(accum, iters);
+  benchmark::DoNotOptimize(accum);
 }
 BENCHMARK(BM_RTrimStringViewAlreadyTrimmed);
 
 static void BM_RTrimStringViewAlreadyTrimmedAndMakeString(benchmark::State& state) {
   int accum = 0;
-  int iters = 0;
   for (auto _ : state) {
     absl::string_view text(AlreadyTrimmed, AlreadyTrimmedLength);
     std::string string_copy = std::string(rightTrim(text));
     accum += AlreadyTrimmedLength - string_copy.size();
-    ++iters;
   }
-  printResults(accum, iters);
+  benchmark::DoNotOptimize(accum);
 }
 BENCHMARK(BM_RTrimStringViewAlreadyTrimmedAndMakeString);
 
+// Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv))
+  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;
+  }
   benchmark::RunSpecifiedBenchmarks();
 }
