@@ -35,7 +35,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
                                       const Upstream::ClusterInfo& cluster) {
-  if (cluster.sslContext()) {
+  if (cluster.transportSocketFactory().implementsSecureTransport()) {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);

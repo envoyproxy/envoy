@@ -36,7 +36,8 @@ public:
           envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->mutable_cluster()->set_cluster_name("accesslog");
+          common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+              "accesslog");
           MessageUtil::jsonConvert(config, *access_log->mutable_config());
         });
 
@@ -144,6 +145,7 @@ http_logs:
   envoy::api::v2::filter::accesslog::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
+  test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);

@@ -87,8 +87,8 @@ public:
         dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                     Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-    client_connection_ =
-        dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
+    client_connection_ = dispatcher_->createClientConnection(
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket());
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -565,7 +565,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
       dispatcher_->createListener(connection_handler_, socket_, listener_callbacks_, stats_store_,
                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_);
+  client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_,
+                                                           Network::Test::createRawBufferSocket());
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -747,7 +748,8 @@ public:
                                      .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), Network::Address::InstanceConstSharedPtr());
+        socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
+        Network::Test::createRawBufferSocket());
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -812,8 +814,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
     // IPv6 reserved multicast address.
     address = Utility::resolveUrl("tcp://[ff00::]:1");
   }
-  ClientConnectionPtr connection =
-      dispatcher.createClientConnection(address, Network::Address::InstanceConstSharedPtr());
+  ClientConnectionPtr connection = dispatcher.createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -827,7 +829,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher.createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr());
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);

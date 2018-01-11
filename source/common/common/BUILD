@@ -123,9 +123,19 @@ envoy_cc_library(
     deps = ["//include/envoy/common:time_interface"],
 )
 
+genrule(
+    name = "generate_version_number",
+    srcs = ["@envoy_api//:VERSION"],
+    outs = ["version_number.h"],
+    cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
+)
+
 envoy_cc_library(
     name = "version_includes",
-    hdrs = ["version.h"],
+    hdrs = [
+        "version.h",
+        ":generate_version_number",
+    ],
 )
 
 envoy_cc_library(

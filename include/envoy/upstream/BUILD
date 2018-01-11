@@ -99,6 +99,7 @@ envoy_cc_library(
         "//include/envoy/common:optional",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:transport_socket_interface",
         "//include/envoy/ssl:context_interface",
     ],
 )
