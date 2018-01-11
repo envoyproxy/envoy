@@ -707,7 +707,7 @@ TEST(PrioritySet, Extend) {
   }
 }
 
-// Resolve zero hosts, while using health checking.
+// Cluster metadata retrieval.
 TEST(ClusterMetadataTest, Metadata) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
@@ -723,11 +723,10 @@ TEST(ClusterMetadataTest, Metadata) {
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
   )EOF";
 
   auto cluster_config = parseClusterFromV2Yaml(yaml);
-  Config::Metadata::mutableMetadataValue(*cluster_config.mutable_metadata(), "com.bar.foo", "baz")
-      .set_string_value("test_value");
   StrictDnsClusterImpl cluster(cluster_config, runtime, stats, ssl_context_manager, dns_resolver,
                                cm, dispatcher, false);
   EXPECT_EQ("test_value",
