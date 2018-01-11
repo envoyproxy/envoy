@@ -32,6 +32,8 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
   std::string result;
 
+  static_assert(ResponseFlag::LastFlag == 0x800, "A flag has been added. Fix this code.");
+
   if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }

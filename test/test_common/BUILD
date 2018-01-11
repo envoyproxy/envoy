@@ -40,6 +40,7 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
     ],

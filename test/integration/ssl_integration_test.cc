@@ -29,10 +29,10 @@ void SslIntegrationTest::initialize() {
   context_manager_.reset(new ContextManagerImpl(*runtime_));
 
   registerTestServerPorts({"http"});
-  client_ssl_ctx_plain_ = createClientSslContext(false, false, *context_manager_);
-  client_ssl_ctx_alpn_ = createClientSslContext(true, false, *context_manager_);
-  client_ssl_ctx_san_ = createClientSslContext(false, true, *context_manager_);
-  client_ssl_ctx_alpn_san_ = createClientSslContext(true, true, *context_manager_);
+  client_ssl_ctx_plain_ = createClientSslTransportSocketFactory(false, false, *context_manager_);
+  client_ssl_ctx_alpn_ = createClientSslTransportSocketFactory(true, false, *context_manager_);
+  client_ssl_ctx_san_ = createClientSslTransportSocketFactory(false, true, *context_manager_);
+  client_ssl_ctx_alpn_san_ = createClientSslTransportSocketFactory(true, true, *context_manager_);
 }
 
 void SslIntegrationTest::TearDown() {
@@ -64,13 +64,15 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   if (alpn) {
-    return dispatcher_->createSslClientConnection(
-        san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_, address,
-        Network::Address::InstanceConstSharedPtr());
+    return dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(),
+        san ? client_ssl_ctx_alpn_san_->createTransportSocket()
+            : client_ssl_ctx_alpn_->createTransportSocket());
   } else {
-    return dispatcher_->createSslClientConnection(
-        san ? *client_ssl_ctx_san_ : *client_ssl_ctx_plain_, address,
-        Network::Address::InstanceConstSharedPtr());
+    return dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(),
+        san ? client_ssl_ctx_san_->createTransportSocket()
+            : client_ssl_ctx_plain_->createTransportSocket());
   }
 }
 

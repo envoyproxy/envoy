@@ -41,6 +41,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "grpc_access_log_impl_test",
+    srcs = ["grpc_access_log_impl_test.cc"],
+    deps = [
+        "//source/common/access_log:grpc_access_log_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/request_info:request_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "access_log_manager_impl_test",
     srcs = ["access_log_manager_impl_test.cc"],
     deps = [

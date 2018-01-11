@@ -1,3 +1,5 @@
+#include "envoy/common/exception.h"
+
 #include "common/config/cds_json.h"
 #include "common/config/lds_json.h"
 #include "common/config/rds_json.h"
@@ -7,6 +9,8 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "api/eds.pb.h"
@@ -15,6 +19,7 @@
 #include "gtest/gtest.h"
 
 using testing::AtLeast;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -57,7 +62,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::REST_LEGACY, api_config_source_rest_legacy.api_type());
   EXPECT_EQ(10000, Protobuf::util::TimeUtil::DurationToMilliseconds(
                        api_config_source_rest_legacy.refresh_delay()));
-  EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_name(0));
+  EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_names(0));
 
   envoy::api::v2::ApiConfigSource api_config_source_rest;
   Utility::translateApiConfigSource("test_rest_cluster", 20000, ApiType::get().Rest,
@@ -65,7 +70,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::REST, api_config_source_rest.api_type());
   EXPECT_EQ(20000, Protobuf::util::TimeUtil::DurationToMilliseconds(
                        api_config_source_rest.refresh_delay()));
-  EXPECT_EQ("test_rest_cluster", api_config_source_rest.cluster_name(0));
+  EXPECT_EQ("test_rest_cluster", api_config_source_rest.cluster_names(0));
 
   envoy::api::v2::ApiConfigSource api_config_source_grpc;
   Utility::translateApiConfigSource("test_grpc_cluster", 30000, ApiType::get().Grpc,
@@ -73,7 +78,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ(envoy::api::v2::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
   EXPECT_EQ(30000, Protobuf::util::TimeUtil::DurationToMilliseconds(
                        api_config_source_grpc.refresh_delay()));
-  EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_name(0));
+  EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_names(0));
 }
 
 TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
@@ -227,6 +232,55 @@ TEST(UtilityTest, UnixClusterStatic) {
   envoy::api::v2::ConfigSource eds_config;
   Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
+}
+
+TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::checkFilesystemSubscriptionBackingPath("foo"), EnvoyException,
+      "envoy::api::v2::Path must refer to an existing path in the system: 'foo' does not exist");
+  std::string test_path = TestEnvironment::temporaryDirectory();
+  Utility::checkFilesystemSubscriptionBackingPath(test_path);
+}
+
+TEST(UtilityTest, CheckApiConfigSourceSubscriptionBackingCluster) {
+  envoy::api::v2::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->add_cluster_names("foo_cluster");
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+
+  // Non-existent cluster.
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      EnvoyException,
+      "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'foo_cluster' "
+      "does not exist, was added via api, or is an EDS cluster");
+
+  // Dynamic Cluster.
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("foo_cluster", cluster);
+  EXPECT_CALL(cluster, info());
+  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      EnvoyException,
+      "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'foo_cluster' "
+      "does not exist, was added via api, or is an EDS cluster");
+
+  // EDS Cluster backing EDS Cluster.
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
+      EnvoyException,
+      "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'foo_cluster' "
+      "does not exist, was added via api, or is an EDS cluster");
+
+  // All ok.
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(*cluster.info_, type());
+  Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
 }
 
 } // namespace Config

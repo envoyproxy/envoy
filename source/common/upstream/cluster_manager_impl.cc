@@ -15,6 +15,7 @@
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
@@ -172,17 +173,17 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   const auto& ads_config = bootstrap.dynamic_resources().ads_config();
-  if (ads_config.cluster_name().empty()) {
+  if (ads_config.cluster_names().empty()) {
     ENVOY_LOG(debug, "No ADS clusters defined, ADS will not be initialized.");
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   } else {
-    if (ads_config.cluster_name().size() != 1) {
+    if (ads_config.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
     }
     ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(), *this, ads_config.cluster_name()[0], primary_dispatcher,
+        bootstrap.node(), *this, ads_config.cluster_names()[0], primary_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   }
@@ -206,16 +207,52 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
         bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
+  // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
+  // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
+  // only EDS clusters are secondary. This two phase loading is done because in v2 configuration
+  // each EDS cluster individually sets up a subscription. When this subscription is an API source
+  // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    loadCluster(cluster, false);
+    // First load all the primary clusters.
+    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
   }
 
-  // We can now potentially create the CDS API once the backing cluster exists.
-  if (bootstrap.dynamic_resources().has_cds_config()) {
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
-    init_helper_.setCds(cds_api_.get());
-  } else {
-    init_helper_.setCds(nullptr);
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    // Now load all the secondary clusters.
+    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
+  }
+
+  // All the static clusters have been loaded. At this point we can check for the
+  // existence of the v1 sds backing cluster, and the ads backing cluster.
+  // TODO(htuch): Add support for multiple clusters, #1170.
+  const ClusterInfoMap loaded_clusters = clusters();
+  if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
+    const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
+    switch (sds_config.config_source_specifier_case()) {
+    case envoy::api::v2::ConfigSource::kPath: {
+      Config::Utility::checkFilesystemSubscriptionBackingPath(sds_config.path());
+      break;
+    }
+    case envoy::api::v2::ConfigSource::kApiConfigSource: {
+      Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(
+          loaded_clusters, sds_config.api_config_source());
+      break;
+    }
+    case envoy::api::v2::ConfigSource::kAds: {
+      // Backing cluster will be checked below
+      break;
+    }
+    default:
+      throw EnvoyException(
+          "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
+    }
+  }
+  if (!ads_config.cluster_names().empty()) {
+    Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, ads_config);
   }
 
   Optional<std::string> local_cluster_name;
@@ -235,6 +272,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
 
+  // We can now potentially create the CDS API once the backing cluster exists.
+  if (bootstrap.dynamic_resources().has_cds_config()) {
+    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), eds_config_, *this);
+    init_helper_.setCds(cds_api_.get());
+  } else {
+    init_helper_.setCds(nullptr);
+  }
+
   // Proceed to add all static bootstrap clusters to the init manager. This will immediately
   // initialize any primary clusters. Post-init processing further initializes any thread
   // aware load balancer and sets up the per-worker host set updates.
@@ -250,13 +295,13 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    if (load_stats_config.cluster_name().size() != 1) {
+    if (load_stats_config.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
     }
     load_stats_reporter_.reset(new LoadStatsReporter(
-        bootstrap.node(), *this, stats, load_stats_config.cluster_name()[0], primary_dispatcher));
+        bootstrap.node(), *this, stats, load_stats_config.cluster_names()[0], primary_dispatcher));
   }
 }
 
@@ -427,7 +472,7 @@ ThreadLocalCluster* ClusterManagerImpl::get(const std::string& cluster) {
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                           LoadBalancerContext* context) {
+                                           Http::Protocol protocol, LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -436,7 +481,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->connPool(priority, context);
+  return entry->second->connPool(priority, protocol, context);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(
@@ -580,7 +625,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
       container.drains_remaining_--;
       if (container.drains_remaining_ == 0) {
         for (Http::ConnectionPool::InstancePtr& pool : container.pools_) {
-          thread_local_dispatcher_.deferredDelete(std::move(pool));
+          if (pool) {
+            thread_local_dispatcher_.deferredDelete(std::move(pool));
+          }
         }
         host_http_conn_pool_map_.erase(old_host);
       }
@@ -621,7 +668,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host, ThreadLocal::Slot& tls) {
 
-  // Close all HTTP connection pool connections in the case of a host health failure. If outlier/
+  // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
   // health is due to ECMP flow hashing issues for example, a new set of connections might do
   // better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
@@ -635,7 +682,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         continue;
       }
 
-      pool->closeConnections();
+      pool->drainConnections();
     }
   }
 }
@@ -717,7 +764,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
+    ResourcePriority priority, Http::Protocol protocol, LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -726,13 +773,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  ASSERT(enumToInt(priority) < container.pools_.size());
-  if (!container.pools_[enumToInt(priority)]) {
-    container.pools_[enumToInt(priority)] =
-        parent_.parent_.factory_.allocateConnPool(parent_.thread_local_dispatcher_, host, priority);
+  const auto idx = container.index(priority, protocol);
+  if (!container.pools_[idx]) {
+    container.pools_[idx] = parent_.parent_.factory_.allocateConnPool(
+        parent_.thread_local_dispatcher_, host, priority, protocol);
   }
 
-  return container.pools_[enumToInt(priority)].get();
+  return container.pools_[idx].get();
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
@@ -745,8 +792,8 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 
 Http::ConnectionPool::InstancePtr
 ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                            ResourcePriority priority) {
-  if ((host->cluster().features() & ClusterInfo::Features::HTTP2) &&
+                                            ResourcePriority priority, Http::Protocol protocol) {
+  if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::ConnectionPool::InstancePtr{
         new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority)};

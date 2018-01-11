@@ -8,7 +8,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_cyan4973_xxhash = dict(
-        commit = "50a564c33c36b3f0c83f027dd21c25cba2967c72",  # v0.6.3
+        commit = "7caf8bd76440c75dfe1070d3acfbd7891aea8fca",  # v0.6.4
         remote = "https://github.com/Cyan4973/xxHash",
     ),
     com_github_eile_tclap = dict(
@@ -21,24 +21,25 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "eb5beb4e53f4bfff5b32eb4db8588484bdc15a17b90eeefef3a9fc74fec1d83d",
-        strip_prefix = "spdlog-0.14.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v0.14.0.tar.gz"],
+        sha256 = "2081e5df5e87402398847431e16b87c71dd5c4d632314bb976ace8161f4d32de",
+        strip_prefix = "spdlog-0.16.2",
+        urls = ["https://github.com/gabime/spdlog/archive/v0.16.2.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
         remote = "https://github.com/gcovr/gcovr",
+    ),
+    com_github_grpc_grpc = dict(
+        commit = "f526a2164f9c1eb816eea420f7201b8dfa278a8f", # v1.8.3
+        remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
         commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
         remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0
     ),
     com_lightstep_tracer_cpp = dict(
-        # This picks up a commit after v0.6.0 (d4501f84de2d149da2a7a56c545a1c40f214db3f) that fixes
-        # a Clang build issue.
-        # TODO(htuch): Switch back to regular versioned releases at next release.
-        commit = "1c63a24bd7f4e71ccae0d807afd699c3d49307df",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.6.0+
+        commit = "6a198acd328f976984699f7272bbec7c8b220f65",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.6.1
     ),
     lightstep_vendored_googleapis = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
@@ -70,7 +71,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "05384e069b3ea910b04d1ee267aa4fc0fdf15103",
+        commit = "90698c63882c4ed02414afd6b5dd080a0437b397",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

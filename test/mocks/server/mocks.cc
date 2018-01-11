@@ -139,6 +139,10 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
 
 MockFactoryContext::~MockFactoryContext() {}
 
+MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {}
+
+MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

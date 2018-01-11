@@ -69,6 +69,7 @@ public:
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString Referer{"referer"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};

@@ -25,6 +25,7 @@ public:
   void registerThread(Event::Dispatcher& dispatcher, bool main_thread) override;
   void shutdownGlobalThreading() override;
   void shutdownThread() override;
+  Event::Dispatcher& dispatcher() override;
 
 private:
   struct SlotImpl : public Slot {
@@ -41,6 +42,7 @@ private:
   };
 
   struct ThreadLocalData {
+    Event::Dispatcher* dispatcher_{};
     std::vector<ThreadLocalObjectSharedPtr> data_;
   };
 

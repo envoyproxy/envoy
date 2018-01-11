@@ -75,6 +75,9 @@ std::vector<std::pair<std::string, std::string>> TagNameValues::getRegexMapping(
   // listener.[<address>.]ssl.cipher.(<cipher>)
   name_regex_pairs.push_back({SSL_CIPHER, "^listener(?=\\.).*?\\.ssl\\.cipher(\\.(.*?))$"});
 
+  // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
+  name_regex_pairs.push_back({SSL_CIPHER_SUITE, "^cluster(?=\\.).*?\\.ssl\\.ciphers(\\.(.*?))$"});
+
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
   name_regex_pairs.push_back({GRPC_BRIDGE_SERVICE, "^cluster(?=\\.).*?\\.grpc\\.((.*?)\\.)"});
 

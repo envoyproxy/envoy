@@ -105,7 +105,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "subscription_factory_test",
     srcs = ["subscription_factory_test.cc"],
-    external_deps = ["envoy_eds"],
+    external_deps = [
+        "envoy_base",
+        "envoy_eds",
+    ],
     deps = [
         "//source/common/config:subscription_factory_lib",
         "//test/mocks/config:config_mocks",
@@ -114,6 +117,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -159,6 +163,8 @@ envoy_cc_test(
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

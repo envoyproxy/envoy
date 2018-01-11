@@ -275,6 +275,7 @@ private:
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(Server)                                                                              \

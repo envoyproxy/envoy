@@ -392,7 +392,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   ASSERT_NE(host, nullptr);
   EXPECT_EQ(*connection.local_address_, *host->address());
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(connection.local_address_), _))
+  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(connection.local_address_), _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   host->createConnection(dispatcher_);
 }
