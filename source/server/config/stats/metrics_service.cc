@@ -33,24 +33,19 @@ public:
   const std::string cluster_name_;
 };
 
-// Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(grpc_metrics_streamer);
-
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::api::v2::MetricsServiceConfig&>(config);
-  const std::string cluster_name = sink_config.cluster_name();
+  const std::string cluster_name = sink_config.grpc_service().envoy_grpc().cluster_name();
   ENVOY_LOG(debug, "Metrics Service cluster name: {}", cluster_name);
 
   std::shared_ptr<Stats::Metrics::GrpcMetricsStreamer> grpc_metrics_streamer =
-      server.singletonManager().getTyped<Stats::Metrics::GrpcMetricsStreamer>(
-          SINGLETON_MANAGER_REGISTERED_NAME(grpc_metrics_streamer), [&server, &sink_config] {
-            return std::make_shared<Stats::Metrics::GrpcMetricsStreamerImpl>(
-                std::make_unique<GrpcMetricsServiceClientFactoryImpl>(server.clusterManager(),
-                                                                      sink_config.cluster_name()),
-                server.threadLocal(), server.localInfo());
-          });
+      std::make_shared<Stats::Metrics::GrpcMetricsStreamerImpl>(
+          std::make_unique<GrpcMetricsServiceClientFactoryImpl>(server.clusterManager(),
+                                                                cluster_name),
+          server.threadLocal(), server.localInfo());
+
   return Stats::SinkPtr(new Stats::Metrics::MetricsServiceSink(grpc_metrics_streamer));
 }
 

@@ -33,7 +33,7 @@ public:
       // metrics_sink->MergeFrom(bootstrap.stat_sinks()[0]);
       metrics_sink->set_name("envoy.metrics_service");
       envoy::api::v2::MetricsServiceConfig config;
-      config.set_cluster_name("metrics_service");
+      config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("metrics_service");
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
 
     });
@@ -58,8 +58,7 @@ public:
                  metrics_service_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc",
                  metrics_service_request_->headers().ContentType()->value().c_str());
-    std::cout << "waitForMetricsRequest"
-              << "\n";
+    EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
   }
 
   void cleanup() {
@@ -88,7 +87,7 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   envoy::api::v2::StreamMetricsResponse response_msg;
   metrics_service_request_->sendGrpcMessage(response_msg);
   metrics_service_request_->finishGrpcStream(Grpc::Status::Ok);
-
+  test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);
   cleanup();
 }
 

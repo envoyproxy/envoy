@@ -25,6 +25,8 @@ typedef std::unique_ptr<
     Grpc::AsyncClient<envoy::api::v2::StreamMetricsMessage, envoy::api::v2::StreamMetricsResponse>>
     GrpcMetricsServiceClientPtr;
 
+// TODO : Move the common code base class so that Accesslog and Metrics Service can reuse.
+
 /**
  * Factory for creating a gRPC metrics service streaming client.
  */
@@ -74,8 +76,7 @@ public:
 private:
   /**
    * Shared state that is owned by the per-thread streamers. This allows the
-   * main streamer/TLS
-   * slot to be destroyed while the streamers hold onto the shared state.
+   * main streamer/TLS slot to be destroyed while the streamers hold onto the shared state.
    */
   struct SharedState {
     SharedState(GrpcMetricsServiceClientFactoryPtr&& factory,
@@ -130,7 +131,7 @@ private:
 class MetricsServiceSink : public Sink {
 public:
   // MetricsService::Sink
-  MetricsServiceSink(GrpcMetricsStreamerSharedPtr grpc_metrics_streamer);
+  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer);
 
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
@@ -150,11 +151,16 @@ public:
     gauage_metric->set_value(value);
   }
 
-  void endFlush() override { grpc_metrics_streamer_->send(message_); }
+  void endFlush() override {
+    grpc_metrics_streamer_->send(message_);
+    // for perf reasons, clear the identifer after the first flush.
+    if (message_.has_identifier()) {
+      message_.clear_identifier();
+    }
+  }
 
   void onHistogramComplete(const Histogram&, uint64_t) override {
-    // TODO(ramaraochavali): Need to figure out how map existing histogram to
-    // Proto Model
+    // TODO : Need to figure out how map existing histogram to Proto Model
   }
 
 private:
