@@ -94,11 +94,6 @@ TEST(StringUtil, rtrim) {
   }
 }
 
-TEST(StringUtil, rtrimView) {
-  EXPECT_EQ("", StringUtil::rightTrim("  "));
-  EXPECT_EQ("   hello", StringUtil::rightTrim("   hello \r\t\r\n"));
-}
-
 TEST(StringUtil, strlcpy) {
   {
     char dest[6];

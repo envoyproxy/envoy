@@ -98,11 +98,6 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
-absl::string_view StringUtil::rightTrim(absl::string_view source) {
-  source.remove_suffix(source.size() - source.find_last_not_of(" \t\f\v\n\r") - 1);
-  return source;
-}
-
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   strncpy(dst, src, size - 1);
   dst[size - 1] = '\0';
