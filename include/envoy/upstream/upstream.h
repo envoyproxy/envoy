@@ -432,7 +432,7 @@ public:
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
-   * @return the configuration metadata for this cluster.
+   * @return const envoy::api::v2::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::api::v2::Metadata& metadata() const PURE;
 };
