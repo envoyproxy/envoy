@@ -10,8 +10,6 @@
 
 #include "envoy/common/time.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 /**
  * Utility class for formatting dates given a strftime style format string.
