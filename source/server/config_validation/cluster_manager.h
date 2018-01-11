@@ -48,6 +48,7 @@ public:
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
+                                                         Http::Protocol,
                                                          LoadBalancerContext*) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;
