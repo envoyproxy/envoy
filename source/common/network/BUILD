@@ -94,6 +94,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lc_trie_lib",
+    srcs = ["lc_trie.cc"],
+    hdrs = ["lc_trie.h"],
+    external_deps = ["abseil_int128"],
+    deps = [
+        ":cidr_range_lib",
+        ":utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "listen_socket_lib",
     srcs = ["listen_socket_impl.cc"],
     hdrs = ["listen_socket_impl.h"],

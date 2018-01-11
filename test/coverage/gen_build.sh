@@ -9,7 +9,7 @@
 set -e
 
 [ -z "${BAZEL_BIN}" ] && BAZEL_BIN=bazel
-[ -z "${BUILDIFIER_BIN}" ] && BUILDIFIER_BIN=buildifier
+[ -z "${BUILDIFIER_BIN}" ] && BUILDIFIER_BIN=/usr/lib/go/bin/buildifier
 
 # Path to the generated BUILD file for the coverage target.
 [ -z "${BUILD_PATH}" ] && BUILD_PATH="$(dirname "$0")"/BUILD
