@@ -35,40 +35,39 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 TEST_P(StatsIntegrationTest, WithDefaultTags) {
   initialize();
 
-  auto cx_active = test_server_->gauge("listener.127.0.0.1_0.downstream_cx_active");
-  EXPECT_EQ(cx_active->tags().size(), 1);
-  EXPECT_EQ(cx_active->tags()[0].name_, "envoy.listener_address");
-  EXPECT_EQ(cx_active->tags()[0].value_, "127.0.0.1_0");
+  auto counter = test_server_->counter("http.config_test.rq_total");
+  EXPECT_EQ(counter->tags().size(), 1);
+  EXPECT_EQ(counter->tags()[0].name_, "envoy.http_conn_manager_prefix");
+  EXPECT_EQ(counter->tags()[0].value_, "config_test");
 }
 
 TEST_P(StatsIntegrationTest, WithEmptyTagValue) {
   config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-    tag_specifier->set_tag_name("envoy.listener_address");
+    tag_specifier->set_tag_name("envoy.http_conn_manager_prefix");
   });
   initialize();
 
-  auto cx_active = test_server_->gauge("listener.127.0.0.1_0.downstream_cx_active");
-  EXPECT_EQ(cx_active->tags().size(), 1);
-  EXPECT_EQ(cx_active->tags()[0].name_, "envoy.listener_address");
-  EXPECT_EQ(cx_active->tags()[0].value_, "127.0.0.1_0");
+  auto counter = test_server_->counter("http.config_test.rq_total");
+  EXPECT_EQ(counter->tags().size(), 1);
+  EXPECT_EQ(counter->tags()[0].name_, "envoy.http_conn_manager_prefix");
+  EXPECT_EQ(counter->tags()[0].value_, "config_test");
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
   config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-    tag_specifier->set_tag_name("my_listener_address");
-    tag_specifier->set_regex(
-        "^listener\\.(((?:[_.[:digit:]]*|[_\\[\\]aAbBcCdDeEfF[:digit:]]*))\\.)");
+    tag_specifier->set_tag_name("my.http_conn_manager_prefix");
+    tag_specifier->set_regex("^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)");
   });
   initialize();
 
-  auto cx_active = test_server_->gauge("listener.127.0.0.1_0.downstream_cx_active");
-  EXPECT_EQ(cx_active->tags().size(), 1);
-  EXPECT_EQ(cx_active->tags()[0].name_, "my_listener_address");
-  EXPECT_EQ(cx_active->tags()[0].value_, "127.0.0.1_0");
+  auto counter = test_server_->counter("http.config_test.rq_total");
+  EXPECT_EQ(counter->tags().size(), 1);
+  EXPECT_EQ(counter->tags()[0].name_, "my.http_conn_manager_prefix");
+  EXPECT_EQ(counter->tags()[0].value_, "config_test");
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
