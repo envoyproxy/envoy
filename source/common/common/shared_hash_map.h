@@ -59,7 +59,8 @@ public:
    */
   struct Control {
     std::string toString() const {
-      return fmt::format("{} size={} free_cell_index={}", options.toString(), size, free_cell_index);
+      return fmt::format("{} size={} free_cell_index={}",
+                         options.toString(), size, free_cell_index);
     }
 
     mutable pthread_mutex_t mutex; // Marked mutable so get() can be const and also lock.
@@ -72,10 +73,8 @@ public:
    * Represents a value-cell, which is stored in a linked-list from each slot.
    */
   struct Cell {
-    void free() { key_size = 0; }
-    absl::string_view getKey() const {
-      return absl::string_view(key, key_size);
-    }
+    /** Returns the key as a string_view. */
+    absl::string_view getKey() const { return absl::string_view(key, key_size); }
 
     Value value;          // Templated value field.
     uint32_t next_cell;   // OFfset of next cell in map->cells_, terminated with Sentinal.
@@ -231,11 +230,11 @@ private:
   void initHelper(uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
+    cells_ = reinterpret_cast<Cell*>(memory);  // First because Value may need to be aligned.
+    memory += cellOffset(options_.capacity);
     control_ = reinterpret_cast<Control*>(memory);
     memory += sizeof(Control);
     slots_ = reinterpret_cast<uint32_t*>(memory);
-    memory += options_.num_slots * sizeof(uint32_t);
-    cells_ = reinterpret_cast<Cell*>(memory);
   }
 
   Value* getLockHeld(absl::string_view key) const EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
@@ -254,12 +253,12 @@ private:
     bool ret = true;
     if (memcmp(&options_, &control_->options, sizeof(SharedHashMapOptions)) != 0) {
       // options doesn't match.
-      ENVOY_LOG(error, "SharedMap options don't match");
+      ENVOY_LOG(error, "SharedHashMap options don't match");
       return false;
     }
 
     if (control_->size > options_.capacity) {
-      ENVOY_LOG(error, "SharedMap size={} > capacity={}", control_->size, options_.capacity);
+      ENVOY_LOG(error, "SharedHashMap size={} > capacity={}", control_->size, options_.capacity);
       return false;
     }
 
@@ -271,11 +270,11 @@ private:
         const Cell& cell = getCell(cell_index);
         next = cell.next_cell;
         if ((next >= options_.capacity) && (next != Sentinal)) {
-          ENVOY_LOG(error, "SharedMap live cell has corrupt next_cell={}", next);
+          ENVOY_LOG(error, "SharedHashMap live cell has corrupt next_cell={}", next);
           ret = false;
         } else {
           if (cell.key_size > options_.max_key_size) {
-            ENVOY_LOG(error, "SharedMap live cell has key_size=={}", cell.key_size);
+            ENVOY_LOG(error, "SharedHashMap live cell has key_size=={}", cell.key_size);
             ret = false;
           }
           ++num_values;
@@ -286,7 +285,7 @@ private:
       }
     }
     if (num_values != control_->size) {
-      ENVOY_LOG(error, "SharedMap has wrong number of live cells: {}, expected {}", num_values,
+      ENVOY_LOG(error, "SharedHashMap has wrong number of live cells: {}, expected {}", num_values,
                 control_->size);
       ret = false;
     }
@@ -301,10 +300,11 @@ private:
 
   const SharedHashMapOptions options_;
 
-  // Pointers into shared memory.
+  // Pointers into shared memory.  Cells go first, because Value may need a more aggressive
+  // aligmnment.
+  Cell* cells_ PT_GUARDED_BY(control_->mutex);
   Control* control_;
   uint32_t* slots_ PT_GUARDED_BY(control_->mutex);
-  Cell* cells_ PT_GUARDED_BY(control_->mutex);
 };
 
 } // namespace Envoy
