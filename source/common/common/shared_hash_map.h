@@ -13,13 +13,21 @@
 
 namespace Envoy {
 
-// This block is used solely to help with initialization. It is duplicated
-// to the control-block after init.
+/**
+ * Initialization parameters for SharedHashMap. The options are duplicated
+ * to the control-block after init, to aid with sanity checking when attaching
+ * an existing memory segment.
+ */
 struct SharedHashMapOptions {
   std::string toString() const {
     return fmt::format("capacity={}, max_key_size={}, num_slots={}",
                        capacity, max_key_size, num_slots);
   }
+  bool operator==(const SharedHashMapOptions& that) const {
+    return capacity == that.capacity && max_key_size == that.max_key_size &&
+        num_slots == that.num_slots;
+  }
+  bool operator!=(const SharedHashMapOptions& that) const { return ! (*this == that); }
 
   uint32_t capacity;         // how many values can be stored.
   uint32_t max_key_size;     // how many bytes of string can be stored.
@@ -27,20 +35,18 @@ struct SharedHashMapOptions {
 };
 
 /**
- * Implements Hash-map<string, Value> without using pointers, suitable
- * for use in shared memory. This hash-table exploits a simplification
- * for its intended use-case (Envoy stats); it provides no way to
- * delete a key. If we did want to delete keys we'd have to be able
- * to recycle string memory, which would probably force us to save uniform
- * key sizes.
+ * Implements hash_map<string, Value> without using pointers, suitable
+ * for use in shared memory. Users must commit to capacity, max_key_size,
+ * and num_slots at construction time, and to the payload value at compile-time.
  *
- * This map may also be suitable for a persistent memory-mapped hash-table.
+ * This map may also be suitable for persisting a hash-table to long term storage,
+ * but not across machine architectures, as it doesn't use network byte order for
+ * storing ints.
  */
 template <class Value> class SharedHashMap : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
-   * Sentinal to used for a cell's char_offset to indicate it's free.
-   * We also use this sentinal to denote the end of the free-list of cells.
+   * Sentinal used for a next_cell links to indicate end-of-list.
    */
   static const uint32_t Sentinal = 0xffffffff;
 
@@ -52,35 +58,6 @@ public:
    */
   SharedHashMap(const SharedHashMapOptions& options)
       : options_(options), cells_(nullptr), control_(nullptr), slots_(nullptr) {}
-
-  /**
-   * Represents control-values for the hash-table, including a mutex, which
-   * must gate all access to the internas.
-   */
-  struct Control {
-    std::string toString() const {
-      return fmt::format("{} size={} free_cell_index={}",
-                         options.toString(), size, free_cell_index);
-    }
-
-    mutable pthread_mutex_t mutex; // Marked mutable so get() can be const and also lock.
-    SharedHashMapOptions options;  // Options established at map construction time.
-    uint32_t size;                 // Number of values currently stored.
-    uint32_t free_cell_index;      // Offset of first free cell.
-  };
-
-  /**
-   * Represents a value-cell, which is stored in a linked-list from each slot.
-   */
-  struct Cell {
-    /** Returns the key as a string_view. */
-    absl::string_view getKey() const { return absl::string_view(key, key_size); }
-
-    Value value;          // Templated value field.
-    uint32_t next_cell;   // OFfset of next cell in map->cells_, terminated with Sentinal.
-    uint8_t key_size;     // size of key in bytes, or 0 if unused.
-    char key[];
-  };
 
   /** Returns the numbers of byte required for the hash-table, based on the control structure. */
   size_t numBytes() const {
@@ -112,7 +89,7 @@ public:
    * Returns a string describing the contents of the map, including the control
    * bits and the keys in each slot.
    */
-  std::string toString() const {
+  std::string toString() {
     std::string ret;
     lock();
     ret = fmt::format("options={}\ncontrol={}\n", options_.toString(), control_->toString());
@@ -228,7 +205,7 @@ public:
    * Gets the value associated with a key, returning null if the value was not found.
    * @param key
    */
-  Value* get(absl::string_view key) const {
+  Value* get(absl::string_view key) {
     if (key.size() > options_.max_key_size) {
       return nullptr;
     }
@@ -240,19 +217,43 @@ public:
   }
 
 private:
+  /**
+   * Represents control-values for the hash-table, including a mutex, which
+   * must gate all access to the internals.
+   */
+  struct Control {
+    std::string toString() const {
+      return fmt::format("{} size={} free_cell_index={}",
+                         options.toString(), size, free_cell_index);
+    }
+
+    pthread_mutex_t mutex;
+    SharedHashMapOptions options;  // Options established at map construction time.
+    uint32_t size;                 // Number of values currently stored.
+    uint32_t free_cell_index;      // Offset of first free cell.
+  };
+
+  /**
+   * Represents a value-cell, which is stored in a linked-list from each slot.
+   */
+  struct Cell {
+    /** Returns the key as a string_view. */
+    absl::string_view getKey() const { return absl::string_view(key, key_size); }
+
+    Value value;          // Templated value field.
+    uint32_t next_cell;   // OFfset of next cell in map->cells_, terminated with Sentinal.
+    uint8_t key_size;     // size of key in bytes, or 0 if unused.
+    char key[];
+  };
+
   uint32_t cellOffset(uint32_t cell_index) const {
     return cell_index * (options_.max_key_size + sizeof(Cell));
   }
 
   Cell& getCell(uint32_t cell_index) {
-    const SharedHashMap* const_this = this;
-    return const_cast<Cell&>(const_this->getCell(cell_index));
-  }
-
-  const Cell& getCell(uint32_t cell_index) const {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
-    const char* ptr = reinterpret_cast<const char*>(cells_) + cellOffset(cell_index);
-    return *reinterpret_cast<const Cell*>(ptr);
+    char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index);
+    return *reinterpret_cast<Cell*>(ptr);
   }
 
   /** Maps out the segments of shared memory for us to work with. */
@@ -266,21 +267,21 @@ private:
     slots_ = reinterpret_cast<uint32_t*>(memory);
   }
 
-  Value* getLockHeld(absl::string_view key) const EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
+  Value* getLockHeld(absl::string_view key) EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
     uint32_t slot = HashUtil::xxHash64(key) % options_.num_slots;
     for (uint32_t c = slots_[slot]; c != Sentinal; c = getCell(c).next_cell) {
-      const Cell& cell = getCell(c);
+      Cell& cell = getCell(c);
       if (cell.getKey() == key) {
-        return const_cast<Value*>(&cell.value);
+        return &cell.value;
       }
     }
     return nullptr;
   }
 
-  /** Examines the data structures to see if they are sane. Tries not to crash or hang. */
-  bool sanityCheckLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
+  /** Examines the data structures to see if they are sane. Tries hard not to crash or hang. */
+  bool sanityCheckLockHeld() EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
     bool ret = true;
-    if (memcmp(&options_, &control_->options, sizeof(SharedHashMapOptions)) != 0) {
+    if (options_ != control_->options) {
       // options doesn't match.
       ENVOY_LOG(error, "SharedHashMap options don't match");
       return false;
@@ -296,7 +297,7 @@ private:
     uint32_t num_values = 0;
     for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
       for (uint32_t next, cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
-        const Cell& cell = getCell(cell_index);
+        Cell& cell = getCell(cell_index);
         next = cell.next_cell;
         if ((next >= options_.capacity) && (next != Sentinal)) {
           ENVOY_LOG(error, "SharedHashMap live cell has corrupt next_cell={}", next);
@@ -322,10 +323,10 @@ private:
   }
 
   /** Locks the mutex. */
-  void lock() const { pthread_mutex_lock(&control_->mutex); }
+  void lock() { pthread_mutex_lock(&control_->mutex); }
 
   /** Unocks the mutex. */
-  void unlock() const { pthread_mutex_unlock(&control_->mutex); }
+  void unlock() { pthread_mutex_unlock(&control_->mutex); }
 
   const SharedHashMapOptions options_;
 
