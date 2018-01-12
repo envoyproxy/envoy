@@ -20,18 +20,18 @@ namespace Envoy {
  */
 struct SharedHashMapOptions {
   std::string toString() const {
-    return fmt::format("capacity={}, max_key_size={}, num_slots={}",
-                       capacity, max_key_size, num_slots);
+    return fmt::format("capacity={}, max_key_size={}, num_slots={}", capacity, max_key_size,
+                       num_slots);
   }
   bool operator==(const SharedHashMapOptions& that) const {
     return capacity == that.capacity && max_key_size == that.max_key_size &&
-        num_slots == that.num_slots;
+           num_slots == that.num_slots;
   }
-  bool operator!=(const SharedHashMapOptions& that) const { return ! (*this == that); }
+  bool operator!=(const SharedHashMapOptions& that) const { return !(*this == that); }
 
-  uint32_t capacity;         // how many values can be stored.
-  uint32_t max_key_size;     // how many bytes of string can be stored.
-  uint32_t num_slots;        // determines speed of hash vs size efficiency.
+  uint32_t capacity;     // how many values can be stored.
+  uint32_t max_key_size; // how many bytes of string can be stored.
+  uint32_t num_slots;    // determines speed of hash vs size efficiency.
 };
 
 /**
@@ -188,7 +188,7 @@ public:
       if (cell.getKey() == key) {
         control_->free_cell_index = *cptr;
         --control_->size;
-        *cptr = *next;  // Splices current cell out of slot-chain.
+        *cptr = *next; // Splices current cell out of slot-chain.
         *next = control_->free_cell_index;
         found = true;
         break;
@@ -223,14 +223,14 @@ private:
    */
   struct Control {
     std::string toString() const {
-      return fmt::format("{} size={} free_cell_index={}",
-                         options.toString(), size, free_cell_index);
+      return fmt::format("{} size={} free_cell_index={}", options.toString(), size,
+                         free_cell_index);
     }
 
     pthread_mutex_t mutex;
-    SharedHashMapOptions options;  // Options established at map construction time.
-    uint32_t size;                 // Number of values currently stored.
-    uint32_t free_cell_index;      // Offset of first free cell.
+    SharedHashMapOptions options; // Options established at map construction time.
+    uint32_t size;                // Number of values currently stored.
+    uint32_t free_cell_index;     // Offset of first free cell.
   };
 
   /**
@@ -240,9 +240,9 @@ private:
     /** Returns the key as a string_view. */
     absl::string_view getKey() const { return absl::string_view(key, key_size); }
 
-    Value value;          // Templated value field.
-    uint32_t next_cell;   // OFfset of next cell in map->cells_, terminated with Sentinal.
-    uint8_t key_size;     // size of key in bytes, or 0 if unused.
+    Value value;        // Templated value field.
+    uint32_t next_cell; // OFfset of next cell in map->cells_, terminated with Sentinal.
+    uint8_t key_size;   // size of key in bytes, or 0 if unused.
     char key[];
   };
 
@@ -260,7 +260,7 @@ private:
   void initHelper(uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
-    cells_ = reinterpret_cast<Cell*>(memory);  // First because Value may need to be aligned.
+    cells_ = reinterpret_cast<Cell*>(memory); // First because Value may need to be aligned.
     memory += cellOffset(options_.capacity);
     control_ = reinterpret_cast<Control*>(memory);
     memory += sizeof(Control);
@@ -330,7 +330,7 @@ private:
 
   const SharedHashMapOptions options_;
 
-  // Pointers into shared memory.  Cells go first, because Value may need a more aggressive
+  // Pointers into shared memory. Cells go first, because Value may need a more aggressive
   // aligmnment.
   Cell* cells_ PT_GUARDED_BY(control_->mutex);
   Control* control_;
