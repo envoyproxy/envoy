@@ -5,6 +5,7 @@
 
 #include "common/common/macros.h"
 
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -153,20 +154,27 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
   // with a data structure that parses Accept-Encoding values and allows fast lookup of
   // key/priority. Also, this should be part of some utility library.
   if (accept_encoding) {
-    bool is_identity{true};  // true if does not exist or is followed by q=0.
+    bool is_identity{true};  // true if does not exist or is followed by `q=0`.
     bool is_wildcard{false}; // true if found and not followed by `q=0`.
     bool is_gzip{false};     // true if exists and not followed by `q=0`.
 
-    auto tokens = StringViewUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ";,");
-    for (auto it = tokens.begin(); it != tokens.end(); it++) {
-      if (*it == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        is_gzip = *(it + 1) != ZeroQvalueString;
+    std::vector<absl::string_view> tokens =
+        StringViewUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ";,", false);
+
+    for (auto& token : tokens) {
+      absl::string_view next_token{};
+      absl::string_view trimmed_token = StringViewUtil::trim(token);
+      if (token != tokens.back()) {
+        next_token = StringViewUtil::trim(*(&token + 1));
       }
-      if (*it == Http::Headers::get().AcceptEncodingValues.Identity) {
-        is_identity = *(it + 1) == ZeroQvalueString;
+      if (trimmed_token == Http::Headers::get().AcceptEncodingValues.Gzip) {
+        is_gzip = next_token.empty() ? true : (next_token != ZeroQvalueString);
       }
-      if (*it == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = *(it + 1) != ZeroQvalueString;
+      if (trimmed_token == Http::Headers::get().AcceptEncodingValues.Identity) {
+        is_identity = next_token.empty() ? false : (next_token == ZeroQvalueString);
+      }
+      if (trimmed_token == Http::Headers::get().AcceptEncodingValues.Wildcard) {
+        is_wildcard = !next_token.empty() ? true : (next_token != ZeroQvalueString);
       }
     }
 
