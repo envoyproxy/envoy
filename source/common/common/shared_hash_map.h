@@ -2,8 +2,10 @@
 
 #include <pthread.h>
 
+#include <algorithm>
 #include <string>
 
+#include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/logger.h"
 
@@ -46,7 +48,7 @@ struct SharedHashMapOptions {
 template <class Value> class SharedHashMap : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
-   * Sentinal used for a next_cell links to indicate end-of-list.
+   * Sentinal used for next_cell links to indicate end-of-list.
    */
   static const uint32_t Sentinal = 0xffffffff;
 
@@ -66,7 +68,9 @@ public:
    * constructing the object with the desired sizing.
    */
   size_t numBytes() const {
-    return cellOffset(options_.capacity) + sizeof(Control) + options_.num_slots * sizeof(uint32_t);
+    size_t size = cellOffset(options_.capacity) + sizeof(Control) +
+        options_.num_slots * sizeof(uint32_t);
+    return align(size);
   }
 
   /**
@@ -251,13 +255,23 @@ private:
     char key[];
   };
 
+  // It seems like this is an obvious constexpr, but it won't compile as one.
+  static size_t alignment() {
+    return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
+  }
+
+  static uint32_t align(uint32_t size) {
+    return (size + alignment() - 1) & ~(alignment() - 1);
+  }
+
   /**
    * Computes the byte offset of a cell into cells_. This is not
    * simply an array index because we don't know the size of a key at
    * compile-time.
    */
   uint32_t cellOffset(uint32_t cell_index) const {
-    return cell_index * (options_.max_key_size + sizeof(Cell));
+    uint32_t cell_size = align(options_.max_key_size + sizeof(Cell));
+    return cell_index * cell_size;
   }
 
   /**
@@ -266,6 +280,7 @@ private:
   Cell& getCell(uint32_t cell_index) {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index);
+    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (alignment() - 1)) == 0);
     return *reinterpret_cast<Cell*>(ptr);
   }
 

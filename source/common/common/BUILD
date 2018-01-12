@@ -160,6 +160,7 @@ envoy_cc_library(
         "abseil_strings",
     ],
     deps = [
+        ":assert_lib",
         ":hash_lib",
         ":logger_lib",
     ],
