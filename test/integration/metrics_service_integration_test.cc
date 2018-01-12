@@ -64,17 +64,14 @@ public:
     bool known_gauge_exists = false;
     int known_counter_value = -1;
     int known_gauge_value = -1;
-    std::string known_counter("cluster.metrics_service.membership_change");
-    std::string known_gauge("cluster.metrics_service.membership_total");
-    int metrics_size = envoy_metrics.size();
-    for (int i = 0; i < metrics_size; i++) {
-      ::io::prometheus::client::MetricFamily metrics_family = envoy_metrics.Get(i);
-      if (known_counter.compare(metrics_family.name()) == 0 &&
+    for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
+      if (metrics_family.name().compare("cluster.metrics_service.membership_change") == 0 &&
           metrics_family.metric(0).has_counter()) {
         known_counter_exists = true;
         known_counter_value = metrics_family.metric(0).counter().value();
       }
-      if (known_gauge.compare(metrics_family.name()) == 0 && metrics_family.metric(0).has_gauge()) {
+      if (metrics_family.name().compare("cluster.metrics_service.membership_total") == 0 &&
+          metrics_family.metric(0).has_gauge()) {
         known_gauge_exists = true;
         known_gauge_value = metrics_family.metric(0).gauge().value();
       }
