@@ -96,9 +96,9 @@ private:
      * @return true if other is a prefix of this.
      */
     bool isPrefix(const IpPrefixes& other) {
-      return (length_ == 0 ||
-              (length_ <= other.length_ && extractBits<IpType, address_size>(0, length_, ip_) ==
-                                           extractBits<IpType, address_size>(0, length_, other.ip_)));
+      return (length_ == 0 || (length_ <= other.length_ &&
+                               extractBits<IpType, address_size>(0, length_, ip_) ==
+                                   extractBits<IpType, address_size>(0, length_, other.ip_)));
     }
 
     // The address represented either in uint32_t or uint128.
@@ -168,8 +168,7 @@ private:
         // TODO(ccaraman): Add support for nested prefixes.
         if (tag_data[i - 1].isPrefix(tag_data[i])) {
           // TODO(ccaraman): Add printing of nested prefixes to simplify debugging.
-          throw EnvoyException(
-              fmt::format("LcTrie does not support nested prefixes."));
+          throw EnvoyException(fmt::format("LcTrie does not support nested prefixes."));
         }
         if (tag_data[i - 1].compare(tag_data[i]) != 0) {
           ip_prefixes_.push_back(tag_data[i]);
@@ -182,7 +181,7 @@ private:
       // TODO(ccaraman): Define a better buffer value for the trie_ size.
       // TODO(ccaraman): Define a better buffer value for the trie_ size.
       // The value(2000000) was used in the original implementation in
-      // http://www.csc.kth.se/~snilsson/software/router/C/trie.c. 
+      // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
       trie_.resize(2 * ip_prefixes_.size() + 2000000);
 
       uint32_t next_free_index = 1;
