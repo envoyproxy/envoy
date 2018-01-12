@@ -251,6 +251,7 @@ public:
    * Creates the set of tags if TagSpecifiers have "fixed_value" field. The
    * tags will use as default tags. In other words, the tags will be added into
    * all metrics.
+   * @param bootstrap bootstrap proto.
    */
   static std::vector<Stats::Tag> createTags(const envoy::api::v2::Bootstrap& bootstrap);
 
