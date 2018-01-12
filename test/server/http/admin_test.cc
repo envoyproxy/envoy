@@ -216,10 +216,7 @@ TEST_P(AdminInstanceTest, Runtime) {
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
   EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
-
-  const std::string std_format{"int_key: 1\nother_key: bar\nstring_key: foo\n"};
-  EXPECT_NE(-1, response.search(std_format.data(), std_format.size(), 0));
-  EXPECT_EQ(std_format.size(), response.length());
+  EXPECT_EQ("int_key: 1\nother_key: bar\nstring_key: foo\n", TestUtility::bufferToString(response));
 }
 
 TEST_P(AdminInstanceTest, RuntimeJSON) {
@@ -271,10 +268,7 @@ TEST_P(AdminInstanceTest, RuntimeBadFormat) {
 
   EXPECT_EQ(Http::Code::BadRequest,
             admin_.runCallback("/runtime?format=foo", header_map, response));
-
-  std::string help_msg = "usage: /runtime?format=json\n";
-  EXPECT_NE(-1, response.search(help_msg.data(), help_msg.size(), 0));
-  EXPECT_EQ(help_msg.size(), response.length());
+  EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {
