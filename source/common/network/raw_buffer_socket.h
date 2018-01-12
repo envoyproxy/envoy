@@ -15,6 +15,7 @@ public:
   std::string protocol() const override;
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
+  void halfCloseSocket() override;
   void onConnected() override;
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer) override;

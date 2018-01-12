@@ -68,11 +68,13 @@ typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
 class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
-                       Network::Address::IpVersion version);
+                       Network::Address::IpVersion version, bool enable_half_close = false);
 
   void close();
+  void halfClose();
   void waitForData(const std::string& data);
   void waitForDisconnect();
+  void waitForHalfClose();
   void write(const std::string& data);
   const std::string& data() { return payload_reader_->data(); }
 
@@ -92,6 +94,7 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
+  bool half_closed_{};
   MockWatermarkBuffer* client_write_buffer_;
 };
 
@@ -167,6 +170,8 @@ protected:
   std::vector<std::string> named_ports_{{"default_port"}};
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+
+  bool enable_half_close_{false};
 
 private:
   // The codec type for the client-to-Envoy connection

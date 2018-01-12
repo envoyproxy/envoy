@@ -160,6 +160,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+  read_callbacks_->connection().enableHalfClose(true);
   request_info_.downstream_local_address_ = read_callbacks_->connection().localAddress();
   request_info_.downstream_remote_address_ = read_callbacks_->connection().remoteAddress();
 
@@ -332,6 +333,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
+  upstream_connection_->enableHalfClose(true);
   upstream_connection_->setConnectionStats(
       {read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_total_,
        read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
@@ -381,7 +383,9 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
 
 void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   if (upstream_connection_) {
-    if (event == Network::ConnectionEvent::RemoteClose) {
+    if (event == Network::ConnectionEvent::RemoteHalfClose) {
+      upstream_connection_->close(Network::ConnectionCloseType::HalfClose);
+    } else if (event == Network::ConnectionEvent::RemoteClose) {
       upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
 
       if (upstream_connection_->state() != Network::Connection::State::Closed) {
@@ -426,7 +430,9 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     disableIdleTimer();
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteHalfClose) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::HalfClose);
+  } else if (event == Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connecting) {
       request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);

@@ -12,8 +12,12 @@ namespace Network {
  * Action that should occur on a connection after I/O.
  */
 enum class PostIoAction {
-  // Close the connection.
+  // Remote side sent a half-close.
+  HalfClose,
+
+  // Connection is forcibly closed.
   Close,
+
   // Keep the connection open.
   KeepOpen
 };
@@ -99,6 +103,11 @@ public:
    * @param event supplies the connection event that is closing the socket.
    */
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
+
+  /**
+   * Half-closes the transport socket. For TCP, this sends a FIN.
+   */
+  virtual void halfCloseSocket() PURE;
 
   /**
    *

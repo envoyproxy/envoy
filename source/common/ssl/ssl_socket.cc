@@ -62,6 +62,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         switch (err) {
         case SSL_ERROR_WANT_READ:
           break;
+        case SSL_ERROR_ZERO_RETURN:
+          action = PostIoAction::HalfClose;
+          break;
         case SSL_ERROR_WANT_WRITE:
           // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
@@ -263,17 +266,22 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
   return result;
 }
 
-void SslSocket::closeSocket(Network::ConnectionEvent) {
-  if (handshake_complete_ &&
+void SslSocket::halfCloseSocket() {
+  if (!shutdown_sent_ && handshake_complete_ &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
-    // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
-    // there is no room on the socket. We can extend the state machine to handle this at some point
-    // if needed.
     int rc = SSL_shutdown(ssl_.get());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     UNREFERENCED_PARAMETER(rc);
     drainErrorQueue();
+    shutdown_sent_ = true;
   }
+}
+
+void SslSocket::closeSocket(Network::ConnectionEvent) {
+  // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
+  // there is no room on the socket. We can extend the state machine to handle this at some point
+  // if needed.
+  halfCloseSocket();
 }
 
 std::string SslSocket::protocol() const {

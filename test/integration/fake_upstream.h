@@ -170,11 +170,13 @@ class FakeConnectionBase : public Network::ConnectionCallbacks {
 public:
   ~FakeConnectionBase() { ASSERT(initialized_); }
   void close();
+  void halfClose();
   void readDisable(bool disable);
-  // By default waitForDisconnect assumes the next event is a disconnect and
-  // fails an assert if an unexpected event occurs. If a caller truly wishes to
-  // wait until disconnect, set ignore_spurious_events = true.
+  // By default waitForDisconnect and waitForHalfClose assume the next event is a disconnect and
+  // fails an assert if an unexpected event occurs. If a caller truly wishes to wait until
+  // disconnect, set ignore_spurious_events = true.
   void waitForDisconnect(bool ignore_spurious_events = false);
+  void waitForHalfClose(bool ignore_spurious_events = false);
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -186,6 +188,7 @@ public:
     connection_wrapper_->set_parented();
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
+  void enableHalfClose(bool enabled) { connection_.enableHalfClose(enabled); }
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
@@ -196,6 +199,7 @@ protected:
   std::mutex lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
+  bool half_closed_{};
   bool initialized_{false};
 
 private:
@@ -276,7 +280,8 @@ typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
 class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::FilterChainFactory {
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
-  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version);
+  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
+               bool enable_half_close = false);
   FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type,
                Network::Address::IpVersion version);
   ~FakeUpstream();
@@ -302,7 +307,7 @@ protected:
 
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
-               FakeHttpConnection::Type type);
+               FakeHttpConnection::Type type, bool enable_half_close);
   void threadRoutine();
 
   Ssl::ServerContext* ssl_ctx_{};
@@ -318,5 +323,6 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_; // Guarded by lock_
   bool allow_unexpected_disconnects_;
+  const bool enable_half_close_;
 };
 } // namespace Envoy

@@ -60,6 +60,7 @@ public:
   MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
   MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
   MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
+  MOCK_METHOD1(enableHalfClose, void(bool enabled));
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_CONST_METHOD0(id, uint64_t());
@@ -97,6 +98,7 @@ public:
   MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
   MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
   MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
+  MOCK_METHOD1(enableHalfClose, void(bool enabled));
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_CONST_METHOD0(id, uint64_t());
@@ -310,6 +312,7 @@ public:
   MOCK_CONST_METHOD0(protocol, std::string());
   MOCK_METHOD0(canFlushClose, bool());
   MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
+  MOCK_METHOD0(halfCloseSocket, void());
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD1(doWrite, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD0(onConnected, void());

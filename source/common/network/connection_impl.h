@@ -71,6 +71,7 @@ public:
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void addBytesSentCallback(BytesSentCb cb) override;
+  void enableHalfClose(bool enabled) override { enable_half_close_ = enabled; }
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
@@ -151,6 +152,9 @@ private:
   const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
+  bool enable_half_close_{false};
+  bool local_half_closed_{false};
+  bool remote_half_closed_{false};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};

@@ -22,9 +22,9 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     int rc = buffer.read(callbacks_->fd(), 16384);
     ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), rc);
 
-    // Remote close. Might need to raise data before raising close.
     if (rc == 0) {
-      action = PostIoAction::Close;
+      // Remote close. Might need to raise data before raising close.
+      action = PostIoAction::HalfClose;
       break;
     } else if (rc == -1) {
       // Remote error (might be no data).
@@ -71,6 +71,12 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer) {
   } while (true);
 
   return {action, bytes_written};
+}
+
+void RawBufferSocket::halfCloseSocket() {
+  // Ignore the result. This can only fail if the connection failed. In that case, the
+  // error will be detected on the next read, and dealt with appropriately.
+  ::shutdown(callbacks_->fd(), SHUT_WR);
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }

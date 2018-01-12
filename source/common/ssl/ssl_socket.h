@@ -34,6 +34,7 @@ public:
   std::string protocol() const override;
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
+  void halfCloseSocket() override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer) override;
   void onConnected() override;
@@ -52,6 +53,7 @@ private:
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
+  bool shutdown_sent_{};
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory {

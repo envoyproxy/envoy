@@ -34,9 +34,10 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   tcp_client->write("hello");
   fake_upstream_connection->waitForData(5);
 
-  fake_upstream_connection->close();
+  fake_upstream_connection->halfClose();
+  tcp_client->waitForHalfClose();
+  tcp_client->halfClose();
   fake_upstream_connection->waitForDisconnect();
-  tcp_client->waitForDisconnect();
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -50,7 +51,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   fake_upstream_connection->write("world");
   fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
-  tcp_client->waitForDisconnect();
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 
   EXPECT_EQ("world", tcp_client->data());
 }
@@ -66,9 +68,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   fake_upstream_connection->write("world");
   tcp_client->waitForData("world");
   tcp_client->write("hello");
-  tcp_client->close();
+  tcp_client->halfClose();
   fake_upstream_connection->waitForData(10);
-  fake_upstream_connection->waitForDisconnect();
+  fake_upstream_connection->waitForHalfClose();
+  fake_upstream_connection->halfClose();
+  tcp_client->waitForDisconnect();
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
@@ -83,6 +87,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   fake_upstream_connection->write(data);
   tcp_client->waitForData(data);
   tcp_client->close();
+  fake_upstream_connection->waitForHalfClose();
+  fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
 
   uint32_t upstream_pauses =
@@ -161,9 +167,12 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   payload_reader->set_data_to_wait_for(data_to_send_downstream);
   ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
   // Clean up.
-  ssl_client->close(Network::ConnectionCloseType::NoFlush);
-  fake_upstream_connection->close();
-  fake_upstream_connection->waitForDisconnect();
+  ssl_client->close(Network::ConnectionCloseType::HalfClose);
+  fake_upstream_connection->waitForHalfClose();
+  fake_upstream_connection->halfClose();
+  while (!connect_callbacks.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
 TEST_P(TcpProxyIntegrationTest, SendTlsToTlsListener) { sendAndReceiveTlsData("hello", "world"); }
@@ -202,9 +211,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   fake_upstream_connection->write("hello");
   tcp_client->waitForData("hello");
 
-  fake_upstream_connection->close();
+  fake_upstream_connection->halfClose();
+  tcp_client->waitForHalfClose();
+  tcp_client->halfClose();
   fake_upstream_connection->waitForDisconnect();
-  tcp_client->waitForDisconnect();
 
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty

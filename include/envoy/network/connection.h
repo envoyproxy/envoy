@@ -22,6 +22,7 @@ namespace Network {
  * Events that occur on a connection.
  */
 enum class ConnectionEvent {
+  RemoteHalfClose,
   RemoteClose,
   LocalClose,
   Connected,
@@ -62,7 +63,10 @@ public:
  */
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
-  NoFlush     // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
+  NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
+  HalfClose,  // Send a half-close after flushing any pending data. If we have already received
+              // a half-close from the remote side and there is no pending data to flush, this
+              // will result in ConnectionEvent::LocalClose being raised.
 };
 
 /**
@@ -98,6 +102,12 @@ public:
    * Register for callback everytime bytes are written to the underlying TransportSocket.
    */
   virtual void addBytesSentCallback(BytesSentCb cb) PURE;
+
+  /**
+   * Enable half-close semantics on this connection. Reading a remote half-close
+   * will not fully close the connection. This is off by default.
+   */
+  virtual void enableHalfClose(bool enabled) PURE;
 
   /**
    * Close the connection.

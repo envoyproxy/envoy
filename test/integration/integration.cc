@@ -110,7 +110,8 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
                                            MockBufferFactory& factory, uint32_t port,
-                                           Network::Address::IpVersion version)
+                                           Network::Address::IpVersion version,
+                                           bool enable_half_close)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _))
@@ -129,12 +130,16 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
+  connection_->enableHalfClose(enable_half_close);
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
 }
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void IntegrationTcpClient::halfClose() {
+  connection_->close(Network::ConnectionCloseType::HalfClose);
+}
 
 void IntegrationTcpClient::waitForData(const std::string& data) {
   if (payload_reader_->data().find(data) == 0) {
@@ -148,6 +153,11 @@ void IntegrationTcpClient::waitForData(const std::string& data) {
 void IntegrationTcpClient::waitForDisconnect() {
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(disconnected_);
+}
+
+void IntegrationTcpClient::waitForHalfClose() {
+  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(half_closed_);
 }
 
 void IntegrationTcpClient::write(const std::string& data) {
@@ -166,6 +176,9 @@ void IntegrationTcpClient::write(const std::string& data) {
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
+    parent_.connection_->dispatcher().exit();
+  } else if (event == Network::ConnectionEvent::RemoteHalfClose) {
+    parent_.half_closed_ = true;
     parent_.connection_->dispatcher().exit();
   }
 }
@@ -192,10 +205,12 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
 }
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
-  return dispatcher_->createClientConnection(
+  Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket()));
+  connection->enableHalfClose(enable_half_close_);
+  return connection;
 }
 
 void BaseIntegrationTest::initialize() {
@@ -211,7 +226,8 @@ void BaseIntegrationTest::createUpstreams() {
   if (autonomous_upstream_) {
     fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
   } else {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
   }
 }
 
@@ -246,8 +262,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{
-      new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port, version_)};
+  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port,
+                                                          version_, enable_half_close_)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
