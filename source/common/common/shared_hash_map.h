@@ -59,7 +59,12 @@ public:
   SharedHashMap(const SharedHashMapOptions& options)
       : options_(options), cells_(nullptr), control_(nullptr), slots_(nullptr) {}
 
-  /** Returns the numbers of byte required for the hash-table, based on the control structure. */
+  /**
+   * Returns the numbers of byte required for the hash-table, based on
+   * the control structure. This must be used to allocate the
+   * backing-store (eg) in shared memory, which we do after
+   * constructing the object with the desired sizing.
+   */
   size_t numBytes() const {
     return cellOffset(options_.capacity) + sizeof(Control) + options_.num_slots * sizeof(uint32_t);
   }
@@ -73,7 +78,7 @@ public:
    * can hang.
    */
   bool attach(uint8_t* memory) {
-    initHelper(memory);
+    mapMemorySegments(memory);
     return sanityCheck();
   }
 
@@ -110,7 +115,7 @@ public:
    * @param memory
    */
   void init(uint8_t* memory) {
-    initHelper(memory);
+    mapMemorySegments(memory);
     pthread_mutexattr_t attribute;
     pthread_mutexattr_init(&attribute);
     pthread_mutexattr_setpshared(&attribute, PTHREAD_PROCESS_SHARED);
@@ -246,10 +251,18 @@ private:
     char key[];
   };
 
+  /**
+   * Computes the byte offset of a cell into cells_. This is not
+   * simply an array index because we don't know the size of a key at
+   * compile-time.
+   */
   uint32_t cellOffset(uint32_t cell_index) const {
     return cell_index * (options_.max_key_size + sizeof(Cell));
   }
 
+  /**
+   * Returns a reference to a Cell at the specified index.
+   */
   Cell& getCell(uint32_t cell_index) {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index);
@@ -257,7 +270,7 @@ private:
   }
 
   /** Maps out the segments of shared memory for us to work with. */
-  void initHelper(uint8_t* memory) {
+  void mapMemorySegments(uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
     cells_ = reinterpret_cast<Cell*>(memory); // First because Value may need to be aligned.
@@ -297,18 +310,21 @@ private:
     uint32_t num_values = 0;
     for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
       for (uint32_t next, cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
-        Cell& cell = getCell(cell_index);
-        next = cell.next_cell;
-        if ((next >= options_.capacity) && (next != Sentinal)) {
-          ENVOY_LOG(error, "SharedHashMap live cell has corrupt next_cell={}", next);
-          ret = false;
+        if (cell_index >= options_.capacity) {
+          ENVOY_LOG(error, "SharedHashMap cell index too high={}, capacity={}", cell_index,
+                    options_.capacity);
         } else {
+          Cell& cell = getCell(cell_index);
+          next = cell.next_cell;
           if (cell.key_size > options_.max_key_size) {
             ENVOY_LOG(error, "SharedHashMap live cell has key_size=={}", cell.key_size);
             ret = false;
           }
           ++num_values;
-          if (num_values > control_->size) { // avoid infinite loops if there is a bucket cycle.
+          // Avoid infinite loops if there is a next_cell cycle within
+          // a slot. Note that the num_values message will be emitted
+          // outside the loop.
+          if (num_values > control_->size) {
             break;
           }
         }
@@ -325,9 +341,11 @@ private:
   /** Locks the mutex. */
   void lock() { pthread_mutex_lock(&control_->mutex); }
 
-  /** Unocks the mutex. */
+  /** Unlocks the mutex. */
   void unlock() { pthread_mutex_unlock(&control_->mutex); }
 
+  // Copy of the options in process-local memory; which is used to help compute
+  // the required size in bytes after construction and before init/attach.
   const SharedHashMapOptions options_;
 
   // Pointers into shared memory. Cells go first, because Value may need a more aggressive
