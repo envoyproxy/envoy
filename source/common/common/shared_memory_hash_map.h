@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -16,20 +17,20 @@
 namespace Envoy {
 
 /**
- * Initialization parameters for SharedHashMap. The options are duplicated
+ * Initialization parameters for SharedMemoryHashMap. The options are duplicated
  * to the control-block after init, to aid with sanity checking when attaching
  * an existing memory segment.
  */
-struct SharedHashMapOptions {
+struct SharedMemoryHashMapOptions {
   std::string toString() const {
     return fmt::format("capacity={}, max_key_size={}, num_slots={}", capacity, max_key_size,
                        num_slots);
   }
-  bool operator==(const SharedHashMapOptions& that) const {
+  bool operator==(const SharedMemoryHashMapOptions& that) const {
     return capacity == that.capacity && max_key_size == that.max_key_size &&
            num_slots == that.num_slots;
   }
-  bool operator!=(const SharedHashMapOptions& that) const { return !(*this == that); }
+  bool operator!=(const SharedMemoryHashMapOptions& that) const { return !(*this == that); }
 
   uint32_t capacity;     // how many values can be stored.
   uint32_t max_key_size; // how many bytes of string can be stored.
@@ -45,20 +46,23 @@ struct SharedHashMapOptions {
  * but not across machine architectures, as it doesn't use network byte order for
  * storing ints.
  */
-template <class Value> class SharedHashMap : public Logger::Loggable<Logger::Id::config> {
+template <class Value> class SharedMemoryHashMap : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Sentinal used for next_cell links to indicate end-of-list.
    */
   static const uint32_t Sentinal = 0xffffffff;
 
+  /** Type used by put() to indicate the value at a key, and whether it was created */
+  typedef std::pair<Value*, bool> ValueCreatedPair;
+
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
-   * Note that the map dtaa itself is not constructed when the object is constructed.
+   * Note that the map data itself is not constructed when the object is constructed.
    * After the control-structure is constructed, the number of bytes can be computed so
    * that a shared-memory segment can be allocated and passed to init() or attach().
    */
-  SharedHashMap(const SharedHashMapOptions& options)
+  SharedMemoryHashMap(const SharedMemoryHashMapOptions& options)
       : options_(options), cells_(nullptr), control_(nullptr), slots_(nullptr) {}
 
   /**
@@ -67,9 +71,9 @@ public:
    * backing-store (eg) in shared memory, which we do after
    * constructing the object with the desired sizing.
    */
-  size_t numBytes() const {
-    size_t size =
-        cellOffset(options_.capacity) + sizeof(Control) + options_.num_slots * sizeof(uint32_t);
+  static size_t numBytes(const SharedMemoryHashMapOptions& options) {
+    size_t size = cellOffset(options.capacity, options) + sizeof(Control) +
+                  options.num_slots * sizeof(uint32_t);
     return align(size);
   }
 
@@ -81,7 +85,12 @@ public:
    * Note that if mutex is in a locked state at the time of attachment, this function
    * can hang.
    */
-  bool attach(uint8_t* memory) {
+  bool attach(uint8_t* memory, size_t num_bytes) {
+    if (num_bytes != numBytes(options_)) {
+      ENVOY_LOG(error, "SharedMemoryHashMap unexpected memory size {}!={}", num_bytes,
+                numBytes(options_));
+      return false;
+    }
     mapMemorySegments(memory);
     return sanityCheck();
   }
@@ -144,19 +153,28 @@ public:
   /**
    * Puts a new key into the map. If successful (e.g. map has capacity)
    * then put returns a pointer to the value object, which the caller
-   * can then write. Returns nullptr if the key was too large, or the
+   * can then write. Returns {nullptr, false} if the key was too large, or the
    * capacity of the map has been exceeded.
    *
+   * If the value was already present in the map, then {value, false} is returned.
+   * The caller may need to clean up an old value.
+   *
+   * If the value is newly allocated, then {value, true} is returned.
+   *
    * @param key THe key must be 255 bytes or smaller.
+   * @return a pair with the value-pointer (or nullptr), and a bool indicating
+   *         whether the value is newly allocated.
    */
-  Value* put(absl::string_view key) {
+  ValueCreatedPair put(absl::string_view key) {
     if (key.size() > options_.max_key_size) {
-      return nullptr;
+      return ValueCreatedPair(nullptr, false);
     }
 
     lock();
     Value* value = getLockHeld(key);
+    bool created = false;
     if ((value == nullptr) && (control_->size < options_.capacity)) {
+      created = true;
       uint32_t slot = HashUtil::xxHash64(key) % options_.num_slots;
       uint32_t cell_index = control_->free_cell_index;
       Cell& cell = getCell(cell_index);
@@ -169,7 +187,7 @@ public:
       ++control_->size;
     }
     unlock();
-    return value;
+    return ValueCreatedPair(value, created);
   }
 
   /**
@@ -232,9 +250,9 @@ private:
     }
 
     pthread_mutex_t mutex;
-    SharedHashMapOptions options; // Options established at map construction time.
-    uint32_t size;                // Number of values currently stored.
-    uint32_t free_cell_index;     // Offset of first free cell.
+    SharedMemoryHashMapOptions options; // Options established at map construction time.
+    uint32_t size;                      // Number of values currently stored.
+    uint32_t free_cell_index;           // Offset of first free cell.
   };
 
   /**
@@ -262,10 +280,12 @@ private:
    * simply an array index because we don't know the size of a key at
    * compile-time.
    */
-  uint32_t cellOffset(uint32_t cell_index) const {
-    uint32_t cell_size = align(options_.max_key_size + sizeof(Cell));
+  static uint32_t cellOffset(uint32_t cell_index, const SharedMemoryHashMapOptions& options) {
+    uint32_t cell_size = align(options.max_key_size + sizeof(Cell));
     return cell_index * cell_size;
   }
+
+  uint32_t cellOffset(uint32_t cell_index) const { return cellOffset(cell_index, options_); }
 
   /**
    * Returns a reference to a Cell at the specified index.
@@ -311,30 +331,32 @@ private:
     bool ret = true;
     if (options_ != control_->options) {
       // options doesn't match.
-      ENVOY_LOG(error, "SharedHashMap options don't match");
+      ENVOY_LOG(error, "SharedMemoryHashMap options don't match");
       return false;
     }
 
     if (control_->size > options_.capacity) {
-      ENVOY_LOG(error, "SharedHashMap size={} > capacity={}", control_->size, options_.capacity);
+      ENVOY_LOG(error, "SharedMemoryHashMap size={} > capacity={}", control_->size,
+                options_.capacity);
       return false;
     }
 
-    // As a sanity check, makee sure there are control_->size values
+    // As a sanity check, make sure there are control_->size values
     // reachable from the slots, each of which has a valid char_offset
     uint32_t num_values = 0;
     for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
-      uint32_t next = 0;  // initialized to silence compilers.
+      uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
         if (cell_index >= options_.capacity) {
-          ENVOY_LOG(error, "SharedHashMap cell index too high={}, capacity={}", cell_index,
+          ENVOY_LOG(error, "SharedMemoryHashMap cell index too high={}, capacity={}", cell_index,
                     options_.capacity);
+          ret = false;
           break;
         } else {
           Cell& cell = getCell(cell_index);
           next = cell.next_cell;
           if (cell.key_size > options_.max_key_size) {
-            ENVOY_LOG(error, "SharedHashMap live cell has key_size=={}", cell.key_size);
+            ENVOY_LOG(error, "SharedMemoryHashMap live cell has key_size=={}", cell.key_size);
             ret = false;
           }
           ++num_values;
@@ -348,8 +370,8 @@ private:
       }
     }
     if (num_values != control_->size) {
-      ENVOY_LOG(error, "SharedHashMap has wrong number of live cells: {}, expected {}", num_values,
-                control_->size);
+      ENVOY_LOG(error, "SharedMemoryHashMap has wrong number of live cells: {}, expected {}",
+                num_values, control_->size);
       ret = false;
     }
     return ret;
@@ -363,7 +385,7 @@ private:
 
   // Copy of the options in process-local memory; which is used to help compute
   // the required size in bytes after construction and before init/attach.
-  const SharedHashMapOptions options_;
+  const SharedMemoryHashMapOptions options_;
 
   // Pointers into shared memory. Cells go first, because Value may need a more aggressive
   // aligmnment.

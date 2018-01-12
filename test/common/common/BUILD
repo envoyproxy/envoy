@@ -71,7 +71,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "shared_hash_map_test",
-    srcs = ["shared_hash_map_test.cc"],
-    deps = ["//source/common/common:shared_hash_map_lib"],
+    name = "shared_memory_hash_map_test",
+    srcs = ["shared_memory_hash_map_test.cc"],
+    deps = ["//source/common/common:shared_memory_hash_map_lib"],
 )
