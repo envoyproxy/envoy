@@ -324,10 +324,12 @@ private:
     // reachable from the slots, each of which has a valid char_offset
     uint32_t num_values = 0;
     for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
-      for (uint32_t next, cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
+      uint32_t next = 0;  // initialized to silence compilers.
+      for (uint32_t cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
         if (cell_index >= options_.capacity) {
           ENVOY_LOG(error, "SharedHashMap cell index too high={}, capacity={}", cell_index,
                     options_.capacity);
+          break;
         } else {
           Cell& cell = getCell(cell_index);
           next = cell.next_cell;
