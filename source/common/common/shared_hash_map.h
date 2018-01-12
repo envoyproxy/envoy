@@ -120,11 +120,6 @@ public:
    */
   void init(uint8_t* memory) {
     mapMemorySegments(memory);
-    pthread_mutexattr_t attribute;
-    pthread_mutexattr_init(&attribute);
-    pthread_mutexattr_setpshared(&attribute, PTHREAD_PROCESS_SHARED);
-    pthread_mutexattr_setrobust(&attribute, PTHREAD_MUTEX_ROBUST);
-    pthread_mutex_init(&control_->mutex, &attribute);
     lock();
 
     control_->options = options_;
@@ -291,6 +286,13 @@ private:
     control_ = reinterpret_cast<Control*>(memory);
     memory += sizeof(Control);
     slots_ = reinterpret_cast<uint32_t*>(memory);
+
+    // TODO(jmarantz): share this code with SharedMemory::initializeMutex in hot_restart_impl.cc
+    pthread_mutexattr_t attribute;
+    pthread_mutexattr_init(&attribute);
+    pthread_mutexattr_setpshared(&attribute, PTHREAD_PROCESS_SHARED);
+    pthread_mutexattr_setrobust(&attribute, PTHREAD_MUTEX_ROBUST);
+    pthread_mutex_init(&control_->mutex, &attribute);
   }
 
   Value* getLockHeld(absl::string_view key) EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
