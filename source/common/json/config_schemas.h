@@ -25,6 +25,7 @@ public:
   static const std::string RATELIMIT_NETWORK_FILTER_SCHEMA;
   static const std::string REDIS_PROXY_NETWORK_FILTER_SCHEMA;
   static const std::string TCP_PROXY_NETWORK_FILTER_SCHEMA;
+  static const std::string EXT_AUTHZ_NETWORK_FILTER_SCHEMA;
 
   // HTTP Connection Manager Schemas
   static const std::string ROUTE_CONFIGURATION_SCHEMA;
@@ -44,6 +45,7 @@ public:
   static const std::string RATE_LIMIT_HTTP_FILTER_SCHEMA;
   static const std::string ROUTER_HTTP_FILTER_SCHEMA;
   static const std::string LUA_HTTP_FILTER_SCHEMA;
+  static const std::string EXT_AUTHZ_HTTP_FILTER_SCHEMA;
 
   // Cluster Schemas
   static const std::string CLUSTER_MANAGER_SCHEMA;

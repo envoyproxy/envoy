@@ -20,6 +20,7 @@ const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
 const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
 const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
+const std::string ResponseFlagUtils::UNAUTHORIZED = "UA";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -32,7 +33,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x800, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
 
   if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
@@ -80,6 +81,10 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
 
   if (request_info.getResponseFlag(ResponseFlag::RateLimited)) {
     appendString(result, RATE_LIMITED);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::Unauthorized)) {
+    appendString(result, UNAUTHORIZED);
   }
 
   return result.empty() ? NONE : result;

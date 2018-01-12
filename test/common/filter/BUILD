@@ -46,3 +46,20 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "ext_authz_test",
+    srcs = ["ext_authz_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/filter:ext_authz_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/ext_authz:ext_authz_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+    ],
+)

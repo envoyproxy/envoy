@@ -518,6 +518,31 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::EXT_AUTHZ_NETWORK_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "grpc_cluster" : {
+        "type" : "object",
+        "properties" : {
+          "cluster_name" : {"type": "string"},
+          "timeout": {"type": "integer"}
+        },
+        "required" : ["cluster_name"],
+        "additionalProperties" : false
+      }
+    },
+    "type" : "object",
+    "properties" : {
+      "stat_prefix"  : {"type" : "string"},
+      "grpc_cluster" : {"$ref" : "#/definitions/grpc_cluster"},
+      "failure_mode_allow" : {"type" : "boolean"}
+    },
+    "required" : ["stat_prefix", "grpc_cluster"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1126,6 +1151,31 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
     "additionalProperties" : false
   }
   )EOF");
+
+const std::string Json::Schema::EXT_AUTHZ_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "grpc_cluster" : {
+        "type" : "object",
+        "properties" : {
+          "cluster_name" : {"type": "string"},
+          "timeout": {"type": "integer"}
+        },
+        "required" : ["cluster_name"],
+        "additionalProperties" : false
+      }
+    },
+    "type" : "object",
+    "properties" : {
+      "grpc_cluster" : {"$ref" : "#/definitions/grpc_cluster"},
+      "failure_mode_allow" : {"type" : "boolean"}
+    },
+    "required" : ["grpc_cluster"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 
 const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
   {

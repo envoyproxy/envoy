@@ -189,3 +189,17 @@ envoy_cc_library(
         "//source/server:configuration_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "ext_authz_lib",
+    srcs = ["ext_authz.cc"],
+    hdrs = ["ext_authz.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/http/filter:ext_authz_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
