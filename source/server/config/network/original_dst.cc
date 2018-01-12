@@ -22,6 +22,17 @@ public:
     };
   }
 
+  ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                       FactoryContext&) override {
+    return [](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(Network::ListenerFilterSharedPtr{new Filter::OriginalDst()});
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
   std::string name() override { return Config::ListenerFilterNames::get().ORIGINAL_DST; }
 };
 

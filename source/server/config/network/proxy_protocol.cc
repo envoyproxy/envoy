@@ -26,6 +26,20 @@ public:
     };
   }
 
+  ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                       FactoryContext& context) override {
+    Filter::ProxyProtocol::ConfigSharedPtr config(
+        new Filter::ProxyProtocol::Config(context.scope()));
+    return [config](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(
+          Network::ListenerFilterSharedPtr{new Filter::ProxyProtocol::Instance(config)});
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
   std::string name() override { return Config::ListenerFilterNames::get().PROXY_PROTOCOL; }
 };
 
