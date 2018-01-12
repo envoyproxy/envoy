@@ -30,7 +30,6 @@ public:
       metrics_service_cluster->mutable_http2_protocol_options();
 
       auto* metrics_sink = bootstrap.add_stats_sinks();
-      // metrics_sink->MergeFrom(bootstrap.stat_sinks()[0]);
       metrics_sink->set_name("envoy.metrics_service");
       envoy::api::v2::MetricsServiceConfig config;
       config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("metrics_service");
@@ -59,6 +58,34 @@ public:
     EXPECT_STREQ("application/grpc",
                  metrics_service_request_->headers().ContentType()->value().c_str());
     EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
+    const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
+        request_msg.envoy_metrics();
+    bool known_counter_exists = false;
+    bool known_gauge_exists = false;
+    int known_counter_value = -1;
+    int known_gauge_value = -1;
+    std::string known_counter("cluster.metrics_service.membership_change");
+    std::string known_gauge("cluster.metrics_service.membership_total");
+    int metrics_size = envoy_metrics.size();
+    for (int i = 0; i < metrics_size; i++) {
+      ::io::prometheus::client::MetricFamily metrics_family = envoy_metrics.Get(i);
+      if (known_counter.compare(metrics_family.name()) == 0 &&
+          metrics_family.metric(0).has_counter()) {
+        known_counter_exists = true;
+        known_counter_value = metrics_family.metric(0).counter().value();
+      }
+      if (known_gauge.compare(metrics_family.name()) == 0 && metrics_family.metric(0).has_gauge()) {
+        known_gauge_exists = true;
+        known_gauge_value = metrics_family.metric(0).gauge().value();
+      }
+      if (known_counter_exists && known_gauge_exists) {
+        break;
+      }
+    }
+    EXPECT_TRUE(known_counter_exists);
+    EXPECT_TRUE(known_gauge_exists);
+    EXPECT_EQ(1, known_counter_value);
+    EXPECT_EQ(1, known_gauge_value);
   }
 
   void cleanup() {

@@ -46,12 +46,13 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
                                                                 cluster_name),
           server.threadLocal(), server.localInfo());
 
-  return Stats::SinkPtr(new Stats::Metrics::MetricsServiceSink(grpc_metrics_streamer));
+  return Stats::SinkPtr(
+      std::make_unique<Stats::Metrics::MetricsServiceSink>(grpc_metrics_streamer));
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
   return std::unique_ptr<envoy::api::v2::MetricsServiceConfig>(
-      new envoy::api::v2::MetricsServiceConfig());
+      std::make_unique<envoy::api::v2::MetricsServiceConfig>());
 }
 
 std::string MetricsServiceSinkFactory::name() {
