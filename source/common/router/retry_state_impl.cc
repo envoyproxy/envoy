@@ -191,7 +191,8 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
-    if (Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(*response_headers))) {
+    if (response_headers != nullptr &&
+        Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(*response_headers))) {
       return true;
     }
   }
