@@ -89,13 +89,13 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   }
 }
 
-Http::Code ConfigUtility::parseDirectResponseCode(const envoy::api::v2::Route& route) {
+Optional<Http::Code> ConfigUtility::parseDirectResponseCode(const envoy::api::v2::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());
   } else if (route.has_direct_response()) {
     return static_cast<Http::Code>(route.direct_response().status());
   }
-  return static_cast<Http::Code>(0);
+  return Optional<Http::Code>();
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(

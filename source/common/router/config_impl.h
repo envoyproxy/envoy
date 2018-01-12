@@ -294,7 +294,7 @@ public:
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
-  bool isDirectResponse() const { return static_cast<int>(direct_response_code_) != 0; }
+  bool isDirectResponse() const { return direct_response_code_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
@@ -332,7 +332,7 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-  Http::Code responseCode() const override { return direct_response_code_; }
+  Http::Code responseCode() const override { return direct_response_code_.value(); }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -488,7 +488,7 @@ private:
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
-  const Http::Code direct_response_code_;
+  const Optional<Http::Code> direct_response_code_;
 };
 
 /**

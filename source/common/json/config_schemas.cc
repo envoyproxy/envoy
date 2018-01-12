@@ -672,7 +672,6 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "weighted_clusters": {"$ref" : "#/definitions/weighted_clusters"},
       "host_redirect" : {"type" : "string"},
       "path_redirect" : {"type" : "string"},
-      "status": {"type": "integer"},
       "prefix_rewrite" : {"type" : "string"},
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
