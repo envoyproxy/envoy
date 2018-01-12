@@ -65,12 +65,12 @@ public:
     int known_counter_value = -1;
     int known_gauge_value = -1;
     for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
-      if (metrics_family.name().compare("cluster.metrics_service.membership_change") == 0 &&
+      if (metrics_family.name() == "cluster.metrics_service.membership_change" &&
           metrics_family.metric(0).has_counter()) {
         known_counter_exists = true;
         known_counter_value = metrics_family.metric(0).counter().value();
       }
-      if (metrics_family.name().compare("cluster.metrics_service.membership_total") == 0 &&
+      if (metrics_family.name() == "cluster.metrics_service.membership_total" &&
           metrics_family.metric(0).has_gauge()) {
         known_gauge_exists = true;
         known_gauge_value = metrics_family.metric(0).gauge().value();
