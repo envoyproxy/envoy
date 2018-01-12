@@ -39,39 +39,66 @@ public:
    * @return tag from the prefix that encompasses the input. An empty string is returned
    *         if no prefix in the LC Trie exists.
    */
-  std::string search(const std::string& ip_address) const;
+  std::string search(Network::Address::InstanceConstSharedPtr ip_address) const;
 
 private:
+  /**
+   * Extract n bits from input starting at position p.
+   * @param position supplies the position.
+   * @param n supplies the number of bits to extract.
+   * @param input supplies the
+   */
+  template <class IpType, uint32_t address_size = 8 * sizeof(IpType)>
+  static IpType extractBits(int p, int n, IpType input) {
+    // The IP's are stored in network byte order. By shifting the value to the left by p bits, the
+    // bits between 0 and p-1 are zero'd out. Then to get the n bits, shift the IP back by the
+    // address_size minus the number of desired bits.
+    return input << p >> (address_size - n);
+  }
+
+  /**
+   * Removes n bits from input starting at 0.
+   * @param n supplies the number of bits to remove.
+   * @param input supplies the
+   */
+  template <class IpType, uint32_t address_size = 8 * sizeof(IpType)>
+  static IpType removeBits(int n, IpType input) {
+    // The IP's are stored in network byte order. By shifting the value to the left by n bits and
+    // back, this zeros out all bits between 0 and n-1.
+    return input << n >> n;
+  }
+
   template <class IpType, uint32_t address_size = 8 * sizeof(IpType)> struct IpPrefixes {
+
     /**
      * @return -1 if the current object is less than b. 0 if they are the same. 1
      * if b is smaller than the current object.
      */
     int compare(const IpPrefixes& b) const {
       {
-        if (ip_ < b.ip_)
+        if (ip_ < b.ip_) {
           return -1;
-        else if (ip_ > b.ip_)
+        } else if (ip_ > b.ip_) {
           return 1;
-        else if (length_ < b.length_)
+        } else if (length_ < b.length_) {
           return -1;
-        else if (length_ > b.length_)
+        } else if (length_ > b.length_) {
           return 1;
-        else
+        } else {
           return 0;
+        }
       }
     }
 
     bool operator<(const IpPrefixes& b) const { return (this->compare(b) == -1); }
 
-    // TODO(ccaraman) remove duplicate
-    static IpType extractBits(int p, int n, IpType input) {
-      return input << p >> (address_size - n);
-    }
-
-    bool isPrefix(const IpPrefixes& b) {
-      return (length_ == 0 || (length_ <= b.length_ &&
-                               extractBits(0, length_, ip_) == extractBits(0, length_, b.ip_)));
+    /**
+     * @return true if other is a prefix of this.
+     */
+    bool isPrefix(const IpPrefixes& other) {
+      return (length_ == 0 ||
+              (length_ <= other.length_ && extractBits<IpType, address_size>(0, length_, ip_) ==
+                                           extractBits<IpType, address_size>(0, length_, other.ip_)));
     }
 
     // The address represented either in uint32_t or uint128.
@@ -116,25 +143,6 @@ private:
 
   private:
     /**
-     * Extract n bits from input starting at position p.
-     * @param position supplies the position.
-     * @param n supplies the number of bits to extract.
-     * @param input supplies the
-     * @return
-     */
-    static IpType extractBits(int p, int n, IpType input) {
-      return input << p >> (address_size - n);
-    }
-
-    /**
-     * Removes n bits from input starting at 0.
-     * @param n supplies the number of bits to remove.
-     * @param input supplies the
-     * @return
-     */
-    static IpType removeBits(int n, IpType input) { return input << n >> n; }
-
-    /**
      * Builds the Level Compresesed Trie, by first sorting the base vector, removing nested prefixes
      * and duplicated and then recursively builds the trie by invoking buildRecursively().
      */
@@ -147,7 +155,7 @@ private:
       // an input greater than 524288(2^19) nodes.
       // TODO(ccaraman) Add a test case for this.
       if (tag_data.size() > (1 << 19)) {
-        throw new EnvoyException(fmt::format(
+        throw EnvoyException(fmt::format(
             "Size of the input vector({0}) for LC-Trie is larger than the max size supported(2^19)",
             tag_data.size()));
       }
@@ -158,7 +166,12 @@ private:
       // Remove duplicate entries and nested prefixes.
       for (size_t i = 1; i < tag_data.size(); ++i) {
         // TODO(ccaraman) Add support for nested prefixes.
-        if (tag_data[i - 1].compare(tag_data[i]) != 0 && !tag_data[i - 1].isPrefix(tag_data[i])) {
+        if (tag_data[i - 1].isPrefix(tag_data[i])) {
+          // TODO(ccaraman) Add printing of nested prefixes to simplify debugging.
+          throw EnvoyException(
+              fmt::format("LcTrie does not support nested prefixes."));
+        }
+        if (tag_data[i - 1].compare(tag_data[i]) != 0) {
           ip_prefixes_.push_back(tag_data[i]);
         }
       }
@@ -167,6 +180,8 @@ private:
       // However, due to the fill factor a buffer is added. Preallocate the size of the vector to
       // avoid resizing while building the trie.
       // TODO(ccaraman) Define a better buffer value for the trie_ size.
+      // The value(2000000) was used in the original implementation in 
+      // http://www.csc.kth.se/~snilsson/software/router/C/trie.c. 
       trie_.resize(2 * ip_prefixes_.size() + 2000000);
 
       uint32_t next_free_index = 1;
@@ -203,16 +218,16 @@ private:
 
       ComputePair compute(0, 0);
 
-      // compute the new prefix
-      high = removeBits(prefix, ip_prefixes_[first].ip_);
-      low = removeBits(prefix, ip_prefixes_[first + n - 1].ip_);
+      // Compute the new prefix.
+      high = removeBits<IpType, address_size>(prefix, ip_prefixes_[first].ip_);
+      low = removeBits<IpType, address_size>(prefix, ip_prefixes_[first + n - 1].ip_);
       i = prefix;
 
       // Find the index at which low and high diverge to get the skip.
-      while (extractBits(i, 1, low) == extractBits(i, 1, high)) {
+      while (extractBits<IpType, address_size>(i, 1, low) ==
+             extractBits<IpType, address_size>(i, 1, high)) {
         ++i;
       }
-      // FIXME explain how this is the new prefix.
       compute.prefix_ = i;
 
       // For 2 elements, use a branching factor of 2(2^1).
@@ -256,7 +271,7 @@ private:
           pattern_found = false;
           // Keep on looping until either all elements have been looked at
           // stop looping when the pattern isn't matched anymore or we get the index out of bounds
-          while (i < first + n && static_cast<uint32_t>(extractBits(
+          while (i < first + n && static_cast<uint32_t>(extractBits<IpType, address_size>(
                                       compute.prefix_, branch, ip_prefixes_[i].ip_)) == pattern) {
             ++i;
             pattern_found = true;
@@ -314,8 +329,8 @@ private:
         k = 0;
         // k is finding the number of entries in the base vector that have the same bit pattern.
         while (p + k < first + n &&
-               static_cast<uint32_t>(extractBits(output.prefix_, output.branch_,
-                                                 ip_prefixes_[p + k].ip_)) == bit_pattern) {
+               static_cast<uint32_t>(extractBits<IpType, address_size>(
+                   output.prefix_, output.branch_, ip_prefixes_[p + k].ip_)) == bit_pattern) {
           ++k;
         }
 
@@ -450,8 +465,9 @@ std::string LcTrie::LcTrieInternal<IpType, address_size>::search(const IpType& i
   address = getAddress(node);
   while (branch != 0) {
     // branch value is at most 2^5-1= 31 bits to extract so we can safely cast the
-    // output of EXTRACT to uint32_t without any data loss.
-    node = trie_[address + static_cast<uint32_t>(extractBits(position, branch, ip_address))];
+    // output of extractBits to uint32_t without any data loss.
+    node = trie_[address + static_cast<uint32_t>(
+                               extractBits<IpType, address_size>(position, branch, ip_address))];
     position += branch + getSkip(node);
     branch = getBranch(node);
     address = getAddress(node);
@@ -460,7 +476,7 @@ std::string LcTrie::LcTrieInternal<IpType, address_size>::search(const IpType& i
   // Check the input ip is contained by node at ip_prefixes_[adr] by XOR'ing the two values and
   // checking that up until the length of the range the value is 0.
   bitmask = ip_prefixes_[address].ip_ ^ ip_address;
-  if (extractBits(0, ip_prefixes_[address].length_, bitmask) == 0) {
+  if (extractBits<IpType, address_size>(0, ip_prefixes_[address].length_, bitmask) == 0) {
     return ip_prefixes_[address].tag_;
   }
   return "";

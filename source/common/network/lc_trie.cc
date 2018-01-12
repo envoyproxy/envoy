@@ -30,13 +30,12 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
   ipv6_trie_.reset(new LcTrieInternal<Ipv6>(ipv6_prefixes, fill_factor, root_branching_factor));
 }
 
-std::string LcTrie::search(const std::string& ip_address) const {
-  Address::InstanceConstSharedPtr address_ptr = Utility::parseInternetAddress(ip_address);
-  if (address_ptr->ip()->version() == Address::IpVersion::v4) {
-    Ipv4 ip = ntohl(address_ptr->ip()->ipv4()->address());
+std::string LcTrie::search(Network::Address::InstanceConstSharedPtr ip_address) const {
+  if (ip_address->ip()->version() == Address::IpVersion::v4) {
+    Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
     return ipv4_trie_->search(ip);
   } else {
-    Ipv6 ip = convertToIpv6(address_ptr->ip()->ipv6()->address());
+    Ipv6 ip = convertToIpv6(ip_address->ip()->ipv6()->address());
     return ipv6_trie_->search(ip);
   }
 }
