@@ -17,12 +17,12 @@ namespace Envoy {
 // to the control-block after init.
 struct SharedHashMapOptions {
   std::string toString() const {
-    return fmt::format("capacity={}, num_string_bytes={}, num_slots={}", capacity, num_string_bytes,
-                       num_slots);
+    return fmt::format("capacity={}, max_key_size={}, num_slots={}",
+                       capacity, max_key_size, num_slots);
   }
 
   uint32_t capacity;         // how many values can be stored.
-  uint32_t num_string_bytes; // how many bytes of string can be stored.
+  uint32_t max_key_size;     // how many bytes of string can be stored.
   uint32_t num_slots;        // determines speed of hash vs size efficiency.
 };
 
@@ -51,7 +51,7 @@ public:
    * that a shared-memory segment can be allocated and passed to init() or attach().
    */
   SharedHashMap(const SharedHashMapOptions& options)
-      : options_(options), control_(nullptr), slots_(nullptr), cells_(nullptr), chars_(nullptr) {}
+      : options_(options), control_(nullptr), slots_(nullptr), cells_(nullptr) {}
 
   /**
    * Represents control-values for the hash-table, including a mutex, which
@@ -59,33 +59,34 @@ public:
    */
   struct Control {
     std::string toString() const {
-      return fmt::format("{} size={} next_key_char={}", options.toString(), size, next_key_char);
+      return fmt::format("{} size={} free_cell_index={}", options.toString(), size, free_cell_index);
     }
 
     mutable pthread_mutex_t mutex; // Marked mutable so get() can be const and also lock.
     SharedHashMapOptions options;  // Options established at map construction time.
     uint32_t size;                 // Number of values currently stored.
-    uint32_t next_key_char;        // Offset of next key in chars_.
+    uint32_t free_cell_index;      // Offset of first free cell.
   };
 
   /**
    * Represents a value-cell, which is stored in a linked-list from each slot.
    */
   struct Cell {
-    void free() { char_offset = Sentinal; }
-    absl::string_view key(const char* chars) const {
-      return absl::string_view(&chars[char_offset + 1], chars[char_offset]);
+    void free() { key_size = 0; }
+    absl::string_view getKey() const {
+      return absl::string_view(key, key_size);
     }
 
-    uint32_t char_offset; // Offset of the key bytes into map->chars_.
-    uint32_t next_cell;   // OFfset of next cell in map->cells_, terminated with Sentinal.
     Value value;          // Templated value field.
+    uint32_t next_cell;   // OFfset of next cell in map->cells_, terminated with Sentinal.
+    uint8_t key_size;     // size of key in bytes, or 0 if unused.
+    char key[];
   };
 
   /** Returns the numbers of byte required for the hash-table, based on the control structure. */
   size_t numBytes() const {
     return sizeof(Control) + (options_.num_slots * sizeof(uint32_t)) +
-           (options_.capacity * sizeof(Cell)) + options_.num_string_bytes;
+        cellOffset(options_.capacity);
   }
 
   /**
@@ -119,10 +120,8 @@ public:
     ret = fmt::format("options={}\ncontrol={}\n", options_.toString(), control_->toString());
     for (uint32_t i = 0; i < options_.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
-      for (uint32_t j = slots_[i]; j != Sentinal; j = cells_[j].next_cell) {
-        const Cell* cell = &cells_[j];
-        std::string key(std::string(cell->key(chars_)));
-        ret += " " + key;
+      for (uint32_t j = slots_[i]; j != Sentinal; j = getCell(j).next_cell) {
+        ret += " " + std::string(getCell(j).getKey());
       }
       ret += "\n";
     }
@@ -146,16 +145,18 @@ public:
 
     control_->options = options_;
     control_->size = 0;
-    control_->next_key_char = 0;
+    control_->free_cell_index = 0;
 
     // Initialize all the slots;
-    for (uint32_t i = 0; i < options_.num_slots; ++i) {
-      slots_[i] = Sentinal;
+    for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
+      slots_[slot] = Sentinal;
     }
 
     // Initialize all the key-char offsets.
-    for (uint32_t i = 0; i < options_.capacity; ++i) {
-      cells_[i].char_offset = Sentinal;
+    for (uint32_t cell_index = 0; cell_index < options_.capacity; ++cell_index) {
+      Cell& cell = getCell(cell_index);
+      cell.key_size = 0;
+      cell.next_cell = cell_index + 1;
     }
 
     unlock();
@@ -170,29 +171,23 @@ public:
    * @param key THe key must be 255 bytes or smaller.
    */
   Value* put(absl::string_view key) {
-    Value* value = nullptr;
+    if (key.size() > options_.max_key_size) {
+      return nullptr;
+    }
+
     lock();
-    if ((key.size() <= 255) && (control_->size < options_.capacity) &&
-        (key.size() + 1 + control_->next_key_char <= options_.num_string_bytes)) {
+    Value* value = getLockHeld(key);
+    if ((value == nullptr) && (control_->size < options_.capacity)) {
       uint32_t slot = HashUtil::xxHash64(key) % options_.num_slots;
-
-      uint32_t* prevNext = &slots_[slot];
-      uint32_t cell = *prevNext;
-
-      while (cell != Sentinal) {
-        prevNext = &cells_[cell].next_cell;
-        cell = *prevNext;
-      }
-
-      cell = control_->size++;
-      *prevNext = cell;
-      value = &cells_[cell].value;
-      uint32_t char_offset = control_->next_key_char;
-      cells_[cell].char_offset = char_offset;
-      cells_[cell].next_cell = Sentinal;
-      control_->next_key_char += key.size() + 1;
-      chars_[char_offset] = key.size();
-      memcpy(&chars_[char_offset + 1], key.data(), key.size());
+      uint32_t cell_index = control_->free_cell_index;
+      Cell& cell = getCell(cell_index);
+      control_->free_cell_index = cell.next_cell;
+      cell.next_cell = slots_[slot];
+      slots_[slot] = cell_index;
+      cell.key_size = key.size();
+      memcpy(cell.key, key.data(), key.size());
+      value = &cell.value;
+      ++control_->size;
     }
     unlock();
     return value;
@@ -202,36 +197,36 @@ public:
   size_t size() const { return control_->size; }
 
   /**
-   * Const method to get a value.
-   * @param key
-   */
-  const Value* get(absl::string_view key) const {
-    SharedHashMap* non_const_this = const_cast<SharedHashMap*>(this);
-    return non_const_this->get(key);
-  }
-
-  /**
    * Gets the value associated with a key, returning null if the value was not found.
    * @param key
    */
-  Value* get(absl::string_view key) {
-    lock();
-    Value* value = nullptr;
-    if (key.size() <= 255) {
-      uint32_t slot = HashUtil::xxHash64(key) % options_.num_slots;
-      for (uint32_t cell = slots_[slot]; cell != Sentinal; cell = cells_[cell].next_cell) {
-        absl::string_view cell_key = cells_[cell].key(chars_);
-        if (cell_key == key) {
-          value = &cells_[cell].value;
-          break;
-        }
-      }
+  Value* get(absl::string_view key) const {
+    if (key.size() > options_.max_key_size) {
+      return nullptr;
     }
+
+    lock();
+    Value* value = getLockHeld(key);
     unlock();
     return value;
   }
 
 private:
+  uint32_t cellOffset(uint32_t cell_index) const {
+    return cell_index * (options_.max_key_size + sizeof(Cell));
+  }
+
+  Cell& getCell(uint32_t cell_index) {
+    const SharedHashMap* const_this = this;
+    return const_cast<Cell&>(const_this->getCell(cell_index));
+  }
+
+  const Cell& getCell(uint32_t cell_index) const {
+    // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
+    const char* ptr = reinterpret_cast<const char*>(cells_) + cellOffset(cell_index);
+    return *reinterpret_cast<const Cell*>(ptr);
+  }
+
   /** Maps out the segments of shared memory for us to work with. */
   void initHelper(uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
@@ -241,12 +236,21 @@ private:
     slots_ = reinterpret_cast<uint32_t*>(memory);
     memory += options_.num_slots * sizeof(uint32_t);
     cells_ = reinterpret_cast<Cell*>(memory);
-    memory += options_.capacity * sizeof(Cell);
-    chars_ = reinterpret_cast<char*>(memory);
+  }
+
+  Value* getLockHeld(absl::string_view key) const EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
+    uint32_t slot = HashUtil::xxHash64(key) % options_.num_slots;
+    for (uint32_t c = slots_[slot]; c != Sentinal; c = getCell(c).next_cell) {
+      const Cell& cell = getCell(c);
+      if (cell.getKey() == key) {
+        return const_cast<Value*>(&cell.value);
+      }
+    }
+    return nullptr;
   }
 
   /** Examines the data structures to see if they are sane. Tries not to crash or hang. */
-  bool sanityCheckLockHeld() EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
+  bool sanityCheckLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(control_->mutex) {
     bool ret = true;
     if (memcmp(&options_, &control_->options, sizeof(SharedHashMapOptions)) != 0) {
       // options doesn't match.
@@ -262,24 +266,21 @@ private:
     // As a sanity check, makee sure there are control_->size values
     // reachable from the slots, each of which has a valid char_offset
     uint32_t num_values = 0;
-    for (uint32_t i = 0; i < options_.num_slots; ++i) {
-      for (uint32_t j = slots_[i]; j != Sentinal; j = cells_[j].next_cell) {
-        if (j >= options_.capacity) {
-          ENVOY_LOG(error, "SharedMap live cell has corrupt next_cell");
+    for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
+      for (uint32_t next, cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
+        const Cell& cell = getCell(cell_index);
+        next = cell.next_cell;
+        if ((next >= options_.capacity) && (next != Sentinal)) {
+          ENVOY_LOG(error, "SharedMap live cell has corrupt next_cell={}", next);
           ret = false;
         } else {
-          uint32_t char_offset = cells_[j].char_offset;
-          if (char_offset == Sentinal) {
-            ENVOY_LOG(error, "SharedMap live cell has char_offset==Sentinal");
+          if (cell.key_size > options_.max_key_size) {
+            ENVOY_LOG(error, "SharedMap live cell has key_size=={}", cell.key_size);
             ret = false;
-          } else if (char_offset >= options_.num_string_bytes) {
-            ENVOY_LOG(error, "SharedMap live cell has corrupt_offset: {}", char_offset);
-            ret = false;
-          } else {
-            ++num_values;
-            if (num_values > control_->size) { // avoid infinite loops if there is a bucket cycle.
-              break;
-            }
+          }
+          ++num_values;
+          if (num_values > control_->size) { // avoid infinite loops if there is a bucket cycle.
+            break;
           }
         }
       }
@@ -304,7 +305,6 @@ private:
   Control* control_;
   uint32_t* slots_ PT_GUARDED_BY(control_->mutex);
   Cell* cells_ PT_GUARDED_BY(control_->mutex);
-  char* chars_ PT_GUARDED_BY(control_->mutex);
 };
 
 } // namespace Envoy

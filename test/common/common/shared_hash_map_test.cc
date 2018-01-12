@@ -14,7 +14,7 @@ class SharedHashTest : public testing::Test {
 protected:
   void SetUp() override {
     options_.capacity = 100;
-    options_.num_string_bytes = 1000;
+    options_.max_key_size = 250;
     options_.num_slots = 67;
   }
 
@@ -98,28 +98,6 @@ TEST_F(SharedHashTest, tooManyValues) {
   // We can't fit one more value.
   EXPECT_EQ(nullptr, hash_map1.put(fmt::format("key{}", options_.capacity)));
   EXPECT_TRUE(hash_map1.sanityCheck()) << hash_map1.toString();
-}
-
-TEST_F(SharedHashTest, tooManyKeyBytes) {
-  SharedHashMap<int64_t> hash_map1(options_);
-  memory_.reset(new uint8_t[hash_map1.numBytes()]);
-  hash_map1.init(memory_.get());
-
-  std::string big_key_prefix(200, 'a');
-
-  // Key size doesn't have to be exact here. 4 keys will easily fit even with slop.
-  const int num_200_byte_keys_that_will_fit = options_.num_string_bytes / 201;
-  for (int i = 0; i < num_200_byte_keys_that_will_fit; ++i) {
-    int64_t* value = hash_map1.put(fmt::format("{}{}", big_key_prefix, i));
-    ASSERT_NE(nullptr, value);
-    *value = i;
-  }
-  EXPECT_TRUE(hash_map1.sanityCheck());
-
-  // The next key will not fit in our char-space.
-  std::string key = fmt::format("{}{}", big_key_prefix, num_200_byte_keys_that_will_fit);
-  EXPECT_EQ(nullptr, hash_map1.put(key)) << key;
-  EXPECT_TRUE(hash_map1.sanityCheck());
 }
 
 } // namespace Envoy
