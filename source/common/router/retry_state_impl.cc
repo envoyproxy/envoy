@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Router {
 
-// These are defined in envoy/router.h, however during certain cases the compiler is
+// These are defined in envoy/router/router.h, however during certain cases the compiler is
 // refusing to use the header version so allocate space here.
 const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
