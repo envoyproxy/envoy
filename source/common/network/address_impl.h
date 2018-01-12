@@ -157,7 +157,7 @@ public:
 
 private:
   struct Ipv6Helper : public Ipv6 {
-    // TODO (ccaraman) Use absl::uint128 instead of std::array<uint8_t, 16>.
+    // TODO(ccaraman): Use absl::uint128 instead of std::array<uint8_t, 16>.
     std::array<uint8_t, 16> address() const override;
     uint32_t port() const;
 

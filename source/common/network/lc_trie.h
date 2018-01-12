@@ -153,7 +153,7 @@ private:
 
       // The node used for the trie uses the last 20 bits of uint32_t. The trie cannot support
       // an input greater than 524288(2^19) nodes.
-      // TODO(ccaraman) Add a test case for this.
+      // TODO(ccaraman): Add a test case for this.
       if (tag_data.size() > (1 << 19)) {
         throw EnvoyException(fmt::format(
             "Size of the input vector({0}) for LC-Trie is larger than the max size supported(2^19)",
@@ -165,9 +165,9 @@ private:
 
       // Remove duplicate entries and nested prefixes.
       for (size_t i = 1; i < tag_data.size(); ++i) {
-        // TODO(ccaraman) Add support for nested prefixes.
+        // TODO(ccaraman): Add support for nested prefixes.
         if (tag_data[i - 1].isPrefix(tag_data[i])) {
-          // TODO(ccaraman) Add printing of nested prefixes to simplify debugging.
+          // TODO(ccaraman): Add printing of nested prefixes to simplify debugging.
           throw EnvoyException(
               fmt::format("LcTrie does not support nested prefixes."));
         }
@@ -179,8 +179,9 @@ private:
       // The trie_ vector can have at most twice the number of nodes in the ip_prefixes vector.
       // However, due to the fill factor a buffer is added. Preallocate the size of the vector to
       // avoid resizing while building the trie.
-      // TODO(ccaraman) Define a better buffer value for the trie_ size.
-      // The value(2000000) was used in the original implementation in 
+      // TODO(ccaraman): Define a better buffer value for the trie_ size.
+      // TODO(ccaraman): Define a better buffer value for the trie_ size.
+      // The value(2000000) was used in the original implementation in
       // http://www.csc.kth.se/~snilsson/software/router/C/trie.c. 
       trie_.resize(2 * ip_prefixes_.size() + 2000000);
 
@@ -413,7 +414,7 @@ private:
 
   /**
    * Converts Ipv6 address in std::array<uint8_t, 16> to absl::uint128 in ntohl order.
-   * TODO (ccaraman) Remove this workaround once Ipv6Helper returns absl::uint128t.
+   * TODO (ccaraman): Remove this workaround once Ipv6Helper returns absl::uint128t.
    */
   static Ipv6 convertToIpv6(const std::array<uint8_t, 16>& address) {
     Ipv6 ipv6;

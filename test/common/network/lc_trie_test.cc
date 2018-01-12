@@ -28,7 +28,7 @@ generateTestCase(const std::vector<std::vector<std::string>>& cidr_range_strings
 };
 } // namespace
 
-// TODO(ccaraman) Add a perf test.
+// TODO(ccaraman): Add a performance benchmark test.
 
 TEST(LcTrie, Ipv4) {
 
