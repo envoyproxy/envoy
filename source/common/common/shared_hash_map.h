@@ -68,8 +68,8 @@ public:
    * constructing the object with the desired sizing.
    */
   size_t numBytes() const {
-    size_t size = cellOffset(options_.capacity) + sizeof(Control) +
-        options_.num_slots * sizeof(uint32_t);
+    size_t size =
+        cellOffset(options_.capacity) + sizeof(Control) + options_.num_slots * sizeof(uint32_t);
     return align(size);
   }
 
@@ -260,9 +260,7 @@ private:
     return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
   }
 
-  static uint32_t align(uint32_t size) {
-    return (size + alignment() - 1) & ~(alignment() - 1);
-  }
+  static uint32_t align(uint32_t size) { return (size + alignment() - 1) & ~(alignment() - 1); }
 
   /**
    * Computes the byte offset of a cell into cells_. This is not
