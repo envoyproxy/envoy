@@ -51,7 +51,7 @@ public:
    * that a shared-memory segment can be allocated and passed to init() or attach().
    */
   SharedHashMap(const SharedHashMapOptions& options)
-      : options_(options), control_(nullptr), slots_(nullptr), cells_(nullptr) {}
+      : options_(options), cells_(nullptr), control_(nullptr), slots_(nullptr) {}
 
   /**
    * Represents control-values for the hash-table, including a mutex, which
@@ -84,8 +84,7 @@ public:
 
   /** Returns the numbers of byte required for the hash-table, based on the control structure. */
   size_t numBytes() const {
-    return sizeof(Control) + (options_.num_slots * sizeof(uint32_t)) +
-        cellOffset(options_.capacity);
+    return cellOffset(options_.capacity) + sizeof(Control) + options_.num_slots * sizeof(uint32_t);
   }
 
   /**
@@ -190,6 +189,36 @@ public:
     }
     unlock();
     return value;
+  }
+
+  /**
+   * Removes the specified key from the map, returning bool if the key
+   * was found.
+   * @param key the key to remove
+   */
+  bool remove(absl::string_view key) {
+    if (key.size() > options_.max_key_size) {
+      return false;
+    }
+
+    bool found = false;
+    lock();
+    uint32_t slot = HashUtil::xxHash64(key) % options_.num_slots;
+    uint32_t* next = nullptr;
+    for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinal; cptr = next) {
+      Cell& cell = getCell(*cptr);
+      next = &cell.next_cell;
+      if (cell.getKey() == key) {
+        control_->free_cell_index = *cptr;
+        --control_->size;
+        *cptr = *next;  // Splices current cell out of slot-chain.
+        *next = control_->free_cell_index;
+        found = true;
+        break;
+      }
+    }
+    unlock();
+    return found;
   }
 
   /** Returns the number of key/values stored in the map. */
