@@ -9,6 +9,7 @@
 
 namespace Envoy {
 
+// Tests SharedHashMap.
 class SharedHashTest : public testing::Test {
 protected:
   void SetUp() override {
@@ -61,7 +62,7 @@ TEST_F(SharedHashTest, setAndCheck) {
 
     EXPECT_EQ(1, hash_map2.size());
     EXPECT_EQ(nullptr, hash_map2.get("no such key"));
-    EXPECT_EQ(12345, *hash_map2.get("good key"));
+    EXPECT_EQ(12345, *hash_map2.get("good key")) << hash_map2.toString();
   }
 }
 
@@ -96,7 +97,7 @@ TEST_F(SharedHashTest, tooManyValues) {
 
   // We can't fit one more value.
   EXPECT_EQ(nullptr, hash_map1.put(fmt::format("key{}", options_.capacity)));
-  EXPECT_TRUE(hash_map1.sanityCheck());
+  EXPECT_TRUE(hash_map1.sanityCheck()) << hash_map1.toString();
 }
 
 TEST_F(SharedHashTest, tooManyKeyBytes) {
