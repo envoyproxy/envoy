@@ -164,12 +164,10 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&
 
   // Implicitly add legacy filters
   if (config_.useOriginalDst()) {
-    active_socket->accept_filters_.emplace_back(
-        Network::ListenerFilterSharedPtr{new Filter::OriginalDst()});
+    active_socket->accept_filters_.emplace_back(new Filter::OriginalDst());
   }
   if (config_.useProxyProto()) {
-    active_socket->accept_filters_.emplace_back(
-        Network::ListenerFilterSharedPtr{new Filter::ProxyProtocol::Instance(legacy_stats_)});
+    active_socket->accept_filters_.emplace_back(new Filter::ProxyProtocol::Instance(legacy_stats_));
   }
 
   // Create and run the filters

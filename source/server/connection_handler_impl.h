@@ -152,7 +152,7 @@ private:
     }
 
     // Network::ListenerFilterManager
-    void addAcceptFilter(Network::ListenerFilterSharedPtr filter) override {
+    void addAcceptFilter(Network::ListenerFilter* filter) override {
       accept_filters_.emplace_back(filter);
     }
 
@@ -163,8 +163,8 @@ private:
 
     ActiveListener* listener_;
     Network::AcceptedSocketPtr socket_;
-    std::list<Network::ListenerFilterSharedPtr> accept_filters_;
-    std::list<Network::ListenerFilterSharedPtr>::iterator iter_;
+    std::list<Network::ListenerFilterPtr> accept_filters_;
+    std::list<Network::ListenerFilterPtr>::iterator iter_;
   };
 
   static ListenerStats generateStats(Stats::Scope& scope);

@@ -271,7 +271,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
-          manager.addAcceptFilter(Network::ListenerFilterSharedPtr{test_filter});
+          manager.addAcceptFilter(test_filter);
           redirected = true;
         }
         return true;
@@ -331,7 +331,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
-          manager.addAcceptFilter(Network::ListenerFilterSharedPtr{test_filter});
+          manager.addAcceptFilter(test_filter);
           redirected = true;
         }
         return true;
@@ -384,7 +384,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
   EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
-        manager.addAcceptFilter(Network::ListenerFilterSharedPtr{test_filter});
+        manager.addAcceptFilter(test_filter);
         return true;
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
@@ -427,7 +427,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
   EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
-        manager.addAcceptFilter(Network::ListenerFilterSharedPtr{test_filter});
+        manager.addAcceptFilter(test_filter);
         return true;
       }));
   EXPECT_CALL(*test_filter, onAccept(_)).WillOnce(Return(Network::FilterStatus::Continue));

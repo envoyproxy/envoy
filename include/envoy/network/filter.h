@@ -192,7 +192,7 @@ public:
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
 };
 
-typedef std::shared_ptr<ListenerFilter> ListenerFilterSharedPtr;
+typedef std::unique_ptr<ListenerFilter> ListenerFilterPtr;
 
 /**
  * Interface for filter callbacks and adding listener filters to a manager.
@@ -206,7 +206,7 @@ public:
    * first is called first).
    * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(ListenerFilterSharedPtr filter) PURE;
+  virtual void addAcceptFilter(ListenerFilter* filter) PURE;
 };
 
 /**
