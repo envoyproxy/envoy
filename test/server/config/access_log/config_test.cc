@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class HttpGrpcAccessLogTest : public testing::Test {
+class HttpGrpcAccessLogConfigTest : public testing::Test {
 public:
   void SetUp() override {
     factory_ = Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(
@@ -39,7 +39,7 @@ public:
 };
 
 // Normal OK configuration.
-TEST_F(HttpGrpcAccessLogTest, Ok) {
+TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   AccessLog::InstanceSharedPtr instance =
       factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
   EXPECT_NE(nullptr, instance);
@@ -47,7 +47,7 @@ TEST_F(HttpGrpcAccessLogTest, Ok) {
 }
 
 // Configuration with no matching cluster.
-TEST_F(HttpGrpcAccessLogTest, NoCluster) {
+TEST_F(HttpGrpcAccessLogConfigTest, NoCluster) {
   ON_CALL(context_.cluster_manager_, get("bar")).WillByDefault(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(
       factory_->createAccessLogInstance(*message_, std::move(filter_), context_), EnvoyException,
@@ -55,7 +55,7 @@ TEST_F(HttpGrpcAccessLogTest, NoCluster) {
 }
 
 // Configuration with cluster but not a static cluster.
-TEST_F(HttpGrpcAccessLogTest, ClusterAddedViaApi) {
+TEST_F(HttpGrpcAccessLogConfigTest, ClusterAddedViaApi) {
   ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, addedViaApi())
       .WillByDefault(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
