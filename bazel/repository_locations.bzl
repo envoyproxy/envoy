@@ -71,6 +71,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
+        # Pin to a temporal fork for a code review. Needs to be updated before merging.
         commit = "07b79a51679558d6460fd2785b7206d102869f4d",
         remote = "https://github.com/taiki45/data-plane-api",
     ),
