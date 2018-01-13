@@ -62,18 +62,16 @@ public:
         request_msg.envoy_metrics();
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
-    int known_counter_value = -1;
-    int known_gauge_value = -1;
     for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
       if (metrics_family.name() == "cluster.metrics_service.membership_change" &&
           metrics_family.metric(0).has_counter()) {
         known_counter_exists = true;
-        known_counter_value = metrics_family.metric(0).counter().value();
+        EXPECT_EQ(1, metrics_family.metric(0).counter().value());
       }
       if (metrics_family.name() == "cluster.metrics_service.membership_total" &&
           metrics_family.metric(0).has_gauge()) {
         known_gauge_exists = true;
-        known_gauge_value = metrics_family.metric(0).gauge().value();
+        EXPECT_EQ(1, metrics_family.metric(0).gauge().value());
       }
       if (known_counter_exists && known_gauge_exists) {
         break;
@@ -81,8 +79,6 @@ public:
     }
     EXPECT_TRUE(known_counter_exists);
     EXPECT_TRUE(known_gauge_exists);
-    EXPECT_EQ(1, known_counter_value);
-    EXPECT_EQ(1, known_gauge_value);
   }
 
   void cleanup() {

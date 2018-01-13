@@ -22,7 +22,6 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(GrpcMetricsServiceClientFactory
                                                  ThreadLocal::SlotAllocator& tls,
                                                  const LocalInfo::LocalInfo& local_info)
     : tls_slot_(tls.allocateSlot()) {
-
   SharedStateSharedPtr shared_state = std::make_shared<SharedState>(std::move(factory), local_info);
   tls_slot_->set([shared_state](Event::Dispatcher&) {
     return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalStreamer(shared_state)};
