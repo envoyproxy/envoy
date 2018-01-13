@@ -92,8 +92,8 @@ public:
   bool attach(uint8_t* memory, uint32_t num_bytes) {
     mapMemorySegments(memory);
     if (num_bytes != control_->num_bytes) {
-      ENVOY_LOG(error, "SharedMemoryHashSet unexpected memory size {} != {}",
-                num_bytes, control_->num_bytes);
+      ENVOY_LOG(error, "SharedMemoryHashSet unexpected memory size {} != {}", num_bytes,
+                control_->num_bytes);
       return false;
     }
     return sanityCheck();

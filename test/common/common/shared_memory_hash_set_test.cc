@@ -52,7 +52,7 @@ TEST_F(SharedMemoryHashSetTest, initAndAttach) {
   // If we pass in a memory-buffer with the wrong size, we can no longer attach it.
   {
     SharedMemoryHashSet<TestValue> hash_set3(options_);
-    //EXPECT_FALSE(hash_set3.attach(memory_.get(), mem_size_ - 1));
+    EXPECT_FALSE(hash_set3.attach(memory_.get(), mem_size_ - 1));
   }
 
   // If we tweak an option, we can no longer attach it.

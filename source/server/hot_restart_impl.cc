@@ -116,8 +116,7 @@ std::string SharedMemory::version() {
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options),
-      stats_set_(sharedMemHashOptions(options)),
+    : options_(options), stats_set_(sharedMemHashOptions(options)),
       stats_set_data_size_(stats_set_.numBytes()),
       shmem_(SharedMemory::initialize(stats_set_data_size_, options)), log_lock_(shmem_.log_lock_),
       access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),

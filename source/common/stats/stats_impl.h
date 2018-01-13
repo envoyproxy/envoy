@@ -113,13 +113,14 @@ struct RawStatData {
 
   /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment.  This is required by SharedMemoryHashSet.
+   * and padding for alignment. This is required by SharedMemoryHashSet.
    */
   static size_t size();
 
   /**
    * Initializes this object to have the specified key,
-   * a refcount of 1, and all other values zero.
+   * a refcount of 1, and all other values zero. This is required by
+   * SharedMemoryHashSet
    */
   void initialize(absl::string_view key);
 
@@ -129,23 +130,9 @@ struct RawStatData {
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns true if this matches name, truncated to maxNameLength().
-   */
-  //bool matches(const std::string& name);
-
-  /**
-   * Returns the name as a string_view.   This is required by SharedMemoryHashSet.
+   * Returns the name as a string_view. This is required by SharedMemoryHashSet.
    */
   absl::string_view key() const { return absl::string_view(name_, strlen(name_)); }
-
-  /**
-   * Sets the key from a string_view.   This is required by SharedMemoryHashSet.
-   */
-  void setKey(absl::string_view key) {
-    size_t xfer = std::max(nameSize() - 1, key.size());
-    memcpy(name_, key.data(), xfer);
-    name_[xfer] = '\0';
-  }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;

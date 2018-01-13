@@ -164,7 +164,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   };
 
   auto verify = [](TestStat& ts) {
-    EXPECT_EQ(ts.stat_->key(), ts.name_);;
+    EXPECT_EQ(ts.stat_->key(), ts.name_);
     EXPECT_EQ(ts.stat_->value_, ts.index_);
     EXPECT_EQ(ts.stat_->pending_increment_, ts.index_);
     EXPECT_EQ(ts.stat_->flags_, ts.index_);
