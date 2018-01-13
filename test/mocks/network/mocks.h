@@ -208,6 +208,32 @@ public:
   MOCK_CONST_METHOD0(drainClose, bool());
 };
 
+class MockListenerFilter : public Network::ListenerFilter {
+public:
+  MockListenerFilter();
+  ~MockListenerFilter();
+
+  MOCK_METHOD1(onAccept, Network::FilterStatus(Network::ListenerFilterCallbacks&));
+};
+
+class MockListenerFilterCallbacks : public ListenerFilterCallbacks {
+public:
+  MockListenerFilterCallbacks();
+  ~MockListenerFilterCallbacks();
+
+  MOCK_METHOD0(socket, AcceptSocket&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD1(continueFilterChain, void(bool));
+};
+
+class MockListenerFilterManager : public ListenerFilterManager {
+public:
+  MockListenerFilterManager();
+  ~MockListenerFilterManager();
+
+  MOCK_METHOD1(addAcceptFilter, void(Network::ListenerFilterSharedPtr));
+};
+
 class MockFilterChainFactory : public FilterChainFactory {
 public:
   MockFilterChainFactory();

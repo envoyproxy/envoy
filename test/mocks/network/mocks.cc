@@ -144,6 +144,15 @@ MockListenerCallbacks::~MockListenerCallbacks() {}
 MockDrainDecision::MockDrainDecision() {}
 MockDrainDecision::~MockDrainDecision() {}
 
+MockListenerFilter::MockListenerFilter() {}
+MockListenerFilter::~MockListenerFilter() {}
+
+MockListenerFilterCallbacks::MockListenerFilterCallbacks() {}
+MockListenerFilterCallbacks::~MockListenerFilterCallbacks() {}
+
+MockListenerFilterManager::MockListenerFilterManager() {}
+MockListenerFilterManager::~MockListenerFilterManager() {}
+
 MockFilterChainFactory::MockFilterChainFactory() {
   ON_CALL(*this, createFilterChain(A<ListenerFilterManager&>())).WillByDefault(Return(true));
 }

@@ -234,11 +234,6 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   EXPECT_CALL(*listener3, onDestroy());
 }
 
-class TestFilter : public Network::ListenerFilter {
-public:
-  MOCK_METHOD1(onAccept, Network::FilterStatus(Network::ListenerFilterCallbacks&));
-};
-
 TEST_F(ConnectionHandlerTest, NormalRedirect) {
   // 'false' for use_original_dst since we add a mock filter manually below.
   TestListener* test_listener1 = addListener(1, true, false, "test_listener1");
@@ -269,7 +264,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(test_listener2->socket_, localAddress()).WillRepeatedly(Return(alt_address));
   handler_->addListener(*test_listener2);
 
-  TestFilter* test_filter = new TestFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptSocket* accept_socket = new NiceMock<Network::MockAcceptSocket>();
   bool redirected = false;
   EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
@@ -329,7 +324,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   EXPECT_CALL(test_listener2->socket_, localAddress()).WillRepeatedly(Return(any_address));
   handler_->addListener(*test_listener2);
 
-  TestFilter* test_filter = new TestFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptSocket* accept_socket = new NiceMock<Network::MockAcceptSocket>();
   bool redirected = false;
   EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
@@ -384,7 +379,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(Return(any_address));
   handler_->addListener(*test_listener1);
 
-  TestFilter* test_filter = new TestFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptSocket* accept_socket = new NiceMock<Network::MockAcceptSocket>();
   EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
@@ -427,7 +422,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(Return(any_address));
   handler_->addListener(*test_listener1);
 
-  TestFilter* test_filter = new TestFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptSocket* accept_socket = new NiceMock<Network::MockAcceptSocket>();
   EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
