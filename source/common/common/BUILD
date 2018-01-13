@@ -154,8 +154,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "shared_memory_hash_map_lib",
-    hdrs = ["shared_memory_hash_map.h"],
+    name = "shared_memory_hash_set_lib",
+    hdrs = ["shared_memory_hash_set.h"],
     external_deps = [
         "abseil_strings",
     ],

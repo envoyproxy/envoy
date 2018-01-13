@@ -12,10 +12,13 @@
 #include "envoy/server/options.h"
 
 #include "common/common/assert.h"
+#include "common/common/shared_memory_hash_set.h"
 #include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Server {
+
+typedef SharedMemoryHashSet<Stats::RawStatData> RawStatDataSet;
 
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
@@ -32,7 +35,7 @@ private:
     static const uint64_t INITIALIZING = 0x1;
   };
 
-  // Due to the flexible-array-length of stats_slots_, c-style allocation
+  // Due to the flexible-array-length of stats_set_data_, c-style allocation
   // and initialization are neccessary.
   SharedMemory() = delete;
   ~SharedMemory() = delete;
@@ -41,7 +44,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(Options& options);
+  static SharedMemory& initialize(uint32_t stats_set_size, Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -52,16 +55,14 @@ private:
 
   uint64_t size_;
   uint64_t version_;
-  uint64_t num_stats_;
+  uint64_t max_stats_;
   uint64_t entry_size_;
   std::atomic<uint64_t> flags_;
   pthread_mutex_t log_lock_;
   pthread_mutex_t access_log_lock_;
   pthread_mutex_t stat_lock_;
   pthread_mutex_t init_lock_;
-  alignas(Stats::RawStatData) uint8_t
-      stats_slots_[]; // array of Stats::RawStatData, which has a flexible-array-length member
-                      // so non-fixed size
+  alignas(SharedMemoryHashSet<Stats::RawStatData>) uint8_t stats_set_data_[];
 
   friend class HotRestartImpl;
 };
@@ -197,6 +198,8 @@ private:
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
 
   Options& options_;
+  RawStatDataSet stats_set_;
+  uint32_t stats_set_data_size_;
   SharedMemory& shmem_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;

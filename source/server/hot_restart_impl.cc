@@ -26,11 +26,18 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-SharedMemory& SharedMemory::initialize(Options& options) {
+static SharedMemoryHashSetOptions sharedMemHashOptions(Options& options) {
+  SharedMemoryHashSetOptions hash_set_options;
+  hash_set_options.capacity = options.maxStats();
+  hash_set_options.num_slots = 9973;
+  return hash_set_options;
+}
+
+SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   const uint64_t entry_size = Stats::RawStatData::size();
-  const uint64_t total_size = sizeof(SharedMemory) + (entry_size * options.maxStats());
+  const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
   int flags = O_RDWR;
   const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
@@ -61,7 +68,7 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   if (options.restartEpoch() == 0) {
     shmem->size_ = total_size;
     shmem->version_ = VERSION;
-    shmem->num_stats_ = options.maxStats();
+    shmem->max_stats_ = options.maxStats();
     shmem->entry_size_ = entry_size;
     shmem->initializeMutex(shmem->log_lock_);
     shmem->initializeMutex(shmem->access_log_lock_);
@@ -70,13 +77,13 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   } else {
     RELEASE_ASSERT(shmem->size_ == total_size);
     RELEASE_ASSERT(shmem->version_ == VERSION);
-    RELEASE_ASSERT(shmem->num_stats_ == options.maxStats());
+    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats());
     RELEASE_ASSERT(shmem->entry_size_ == entry_size);
   }
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_slots_) % alignof(Stats::RawStatData)) ==
-                 0);
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) %
+                  alignof(SharedMemoryHashSet<Stats::RawStatData>)) == 0);
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -105,18 +112,26 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
 }
 
 std::string SharedMemory::version() {
-  return version(num_stats_, Stats::RawStatData::maxNameLength());
+  return version(max_stats_, Stats::RawStatData::maxNameLength());
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
+    : options_(options),
+      stats_set_(sharedMemHashOptions(options)),
+      stats_set_data_size_(stats_set_.numBytes()),
+      shmem_(SharedMemory::initialize(stats_set_data_size_, options)), log_lock_(shmem_.log_lock_),
       access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
       init_lock_(shmem_.init_lock_) {
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
+  bool need_init = true;
   if (options.restartEpoch() != 0) {
     parent_address_ = createDomainSocketAddress((options.restartEpoch() + -1));
+    need_init = !stats_set_.attach(shmem_.stats_set_data_, stats_set_data_size_);
+  }
+  if (need_init) {
+    stats_set_.init(shmem_.stats_set_data_, stats_set_data_size_);
   }
 
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
@@ -128,25 +143,16 @@ HotRestartImpl::HotRestartImpl(Options& options)
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
-  Stats::RawStatData* unused = nullptr;
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
-  for (uint64_t i = 0; i < shmem_.num_stats_; i++) {
-    const size_t offset = shmem_.entry_size_ * i;
-    Stats::RawStatData* data = reinterpret_cast<Stats::RawStatData*>(shmem_.stats_slots_ + offset);
-    if (!data->initialized()) {
-      unused = data;
-    } else if (data->matches(name)) {
-      data->ref_count_++;
-      return data;
-    }
+  auto value_created = stats_set_.insert(name);
+  Stats::RawStatData* data = value_created.first;
+  if (data == nullptr) {
+    return nullptr;
   }
-
-  if (unused != nullptr) {
-    unused->initialize(name);
-    return unused;
+  if (!value_created.second) {
+    ++data->ref_count_;
   }
-
-  return nullptr;
+  return data;
 }
 
 void HotRestartImpl::free(Stats::RawStatData& data) {
@@ -156,7 +162,8 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   if (--data.ref_count_ > 0) {
     return;
   }
-
+  bool removed = stats_set_.remove(data.key());
+  ASSERT(removed);
   memset(&data, 0, Stats::RawStatData::size());
 }
 
