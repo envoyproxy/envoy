@@ -180,6 +180,13 @@ void Utility::detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap) 
 std::vector<Stats::TagExtractorPtr>
 Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
   std::vector<Stats::TagExtractorPtr> tag_extractors;
+  int size = 0;
+  // Roughly estimate the size of the tag_extractors vector.
+  if (!bootstrap.stats_config().has_use_all_default_tags() ||
+      bootstrap.stats_config().use_all_default_tags().value()) {
+    size = TagNames::get().name_regex_pairs_.size();
+  }
+  tag_extractors.reserve(size + bootstrap.stats_config().stats_tags().size());
 
   // Add defaults.
   if (!bootstrap.stats_config().has_use_all_default_tags() ||
