@@ -666,7 +666,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
 }
 
-bool AdminImpl::createFilterChain(Network::Connection& connection) {
+bool AdminImpl::createNetworkFilterChain(Network::Connection& connection) {
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
       server_.localInfo(), server_.clusterManager())});

@@ -10,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::A;
 using testing::ByRef;
 using testing::InSequence;
 using testing::Invoke;
@@ -85,7 +84,7 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   handler_->addListener(*test_listener);
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(true));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(true));
   listener_callbacks->onNewConnection(Network::ConnectionPtr{connection});
   EXPECT_EQ(1UL, handler_->numConnections());
 
@@ -123,7 +122,7 @@ TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   handler_->addListener(*test_listener);
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(true));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(true));
   listener_callbacks->onNewConnection(Network::ConnectionPtr{connection});
   EXPECT_EQ(1UL, handler_->numConnections());
 
@@ -150,7 +149,7 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   handler_->addListener(*test_listener);
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>()));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_));
   EXPECT_CALL(*connection, state()).WillOnce(Return(Network::Connection::State::Closed));
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(0);
   listener_callbacks->onNewConnection(Network::ConnectionPtr{connection});
@@ -176,7 +175,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   handler_->addListener(*test_listener);
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(false));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(false));
   EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush));
   listener_callbacks->onNewConnection(Network::ConnectionPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
@@ -267,7 +266,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptedSocket* accepted_socket = new NiceMock<Network::MockAcceptedSocket>();
   bool redirected = false;
-  EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
@@ -286,7 +285,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(*accepted_socket, clearReset());
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(true));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(true));
   EXPECT_CALL(dispatcher_, createServerConnection_(_, _)).WillOnce(Return(connection));
   listener_callbacks1->onAccept(Network::AcceptedSocketPtr{accepted_socket});
   EXPECT_EQ(1UL, handler_->numConnections());
@@ -327,7 +326,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptedSocket* accepted_socket = new NiceMock<Network::MockAcceptedSocket>();
   bool redirected = false;
-  EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
@@ -349,7 +348,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(*accepted_socket, clearReset());
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(true));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(true));
   EXPECT_CALL(dispatcher_, createServerConnection_(_, _)).WillOnce(Return(connection));
   listener_callbacks1->onAccept(Network::AcceptedSocketPtr{accepted_socket});
   EXPECT_EQ(1UL, handler_->numConnections());
@@ -381,7 +380,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptedSocket* accepted_socket = new NiceMock<Network::MockAcceptedSocket>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         manager.addAcceptFilter(test_filter);
@@ -396,7 +395,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
   EXPECT_CALL(*accepted_socket, localAddressReset()).WillOnce(Return(true));
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(Return(original_dst_address));
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(true));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(true));
   EXPECT_CALL(dispatcher_, createServerConnection_(_, _)).WillOnce(Return(connection));
   listener_callbacks1->onAccept(Network::AcceptedSocketPtr{accepted_socket});
   EXPECT_EQ(1UL, handler_->numConnections());
@@ -424,7 +423,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
   Network::MockAcceptedSocket* accepted_socket = new NiceMock<Network::MockAcceptedSocket>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::ListenerFilterManager&>()))
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         manager.addAcceptFilter(test_filter);
@@ -434,7 +433,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
   EXPECT_CALL(*accepted_socket, localAddressReset()).WillOnce(Return(false));
   EXPECT_CALL(*accepted_socket, localAddress()).WillRepeatedly(Return(normal_address));
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>())).WillOnce(Return(true));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).WillOnce(Return(true));
   EXPECT_CALL(dispatcher_, createServerConnection_(_, _)).WillOnce(Return(connection));
   listener_callbacks1->onAccept(Network::AcceptedSocketPtr{accepted_socket});
   EXPECT_EQ(1UL, handler_->numConnections());

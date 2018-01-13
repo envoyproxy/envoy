@@ -222,7 +222,7 @@ public:
    * @return true if filter chain was created successfully. Otherwise
    *   false, e.g. filter chain is empty.
    */
-  virtual bool createFilterChain(Connection& connection) PURE;
+  virtual bool createNetworkFilterChain(Connection& connection) PURE;
 
   /**
    * Called to create the listener filter chain.
@@ -230,7 +230,7 @@ public:
    * @return true if filter chain was created successfully. Otherwise
    *   false.
    */
-  virtual bool createFilterChain(ListenerFilterManager& listener) PURE;
+  virtual bool createListenerFilterChain(ListenerFilterManager& listener) PURE;
 };
 
 } // namespace Network

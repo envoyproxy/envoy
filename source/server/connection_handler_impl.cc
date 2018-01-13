@@ -171,7 +171,7 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&
   }
 
   // Create and run the filters
-  config_.filterChainFactory().createFilterChain(*active_socket);
+  config_.filterChainFactory().createListenerFilterChain(*active_socket);
   ActiveSocketPtr as(active_socket);
   as->moveIntoListBack(std::move(as), sockets_);
   active_socket->continueFilterChain(true);
@@ -187,7 +187,7 @@ void ConnectionHandlerImpl::ActiveListener::newConnection(Network::AcceptedSocke
 void ConnectionHandlerImpl::ActiveListener::onNewConnection(
     Network::ConnectionPtr&& new_connection) {
   ENVOY_CONN_LOG_TO_LOGGER(parent_.logger_, debug, "new connection", *new_connection);
-  bool empty_filter_chain = !config_.filterChainFactory().createFilterChain(*new_connection);
+  bool empty_filter_chain = !config_.filterChainFactory().createNetworkFilterChain(*new_connection);
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {

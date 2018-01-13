@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::A;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
@@ -154,7 +153,7 @@ MockListenerFilterManager::MockListenerFilterManager() {}
 MockListenerFilterManager::~MockListenerFilterManager() {}
 
 MockFilterChainFactory::MockFilterChainFactory() {
-  ON_CALL(*this, createFilterChain(A<ListenerFilterManager&>())).WillByDefault(Return(true));
+  ON_CALL(*this, createListenerFilterChain(_)).WillByDefault(Return(true));
 }
 MockFilterChainFactory::~MockFilterChainFactory() {}
 

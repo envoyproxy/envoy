@@ -66,7 +66,7 @@ AutonomousUpstream::~AutonomousUpstream() {
   http_connections_.clear();
 }
 
-bool AutonomousUpstream::createFilterChain(Network::Connection& connection) {
+bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection) {
   AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
       QueuedConnectionWrapperPtr{new QueuedConnectionWrapper(connection, true)}, stats_store_,
       http_type_));
@@ -75,6 +75,6 @@ bool AutonomousUpstream::createFilterChain(Network::Connection& connection) {
   return true;
 }
 
-bool AutonomousUpstream::createFilterChain(Network::ListenerFilterManager&) { return true; }
+bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
 } // namespace Envoy

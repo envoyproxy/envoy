@@ -21,7 +21,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::A;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -46,7 +45,7 @@ public:
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
 
-    ON_CALL(factory_, createFilterChain(A<ListenerFilterManager&>())).WillByDefault(Return(true));
+    ON_CALL(factory_, createListenerFilterChain(_)).WillByDefault(Return(true));
   }
 
   // Listener
@@ -64,9 +63,9 @@ public:
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()))
+    EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](ListenerFilterManager&) -> bool { return true; }));
-    EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>()))
+    EXPECT_CALL(factory_, createNetworkFilterChain(_))
         .WillOnce(Invoke([&](Connection& connection) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
@@ -80,7 +79,7 @@ public:
 
   void connectNoRead() {
     conn_->connect();
-    EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()));
+    EXPECT_CALL(factory_, createListenerFilterChain(_));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -302,7 +301,7 @@ TEST_P(ProxyProtocolTest, Closed) {
 
 TEST_P(ProxyProtocolTest, ClosedEmpty) {
   conn_->connect();
-  EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()));
+  EXPECT_CALL(factory_, createListenerFilterChain(_));
   conn_->close(ConnectionCloseType::NoFlush);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
@@ -340,9 +339,9 @@ public:
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createFilterChain(A<ListenerFilterManager&>()))
+    EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](ListenerFilterManager&) -> bool { return true; }));
-    EXPECT_CALL(factory_, createFilterChain(A<Network::Connection&>()))
+    EXPECT_CALL(factory_, createNetworkFilterChain(_))
         .WillOnce(Invoke([&](Connection& connection) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);

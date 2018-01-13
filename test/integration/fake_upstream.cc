@@ -278,7 +278,7 @@ void FakeUpstream::cleanUp() {
   }
 }
 
-bool FakeUpstream::createFilterChain(Network::Connection& connection) {
+bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection) {
   std::unique_lock<std::mutex> lock(lock_);
   connection.readDisable(true);
   new_connections_.emplace_back(
@@ -287,7 +287,7 @@ bool FakeUpstream::createFilterChain(Network::Connection& connection) {
   return true;
 }
 
-bool FakeUpstream::createFilterChain(Network::ListenerFilterManager&) { return true; }
+bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
 void FakeUpstream::threadRoutine() {
   handler_->addListener(listener_);

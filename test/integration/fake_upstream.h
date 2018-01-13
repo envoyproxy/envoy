@@ -293,8 +293,8 @@ public:
                         std::vector<std::unique_ptr<FakeUpstream>>& upstreams);
 
   // Network::FilterChainFactory
-  bool createFilterChain(Network::Connection& connection) override;
-  bool createFilterChain(Network::ListenerFilterManager& listener) override;
+  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
 protected:

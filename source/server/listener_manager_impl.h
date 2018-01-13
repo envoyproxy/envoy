@@ -25,11 +25,11 @@ public:
   ProdListenerComponentFactory(Instance& server) : server_(server) {}
 
   /**
-   * Static worker for createFilterFactoryList() that can be used directly in tests.
+   * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                           Configuration::FactoryContext& context);
+  createNetworkFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                  Configuration::FactoryContext& context);
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
@@ -39,9 +39,9 @@ public:
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                          Configuration::FactoryContext& context) override {
-    return createFilterFactoryList_(filters, context);
+  createNetworkFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                 Configuration::FactoryContext& context) override {
+    return createNetworkFilterFactoryList_(filters, context);
   }
   std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
@@ -248,8 +248,8 @@ public:
   bool drainClose() const override;
 
   // Network::FilterChainFactory
-  bool createFilterChain(Network::Connection& connection) override;
-  bool createFilterChain(Network::ListenerFilterManager& manager) override;
+  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
 
 private:
   ListenerManagerImpl& parent_;

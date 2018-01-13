@@ -239,8 +239,8 @@ public:
   MockFilterChainFactory();
   ~MockFilterChainFactory();
 
-  MOCK_METHOD1(createFilterChain, bool(Connection& connection));
-  MOCK_METHOD1(createFilterChain, bool(ListenerFilterManager& listener));
+  MOCK_METHOD1(createNetworkFilterChain, bool(Connection& connection));
+  MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
 };
 
 class MockListenSocket : public ListenSocket {

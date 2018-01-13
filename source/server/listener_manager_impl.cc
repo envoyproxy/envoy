@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
-ProdListenerComponentFactory::createFilterFactoryList_(
+ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
@@ -139,7 +139,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
                                          filter_chain.filter_chain_match().sni_domains().end());
     if (!filters_hash.valid()) {
       filters_hash.value(RepeatedPtrUtil::hash(filter_chain.filters()));
-      filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+      filter_factories_ =
+          parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this);
     } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
       throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
                                        "is currently not supported",
@@ -178,11 +179,11 @@ ListenerImpl::~ListenerImpl() {
   filter_factories_.clear();
 }
 
-bool ListenerImpl::createFilterChain(Network::Connection& connection) {
+bool ListenerImpl::createNetworkFilterChain(Network::Connection& connection) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
 }
 
-bool ListenerImpl::createFilterChain(Network::ListenerFilterManager& manager) {
+bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
   return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
 }
 

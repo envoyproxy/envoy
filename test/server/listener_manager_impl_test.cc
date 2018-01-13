@@ -54,7 +54,7 @@ public:
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
             [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
                                       Configuration::FactoryContext& context)
@@ -95,11 +95,11 @@ class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
-    ON_CALL(listener_factory_, createFilterFactoryList(_, _))
+    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                                  Configuration::FactoryContext& context)
                                   -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
+          return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters, context);
         }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(
