@@ -27,7 +27,9 @@ final version.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
-* Added restrictions for the backing sources of xDS resources. For filesystem based
-xDS the file must exist at configuration time. For cluster based xDS (api\_config\_source, and ADS) the backing cluster must be statically defined and be of non-EDS type.
+* Added restrictions for the backing sources of xDS resources. For filesystem based xDS the file
+  must exist at configuration time. For cluster based xDS (api\_config\_source, and ADS) the backing
+  cluster must be statically defined and be of non-EDS type.
 * Added support for route matching based on URL query string parameters.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
+* Added `/runtime` admin endpoint to read the current runtime values.
