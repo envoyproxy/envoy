@@ -78,13 +78,14 @@ private:
 
     // Network::ListenerCallbacks
     /**
-     * Fires when a new connection is received from the listener.
+     * Fires when a new accepted socket is received from the listener.
      * @param socket supplies the accepted socket to take control of.
      */
     void onAccept(Network::AcceptedSocketPtr&& socket) override;
 
     /**
-     * Fires when a new connection is received from the listener.
+     * Fires when a new connection is received from the listener, after listener filters have
+     * been executed.
      * @param new_connection supplies the connection to take control of.
      */
     void onNewConnection(Network::ConnectionPtr&& new_connection) override;
