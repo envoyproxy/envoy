@@ -67,9 +67,12 @@ public:
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
+  // The given tag extractors are hold by a server. So the lifecycle of them will be
+  // as same as the server.
   void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractors) override {
     tag_extractors_ = &tag_extractors;
   }
+  // Same as setTagExtractors above, the given tags are hold by a server.
   void setDefaultTags(const std::vector<Tag>& tags) override { default_tags_ = &tags; }
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
