@@ -231,10 +231,10 @@ public:
 
   /**
    * Envoy can have both pre-defined tag names in well_known_names and user
-   * provided tag names through bootstrap configuration. Check the confilict of
-   * all the tag names to avoid unexpected tag name overwriting. If found a
-   * confilict, throw an exception.
+   * provided tag names through bootstrap configuration. Check all tag names
+   * for conflicts to avoid unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
+   * @throws EnvoyException when the conflict is found.
    */
   static void detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap);
 
