@@ -179,7 +179,7 @@ public:
   virtual void startWorkers(GuardDog& guard_dog) PURE;
 
   /**
-   * Stop all listeners from accepting new connectins without actually removing any of them. This
+   * Stop all listeners from accepting new connections without actually removing any of them. This
    * is used for server draining.
    */
   virtual void stopListeners() PURE;

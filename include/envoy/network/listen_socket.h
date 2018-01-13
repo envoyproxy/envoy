@@ -51,7 +51,7 @@ public:
    * Reset the original destination address of the socket to a different address than the one
    * the socket was accepted at.
    */
-  virtual void resetLocalAddress(Address::InstanceConstSharedPtr& local_address) PURE;
+  virtual void resetLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
   /**
    * @return true if the local address has been reset.
@@ -67,7 +67,7 @@ public:
   /**
    * Set the original source address of the socket
    */
-  virtual void resetRemoteAddress(Address::InstanceConstSharedPtr& remote_address) PURE;
+  virtual void resetRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
 
   /**
    * @return fd the accepted socket's file descriptor.

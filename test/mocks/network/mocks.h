@@ -261,10 +261,10 @@ public:
   ~MockAcceptedSocket();
 
   MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
-  MOCK_METHOD1(resetLocalAddress, void(Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(resetLocalAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(localAddressReset, bool());
   MOCK_CONST_METHOD0(remoteAddress, Address::InstanceConstSharedPtr());
-  MOCK_METHOD1(resetRemoteAddress, void(Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(resetRemoteAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(takeFd, int());
   MOCK_METHOD0(clearReset, void());

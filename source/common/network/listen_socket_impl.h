@@ -60,13 +60,13 @@ public:
 
   // Network::AcceptedSocket
   Address::InstanceConstSharedPtr localAddress() const override { return local_address_; }
-  void resetLocalAddress(Address::InstanceConstSharedPtr& local_address) override {
+  void resetLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
     local_address_reset_ = true;
   }
   bool localAddressReset() const override { return local_address_reset_; }
   Address::InstanceConstSharedPtr remoteAddress() const override { return remote_address_; }
-  void resetRemoteAddress(Address::InstanceConstSharedPtr& remote_address) override {
+  void resetRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
     remote_address_ = remote_address;
   }
   int fd() const override { return fd_; }
