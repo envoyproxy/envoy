@@ -164,13 +164,12 @@ void Utility::detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap) 
 
   if (!bootstrap.stats_config().has_use_all_default_tags() ||
       bootstrap.stats_config().use_all_default_tags().value()) {
-    for (const std::pair<std::string, std::string>& default_tag :
-         TagNames::get().name_regex_pairs_) {
+    for (const auto& default_tag : TagNames::get().name_regex_pairs_) {
       names.emplace(default_tag.first);
     }
   }
 
-  for (const envoy::api::v2::TagSpecifier& tag_specifier : bootstrap.stats_config().stats_tags()) {
+  for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
     const std::string name = tag_specifier.tag_name();
     if (!names.emplace(name).second) {
       throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
@@ -185,15 +184,14 @@ Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
   // Add defaults.
   if (!bootstrap.stats_config().has_use_all_default_tags() ||
       bootstrap.stats_config().use_all_default_tags().value()) {
-    for (const std::pair<std::string, std::string>& default_tag :
-         TagNames::get().name_regex_pairs_) {
+    for (const auto& default_tag : TagNames::get().name_regex_pairs_) {
       tag_extractors.emplace_back(
           Stats::TagExtractorImpl::createTagExtractor(default_tag.first, default_tag.second));
     }
   }
 
   // Add custom tags.
-  for (const envoy::api::v2::TagSpecifier& tag_specifier : bootstrap.stats_config().stats_tags()) {
+  for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
     // If no tag value are found, fallback to default regex to keep backward compatibility.
     if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
         tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
@@ -208,7 +206,7 @@ Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
 std::vector<Stats::Tag> Utility::createTags(const envoy::api::v2::Bootstrap& bootstrap) {
   std::vector<Stats::Tag> tags;
 
-  for (const envoy::api::v2::TagSpecifier& tag_specifier : bootstrap.stats_config().stats_tags()) {
+  for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
     if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
       tags.emplace_back(Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
     }
