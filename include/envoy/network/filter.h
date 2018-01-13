@@ -167,9 +167,9 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * If an filter stopped filter iteration by returning FilterStatus::StopIteration,
+   * If a filter stopped filter iteration by returning FilterStatus::StopIteration,
    * the filter should call continueFilterChain(true) when complete to continue the filter chain,
-   * or continueFilterChain(false) if the filter execution failed and the connection musrt be
+   * or continueFilterChain(false) if the filter execution failed and the connection must be
    * closed.
    * @param success boolean telling whether the filter execution was successful or not.
    */

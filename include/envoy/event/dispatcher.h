@@ -43,7 +43,7 @@ public:
    * @param accept_socket supplies a socket with an open file descriptor and connection metadata
    *        to use for the connection. Takes ownership of the accept_socket.
    * @param ssl_ctx supplies the SSL context to use, if not nullptr.
-   * @return Network::ConnectionPtr a client connection that is owned by the caller.
+   * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
   virtual Network::ConnectionPtr createConnection(Network::AcceptSocketPtr&& accept_socket,
                                                   Ssl::Context* ssl_ctx) PURE;
@@ -88,11 +88,9 @@ public:
 
   /**
    * Create a listener on a specific port.
-   * @param conn_handler supplies the handler for connections received by the listener
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
-   * @param scope supplies the Stats::Scope to use.
-   * @param listener_options listener configuration options.
+   * @param bind_to_port controls whether the listener binds to a transport port or not.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::ListenSocket& socket,
