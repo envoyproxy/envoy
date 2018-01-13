@@ -81,7 +81,7 @@ private:
      * Fires when a new connection is received from the listener.
      * @param socket supplies the accepted socket to take control of.
      */
-    void onAccept(Network::AcceptSocketPtr&& socket) override;
+    void onAccept(Network::AcceptedSocketPtr&& socket) override;
 
     /**
      * Fires when a new connection is received from the listener.
@@ -98,7 +98,7 @@ private:
     /**
      * Create a new connection from a socket accepted by the listener.
      */
-    void newConnection(Network::AcceptSocketPtr&& accept_socket);
+    void newConnection(Network::AcceptedSocketPtr&& socket);
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
@@ -138,13 +138,13 @@ private:
   };
 
   /**
-   * Wrapper for an active accept socket owned by this handler.
+   * Wrapper for an active accepted socket owned by this handler.
    */
   struct ActiveSocket : public Network::ListenerFilterManager,
                         public Network::ListenerFilterCallbacks,
                         LinkedObject<ActiveSocket>,
                         public Event::DeferredDeletable {
-    ActiveSocket(ActiveListener& listener, Network::AcceptSocketPtr&& socket)
+    ActiveSocket(ActiveListener& listener, Network::AcceptedSocketPtr&& socket)
         : listener_(&listener), socket_(std::move(socket)), iter_(accept_filters_.end()) {}
     ~ActiveSocket() {
       ASSERT(iter_ == accept_filters_.end());
@@ -157,12 +157,12 @@ private:
     }
 
     // Network::ListenerFilterCallbacks
-    Network::AcceptSocket& socket() override { return *socket_.get(); }
+    Network::AcceptedSocket& socket() override { return *socket_.get(); }
     Event::Dispatcher& dispatcher() override { return listener_->parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
 
     ActiveListener* listener_;
-    Network::AcceptSocketPtr socket_;
+    Network::AcceptedSocketPtr socket_;
     std::list<Network::ListenerFilterSharedPtr> accept_filters_;
     std::list<Network::ListenerFilterSharedPtr>::iterator iter_;
   };

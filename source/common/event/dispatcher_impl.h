@@ -33,7 +33,7 @@ public:
 
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
-  Network::ConnectionPtr createServerConnection(Network::AcceptSocketPtr&& accept_socket,
+  Network::ConnectionPtr createServerConnection(Network::AcceptedSocketPtr&& socket,
                                                 Ssl::Context* ssl_ctx) override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,

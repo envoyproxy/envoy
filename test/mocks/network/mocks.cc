@@ -164,11 +164,11 @@ MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(
 
 MockListenSocket::~MockListenSocket() {}
 
-MockAcceptSocket::MockAcceptSocket() : local_address_(new Address::Ipv4Instance(80)) {
+MockAcceptedSocket::MockAcceptedSocket() : local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(Return(local_address_));
 }
 
-MockAcceptSocket::~MockAcceptSocket() {}
+MockAcceptedSocket::~MockAcceptedSocket() {}
 
 MockListener::MockListener() {}
 MockListener::~MockListener() { onDestroy(); }

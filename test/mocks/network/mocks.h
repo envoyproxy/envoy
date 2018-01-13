@@ -193,10 +193,10 @@ public:
   MockListenerCallbacks();
   ~MockListenerCallbacks();
 
-  void onAccept(AcceptSocketPtr&& socket) override { onAccept_(socket); }
+  void onAccept(AcceptedSocketPtr&& socket) override { onAccept_(socket); }
   void onNewConnection(ConnectionPtr&& conn) override { onNewConnection_(conn); }
 
-  MOCK_METHOD1(onAccept_, void(AcceptSocketPtr& socket));
+  MOCK_METHOD1(onAccept_, void(AcceptedSocketPtr& socket));
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 
@@ -221,7 +221,7 @@ public:
   MockListenerFilterCallbacks();
   ~MockListenerFilterCallbacks();
 
-  MOCK_METHOD0(socket, AcceptSocket&());
+  MOCK_METHOD0(socket, AcceptedSocket&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD1(continueFilterChain, void(bool));
 };
@@ -255,10 +255,10 @@ public:
   Address::InstanceConstSharedPtr local_address_;
 };
 
-class MockAcceptSocket : public AcceptSocket {
+class MockAcceptedSocket : public AcceptedSocket {
 public:
-  MockAcceptSocket();
-  ~MockAcceptSocket();
+  MockAcceptedSocket();
+  ~MockAcceptedSocket();
 
   MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
   MOCK_METHOD1(resetLocalAddress, void(Address::InstanceConstSharedPtr&));

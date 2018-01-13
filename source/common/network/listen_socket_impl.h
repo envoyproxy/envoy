@@ -50,15 +50,15 @@ public:
   UdsListenSocket(const std::string& uds_path);
 };
 
-class AcceptSocketImpl : public AcceptSocket {
+class AcceptedSocketImpl : public AcceptedSocket {
 public:
-  AcceptSocketImpl(int fd, Address::InstanceConstSharedPtr&& local_address,
-                   Address::InstanceConstSharedPtr&& remote_address)
+  AcceptedSocketImpl(int fd, Address::InstanceConstSharedPtr&& local_address,
+                     Address::InstanceConstSharedPtr&& remote_address)
       : fd_(fd), local_address_reset_(false), local_address_(std::move(local_address)),
         remote_address_(std::move(remote_address)) {}
-  ~AcceptSocketImpl() { close(); }
+  ~AcceptedSocketImpl() { close(); }
 
-  // Network::AcceptSocket
+  // Network::AcceptedSocket
   Address::InstanceConstSharedPtr localAddress() const override { return local_address_; }
   void resetLocalAddress(Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;

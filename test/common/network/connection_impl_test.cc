@@ -99,7 +99,7 @@ public:
     client_connection_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
-        .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+        .WillOnce(Invoke([&](Network::AcceptedSocketPtr& socket) -> void {
           Network::ConnectionPtr new_connection =
               dispatcher_->createServerConnection(std::move(socket), nullptr);
           listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -194,7 +194,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
-      .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+      .WillOnce(Invoke([&](Network::AcceptedSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
             dispatcher_->createServerConnection(std::move(socket), nullptr);
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -248,7 +248,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   read_filter_.reset(new NiceMock<MockReadFilter>());
   MockConnectionStats server_connection_stats;
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
-      .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+      .WillOnce(Invoke([&](Network::AcceptedSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
             dispatcher_->createServerConnection(std::move(socket), nullptr);
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -765,7 +765,7 @@ public:
 
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
-        .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
+        .WillOnce(Invoke([&](Network::AcceptedSocketPtr& socket) -> void {
           Network::ConnectionPtr new_connection =
               dispatcher_->createServerConnection(std::move(socket), nullptr);
           new_connection->setBufferLimits(read_buffer_limit);

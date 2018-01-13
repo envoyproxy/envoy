@@ -35,11 +35,11 @@ typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
 typedef std::shared_ptr<ListenSocket> ListenSocketSharedPtr;
 
 /**
- * An abstract accept socket.
+ * An abstract accepted socket.
  */
-class AcceptSocket {
+class AcceptedSocket {
 public:
-  virtual ~AcceptSocket() {}
+  virtual ~AcceptedSocket() {}
 
   /**
    * @return the address that the socket was received at, or an original destination address if
@@ -70,7 +70,7 @@ public:
   virtual void resetRemoteAddress(Address::InstanceConstSharedPtr& remote_address) PURE;
 
   /**
-   * @return fd the accept socket's file descriptor.
+   * @return fd the accepted socket's file descriptor.
    */
   virtual int fd() const PURE;
 
@@ -91,8 +91,8 @@ public:
   virtual void close() PURE;
 };
 
-typedef std::unique_ptr<AcceptSocket> AcceptSocketPtr;
-typedef std::shared_ptr<AcceptSocket> AcceptSocketSharedPtr;
+typedef std::unique_ptr<AcceptedSocket> AcceptedSocketPtr;
+typedef std::shared_ptr<AcceptedSocket> AcceptedSocketSharedPtr;
 
 } // namespace Network
 } // namespace Envoy

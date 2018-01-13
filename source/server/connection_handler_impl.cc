@@ -138,7 +138,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
             listener_->parent_.findActiveListenerByAddress(*socket_->localAddress());
 
         if (new_listener != nullptr) {
-          // Reset the accept socket transiet state and hand it to the new listener.
+          // Reset the accepted socket transient state and hand it to the new listener.
           socket_->clearReset();
           new_listener->onAccept(std::move(socket_));
           goto out;
@@ -158,9 +158,9 @@ out:
   listener_->parent_.dispatcher_.deferredDelete(std::move(removed));
 }
 
-void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptSocketPtr&& accept_socket) {
-  Network::Address::InstanceConstSharedPtr local_address = accept_socket->localAddress();
-  ActiveSocket* active_socket(new ActiveSocket(*this, std::move(accept_socket)));
+void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&& socket) {
+  Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
+  ActiveSocket* active_socket(new ActiveSocket(*this, std::move(socket)));
 
   // Implicitly add legacy filters
   if (config_.useOriginalDst()) {
@@ -179,10 +179,9 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptSocketPtr&& 
   active_socket->continueFilterChain(true);
 }
 
-void ConnectionHandlerImpl::ActiveListener::newConnection(
-    Network::AcceptSocketPtr&& accept_socket) {
-  Network::ConnectionPtr new_connection = parent_.dispatcher_.createServerConnection(
-      std::move(accept_socket), config_.defaultSslContext());
+void ConnectionHandlerImpl::ActiveListener::newConnection(Network::AcceptedSocketPtr&& socket) {
+  Network::ConnectionPtr new_connection =
+      parent_.dispatcher_.createServerConnection(std::move(socket), config_.defaultSslContext());
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());
   onNewConnection(std::move(new_connection));
 }

@@ -20,9 +20,9 @@ public:
 
   /**
    * Called when a new connection is accepted.
-   * @param socket supplies the socket that is moved into the callee.
+   * @param socket supplies the accepted socket that is moved into the callee.
    */
-  virtual void onAccept(AcceptSocketPtr&& socket) PURE;
+  virtual void onAccept(AcceptedSocketPtr&& socket) PURE;
 
   /**
    * Called when a new connection is accepted.

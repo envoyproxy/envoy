@@ -101,8 +101,8 @@ public:
                                const std::vector<NetworkFilterFactoryCb>& factories);
 
   /**
-   * Given an accept socket and a list of factories, create a new filter chain. Chain creation will
-   * exit early if any filters immediately close the connection.
+   * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
                                const std::vector<ListenerFilterFactoryCb>& factories);

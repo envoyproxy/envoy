@@ -40,12 +40,12 @@ public:
 
   /**
    * Create a server connection.
-   * @param accept_socket supplies a socket with an open file descriptor and connection metadata
-   *        to use for the connection. Takes ownership of the accept_socket.
+   * @param socket supplies an accepted socket with an open file descriptor and connection metadata
+   *        to use for the connection. Takes ownership of the socket.
    * @param ssl_ctx supplies the SSL context to use, if not nullptr.
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr createServerConnection(Network::AcceptSocketPtr&& accept_socket,
+  virtual Network::ConnectionPtr createServerConnection(Network::AcceptedSocketPtr&& socket,
                                                         Ssl::Context* ssl_ctx) PURE;
 
   /**

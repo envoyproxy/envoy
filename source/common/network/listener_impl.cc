@@ -23,7 +23,7 @@ Address::InstanceConstSharedPtr ListenerImpl::getLocalAddress(int fd) {
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
-  AcceptSocketPtr socket(new AcceptSocketImpl(
+  AcceptedSocketPtr socket(new AcceptedSocketImpl(
       fd,
       // Get the local address from the new socket if the listener is listening on the all hosts
       // address (e.g., 0.0.0.0 for IPv4).

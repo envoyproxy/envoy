@@ -73,7 +73,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr DispatcherImpl::createServerConnection(Network::AcceptSocketPtr&& socket,
+Network::ConnectionPtr DispatcherImpl::createServerConnection(Network::AcceptedSocketPtr&& socket,
                                                               Ssl::Context* ssl_ctx) {
   ASSERT(isThreadSafe());
   return Network::ConnectionPtr{
