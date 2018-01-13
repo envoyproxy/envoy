@@ -140,10 +140,5 @@ void RawStatData::initialize(absl::string_view key) {
   name_[xfer_size] = '\0';
 }
 
-/*bool RawStatData::matches(const std::string& name) {
-  // In case a stat got truncated, match on the truncated name.
-  return 0 == strcmp(name.substr(0, maxNameLength()).c_str(), name_);
-  }*/
-
 } // namespace Stats
 } // namespace Envoy

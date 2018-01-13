@@ -29,7 +29,7 @@ const uint64_t SharedMemory::VERSION = 9;
 static SharedMemoryHashSetOptions sharedMemHashOptions(Options& options) {
   SharedMemoryHashSetOptions hash_set_options;
   hash_set_options.capacity = options.maxStats();
-  hash_set_options.num_slots = 9973;
+  hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
   return hash_set_options;
 }
 
