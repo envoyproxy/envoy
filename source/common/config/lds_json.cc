@@ -57,26 +57,6 @@ void LdsJson::translateListener(const Json::Object& json_listener,
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);
   JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
-
-  if (json_listener.hasObject("listener_filters")) {
-    for (const auto& json_filter : json_listener.getObjectArray("listener_filters", true)) {
-      auto* filter = listener.mutable_listener_filters()->Add();
-
-      // Translate v1 name to v2 name.
-      filter->set_name(Config::NetworkFilterNames::get().v1_converter_.getV2Name(
-          json_filter->getString("name")));
-      JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
-
-      const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
-                                      json_filter->getObject("config")->asJsonString() + "}";
-
-      const auto status =
-          Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
-      // JSON schema has already validated that this is a valid JSON object.
-      ASSERT(status.ok());
-      UNREFERENCED_PARAMETER(status);
-    }
-  }
 }
 
 } // namespace Config

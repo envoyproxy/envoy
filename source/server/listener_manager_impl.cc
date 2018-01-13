@@ -48,41 +48,26 @@ ProdListenerComponentFactory::createFilterFactoryList_(
   return ret;
 }
 
-// Use a template to reduce code duplication from above?
 std::vector<Configuration::ListenerFilterFactoryCb>
 ProdListenerComponentFactory::createListenerFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
-    const std::string string_type = filters[i].deprecated_v1().type();
-    const std::string string_name = filters[i].name();
-    const auto& proto_config = filters[i].config();
-    ENVOY_LOG(info, "  listener filter #{}:", i);
-    ENVOY_LOG(info, "             name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config = MessageUtil::getJsonObjectFromMessage(proto_config);
+    const auto& proto_config = filters[i];
+    const ProtobufTypes::String string_name = proto_config.name();
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
 
     // Now see if there is a factory that will accept the config.
-    Configuration::NamedListenerFilterConfigFactory* factory =
-        Registry::FactoryRegistry<Configuration::NamedListenerFilterConfigFactory>::getFactory(
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             string_name);
-    if (factory != nullptr) {
-      Configuration::ListenerFilterFactoryCb callback;
-      if (filter_config->getBoolean("deprecated_v1", false)) {
-        callback = factory->createFilterFactory(*filter_config->getObject("value", true), context);
-      } else {
-        auto message = factory->createEmptyConfigProto();
-        if (!message) {
-          throw EnvoyException(
-              fmt::format("Filter factory for '{}' has unexpected proto config", string_name));
-        }
-        MessageUtil::loadFromJson(filter_config->asJsonString(), *message);
-        callback = factory->createFilterFactoryFromProto(*message, context);
-      }
-      ret.push_back(callback);
-    } else {
-      throw EnvoyException(fmt::format("unable to create filter factory for '{}'", string_name));
-    }
+    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
 }

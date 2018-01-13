@@ -46,9 +46,9 @@ public:
    * @param context supplies the factory creation context.
    * @return std::vector<Configuration::ListenerFilterFactoryCb> the list of filter factories.
    */
-  virtual std::vector<Configuration::ListenerFilterFactoryCb>
-  createListenerFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                  Configuration::FactoryContext& context) PURE;
+  virtual std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+      Configuration::FactoryContext& context) PURE;
 
   /**
    * @return DrainManagerPtr a new drain manager.

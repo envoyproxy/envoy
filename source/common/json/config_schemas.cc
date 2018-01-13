@@ -161,15 +161,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
         "required": ["cert_chain_file", "private_key_file"],
         "additionalProperties": false
       },
-      "listener_filters" : {
-        "type" : "object",
-        "properties" : {
-          "name" : { "type": "string" },
-          "config": {"type" : "object"}
-        },
-        "required": ["name", "config"],
-        "additionalProperties": false
-      },
       "filters" : {
         "type" : "object",
         "properties" : {

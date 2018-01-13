@@ -146,23 +146,12 @@ public:
    * produce a factory with the provided parameters, it should throw an EnvoyException in the case
    * of general error or a Json::Exception if the json configuration is erroneous. The returned
    * callback should always be initialized.
-   * @param config supplies the general json configuration for the filter
+   * @param config supplies the general protobuf configuration for the filter
    * @param context supplies the filter's context.
    * @return ListenerFilterFactoryCb the factory creation function.
    */
-  virtual ListenerFilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                      FactoryContext& context) PURE;
-
-  /**
-   * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
-   * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
-   */
   virtual ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                               FactoryContext& context) {
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED;
-  }
+                                                               FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
@@ -170,7 +159,7 @@ public:
    *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
    *         is deprecated.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a listener filter

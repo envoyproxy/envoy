@@ -34,7 +34,7 @@ public:
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
       Configuration::FactoryContext& context);
 
   // Server::ListenerComponentFactory
@@ -43,9 +43,9 @@ public:
                           Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, context);
   }
-  std::vector<Configuration::ListenerFilterFactoryCb>
-  createListenerFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                  Configuration::FactoryContext& context) override {
+  std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+      Configuration::FactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
 

@@ -94,9 +94,9 @@ public:
                           Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
   }
-  std::vector<Configuration::ListenerFilterFactoryCb>
-  createListenerFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                  Configuration::FactoryContext& context) override {
+  std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+      Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
   Network::ListenSocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,

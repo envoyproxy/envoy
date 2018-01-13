@@ -16,16 +16,6 @@ namespace Configuration {
 class ProxyProtocolConfigFactory : public NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  ListenerFilterFactoryCb createFilterFactory(const Json::Object&,
-                                              FactoryContext& context) override {
-    Filter::ProxyProtocol::ConfigSharedPtr config(
-        new Filter::ProxyProtocol::Config(context.scope()));
-    return [config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(
-          Network::ListenerFilterSharedPtr{new Filter::ProxyProtocol::Instance(config)});
-    };
-  }
-
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                        FactoryContext& context) override {
     Filter::ProxyProtocol::ConfigSharedPtr config(

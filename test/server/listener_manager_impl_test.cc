@@ -102,11 +102,13 @@ public:
           return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
         }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                 Configuration::FactoryContext& context)
-                                  -> std::vector<Configuration::ListenerFilterFactoryCb> {
-          return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
-        }));
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+                      Configuration::FactoryContext& context)
+                       -> std::vector<Configuration::ListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+                                                                                    context);
+            }));
   }
 };
 
