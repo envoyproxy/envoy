@@ -72,7 +72,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), server_ctx.get());
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -174,7 +174,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), server_contexts[0].get());
+            dispatcher.createServerConnection(std::move(socket), server_contexts[0].get());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -539,7 +539,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), server_ctx.get());
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -615,7 +615,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), server_ctx.get());
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -682,7 +682,8 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
       .WillRepeatedly(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         ServerContext* ctx = socket->localAddress() == socket1.localAddress() ? server_ctx1.get()
                                                                               : server_ctx2.get();
-        Network::ConnectionPtr new_connection = dispatcher.createConnection(std::move(socket), ctx);
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), ctx);
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -980,7 +981,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
                                  ? server_ctx.get()
                                  : server2_ctx.get();
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(accept_socket), ctx);
+            dispatcher.createServerConnection(std::move(accept_socket), ctx);
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1069,7 +1070,7 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), server_ctx.get());
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1680,7 +1681,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
           Network::ConnectionPtr new_connection =
-              dispatcher_->createConnection(std::move(socket), server_ctx_.get());
+              dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
@@ -1763,7 +1764,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
           Network::ConnectionPtr new_connection =
-              dispatcher_->createConnection(std::move(socket), server_ctx_.get());
+              dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
@@ -1880,7 +1881,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher_->createConnection(std::move(socket), server_ctx_.get());
+            dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
         new_connection->setBufferLimits(0);
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));

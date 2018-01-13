@@ -202,7 +202,7 @@ public:
 
   void onAccept(AcceptSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection =
-        dispatcher_.createConnection(std::move(socket), nullptr);
+        dispatcher_.createServerConnection(std::move(socket), nullptr);
     onNewConnection(std::move(new_connection));
   }
 

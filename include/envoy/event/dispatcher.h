@@ -45,8 +45,8 @@ public:
    * @param ssl_ctx supplies the SSL context to use, if not nullptr.
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr createConnection(Network::AcceptSocketPtr&& accept_socket,
-                                                  Ssl::Context* ssl_ctx) PURE;
+  virtual Network::ConnectionPtr createServerConnection(Network::AcceptSocketPtr&& accept_socket,
+                                                        Ssl::Context* ssl_ctx) PURE;
 
   /**
    * Create a client connection.

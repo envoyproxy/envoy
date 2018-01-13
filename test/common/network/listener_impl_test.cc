@@ -37,7 +37,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), nullptr);
+            dispatcher.createServerConnection(std::move(socket), nullptr);
         listener_callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
@@ -103,7 +103,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
   EXPECT_CALL(listener_callbacks1, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), nullptr);
+            dispatcher.createServerConnection(std::move(socket), nullptr);
         listener_callbacks1.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
@@ -138,7 +138,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher.createConnection(std::move(socket), nullptr);
+            dispatcher.createServerConnection(std::move(socket), nullptr);
         listener_callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))

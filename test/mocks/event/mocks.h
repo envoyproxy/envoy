@@ -29,9 +29,9 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
-  Network::ConnectionPtr createConnection(Network::AcceptSocketPtr&& accept_socket,
-                                          Ssl::Context* ssl_ctx) override {
-    return Network::ConnectionPtr{createConnection_(accept_socket.get(), ssl_ctx)};
+  Network::ConnectionPtr createServerConnection(Network::AcceptSocketPtr&& accept_socket,
+                                                Ssl::Context* ssl_ctx) override {
+    return Network::ConnectionPtr{createServerConnection_(accept_socket.get(), ssl_ctx)};
   }
 
   Network::ClientConnectionPtr
@@ -71,7 +71,7 @@ public:
 
   // Event::Dispatcher
   MOCK_METHOD0(clearDeferredDeleteList, void());
-  MOCK_METHOD2(createConnection_,
+  MOCK_METHOD2(createServerConnection_,
                Network::Connection*(Network::AcceptSocket* accept_socket, Ssl::Context* ssl_ctx));
   MOCK_METHOD3(createClientConnection_,
                Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,

@@ -101,7 +101,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
           Network::ConnectionPtr new_connection =
-              dispatcher_->createConnection(std::move(socket), nullptr);
+              dispatcher_->createServerConnection(std::move(socket), nullptr);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -196,7 +196,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher_->createConnection(std::move(socket), nullptr);
+            dispatcher_->createServerConnection(std::move(socket), nullptr);
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -250,7 +250,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
         Network::ConnectionPtr new_connection =
-            dispatcher_->createConnection(std::move(socket), nullptr);
+            dispatcher_->createServerConnection(std::move(socket), nullptr);
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -767,7 +767,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::AcceptSocketPtr& socket) -> void {
           Network::ConnectionPtr new_connection =
-              dispatcher_->createConnection(std::move(socket), nullptr);
+              dispatcher_->createServerConnection(std::move(socket), nullptr);
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
