@@ -1,5 +1,7 @@
 #include "common/grpc/json_transcoder_filter.h"
 
+#include <common/http/headers.h>
+
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
 
@@ -69,6 +71,14 @@ private:
   std::unique_ptr<TranscoderInputStream> request_stream_;
   std::unique_ptr<TranscoderInputStream> response_stream_;
 };
+
+bool isGrpcResponse(const Http::HeaderMap& headers) {
+  if (strcmp("200", headers.Status()->value().c_str()) != 0) {
+    return false;
+  }
+  return headers.ContentType() &&
+         Http::Headers::get().ContentTypeValues.Grpc == headers.ContentType()->value().c_str();
+}
 
 } // namespace
 
@@ -295,6 +305,10 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
+  if (!isGrpcResponse(headers)) {
+    error_ = true;
+  }
+
   if (error_ || !transcoder_) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -329,7 +343,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
-  if (!method_->server_streaming()) {
+  if (!method_->server_streaming() && !end_stream) {
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }

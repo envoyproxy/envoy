@@ -243,8 +243,16 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestHeaderMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers, false));
-  EXPECT_EQ(expected_request_headers, request_headers);
+  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                           {":status", "200"},
+                                           {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  Http::TestHeaderMapImpl expected_response_headers{{"content-type", "application/grpc"},
+                                                    {":status", "200"},
+                                                    {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(expected_response_headers, response_headers);
 
   Buffer::OwnedImpl response_data{"{}"};
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_data, false));
@@ -332,6 +340,44 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
   EXPECT_EQ(0, request_data.length());
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryTimeout) {
+  Http::TestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Buffer::OwnedImpl request_data{"{\"theme\": \"Children\"}"};
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(request_data, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryNotGrpcResponse) {
+  Http::TestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Buffer::OwnedImpl request_data{"{\"theme\": \"Children\"}"};
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(request_data, true));
 }
 
 struct GrpcJsonTranscoderFilterPrintTestParam {
