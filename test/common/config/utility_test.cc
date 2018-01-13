@@ -96,7 +96,7 @@ TEST(UtilityTest, DetectTagNameConflict) {
   EXPECT_THROW_WITH_MESSAGE(Utility::detectTagNameConflict(bootstrap), EnvoyException,
                             fmt::format("Tag name '{}' specified twice.", "test.x"));
 
-  // Also should raise an error When user defined tag name conflicts with Envoy's default tag names.
+  // Also should raise an error when user defined tag name conflicts with Envoy's default tag names.
   stats_config.clear_stats_tags();
   stats_config.mutable_use_all_default_tags()->set_value(true);
   auto& tag_specifier_with_dup = *stats_config.mutable_stats_tags()->Add();
