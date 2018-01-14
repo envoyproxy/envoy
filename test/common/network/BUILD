@@ -104,6 +104,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

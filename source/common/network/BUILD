@@ -102,6 +102,7 @@ envoy_cc_library(
     deps = [
         ":cidr_range_lib",
         ":utility_lib",
+        "//source/common/common:empty_string",
     ],
 )
 
