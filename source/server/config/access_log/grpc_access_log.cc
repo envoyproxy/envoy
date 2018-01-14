@@ -41,14 +41,20 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig&>(config);
 
+  // TODO(htuch): Support Google gRPC client.
+  const auto cluster_name = proto_config.common_config().grpc_service().envoy_grpc().cluster_name();
+  auto cluster = context.clusterManager().get(cluster_name);
+  if (cluster == nullptr || cluster->info()->addedViaApi()) {
+    throw EnvoyException(fmt::format(
+        "invalid access log cluster '{}'. Missing or not a static cluster.", cluster_name));
+  }
+
   std::shared_ptr<AccessLog::GrpcAccessLogStreamer> grpc_access_log_streamer =
       context.singletonManager().getTyped<AccessLog::GrpcAccessLogStreamer>(
-          SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_log_streamer), [&context, &proto_config] {
+          SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_log_streamer), [&context, cluster_name] {
             return std::make_shared<AccessLog::GrpcAccessLogStreamerImpl>(
-                std::make_unique<GrpcAccessLogClientFactoryImpl>(
-                    context.clusterManager(),
-                    // TODO(htuch): Support Google gRPC client.
-                    proto_config.common_config().grpc_service().envoy_grpc().cluster_name()),
+                std::make_unique<GrpcAccessLogClientFactoryImpl>(context.clusterManager(),
+                                                                 cluster_name),
                 context.threadLocal(), context.localInfo());
           });
 
