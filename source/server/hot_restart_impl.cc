@@ -161,8 +161,8 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   if (--data.ref_count_ > 0) {
     return;
   }
-  bool removed = stats_set_.remove(data.key());
-  ASSERT(removed);
+  bool key_removed = stats_set_.remove(data.key());
+  RELEASE_ASSERT(key_removed);
   memset(&data, 0, Stats::RawStatData::size());
 }
 
