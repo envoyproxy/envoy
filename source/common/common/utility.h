@@ -210,4 +210,20 @@ public:
   static std::string toUpper(const std::string& s);
 };
 
+/**
+ * Utilities for finding primes
+ */
+class Primes {
+public:
+  /**
+   * Determines whether x is prime, assuming it is not even.
+   */
+  static bool isPrime(uint32_t x);
+
+  /**
+   * Finds the next prime number larger than x.
+   */
+  static uint32_t findPrimeLargerThan(uint32_t x);
+};
+
 } // namespace Envoy
