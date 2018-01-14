@@ -117,6 +117,9 @@ envoy_cc_library(
         "listener_impl.h",
         "proxy_protocol.h",
     ],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         ":address_lib",
         ":connection_lib",
@@ -171,7 +174,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "abseil_strings",
+        "envoy_base",
+    ],
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",

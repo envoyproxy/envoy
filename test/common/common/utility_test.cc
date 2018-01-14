@@ -5,6 +5,8 @@
 
 #include "common/common/utility.h"
 
+#include "absl/strings/string_view.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -80,20 +82,6 @@ TEST(StringUtil, itoa) {
   EXPECT_STREQ("18446744073709551615", buf);
 }
 
-TEST(StringUtil, rtrim) {
-  {
-    std::string test("   ");
-    StringUtil::rtrim(test);
-    EXPECT_EQ("", test);
-  }
-
-  {
-    std::string test("   hello \r\t\r\n");
-    StringUtil::rtrim(test);
-    EXPECT_EQ("   hello", test);
-  }
-}
-
 TEST(StringUtil, strlcpy) {
   {
     char dest[6];
@@ -144,7 +132,6 @@ TEST(StringUtil, split) {
               ContainerEq(StringUtil::split("hello world", " ")));
   EXPECT_THAT(std::vector<std::string>({"hello", "world"}),
               ContainerEq(StringUtil::split("hello   world", " ")));
-
   EXPECT_THAT(std::vector<std::string>({"", "", "hello", "world"}),
               ContainerEq(StringUtil::split("  hello world", " ", true)));
   EXPECT_THAT(std::vector<std::string>({"hello", "world", ""}),
@@ -205,6 +192,114 @@ TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper("a"), "A");
   EXPECT_EQ(StringUtil::toUpper("Ba"), "BA");
   EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
+}
+
+TEST(StringUtil, StringViewLtrim) {
+  EXPECT_EQ("", StringUtil::ltrim("     "));
+  EXPECT_EQ("hello \t\f\v\n\r", StringUtil::ltrim("   hello \t\f\v\n\r"));
+  EXPECT_EQ("hello ", StringUtil::ltrim("\t\f\v\n\r   hello "));
+  EXPECT_EQ("a b ", StringUtil::ltrim("\t\f\v\n\ra b "));
+  EXPECT_EQ("", StringUtil::ltrim("\t\f\v\n\r"));
+  EXPECT_EQ("", StringUtil::ltrim(""));
+}
+
+TEST(StringUtil, StringViewRtrim) {
+  EXPECT_EQ("", StringUtil::rtrim("     "));
+  EXPECT_EQ("\t\f\v\n\rhello", StringUtil::rtrim("\t\f\v\n\rhello "));
+  EXPECT_EQ("\t\f\v\n\r a b", StringUtil::rtrim("\t\f\v\n\r a b \t\f\v\n\r"));
+  EXPECT_EQ("", StringUtil::rtrim("\t\f\v\n\r"));
+  EXPECT_EQ("", StringUtil::rtrim(""));
+}
+
+TEST(StringUtil, StringViewTrim) {
+  EXPECT_EQ("", StringUtil::trim("   "));
+  EXPECT_EQ("hello", StringUtil::trim("\t\f\v\n\r  hello   "));
+  EXPECT_EQ("he llo", StringUtil::trim(" \t\f\v\n\r he llo \t\f\v\n\r"));
+}
+
+TEST(StringUtil, StringViewCropRight) {
+  EXPECT_EQ("hello", StringUtil::cropRight("hello; world\t\f\v\n\r", ";"));
+  EXPECT_EQ("", StringUtil::cropRight(";hello world\t\f\v\n\r", ";"));
+  EXPECT_EQ("hel", StringUtil::cropRight(" hello alo\t\f\v\n\r", "lo"));
+  EXPECT_EQ("he 1", StringUtil::cropRight("\t\f\v\n\rhe 12\t\f\v\n\r", "2"));
+  EXPECT_EQ("hello", StringUtil::cropRight("hello alo\t\f\v\n\r", " a"));
+  EXPECT_EQ("hello ", StringUtil::cropRight("hello alo\t\f\v\n\r", "a", false));
+  EXPECT_EQ("abcd", StringUtil::cropRight("abcd", ";"));
+}
+
+TEST(StringUtil, StringViewfind) {
+  EXPECT_TRUE(StringUtil::find("hello; world", ";", "hello"));
+  EXPECT_TRUE(StringUtil::find("abc; type=text", ";=", "text"));
+  EXPECT_TRUE(StringUtil::find("abc; type=text", ";=", "abc"));
+  EXPECT_TRUE(StringUtil::find("abc; type=text", ";=", "type"));
+  EXPECT_FALSE(StringUtil::find("abc; type=text", ";=", " "));
+  EXPECT_TRUE(StringUtil::find("abc; type=text", ";=", " type", false));
+  EXPECT_FALSE(StringUtil::find("hello; world", ".", "hello"));
+  EXPECT_TRUE(StringUtil::find("", "", ""));
+  EXPECT_FALSE(StringUtil::find("", "", " "));
+  EXPECT_FALSE(StringUtil::find(" ", " ", " "));
+  EXPECT_TRUE(StringUtil::find(" ", " ", "", false));
+}
+
+TEST(StringUtil, StringViewSplit) {
+  {
+    auto tokens = StringUtil::splitToken(" one , two , three ", ",", true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " two ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " three ") != tokens.end());
+    EXPECT_FALSE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one , two , three ", ",");
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_FALSE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_FALSE(std::find(tokens.begin(), tokens.end(), "two") != tokens.end());
+    EXPECT_FALSE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one , two , three=five ", ",=", true);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five ") != tokens.end());
+  }
+  {
+    auto sv_tokens = StringUtil::splitToken(" one , two , three=five ", " ", true);
+    auto std_tokens = StringUtil::split(" one , two , three=five ", " ", true);
+
+    // Remove this tests later
+    EXPECT_EQ(std_tokens.size(), sv_tokens.size());
+    EXPECT_EQ(std_tokens.at(0), sv_tokens.at(0));
+    EXPECT_EQ(std_tokens.at(1), sv_tokens.at(1));
+    EXPECT_EQ(std_tokens.at(2), sv_tokens.at(2));
+    EXPECT_EQ(std_tokens.at(3), sv_tokens.at(3));
+    EXPECT_EQ(std_tokens.at(4), sv_tokens.at(4));
+    EXPECT_EQ(std_tokens.at(5), sv_tokens.at(5));
+    EXPECT_EQ(std_tokens.at(6), sv_tokens.at(6));
+  }  
+  {
+    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken(",hello", ","));
+    EXPECT_EQ(std::vector<absl::string_view>{}, StringUtil::splitToken("", ","));
+    EXPECT_EQ(std::vector<absl::string_view>{"a"}, StringUtil::splitToken("a", ","));
+    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken("hello,", ","));
+    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken(",hello", ","));
+    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken("hello, ", ", "));
+    EXPECT_EQ(std::vector<absl::string_view>{}, StringUtil::splitToken(",,", ","));
+
+    EXPECT_THAT(std::vector<absl::string_view>({"h", "e", "l", "l", "o"}),
+                ContainerEq(StringUtil::splitToken("hello", "")));
+    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
+                ContainerEq(StringUtil::splitToken("hello world", " ")));
+    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
+                ContainerEq(StringUtil::splitToken("hello   world", " ")));
+    EXPECT_THAT(std::vector<absl::string_view>({"", "", "hello", "world"}),
+                ContainerEq(StringUtil::splitToken("  hello world", " ", true)));
+    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world", ""}),
+                ContainerEq(StringUtil::splitToken("hello world ", " ", true)));
+    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
+                ContainerEq(StringUtil::splitToken("hello world", " ", true))); 
+  }
 }
 
 } // namespace Envoy

@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/strings/str_split.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -65,6 +67,58 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   } else {
     return true;
   }
+}
+
+absl::string_view StringUtil::ltrim(absl::string_view source) {
+  source.remove_prefix(std::min(source.find_first_not_of(" \t\f\v\n\r"), source.size()));
+  return source;
+}
+
+absl::string_view StringUtil::rtrim(absl::string_view source) {
+  source.remove_suffix(source.size() - source.find_last_not_of(" \t\f\v\n\r") - 1);
+  return source;
+}
+
+absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
+
+bool StringUtil::find(absl::string_view source, absl::string_view delimiters,
+                      absl::string_view key_token, bool trim_whitespace) {
+  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, false);
+
+  if (tokens.empty()) {
+    return key_token.empty();
+  }
+  if (key_token.empty()) {
+    return tokens.empty();
+  }
+  if (trim_whitespace) {
+    for (auto token : tokens) {
+      if (key_token == trim(token)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
+}
+
+absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter,
+                                        bool trim_whitespace) {
+  const absl::string_view::size_type pos = source.find(delimiter);
+
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos);
+  }
+  return trim_whitespace ? trim(source) : source;
+}
+
+std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
+                                                      absl::string_view delimiters,
+                                                      bool keep_empty_string) {
+  if (keep_empty_string) {
+    return absl::StrSplit(source, absl::ByAnyChar(delimiters));
+  }    
+  return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
 }
 
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
