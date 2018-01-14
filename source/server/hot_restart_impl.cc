@@ -82,8 +82,8 @@ SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options
   }
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) %
-                  alignof(SharedMemoryHashSet<Stats::RawStatData>)) == 0);
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) ==
+                 0);
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
