@@ -172,6 +172,12 @@ TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "gateway-error"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, remote_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, remote_reset_, callback_));
 }
 
