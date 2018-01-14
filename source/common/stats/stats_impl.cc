@@ -135,7 +135,7 @@ void RawStatData::initialize(absl::string_view key) {
   ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
-  size_t xfer_size = std::min(maxNameLength(), key.size());
+  size_t xfer_size = std::min(nameSize() - 1, key.size());
   memcpy(name_, key.data(), xfer_size);
   name_[xfer_size] = '\0';
 }

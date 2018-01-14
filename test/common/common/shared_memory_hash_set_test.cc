@@ -17,7 +17,7 @@ protected:
   struct TestValue {
     absl::string_view key() const { return name; }
     void initialize(absl::string_view key) {
-      size_t xfer = std::max(sizeof(name) - 1, key.size());
+      size_t xfer = std::min(sizeof(name) - 1, key.size());
       memcpy(name, key.data(), xfer);
       name[xfer] = '\0';
     }
