@@ -73,11 +73,11 @@ private:
 };
 
 bool isGrpcResponse(const Http::HeaderMap& headers) {
-  if (strcmp("200", headers.Status()->value().c_str()) != 0) {
+  if (Http::Utility::getResponseStatus(headers) != 200) {
     return false;
   }
   return headers.ContentType() &&
-         Http::Headers::get().ContentTypeValues.Grpc == headers.ContentType()->value().c_str();
+         headers.ContentType()->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str();
 }
 
 } // namespace
