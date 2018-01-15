@@ -55,12 +55,6 @@ private:
   void onReadWorker();
 
   /**
-   * Helper function that replaces the current connection with the specified one.
-   */
-  void finishConnection(Network::Address::InstanceConstSharedPtr remote_address,
-                        Network::Address::InstanceConstSharedPtr local_address);
-
-  /**
    * Helper function that attempts to read a line (delimited by '\r\n') from the socket.
    * throws EnvoyException on any socket errors.
    * @return bool true if a line should be read, false if more data is needed.

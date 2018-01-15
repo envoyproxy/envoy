@@ -69,18 +69,9 @@ void Instance::onReadWorker() {
   if (line_parts[1] == "UNKNOWN") {
     // At this point we know it's a proxy protocol line, so we can remove it from the socket
     // and continue.
-    Network::Address::InstanceConstSharedPtr local_address =
-        Envoy::Network::Address::addressFromFd(socket.fd());
-    Network::Address::InstanceConstSharedPtr remote_address;
-    // The remote address not known.
-    if (local_address->ip()->version() == Network::Address::IpVersion::v4) {
-      remote_address = std::make_shared<Network::Address::Ipv4Instance>(
-          Network::Address::Ipv4Instance("0.0.0.0"));
-    } else {
-      remote_address =
-          std::make_shared<Network::Address::Ipv6Instance>(Network::Address::Ipv6Instance("::"));
-    }
-    finishConnection(remote_address, local_address);
+    // According to spec "real connection's parameters" should be used, so we should NOT
+    // reset the addresses in this case.
+    cb_->continueFilterChain(true);
     return;
   }
 
@@ -122,16 +113,8 @@ void Instance::onReadWorker() {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  finishConnection(remote_address, local_address);
-}
-
-void Instance::finishConnection(Network::Address::InstanceConstSharedPtr remote_address,
-                                Network::Address::InstanceConstSharedPtr local_address) {
-  Network::AcceptedSocket& socket = cb_->socket();
-
   socket.resetLocalAddress(local_address);
   socket.resetRemoteAddress(remote_address);
-
   cb_->continueFilterChain(true);
 }
 
