@@ -200,7 +200,7 @@ class TestDnsServer : public ListenerCallbacks {
 public:
   TestDnsServer(Event::DispatcherImpl& dispatcher) : dispatcher_(dispatcher) {}
 
-  void onAccept(AcceptedSocketPtr&& socket) override {
+  void onAccept(AcceptedSocketPtr&& socket, bool) override {
     Network::ConnectionPtr new_connection =
         dispatcher_.createServerConnection(std::move(socket), nullptr);
     onNewConnection(std::move(new_connection));

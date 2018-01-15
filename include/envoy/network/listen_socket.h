@@ -48,7 +48,7 @@ public:
   virtual Address::InstanceConstSharedPtr localAddress() const PURE;
 
   /**
-   * Reset the original destination address of the socket to a different address than the one
+   * Reset the destination address of the socket to a different address than the one
    * the socket was accepted at.
    */
   virtual void resetLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
@@ -65,7 +65,8 @@ public:
   virtual Address::InstanceConstSharedPtr remoteAddress() const PURE;
 
   /**
-   * Set the original source address of the socket
+   * Reset the source address of the socket to a different address than the one
+   * the socket was accepted at.
    */
   virtual void resetRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
 
@@ -79,15 +80,9 @@ public:
    * not be closed on delete.
    */
   virtual int takeFd() PURE;
-
-  /**
-   * Clear 'reset' state so that the socket can be used again with a new listener.
-   */
-  virtual void clearReset() PURE;
 };
 
 typedef std::unique_ptr<AcceptedSocket> AcceptedSocketPtr;
-typedef std::shared_ptr<AcceptedSocket> AcceptedSocketSharedPtr;
 
 } // namespace Network
 } // namespace Envoy

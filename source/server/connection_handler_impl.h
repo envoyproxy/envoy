@@ -77,17 +77,7 @@ private:
     ~ActiveListener();
 
     // Network::ListenerCallbacks
-    /**
-     * Fires when a new accepted socket is received from the listener.
-     * @param socket supplies the accepted socket to take control of.
-     */
-    void onAccept(Network::AcceptedSocketPtr&& socket) override;
-
-    /**
-     * Fires when a new connection is received from the listener, after listener filters have
-     * been executed.
-     * @param new_connection supplies the connection to take control of.
-     */
+    void onAccept(Network::AcceptedSocketPtr&& socket, bool redirected) override;
     void onNewConnection(Network::ConnectionPtr&& new_connection) override;
 
     /**
@@ -145,8 +135,9 @@ private:
                         public Network::ListenerFilterCallbacks,
                         LinkedObject<ActiveSocket>,
                         public Event::DeferredDeletable {
-    ActiveSocket(ActiveListener& listener, Network::AcceptedSocketPtr&& socket)
-        : listener_(&listener), socket_(std::move(socket)), iter_(accept_filters_.end()) {}
+    ActiveSocket(ActiveListener& listener, Network::AcceptedSocketPtr&& socket, bool redirected)
+        : listener_(&listener), socket_(std::move(socket)), redirected_(redirected),
+          iter_(accept_filters_.end()) {}
     ~ActiveSocket() {
       ASSERT(iter_ == accept_filters_.end());
       accept_filters_.clear();
@@ -164,6 +155,7 @@ private:
 
     ActiveListener* listener_;
     Network::AcceptedSocketPtr socket_;
+    bool redirected_;
     std::list<Network::ListenerFilterPtr> accept_filters_;
     std::list<Network::ListenerFilterPtr>::iterator iter_;
   };

@@ -21,8 +21,11 @@ public:
   /**
    * Called when a new connection is accepted.
    * @param socket supplies the accepted socket that is moved into the callee.
+   * @param redirected is true when the socket was first accepted by another listener
+   * and is redirected to a new listener. The recipient should not redirect
+   * the socket any further.
    */
-  virtual void onAccept(AcceptedSocketPtr&& socket) PURE;
+  virtual void onAccept(AcceptedSocketPtr&& socket, bool redirected = false) PURE;
 
   /**
    * Called when a new connection is accepted.

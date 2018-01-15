@@ -128,36 +128,38 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     for (; iter_ != accept_filters_.end(); iter_++) {
       Network::FilterStatus status = (*iter_)->onAccept(*this);
       if (status == Network::FilterStatus::StopIteration) {
+        // The filter is responsible for calling us again at a later time to continue the filter
+        // chain from the next filter.
         return;
       }
     }
     // Successfully ran all the accept filters.
 
     // Check if the socket may need to be redirected to another listener.
-    if (socket_->localAddressReset()) {
+    if (!redirected_ && socket_->localAddressReset()) {
       // Find a listener associated with the original destination address.
       new_listener = listener_->parent_.findActiveListenerByAddress(*socket_->localAddress());
     }
     if (new_listener != nullptr) {
-      // Reset the accepted socket transient state and hand it to the new listener.
-      socket_->clearReset();
       // Hands off connections redirecrted by iptables to the listener associated with the
       // original destination address. Pass 'redirected' as true to prevent further redirection.
-      new_listener->onAccept(std::move(socket_));
+      new_listener->onAccept(std::move(socket_), true);
     } else {
       // Create a new connection on this listener.
       listener_->newConnection(std::move(socket_));
     }
   }
+
   // Filter execution concluded, clear state.
   iter_ = accept_filters_.end();
   ActiveSocketPtr removed = removeFromList(listener_->sockets_);
   listener_->parent_.dispatcher_.deferredDelete(std::move(removed));
 }
 
-void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&& socket) {
+void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&& socket,
+                                                     bool redirected) {
   Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
-  ActiveSocket* active_socket(new ActiveSocket(*this, std::move(socket)));
+  ActiveSocket* active_socket(new ActiveSocket(*this, std::move(socket), redirected));
 
   // Implicitly add legacy filters
   if (config_.useOriginalDst()) {

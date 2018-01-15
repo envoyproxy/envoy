@@ -193,10 +193,12 @@ public:
   MockListenerCallbacks();
   ~MockListenerCallbacks();
 
-  void onAccept(AcceptedSocketPtr&& socket) override { onAccept_(socket); }
+  void onAccept(AcceptedSocketPtr&& socket, bool redirected) override {
+    onAccept_(socket, redirected);
+  }
   void onNewConnection(ConnectionPtr&& conn) override { onNewConnection_(conn); }
 
-  MOCK_METHOD1(onAccept_, void(AcceptedSocketPtr& socket));
+  MOCK_METHOD2(onAccept_, void(AcceptedSocketPtr& socket, bool redirected));
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 

@@ -83,8 +83,6 @@ public:
     return fd;
   }
 
-  void clearReset() override { local_address_reset_ = false; }
-
 protected:
   int fd_;
   bool local_address_reset_;
