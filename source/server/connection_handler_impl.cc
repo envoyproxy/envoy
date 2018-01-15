@@ -118,6 +118,8 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
 
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   if (success) {
+    ActiveListener* new_listener = nullptr;
+
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
     } else {
@@ -129,29 +131,28 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       if (status == Network::FilterStatus::StopIteration) {
         return;
       }
-      // Check if another listener may have to be used.
-      if (socket_->localAddressReset()) {
-        // Hands off redirected connections (from iptables) to the listener associated with the
-        // original destination address. If there is no listener associated with the original
-        // destination address, the connection is handled by the listener that receives it.
-        ActiveListener* new_listener =
-            listener_->parent_.findActiveListenerByAddress(*socket_->localAddress());
-
-        if (new_listener != nullptr) {
-          // Reset the accepted socket transient state and hand it to the new listener.
-          socket_->clearReset();
-          new_listener->onAccept(std::move(socket_));
-          goto out;
-        }
-      }
     }
-    // Successfully ran all the accept filters, create a new connection.
-    listener_->newConnection(std::move(socket_));
+    // Successfully ran all the accept filters.
+
+    // Check if the socket may need to be redirected to another listener.
+    if (socket_->localAddressReset()) {
+      // Find a listener associated with the original destination address.
+      new_listener = listener_->parent_.findActiveListenerByAddress(*socket_->localAddress());
+    }
+    if (new_listener != nullptr) {
+      // Reset the accepted socket transient state and hand it to the new listener.
+      socket_->clearReset();
+      // Hands off connections redirecrted by iptables to the listener associated with the
+      // original destination address. Pass 'redirected' as true to prevent further redirection.
+      new_listener->onAccept(std::move(socket_));
+    } else {
+      // Create a new connection on this listener.
+      listener_->newConnection(std::move(socket_));
+    }
   } else {
     // current filter failed, connection must be abandoned.
     socket_->close();
   }
-out:
   // Filter execution concluded, clear state.
   iter_ = accept_filters_.end();
   ActiveSocketPtr removed = removeFromList(listener_->sockets_);
