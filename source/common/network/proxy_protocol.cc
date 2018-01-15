@@ -63,13 +63,11 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     return;
   }
 
-  // Remove the line feed at the end
-  StringUtil::rtrim(proxy_line);
+  const auto trimmed_proxy_line = StringUtil::rtrim(proxy_line);
 
   // Parse proxy protocol line with format: PROXY TCP4/TCP6/UNKNOWN SOURCE_ADDRESS
   // DESTINATION_ADDRESS SOURCE_PORT DESTINATION_PORT.
-  const auto line_parts = StringUtil::split(proxy_line, " ", true);
-
+  const auto line_parts = StringUtil::splitToken(trimmed_proxy_line, " ", true);
   if (line_parts.size() < 2 || line_parts[0] != "PROXY") {
     throw EnvoyException("failed to read proxy protocol");
   }
@@ -99,19 +97,23 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   Address::InstanceConstSharedPtr local_address;
   if (line_parts[1] == "TCP4") {
     protocol_version = Address::IpVersion::v4;
-    remote_address = Utility::parseInternetAddressAndPort(line_parts[2] + ":" + line_parts[4]);
-    local_address = Utility::parseInternetAddressAndPort(line_parts[3] + ":" + line_parts[5]);
+    // TODO(gsagula): Utility::parseInternetAddressAndPort() should be refactored to take a
+    // string_view as an argument which would eliminate the need for all this string convertions.
+    remote_address = Utility::parseInternetAddressAndPort(std::string{line_parts[2]} + ":" +
+                                                          std::string{line_parts[4]});
+    local_address = Utility::parseInternetAddressAndPort(std::string{line_parts[3]} + ":" +
+                                                         std::string{line_parts[5]});
   } else if (line_parts[1] == "TCP6") {
     protocol_version = Address::IpVersion::v6;
-    remote_address =
-        Utility::parseInternetAddressAndPort("[" + line_parts[2] + "]:" + line_parts[4]);
-    local_address =
-        Utility::parseInternetAddressAndPort("[" + line_parts[3] + "]:" + line_parts[5]);
+    remote_address = Utility::parseInternetAddressAndPort("[" + std::string{line_parts[2]} +
+                                                          "]:" + std::string{line_parts[4]});
+    local_address = Utility::parseInternetAddressAndPort("[" + std::string{line_parts[3]} +
+                                                         "]:" + std::string{line_parts[5]});
   } else {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  // Error check the source and destination fields. Most errors are cought by the address
+  // Error check the source and destination fields. Most errors are caught by the address
   // parsing above, but a malformed IPv6 address may combine with a malformed port and parse as
   // an IPv6 address when parsing for an IPv4 address. Remote address refers to the source
   // address.

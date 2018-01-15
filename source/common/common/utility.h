@@ -148,12 +148,6 @@ public:
   static absl::string_view rtrim(absl::string_view source);
 
   /**
-   * Trim trailing whitespace from a string in place.
-   * @param source supplies the string to be trimmed.
-   */
-  static void rtrim(std::string& source);
-
-  /**
    * Trim leading and trailing whitespaces from a string view.
    * @param source supplies the string view to be trimmed.
    * @return trimmed string view.
@@ -163,18 +157,20 @@ public:
   /**
    * Look up for an exactly token in a delimiter-separated string view.
    * @param source supplies the delimiter-separated string view.
-   * @param delimiters supplies chars used to split the delimiter-separated string view.
+   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param token supplies the lookup string view.
    * @param trim_whitespace remove leading and trailing whitespaces from each of the split
-   * string view instances; default = true.
+   * string views; default = true.
    * @return true if found and false otherwise.
    *
    * E.g,
    *
-   * find("A=5; b", "=;", "5")   .. true
-   * find("A=5; b", "=;", "A=5") .. false
-   * find("A=5; b", "=;", "A")   .. true
-   * find("A=5; b", "=;", "b")   .. true
+   * find("A=5; b", "=;", "5")   . true
+   * find("A=5; b", "=;", "A=5") . false
+   * find("A=5; b", "=;", "A")   . true
+   * find("A=5; b", "=;", "b")   . true
+   * find("", ".", "")           . true (spliting "" with "." returns "" which contains "")
+   * find("", ".", "a")          . false (spliting "" with "." returns "" which doesn't contain "a")
    */
   static bool find(absl::string_view source, absl::string_view delimiters, absl::string_view token,
                    bool trim_whitespace = true);
@@ -191,12 +187,12 @@ public:
   static absl::string_view cropRight(absl::string_view source, absl::string_view delimiters,
                                      bool trim_whitespace = true);
 
-  /** 
+  /**
    * Split a delimiter-separated string view.
    * @param source supplies the delimiter-separated string view.
-   * @param delimiters supplies chars used to split the delimiter-separated string view.
-   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
-   * string view instances; default = true.
+   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
+   * @param keep_empty_string result contains empty strings if the string starts or ends with
+   * 'split', or if instances of 'split' are adjacent; default = false.
    * @return true if found and false otherwise.
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
@@ -204,8 +200,8 @@ public:
                                                    bool keep_empty_string = false);
 
   /**
-   * TODO(gsagula): remove this when all call-sites have been replaced by splitToken().
-   * 
+   * TODO(gsagula): remove this when call-sites have been replaced by splitToken().
+   *
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the string to split on.
@@ -216,12 +212,11 @@ public:
   static std::vector<std::string> split(const std::string& source, const std::string& split,
                                         bool keep_empty_string = false);
 
-  
   /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
-  
+
   /**
    * Join elements of a vector into a string delimited by delimiter.
    * @param source supplies the strings to join.
@@ -277,7 +272,7 @@ public:
    * @param s string.
    * @return std::string s converted to upper case.
    */
-  static std::string toUpper(const std::string& s);
+  static std::string toUpper(absl::string_view s);
 };
 
 } // namespace Envoy

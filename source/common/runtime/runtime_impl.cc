@@ -240,7 +240,8 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
         }
         entry.string_value_ += line + "\n";
       }
-      StringUtil::rtrim(entry.string_value_);
+
+      entry.string_value_ = std::string(StringUtil::rtrim(entry.string_value_));
 
       // As a perf optimization, attempt to convert the string into an integer. If we don't
       // succeed that's fine.

@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_split.h"
-
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -83,14 +83,11 @@ absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtri
 
 bool StringUtil::find(absl::string_view source, absl::string_view delimiters,
                       absl::string_view key_token, bool trim_whitespace) {
-  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, false);
-
+  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, !trim_whitespace);
   if (tokens.empty()) {
     return key_token.empty();
   }
-  if (key_token.empty()) {
-    return tokens.empty();
-  }
+  
   if (trim_whitespace) {
     for (auto token : tokens) {
       if (key_token == trim(token)) {
@@ -99,13 +96,13 @@ bool StringUtil::find(absl::string_view source, absl::string_view delimiters,
     }
     return false;
   }
+
   return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter,
                                         bool trim_whitespace) {
   const absl::string_view::size_type pos = source.find(delimiter);
-
   if (pos != absl::string_view::npos) {
     source.remove_suffix(source.size() - pos);
   }
@@ -117,7 +114,7 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
                                                       bool keep_empty_string) {
   if (keep_empty_string) {
     return absl::StrSplit(source, absl::ByAnyChar(delimiters));
-  }    
+  }
   return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
 }
 
@@ -141,15 +138,6 @@ uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
 
   *current = 0;
   return current - out;
-}
-
-void StringUtil::rtrim(std::string& source) {
-  std::size_t pos = source.find_last_not_of(" \t\f\v\n\r");
-  if (pos != std::string::npos) {
-    source.erase(pos + 1);
-  } else {
-    source.clear();
-  }
 }
 
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
@@ -261,10 +249,10 @@ const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
   return s.empty() ? default_value : s;
 }
 
-std::string StringUtil::toUpper(const std::string& s) {
+std::string StringUtil::toUpper(absl::string_view s) {
   std::string upper_s;
-  std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s),
-                 [](unsigned char c) -> unsigned char { return std::toupper(c); });
+  upper_s.reserve(s.size());
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
 }
 

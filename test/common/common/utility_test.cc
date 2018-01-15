@@ -6,7 +6,6 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -235,9 +234,8 @@ TEST(StringUtil, StringViewfind) {
   EXPECT_FALSE(StringUtil::find("abc; type=text", ";=", " "));
   EXPECT_TRUE(StringUtil::find("abc; type=text", ";=", " type", false));
   EXPECT_FALSE(StringUtil::find("hello; world", ".", "hello"));
-  EXPECT_TRUE(StringUtil::find("", "", ""));
-  EXPECT_FALSE(StringUtil::find("", "", " "));
-  EXPECT_FALSE(StringUtil::find(" ", " ", " "));
+  EXPECT_TRUE(StringUtil::find("", ",", ""));
+  EXPECT_FALSE(StringUtil::find("", "", "a"));
   EXPECT_TRUE(StringUtil::find(" ", " ", "", false));
 }
 
@@ -259,8 +257,10 @@ TEST(StringUtil, StringViewSplit) {
     EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
   }
   {
-    auto tokens = StringUtil::splitToken(" one , two , three=five ", ",=", true);
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", true);
     EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "  ") != tokens.end());
     EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " three") != tokens.end());
     EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five ") != tokens.end());
   }
@@ -277,7 +277,7 @@ TEST(StringUtil, StringViewSplit) {
     EXPECT_EQ(std_tokens.at(4), sv_tokens.at(4));
     EXPECT_EQ(std_tokens.at(5), sv_tokens.at(5));
     EXPECT_EQ(std_tokens.at(6), sv_tokens.at(6));
-  }  
+  }
   {
     EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken(",hello", ","));
     EXPECT_EQ(std::vector<absl::string_view>{}, StringUtil::splitToken("", ","));
@@ -298,7 +298,7 @@ TEST(StringUtil, StringViewSplit) {
     EXPECT_THAT(std::vector<absl::string_view>({"hello", "world", ""}),
                 ContainerEq(StringUtil::splitToken("hello world ", " ", true)));
     EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
-                ContainerEq(StringUtil::splitToken("hello world", " ", true))); 
+                ContainerEq(StringUtil::splitToken("hello world", " ", true)));
   }
 }
 
