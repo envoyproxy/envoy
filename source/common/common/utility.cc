@@ -87,7 +87,7 @@ bool StringUtil::find(absl::string_view source, absl::string_view delimiters,
   if (tokens.empty()) {
     return key_token.empty();
   }
-  
+
   if (trim_whitespace) {
     for (auto token : tokens) {
       if (key_token == trim(token)) {
