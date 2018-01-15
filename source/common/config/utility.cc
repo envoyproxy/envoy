@@ -14,6 +14,7 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
+#include "api/stats.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -159,7 +160,7 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-void Utility::detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap) {
+void detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap) {
   std::unordered_set<std::string> names;
 
   if (!bootstrap.stats_config().has_use_all_default_tags() ||
@@ -178,48 +179,46 @@ void Utility::detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap) 
 }
 
 std::vector<Stats::TagExtractorPtr>
-Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
+buildDefaultTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
   std::vector<Stats::TagExtractorPtr> tag_extractors;
-  int size = 0;
-  // Roughly estimate the size of the tag_extractors vector.
-  if (!bootstrap.stats_config().has_use_all_default_tags() ||
-      bootstrap.stats_config().use_all_default_tags().value()) {
-    size = TagNames::get().name_regex_pairs_.size();
-  }
-  tag_extractors.reserve(size + bootstrap.stats_config().stats_tags().size());
 
-  // Add defaults.
   if (!bootstrap.stats_config().has_use_all_default_tags() ||
       bootstrap.stats_config().use_all_default_tags().value()) {
-    for (const auto& default_tag : TagNames::get().name_regex_pairs_) {
+    tag_extractors.reserve(TagNames::get().name_regex_pairs_.size());
+
+    for (const auto& extractor : TagNames::get().name_regex_pairs_) {
       tag_extractors.emplace_back(
-          Stats::TagExtractorImpl::createTagExtractor(default_tag.first, default_tag.second));
-    }
-  }
-
-  // Add custom tags.
-  for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
-    // If no tag value are found, fallback to default regex to keep backward compatibility.
-    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
-        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
-      tag_extractors.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
-          tag_specifier.tag_name(), tag_specifier.regex()));
+          Stats::TagExtractorImpl::createTagExtractor(extractor.first, extractor.second));
     }
   }
 
   return tag_extractors;
 }
 
-std::vector<Stats::Tag> Utility::createTags(const envoy::api::v2::Bootstrap& bootstrap) {
-  std::vector<Stats::Tag> tags;
+Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
+  detectTagNameConflict(bootstrap);
+
+  auto tag_extractors =
+      std::make_unique<std::vector<Stats::TagExtractorPtr>>(buildDefaultTagExtractors(bootstrap));
+  // Roughly estimate the size of the vectors.
+  auto default_tags = std::make_unique<std::vector<Stats::Tag>>();
+  tag_extractors->reserve(tag_extractors->size() + bootstrap.stats_config().stats_tags().size());
+  default_tags->reserve(bootstrap.stats_config().stats_tags().size());
 
   for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
-    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
-      tags.emplace_back(Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
+    // If no tag value are found, fallback to default regex to keep backward compatibility.
+    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
+        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
+      tag_extractors->emplace_back(Stats::TagExtractorImpl::createTagExtractor(
+          tag_specifier.tag_name(), tag_specifier.regex()));
+
+    } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
+      default_tags->emplace_back(Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
     }
   }
 
-  return tags;
+  return Stats::TagProducerPtr{
+      new Stats::TagProducerImpl(std::move(tag_extractors), std::move(default_tags))};
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {

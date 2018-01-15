@@ -43,6 +43,29 @@ private:
   const std::regex regex_;
 };
 
+class TagProducerImpl : public TagProducer {
+public:
+  typedef std::unique_ptr<std::vector<TagExtractorPtr>> ExtractorsPtr;
+  typedef std::unique_ptr<std::vector<Tag>> TagsPtr;
+
+  TagProducerImpl(ExtractorsPtr&& tag_extractors, TagsPtr&& default_tags);
+  ~TagProducerImpl() override;
+
+  static TagProducerPtr createEmptyTagProducer();
+
+  /*
+   * Take a metric name and a vector then add proper tags into the vector and
+   * return an extracted metric name.
+   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
+   * @param tags std::vector a set of Stats::Tag.
+   */
+  std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
+
+private:
+  ExtractorsPtr tag_extractors_;
+  TagsPtr default_tags_;
+};
+
 /**
  * Common stats utility routines.
  */

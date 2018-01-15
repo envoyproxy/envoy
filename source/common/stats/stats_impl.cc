@@ -122,6 +122,28 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   return data;
 }
 
+TagProducerImpl::TagProducerImpl(ExtractorsPtr&& tag_extractors, TagsPtr&& default_tags)
+    : tag_extractors_(std::move(tag_extractors)), default_tags_(std::move(default_tags)) {}
+
+TagProducerImpl::~TagProducerImpl() {}
+
+TagProducerPtr TagProducerImpl::createEmptyTagProducer() {
+  return TagProducerPtr{new TagProducerImpl(ExtractorsPtr{new std::vector<TagExtractorPtr>()},
+                                            TagsPtr{new std::vector<Tag>()})};
+}
+
+std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
+  if (!default_tags_->empty()) {
+    tags.insert(tags.end(), default_tags_->begin(), default_tags_->end());
+  }
+
+  std::string tag_extracted_name = name;
+  for (const TagExtractorPtr& tag_extractor : *tag_extractors_) {
+    tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
+  }
+  return tag_extracted_name;
+}
+
 void HeapRawStatDataAllocator::free(RawStatData& data) {
   // This allocator does not ever have concurrent access to the raw data.
   ASSERT(data.ref_count_ == 1);

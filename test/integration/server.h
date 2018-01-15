@@ -165,8 +165,7 @@ public:
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
-  void setTagExtractors(const std::vector<TagExtractorPtr>&) override {}
-  void setDefaultTags(const std::vector<Tag>&) override {}
+  void setTagProducer(TagProducerPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
 

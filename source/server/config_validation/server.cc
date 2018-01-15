@@ -67,9 +67,7 @@ void ValidationInstance::initialize(Options& options,
   envoy::api::v2::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
 
-  Config::Utility::detectTagNameConflict(bootstrap);
-  tag_extractors_ = Config::Utility::createTagExtractors(bootstrap);
-  Config::Utility::createTags(bootstrap);
+  Config::Utility::createTagProducer(bootstrap);
 
   bootstrap.mutable_node()->set_build_version(VersionInfo::version());
 

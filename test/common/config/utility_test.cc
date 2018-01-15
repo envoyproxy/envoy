@@ -81,117 +81,50 @@ TEST(UtilityTest, TranslateApiConfigSource) {
   EXPECT_EQ("test_grpc_cluster", api_config_source_grpc.cluster_names(0));
 }
 
-TEST(UtilityTest, DetectTagNameConflict) {
+TEST(UtilityTest, createTagProducer) {
   envoy::api::v2::Bootstrap bootstrap;
   auto& stats_config = *bootstrap.mutable_stats_config();
 
-  // Should pass there were no conflict.
+  // Should pass there were no tag name conflict.
   auto& tag_specifier1 = *stats_config.mutable_stats_tags()->Add();
   tag_specifier1.set_tag_name("test.x");
-  Utility::detectTagNameConflict(bootstrap);
+  tag_specifier1.set_fixed_value("xxx");
+  Utility::createTagProducer(bootstrap);
 
   // Should raise an error when duplicate tag names are specified.
   auto& tag_specifier2 = *stats_config.mutable_stats_tags()->Add();
   tag_specifier2.set_tag_name("test.x");
-  EXPECT_THROW_WITH_MESSAGE(Utility::detectTagNameConflict(bootstrap), EnvoyException,
+  tag_specifier2.set_fixed_value("yyy");
+  EXPECT_THROW_WITH_MESSAGE(Utility::createTagProducer(bootstrap), EnvoyException,
                             fmt::format("Tag name '{}' specified twice.", "test.x"));
 
   // Also should raise an error when user defined tag name conflicts with Envoy's default tag names.
   stats_config.clear_stats_tags();
   stats_config.mutable_use_all_default_tags()->set_value(true);
-  auto& tag_specifier_with_dup = *stats_config.mutable_stats_tags()->Add();
-  tag_specifier_with_dup.set_tag_name(TagNames::get().CLUSTER_NAME);
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::detectTagNameConflict(bootstrap), EnvoyException,
-      fmt::format("Tag name '{}' specified twice.", TagNames::get().CLUSTER_NAME));
-}
-
-TEST(UtilityTest, GetTagExtractorsFromBootstrap) {
-  envoy::api::v2::Bootstrap bootstrap;
-  const auto& tag_names = TagNames::get();
-
-  // Default configuration should be all default tag extractors
-  std::vector<Stats::TagExtractorPtr> tag_extractors = Utility::createTagExtractors(bootstrap);
-  EXPECT_EQ(tag_names.name_regex_pairs_.size(), tag_extractors.size());
-
-  // Default extractors are explicitly turned off.
-  auto& stats_config = *bootstrap.mutable_stats_config();
-  stats_config.mutable_use_all_default_tags()->set_value(false);
-  tag_extractors = Utility::createTagExtractors(bootstrap);
-  EXPECT_EQ(0, tag_extractors.size());
-
-  // Default extractors explicitly tuned on.
-  stats_config.mutable_use_all_default_tags()->set_value(true);
-  tag_extractors = Utility::createTagExtractors(bootstrap);
-  EXPECT_EQ(tag_names.name_regex_pairs_.size(), tag_extractors.size());
-
   auto& custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
-  custom_tag_extractor.set_tag_name(tag_names.CLUSTER_NAME);
-
-  // Remove the defaults and ensure the manually added default gets the correct regex.
-  stats_config.mutable_use_all_default_tags()->set_value(false);
-  tag_extractors = Utility::createTagExtractors(bootstrap);
-  ASSERT_EQ(1, tag_extractors.size());
-  std::vector<Stats::Tag> tags;
-  std::string extracted_name =
-      tag_extractors.at(0)->extractTag("cluster.test_cluster.test_stat", tags);
-  EXPECT_EQ("cluster.test_stat", extracted_name);
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ(tag_names.CLUSTER_NAME, tags.at(0).name_);
-  EXPECT_EQ("test_cluster", tags.at(0).value_);
-
-  // Add a custom regex for the name instead of relying on the default. The regex below just
-  // captures the entire string, and should override the default for this name.
-  custom_tag_extractor.set_regex("((.*))");
-  tag_extractors = Utility::createTagExtractors(bootstrap);
-  ASSERT_EQ(1, tag_extractors.size());
-  tags.clear();
-  // Use the same string as before to ensure the same regex is not applied.
-  extracted_name = tag_extractors.at(0)->extractTag("cluster.test_cluster.test_stat", tags);
-  EXPECT_EQ("", extracted_name);
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ(tag_names.CLUSTER_NAME, tags.at(0).name_);
-  EXPECT_EQ("cluster.test_cluster.test_stat", tags.at(0).value_);
-
-  // Non-default custom name with regex should work the same as above
-  custom_tag_extractor.set_tag_name("test_extractor");
-  tag_extractors = Utility::createTagExtractors(bootstrap);
-  ASSERT_EQ(1, tag_extractors.size());
-  tags.clear();
-  // Use the same string as before to ensure the same regex is not applied.
-  extracted_name = tag_extractors.at(0)->extractTag("cluster.test_cluster.test_stat", tags);
-  EXPECT_EQ("", extracted_name);
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ("test_extractor", tags.at(0).name_);
-  EXPECT_EQ("cluster.test_cluster.test_stat", tags.at(0).value_);
+  custom_tag_extractor.set_tag_name(TagNames::get().CLUSTER_NAME);
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::createTagProducer(bootstrap), EnvoyException,
+      fmt::format("Tag name '{}' specified twice.", TagNames::get().CLUSTER_NAME));
 
   // Non-default custom name without regex should throw
+  stats_config.mutable_use_all_default_tags()->set_value(true);
+  stats_config.clear_stats_tags();
+  custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
+  custom_tag_extractor.set_tag_name("test_extractor");
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::createTagProducer(bootstrap), EnvoyException,
+      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+
+  // Also empty regex should throw
+  stats_config.mutable_use_all_default_tags()->set_value(true);
+  stats_config.clear_stats_tags();
+  custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
+  custom_tag_extractor.set_tag_name("test_extractor");
   custom_tag_extractor.set_regex("");
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::createTagExtractors(bootstrap), EnvoyException,
+      Utility::createTagProducer(bootstrap), EnvoyException,
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
-}
-
-TEST(UtilityTest, GetDefaultTagsFromBootstrap) {
-  envoy::api::v2::Bootstrap bootstrap;
-  auto& stats_config = *bootstrap.mutable_stats_config();
-
-  // Default configuration should produce empty tags.
-  std::vector<Stats::Tag> tags = Utility::createTags(bootstrap);
-  EXPECT_EQ(0, tags.size());
-
-  // Should ignore tag_specifiers which has empty tag_value.
-  auto& tag_specifier = *stats_config.mutable_stats_tags()->Add();
-  tag_specifier.set_tag_name("test.service_cluster");
-  tags = Utility::createTags(bootstrap);
-  EXPECT_EQ(0, tags.size());
-
-  // Should build Stats::Tag when given TagSpecifier has fixed_value.
-  tag_specifier.set_fixed_value("test_cluster");
-  tags = Utility::createTags(bootstrap);
-  EXPECT_EQ(1, tags.size());
-  EXPECT_EQ("test.service_cluster", tags[0].name_);
-  EXPECT_EQ("test_cluster", tags[0].value_);
 }
 
 TEST(UtilityTest, ObjNameLength) {

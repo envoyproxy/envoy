@@ -17,6 +17,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "api/base.pb.h"
+#include "api/bootstrap.pb.h"
 #include "api/cds.pb.h"
 #include "api/eds.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
@@ -229,31 +230,13 @@ public:
    */
   static std::string resourceName(const ProtobufWkt::Any& resource);
 
-  /**
-   * Envoy can have both pre-defined tag names in well_known_names and user
-   * provided tag names through bootstrap configuration. Check all tag names
-   * for conflicts to avoid unexpected tag name overwriting.
+  /*
+   * Create TagProducer instance. Check all tag names for conflicts to avoid
+   * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
-   * @throws EnvoyException when the conflict is found.
+   * @throws EnvoyException when the conflict of tag names is found.
    */
-  static void detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap);
-
-  /**
-   * Creates the set of stats tag extractors requested by the config and transfers ownership to the
-   * caller.
-   * @param bootstrap bootstrap proto.
-   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
-   */
-  static std::vector<Stats::TagExtractorPtr>
-  createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
-
-  /**
-   * Creates the set of tags if TagSpecifiers have "fixed_value" field. The
-   * tags will use as default tags. In other words, the tags will be added into
-   * all metrics.
-   * @param bootstrap bootstrap proto.
-   */
-  static std::vector<Stats::Tag> createTags(const envoy::api::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr createTagProducer(const envoy::api::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

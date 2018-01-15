@@ -13,6 +13,7 @@ namespace Stats {
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
+      tag_producer_(TagProducerImpl::createEmptyTagProducer()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -87,17 +88,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
 }
 
 std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::vector<Tag>& tags) {
-  if (default_tags_ != nullptr) {
-    tags.insert(tags.end(), default_tags_->begin(), default_tags_->end());
-  }
-
-  std::string tag_extracted_name = name;
-  if (tag_extractors_ != nullptr) {
-    for (const TagExtractorPtr& tag_extractor : *tag_extractors_) {
-      tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
-    }
-  }
-  return tag_extracted_name;
+  return tag_producer_->produceTags(name, tags);
 }
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
