@@ -372,6 +372,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "metrics_service_integration_test",
+    srcs = ["metrics_service_integration_test.cc"],
+    external_deps = ["envoy_metrics"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/server/config/stats:metrics_service_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "ssl_integration_test",
     srcs = [
         "ssl_integration_test.cc",
