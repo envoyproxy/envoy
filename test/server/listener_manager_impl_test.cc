@@ -1088,7 +1088,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_CALL(manager, addAcceptFilter(_))
       .WillOnce(Invoke([&](Network::ListenerFilter* filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-	delete filter;
+        delete filter;
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
@@ -1097,7 +1097,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 class OriginalDstTest : public Filter::OriginalDst {
   Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
     return Network::Address::InstanceConstSharedPtr{
-      new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
+        new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
   }
 };
 
@@ -1163,7 +1163,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   EXPECT_CALL(manager, addAcceptFilter(_))
       .WillOnce(Invoke([&](Network::ListenerFilter* filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-	delete filter;
+        delete filter;
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
