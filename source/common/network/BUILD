@@ -117,9 +117,6 @@ envoy_cc_library(
         "listener_impl.h",
         "proxy_protocol.h",
     ],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":address_lib",
         ":connection_lib",

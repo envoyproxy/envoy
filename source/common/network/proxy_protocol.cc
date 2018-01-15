@@ -87,7 +87,7 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
     return;
   }
 
-  // If protocol not UNKNOWN, src and dst adresses have to be present.
+  // If protocol not UNKNOWN, src and dst addresses have to be present.
   if (line_parts.size() != 6) {
     throw EnvoyException("failed to read proxy protocol");
   }
