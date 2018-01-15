@@ -61,6 +61,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",

@@ -19,20 +19,21 @@ namespace AccessLog {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
-  struct TestGrpcAccessLogClientFactory : public GrpcAccessLogClientFactory {
-    // AccessLog::GrpcAccessLogClientFactory
-    Grpc::AsyncClientPtr create() { return Grpc::AsyncClientPtr{async_client_}; }
-
-    Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient()};
-  };
-
   typedef Grpc::MockAsyncStream MockAccessLogStream;
   typedef Grpc::TypedAsyncStreamCallbacks<
       envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>
       AccessLogCallbacks;
 
+  GrpcAccessLogStreamerImplTest() {
+    EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+      return Grpc::AsyncClientPtr{async_client_};
+    }));
+    streamer_ = std::make_unique<GrpcAccessLogStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
+                                                            tls_, local_info_);
+  }
+
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*factory_->async_client_, start(_, _))
+    EXPECT_CALL(*async_client_, start(_, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
                                                      Grpc::AsyncStreamCallbacks& callbacks) {
           *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
@@ -42,8 +43,9 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   LocalInfo::MockLocalInfo local_info_;
-  TestGrpcAccessLogClientFactory* factory_{new TestGrpcAccessLogClientFactory};
-  GrpcAccessLogStreamerImpl streamer_{GrpcAccessLogClientFactoryPtr{factory_}, tls_, local_info_};
+  Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
+  Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
+  std::unique_ptr<GrpcAccessLogStreamerImpl> streamer_;
 };
 
 // Test basic stream logging flow.
@@ -57,11 +59,11 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream1, sendMessage(_, false));
   envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log1;
-  streamer_.send(message_log1, "log1");
+  streamer_->send(message_log1, "log1");
 
   message_log1.Clear();
   EXPECT_CALL(stream1, sendMessage(_, false));
-  streamer_.send(message_log1, "log1");
+  streamer_->send(message_log1, "log1");
 
   // Start a stream for the second log.
   MockAccessLogStream stream2;
@@ -70,7 +72,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream2, sendMessage(_, false));
   envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log2;
-  streamer_.send(message_log2, "log2");
+  streamer_->send(message_log2, "log2");
 
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks1->onReceiveMessage(
@@ -81,14 +83,14 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   expectStreamStart(stream2, &callbacks2);
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream2, sendMessage(_, false));
-  streamer_.send(message_log2, "log2");
+  streamer_->send(message_log2, "log2");
 }
 
 // Test that stream failure is handled correctly.
 TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*factory_->async_client_, start(_, _))
+  EXPECT_CALL(*async_client_, start(_, _))
       .WillOnce(
           Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
@@ -96,7 +98,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
           }));
   EXPECT_CALL(local_info_, node());
   envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log1;
-  streamer_.send(message_log1, "log1");
+  streamer_->send(message_log1, "log1");
 }
 
 class MockGrpcAccessLogStreamer : public GrpcAccessLogStreamer {

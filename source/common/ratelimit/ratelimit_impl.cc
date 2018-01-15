@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "common/common/assert.h"
-#include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 
 #include "fmt/format.h"
@@ -77,16 +76,19 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 }
 
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
-                                 Upstream::ClusterManager& cm)
-    : cluster_name_(config.cluster_name()), cm_(cm) {
-  if (!cm_.get(cluster_name_)) {
-    throw EnvoyException(fmt::format("unknown rate limit service cluster '{}'", cluster_name_));
+                                 Grpc::AsyncClientManager& async_client_manager,
+                                 Stats::Scope& scope) {
+  envoy::api::v2::GrpcService grpc_service;
+  grpc_service.MergeFrom(config.grpc_service());
+  // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
+  if (config.service_specifier_case() == envoy::api::v2::RateLimitServiceConfig::kClusterName) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
+  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope);
 }
 
 ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& timeout) {
-  return std::make_unique<GrpcClientImpl>(
-      std::make_unique<Grpc::AsyncClientImpl>(cm_, cluster_name_), timeout);
+  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 
 } // namespace RateLimit
