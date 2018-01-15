@@ -96,6 +96,10 @@ public:
                 control_->num_bytes);
       return false;
     }
+    if (HashUtil::xxHash64(signatureStringToHash()) != control_->hash_signature) {
+      ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
+      return false;
+    }
     return sanityCheck();
   }
 
@@ -176,6 +180,7 @@ public:
   void init(uint8_t* memory, uint32_t num_bytes) {
     mapMemorySegments(memory);
     RELEASE_ASSERT(num_bytes == numBytes(options_));
+    control_->hash_signature = HashUtil::xxHash64(signatureStringToHash());
     control_->num_bytes = num_bytes;
     control_->options = options_;
     control_->size = 0;
@@ -273,6 +278,20 @@ private:
   }
 
   /**
+   * Computes a signature string, composed of all the non-zero 8-bit characters.
+   * This is used for detecting if the hash algorithm changes, which invalidates
+   * any saved stats-set.
+   */
+  std::string signatureStringToHash() {
+    std::string signature_string;
+    signature_string.resize(255);
+    for (int i = 1; i <= 255; ++i) {
+      signature_string[i - 1] = i;
+    }
+    return signature_string;
+  }
+
+  /**
    * Represents control-values for the hash-table, including a mutex, which
    * must gate all access to the internals.
    */
@@ -283,6 +302,7 @@ private:
     }
 
     SharedMemoryHashSetOptions options; // Options established at map construction time.
+    uint64_t hash_signature;            // Hash of a constant signature string.
     uint32_t num_bytes;                 // Bytes allocated on behalf of the map.
     uint32_t size;                      // Number of values currently stored.
     uint32_t free_cell_index;           // Offset of first free cell.

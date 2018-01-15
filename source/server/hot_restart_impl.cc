@@ -148,6 +148,9 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   if (data == nullptr) {
     return nullptr;
   }
+  // For new entries (value-created.second==true), SharedMemoryHashSet calls Value::initialize()
+  // automatically, but on recycled entries (value-created.second==false) we need to bump the
+  // ref-count.
   if (!value_created.second) {
     ++data->ref_count_;
   }
