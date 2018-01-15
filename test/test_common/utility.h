@@ -121,7 +121,7 @@ public:
    * @return bool indicating whether the protos are equal. Type name and string serialization are
    *         used for equality testing.
    */
-  template <class ProtoType> static bool protoEqual(const ProtoType& lhs, const ProtoType& rhs) {
+  static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
     return lhs.GetTypeName() == rhs.GetTypeName() &&
            lhs.SerializeAsString() == rhs.SerializeAsString();
   }

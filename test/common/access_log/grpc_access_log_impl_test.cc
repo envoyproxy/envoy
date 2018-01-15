@@ -21,26 +21,21 @@ class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   struct TestGrpcAccessLogClientFactory : public GrpcAccessLogClientFactory {
     // AccessLog::GrpcAccessLogClientFactory
-    GrpcAccessLogClientPtr create() { return GrpcAccessLogClientPtr{async_client_}; }
+    Grpc::AsyncClientPtr create() { return Grpc::AsyncClientPtr{async_client_}; }
 
-    Grpc::MockAsyncClient<envoy::api::v2::filter::accesslog::StreamAccessLogsMessage,
-                          envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>*
-
-        async_client_{new Grpc::MockAsyncClient<
-            envoy::api::v2::filter::accesslog::StreamAccessLogsMessage,
-            envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>()};
+    Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient()};
   };
 
-  typedef Grpc::MockAsyncStream<envoy::api::v2::filter::accesslog::StreamAccessLogsMessage>
-      MockAccessLogStream;
-  typedef Grpc::AsyncStreamCallbacks<envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>
+  typedef Grpc::MockAsyncStream MockAccessLogStream;
+  typedef Grpc::TypedAsyncStreamCallbacks<
+      envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>
       AccessLogCallbacks;
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
     EXPECT_CALL(*factory_->async_client_, start(_, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
-                                                     AccessLogCallbacks& callbacks) {
-          *callbacks_to_set = &callbacks;
+                                                     Grpc::AsyncStreamCallbacks& callbacks) {
+          *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
           return &stream;
         }));
   }
@@ -94,10 +89,11 @@ TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
   InSequence s;
 
   EXPECT_CALL(*factory_->async_client_, start(_, _))
-      .WillOnce(Invoke([](const Protobuf::MethodDescriptor&, AccessLogCallbacks& callbacks) {
-        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-        return nullptr;
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
+            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+            return nullptr;
+          }));
   EXPECT_CALL(local_info_, node());
   envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log1;
   streamer_.send(message_log1, "log1");
