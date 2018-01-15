@@ -70,7 +70,6 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   while (!sockets_.empty()) {
     ActiveSocketPtr removed = sockets_.front()->removeFromList(sockets_);
-    removed->socket_->close();
     parent_.dispatcher_.deferredDelete(std::move(removed));
   }
 
@@ -149,9 +148,6 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       // Create a new connection on this listener.
       listener_->newConnection(std::move(socket_));
     }
-  } else {
-    // current filter failed, connection must be abandoned.
-    socket_->close();
   }
   // Filter execution concluded, clear state.
   iter_ = accept_filters_.end();

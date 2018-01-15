@@ -56,7 +56,11 @@ public:
                      Address::InstanceConstSharedPtr&& remote_address)
       : fd_(fd), local_address_reset_(false), local_address_(std::move(local_address)),
         remote_address_(std::move(remote_address)) {}
-  ~AcceptedSocketImpl() { close(); }
+  ~AcceptedSocketImpl() {
+    if (fd_ != -1) {
+      ::close(fd_);
+    }
+  }
 
   // Network::AcceptedSocket
   Address::InstanceConstSharedPtr localAddress() const override { return local_address_; }
@@ -80,13 +84,6 @@ public:
   }
 
   void clearReset() override { local_address_reset_ = false; }
-
-  void close() override {
-    if (fd_ != -1) {
-      ::close(fd_);
-      fd_ = -1;
-    }
-  }
 
 protected:
   int fd_;

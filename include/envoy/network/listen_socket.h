@@ -84,11 +84,6 @@ public:
    * Clear 'reset' state so that the socket can be used again with a new listener.
    */
   virtual void clearReset() PURE;
-
-  /**
-   * Close the underlying socket.
-   */
-  virtual void close() PURE;
 };
 
 typedef std::unique_ptr<AcceptedSocket> AcceptedSocketPtr;
