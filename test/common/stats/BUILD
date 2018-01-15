@@ -38,6 +38,23 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "metrics_service_test",
+    srcs = ["grpc_metrics_service_impl_test.cc"],
+    deps = [
+        "//source/common/config:well_known_names",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/stats:metrics_service_grpc_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "udp_statsd_test",
     srcs = ["udp_statsd_test.cc"],
     deps = [
