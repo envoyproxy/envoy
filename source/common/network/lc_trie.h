@@ -96,9 +96,9 @@ private:
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(input);
     address.sin_port = htons(0);
-    char str[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &address.sin_addr, str, INET_ADDRSTRLEN);
-    return str;
+    char address_string[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &address.sin_addr, address_string, INET_ADDRSTRLEN);
+    return address_string;
   }
 
   static std::string toString(const Ipv6& input) {
@@ -111,10 +111,10 @@ private:
       address.sin6_addr.s6_addr[i] = ip6[i];
     }
 
-    char str[INET6_ADDRSTRLEN];
-    const char* ptr = inet_ntop(AF_INET6, &address.sin6_addr, str, INET6_ADDRSTRLEN);
-    ASSERT(ptr = str);
-    return str;
+    char address_string[INET6_ADDRSTRLEN];
+    const char* address_string_ptr = inet_ntop(AF_INET6, &address.sin6_addr, address_string, INET6_ADDRSTRLEN);
+    ASSERT(address_string_ptr = address_string);
+    return address_string_ptr;
   }
 
   /**
