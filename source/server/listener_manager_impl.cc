@@ -389,8 +389,8 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
   return ret;
 }
 
-std::vector<std::reference_wrapper<Listener>> ListenerManagerImpl::listeners() {
-  std::vector<std::reference_wrapper<Listener>> ret;
+std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::listeners() {
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
   ret.reserve(active_listeners_.size());
   for (const auto& listener : active_listeners_) {
     ret.push_back(*listener);

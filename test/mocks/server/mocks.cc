@@ -59,29 +59,23 @@ MockListenerComponentFactory::~MockListenerComponentFactory() {}
 MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
 
-MockListener::MockListener() {
-  ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
-  ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
-  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
-  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
-}
-MockListener::~MockListener() {}
-
 MockWorkerFactory::MockWorkerFactory() {}
 MockWorkerFactory::~MockWorkerFactory() {}
 
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _))
-      .WillByDefault(Invoke([this](Listener&, AddListenerCompletion completion) -> void {
-        EXPECT_EQ(nullptr, add_listener_completion_);
-        add_listener_completion_ = completion;
-      }));
+      .WillByDefault(
+          Invoke([this](Network::ListenerConfig&, AddListenerCompletion completion) -> void {
+            EXPECT_EQ(nullptr, add_listener_completion_);
+            add_listener_completion_ = completion;
+          }));
 
   ON_CALL(*this, removeListener(_, _))
-      .WillByDefault(Invoke([this](Listener&, std::function<void()> completion) -> void {
-        EXPECT_EQ(nullptr, remove_listener_completion_);
-        remove_listener_completion_ = completion;
-      }));
+      .WillByDefault(
+          Invoke([this](Network::ListenerConfig&, std::function<void()> completion) -> void {
+            EXPECT_EQ(nullptr, remove_listener_completion_);
+            remove_listener_completion_ = completion;
+          }));
 }
 MockWorker::~MockWorker() {}
 
