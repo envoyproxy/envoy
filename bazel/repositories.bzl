@@ -140,6 +140,7 @@ def _envoy_api_deps():
         "eds",
         "health_check",
         "lds",
+        "metrics",
         "protocol",
         "rds",
         "sds",
