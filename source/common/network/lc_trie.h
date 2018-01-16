@@ -112,7 +112,8 @@ private:
     }
 
     char address_string[INET6_ADDRSTRLEN];
-    const char* address_string_ptr = inet_ntop(AF_INET6, &address.sin6_addr, address_string, INET6_ADDRSTRLEN);
+    const char* address_string_ptr =
+        inet_ntop(AF_INET6, &address.sin6_addr, address_string, INET6_ADDRSTRLEN);
     ASSERT(address_string_ptr = address_string);
     return address_string_ptr;
   }
