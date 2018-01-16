@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(RateLimitAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const Optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit")),
@@ -85,11 +85,8 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& c
 }
 
 ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& timeout) {
-  return ClientPtr{new GrpcClientImpl(
-      RateLimitAsyncClientPtr{
-          new Grpc::AsyncClientImpl<pb::lyft::ratelimit::RateLimitRequest,
-                                    pb::lyft::ratelimit::RateLimitResponse>(cm_, cluster_name_)},
-      timeout)};
+  return std::make_unique<GrpcClientImpl>(
+      std::make_unique<Grpc::AsyncClientImpl>(cm_, cluster_name_), timeout);
 }
 
 } // namespace RateLimit

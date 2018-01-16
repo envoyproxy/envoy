@@ -20,23 +20,20 @@ class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
   struct TestGrpcMetricsClientFactory : public GrpcMetricsServiceClientFactory {
 
-    GrpcMetricsServiceClientPtr create() { return GrpcMetricsServiceClientPtr{async_client_}; }
+    Grpc::AsyncClientPtr create() { return Grpc::AsyncClientPtr{async_client_}; }
 
-    Grpc::MockAsyncClient<envoy::api::v2::StreamMetricsMessage,
-                          envoy::api::v2::StreamMetricsResponse>*
-
-        async_client_{new Grpc::MockAsyncClient<envoy::api::v2::StreamMetricsMessage,
-                                                envoy::api::v2::StreamMetricsResponse>()};
+    Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient()};
   };
 
-  typedef Grpc::MockAsyncStream<envoy::api::v2::StreamMetricsMessage> MockMetricsStream;
-  typedef Grpc::AsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse> MetricsServiceCallbacks;
+  typedef Grpc::MockAsyncStream MockMetricsStream;
+  typedef Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse>
+      MetricsServiceCallbacks;
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
     EXPECT_CALL(*factory_->async_client_, start(_, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
-                                                     MetricsServiceCallbacks& callbacks) {
-          *callbacks_to_set = &callbacks;
+                                                     Grpc::AsyncStreamCallbacks& callbacks) {
+          *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
         }));
   }
@@ -69,10 +66,11 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
   EXPECT_CALL(*factory_->async_client_, start(_, _))
-      .WillOnce(Invoke([](const Protobuf::MethodDescriptor&, MetricsServiceCallbacks& callbacks) {
-        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-        return nullptr;
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
+            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+            return nullptr;
+          }));
   EXPECT_CALL(local_info_, node());
   envoy::api::v2::StreamMetricsMessage message_metrics1;
   streamer_.send(message_metrics1);

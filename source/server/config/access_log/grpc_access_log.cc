@@ -22,11 +22,8 @@ public:
       : cluster_manager_(cluster_manager), cluster_name_(cluster_name) {}
 
   // AccessLog::GrpcAccessLogClientFactory
-  AccessLog::GrpcAccessLogClientPtr create() override {
-    return std::make_unique<
-        Grpc::AsyncClientImpl<envoy::api::v2::filter::accesslog::StreamAccessLogsMessage,
-                              envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>>(
-        cluster_manager_, cluster_name_);
+  Grpc::AsyncClientPtr create() override {
+    return std::make_unique<Grpc::AsyncClientImpl>(cluster_manager_, cluster_name_);
   };
 
   Upstream::ClusterManager& cluster_manager_;

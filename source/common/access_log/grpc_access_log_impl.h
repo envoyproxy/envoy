@@ -15,11 +15,6 @@ namespace AccessLog {
 
 // TODO(mattklein123): Stats
 
-typedef std::unique_ptr<
-    Grpc::AsyncClient<envoy::api::v2::filter::accesslog::StreamAccessLogsMessage,
-                      envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>>
-    GrpcAccessLogClientPtr;
-
 /**
  * Factory for creating a gRPC access log streaming client.
  */
@@ -30,7 +25,7 @@ public:
   /**
    * @return GrpcAccessLogClientPtr a new client.
    */
-  virtual GrpcAccessLogClientPtr create() PURE;
+  virtual Grpc::AsyncClientPtr create() PURE;
 };
 
 typedef std::unique_ptr<GrpcAccessLogClientFactory> GrpcAccessLogClientFactoryPtr;
@@ -90,12 +85,12 @@ private:
   /**
    * Per-thread stream state.
    */
-  struct ThreadLocalStream : public Grpc::AsyncStreamCallbacks<
+  struct ThreadLocalStream : public Grpc::TypedAsyncStreamCallbacks<
                                  envoy::api::v2::filter::accesslog::StreamAccessLogsResponse> {
     ThreadLocalStream(ThreadLocalStreamer& parent, const std::string& log_name)
         : parent_(parent), log_name_(log_name) {}
 
-    // Grpc::AsyncStreamCallbacks
+    // Grpc::TypedAsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
     void onReceiveMessage(
@@ -105,7 +100,7 @@ private:
 
     ThreadLocalStreamer& parent_;
     const std::string log_name_;
-    Grpc::AsyncStream<envoy::api::v2::filter::accesslog::StreamAccessLogsMessage>* stream_{};
+    Grpc::AsyncStream* stream_{};
   };
 
   /**
@@ -116,7 +111,7 @@ private:
     void send(envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
               const std::string& log_name);
 
-    GrpcAccessLogClientPtr client_;
+    Grpc::AsyncClientPtr client_;
     std::unordered_map<std::string, ThreadLocalStream> stream_map_;
     SharedStateSharedPtr shared_state_;
   };
