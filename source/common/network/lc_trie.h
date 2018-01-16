@@ -8,6 +8,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/address.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
@@ -36,7 +37,7 @@ public:
    *                              factor. It reduces the depth of the trie.
    */
   LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
-         double fill_factor = 0.5, uint32_t root_branching_factor = 16);
+         double fill_factor = 0.5, uint32_t root_branching_factor = 0);
 
   /**
    * Retrieve the tag associated with the CIDR range that contains `ip_address`. Both IPv4 and IPv6
@@ -186,8 +187,8 @@ private:
      *                              for large LC-Tries to use the value '16' for the root branching
      *                              factor. It reduces the depth of the trie.
      */
-    LcTrieInternal(std::vector<IpPrefix<IpType>>& tag_data, double fill_factor = 0.5,
-                   uint32_t root_branching_factor = 16);
+    LcTrieInternal(std::vector<IpPrefix<IpType>>& tag_data, double fill_factor,
+                   uint32_t root_branching_factor);
 
     /**
      * Retrieve the tag associated with the CIDR range that contains `ip_address`.
