@@ -55,12 +55,14 @@ void TlsContextJson::translateCommonTlsContext(
   for (const auto& san : json_tls_context.getStringArray("verify_subject_alt_name", true)) {
     validation_context->add_verify_subject_alt_name(san);
   }
-  for (auto cipher_suite :
-       StringUtil::splitToken(json_tls_context.getString("cipher_suites", ""), ":")) {
+
+  const std::string cipher_suites_str{json_tls_context.getString("cipher_suites", "")};
+  for (auto cipher_suite : StringUtil::splitToken(cipher_suites_str, ":")) {
     common_tls_context.mutable_tls_params()->add_cipher_suites(std::string{cipher_suite});
   }
-  for (auto ecdh_curve :
-       StringUtil::splitToken(json_tls_context.getString("ecdh_curves", ""), ":")) {
+
+  const std::string ecdh_curves_str{json_tls_context.getString("ecdh_curves", "")};
+  for (auto ecdh_curve : StringUtil::splitToken(ecdh_curves_str, ":")) {
     common_tls_context.mutable_tls_params()->add_ecdh_curves(std::string{ecdh_curve});
   }
 }
