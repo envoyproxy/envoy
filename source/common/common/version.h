@@ -2,7 +2,10 @@
 
 #include <string>
 
+#include "common/common/version_number.h"
+
 namespace Envoy {
+
 /**
  * Wraps compiled in code versioning.
  */

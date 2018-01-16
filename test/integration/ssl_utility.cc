@@ -4,6 +4,7 @@
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
@@ -12,7 +13,8 @@
 namespace Envoy {
 namespace Ssl {
 
-ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& context_manager) {
+Network::TransportSocketFactoryPtr
+createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager) {
   const std::string json_plain = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
@@ -58,7 +60,8 @@ ClientContextPtr createClientSslContext(bool alpn, bool san, ContextManager& con
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
   ClientContextConfigImpl cfg(*loader);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  return context_manager.createSslClientContext(*client_stats_store, cfg);
+  return Network::TransportSocketFactoryPtr{
+      new Ssl::ClientSslSocketFactory(cfg, context_manager, *client_stats_store)};
 }
 
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,

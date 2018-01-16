@@ -3,11 +3,11 @@
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements) are typically
 independently sourced, the following steps should be followed:
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/requirements).
+2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
 3. Configure a Bazel [WORKSPACE](https://bazel.build/versions/master/docs/be/workspace.html)
    to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
    [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/ci/WORKSPACE) and corresponding
@@ -243,16 +243,19 @@ remove log statements of lower importance during compilation to enhance performa
 bazel build --copt=-DNVLOG //source/exe:envoy-static
 ```
 
-## Hot Restart
+## Disabling optional features
 
-Hot restart can be disabled in any build by specifying `--define=hot_restart=disabled`
-on the Bazel command line.
+The following optional features can be disabled on the Bazel build command-line:
+
+* Hot restart with `--define hot_restart=disabled`
+* Google C++ gRPC client with `--define google_grpc=disabled`
+* Backtracing on signals with `--define signal_trace=disabled`
 
 ## Stats Tunables
 
 The default maximum number of stats in shared memory, and the default
 maximum length of a cluster/route config/listener name, can be
-overriden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
+overridden at compile-time by defining `ENVOY_DEFAULT_MAX_STATS` and
 `ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`, respectively, to the desired
 value. For example:
 

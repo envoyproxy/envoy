@@ -26,11 +26,6 @@ void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
   new_filter->moveIntoListBack(std::move(new_filter), upstream_filters_);
 }
 
-void FilterManagerImpl::destroyFilters() {
-  upstream_filters_.clear();
-  downstream_filters_.clear();
-}
-
 bool FilterManagerImpl::initializeReadFilters() {
   if (upstream_filters_.empty()) {
     return false;

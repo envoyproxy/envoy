@@ -9,6 +9,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/metadata.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
@@ -704,6 +705,32 @@ TEST(PrioritySet, Extend) {
   for (auto& host_set : priority_set.hostSetsPerPriority()) {
     EXPECT_EQ(host_set.get(), priority_set.hostSetsPerPriority()[i++].get());
   }
+}
+
+// Cluster metadata retrieval.
+TEST(ClusterMetadataTest, Metadata) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<MockClusterManager> cm;
+  ReadyWatcher initialized;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+  )EOF";
+
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
+                .string_value());
 }
 
 } // namespace

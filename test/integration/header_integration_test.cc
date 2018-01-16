@@ -112,7 +112,7 @@ public:
                   eds_cluster_config:
                     eds_config:
                       api_config_source:
-                        cluster_name: "eds-cluster"
+                        cluster_names: "eds-cluster"
                         api_type: GRPC
               )EOF"));
 
@@ -214,33 +214,31 @@ public:
     initialize();
   }
 
-  virtual void createUpstreams() override {
+  void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
       fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-      ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
     }
   }
 
-  virtual void initialize() override {
-    HttpIntegrationTest::initialize();
-
+  void initialize() override {
     if (use_eds_) {
-      eds_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-      eds_stream_ = eds_connection_->waitForNewStream(*dispatcher_);
-      eds_stream_->startGrpcStream();
+      pre_worker_start_test_steps_ = [this]() {
+        eds_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+        eds_stream_ = eds_connection_->waitForNewStream(*dispatcher_);
+        eds_stream_->startGrpcStream();
 
-      envoy::api::v2::DiscoveryRequest discovery_request;
-      eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        envoy::api::v2::DiscoveryRequest discovery_request;
+        eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
 
-      envoy::api::v2::DiscoveryResponse discovery_response;
-      discovery_response.set_version_info("1");
-      discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+        envoy::api::v2::DiscoveryResponse discovery_response;
+        discovery_response.set_version_info("1");
+        discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-      envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
-          TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
-              R"EOF(
+        envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
+            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+                R"EOF(
                 cluster_name: cluster_0
                 endpoints:
                 - lb_endpoints:
@@ -254,15 +252,18 @@ public:
                         test.namespace:
                           key: metadata-value
               )EOF",
-              Network::Test::getLoopbackAddressString(GetParam()),
-              fake_upstreams_[0]->localAddress()->ip()->port()));
+                Network::Test::getLoopbackAddressString(GetParam()),
+                fake_upstreams_[0]->localAddress()->ip()->port()));
 
-      discovery_response.add_resources()->PackFrom(cluster_load_assignment);
-      eds_stream_->sendGrpcMessage(discovery_response);
+        discovery_response.add_resources()->PackFrom(cluster_load_assignment);
+        eds_stream_->sendGrpcMessage(discovery_response);
 
-      // Wait for the next request to make sure the first response was consumed.
-      eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        // Wait for the next request to make sure the first response was consumed.
+        eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+      };
     }
+
+    HttpIntegrationTest::initialize();
   }
 
 protected:

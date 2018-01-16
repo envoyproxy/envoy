@@ -264,6 +264,8 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
     ],
 )
@@ -304,6 +306,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:common_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",

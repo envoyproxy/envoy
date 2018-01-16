@@ -52,9 +52,15 @@ protected:
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     envoy::api::v2::ConfigSource eds_config;
-    eds_config.mutable_api_config_source()->add_cluster_name("sds");
+    eds_config.mutable_api_config_source()->add_cluster_names("sds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
     sds_cluster_ = parseSdsClusterFromJson(raw_config, eds_config);
+    Upstream::ClusterManager::ClusterInfoMap cluster_map;
+    Upstream::MockCluster cluster;
+    cluster_map.emplace("sds", cluster);
+    EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+    EXPECT_CALL(cluster, info()).Times(2);
+    EXPECT_CALL(*cluster.info_, addedViaApi());
     cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, stats_, ssl_context_manager_,
                                       local_info_, cm_, dispatcher_, random_, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());

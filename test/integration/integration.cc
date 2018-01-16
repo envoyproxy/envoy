@@ -15,6 +15,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -122,7 +123,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr());
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
@@ -194,15 +195,15 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
   return dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr());
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
 }
 
 void BaseIntegrationTest::initialize() {
   RELEASE_ASSERT(!initialized_);
+  RELEASE_ASSERT(Event::Libevent::Global::initialized());
   initialized_ = true;
 
   createUpstreams();
-
   createEnvoy();
 }
 
@@ -212,11 +213,16 @@ void BaseIntegrationTest::createUpstreams() {
   } else {
     fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
   }
-  ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
 }
 
 void BaseIntegrationTest::createEnvoy() {
-  config_helper_.finalize(ports_);
+  std::vector<uint32_t> ports;
+  for (auto& upstream : fake_upstreams_) {
+    if (upstream->localAddress()->ip()) {
+      ports.push_back(upstream->localAddress()->ip()->port());
+    }
+  }
+  config_helper_.finalize(ports);
 
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
                  config_helper_.bootstrap().DebugString());
@@ -268,7 +274,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_);
+  test_server_ =
+      IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
@@ -297,7 +304,7 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_);
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), version_, nullptr);
   registerTestServerPorts(port_names);
 }
 

@@ -16,7 +16,7 @@ is set to 10000, which matches the configuration in
 `proxy_config.json`.
 
 This creates a network namespace `ns1` and redirects traffic from
-there to Envoy listening on port 10000 if the desination address of
+there to Envoy listening on port 10000 if the destination address of
 the traffic matches `173.194.222.0/24` :
 
 ```
@@ -65,7 +65,7 @@ thread.
 
 # Cleaning up
 
-To propertly remove the added network namespace and the iptables
+To properly remove the added network namespace and the iptables
 configuration run `netns_cleanup.sh` with the same arguments as
 the setup before:
 

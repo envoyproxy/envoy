@@ -80,8 +80,10 @@ const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::DataSo
   switch (source.specifier_case()) {
   case envoy::api::v2::DataSource::kFilename:
     return Filesystem::fileReadToEnd(source.filename());
-  case envoy::api::v2::DataSource::kInline:
-    return source.inline_();
+  case envoy::api::v2::DataSource::kInlineBytes:
+    return source.inline_bytes();
+  case envoy::api::v2::DataSource::kInlineString:
+    return source.inline_string();
   default:
     if (!allow_empty) {
       throw EnvoyException(

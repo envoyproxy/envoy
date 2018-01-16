@@ -9,6 +9,8 @@ final version.
 
 ## 1.6.0
 * Added support for inline delivery of TLS certificates and private keys.
+* Added Metrics Service implementation.
+* Added gRPC access logging.
 * Added DOWNSTREAM_REMOTE_ADDRESS, DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT, and
   DOWNSTREAM_LOCAL_ADDRESS access log formatters. DOWNSTREAM_ADDRESS access log formatter has been
   deprecated.
@@ -17,12 +19,19 @@ final version.
 * Added DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT header formatter. CLIENT_IP header formatter has been
   deprecated.
 * Added transport socket interface to allow custom implementation of transport socket. A transport socket
-  provides read and write logic with buffer encryption and decryption. The exising TLS implementation is
+  provides read and write logic with buffer encryption and decryption. The existing TLS implementation is
   refactored with the interface.
 * Added support for dynamic response header values (`%CLIENT_IP%` and `%PROTOCOL%`).
 * Added native DogStatsD support. :ref:`DogStatsdSink <envoy_api_msg_DogStatsdSink>`
 * grpc-json: Added support inline descriptor in config.
+* Added support for listening for both IPv4 and IPv6 when binding to ::.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
+* Added restrictions for the backing sources of xDS resources. For filesystem based xDS the file
+  must exist at configuration time. For cluster based xDS (api\_config\_source, and ADS) the backing
+  cluster must be statically defined and be of non-EDS type.
+* Added support for route matching based on URL query string parameters.
+  :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
+* Added `/runtime` admin endpoint to read the current runtime values.

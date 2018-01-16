@@ -21,6 +21,12 @@ static_assert(offsetof(RawSlice, len_) == offsetof(evbuffer_iovec, iov_len),
 
 void OwnedImpl::add(const void* data, uint64_t size) { evbuffer_add(buffer_.get(), data, size); }
 
+void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
+  evbuffer_add_reference(
+      buffer_.get(), fragment.data(), fragment.size(),
+      [](const void*, size_t, void* arg) { static_cast<BufferFragment*>(arg)->done(); }, &fragment);
+}
+
 void OwnedImpl::add(const std::string& data) {
   evbuffer_add(buffer_.get(), data.c_str(), data.size());
 }

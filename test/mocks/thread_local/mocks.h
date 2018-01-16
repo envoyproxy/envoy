@@ -24,6 +24,7 @@ public:
   MOCK_METHOD2(registerThread, void(Event::Dispatcher& dispatcher, bool main_thread));
   MOCK_METHOD0(shutdownGlobalThreading, void());
   MOCK_METHOD0(shutdownThread, void());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
 
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }

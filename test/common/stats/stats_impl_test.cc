@@ -190,6 +190,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("listener.[__1]_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
                          {listener_address, cipher_name});
 
+  // Cipher suite
+  Tag cipher_suite;
+  cipher_suite.name_ = tag_names.SSL_CIPHER_SUITE;
+  cipher_suite.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
+
+  regex_tester.testRegex("cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+                         "cluster.ssl.ciphers", {cluster_tag, cipher_suite});
+
   // ipv6 non-loopback (for alphabetical chars)
   listener_address.value_ = "[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543";
   regex_tester.testRegex(

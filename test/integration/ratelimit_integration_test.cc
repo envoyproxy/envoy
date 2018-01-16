@@ -21,7 +21,6 @@ public:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
-    ports_.push_back(fake_upstreams_.back()->localAddress()->ip()->port());
   }
 
   void initialize() override {
@@ -43,7 +42,6 @@ public:
                                  ->add_rate_limits();
           rate_limit->add_actions()->mutable_destination_cluster();
         });
-    named_ports_ = {"http"};
     HttpIntegrationTest::initialize();
   }
 
