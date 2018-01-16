@@ -93,6 +93,8 @@ public:
 // Templatized variant of AsyncRequestCallbacks.
 template <class ResponseType> class TypedAsyncRequestCallbacks : public AsyncRequestCallbacks {
 public:
+  using AsyncRequestCallbacks::onSuccess;
+
   ProtobufTypes::MessagePtr createEmptyResponse() override {
     return std::make_unique<ResponseType>();
   }
@@ -160,6 +162,8 @@ public:
 // Templatized variant of AsyncStreamCallbacks.
 template <class ResponseType> class TypedAsyncStreamCallbacks : public AsyncStreamCallbacks {
 public:
+  using AsyncStreamCallbacks::onReceiveMessage;
+
   ProtobufTypes::MessagePtr createEmptyResponse() override {
     return std::make_unique<ResponseType>();
   }
