@@ -69,9 +69,10 @@ public:
    */
   SharedMemoryHashSet(const SharedMemoryHashSetOptions& options, bool init, uint8_t* memory)
       : cells_(nullptr), control_(nullptr), slots_(nullptr) {
+    mapMemorySegments(options, memory);
     if (init) {
-      initialize(options, memory);
-    } else if (!attach(options, memory)) {
+      initialize(options);
+    } else if (!attach(options)) {
       throw EnvoyException("SharedMemoryHashSet: Incompatible memory block");
     }
   }
@@ -247,8 +248,7 @@ private:
    * coming in.
    * @param memory
    */
-  void initialize(const SharedMemoryHashSetOptions& options, uint8_t* memory) {
-    mapMemorySegments(options, memory);
+  void initialize(const SharedMemoryHashSetOptions& options) {
     control_->hash_signature = HashUtil::xxHash64(signatureStringToHash());
     control_->num_bytes = numBytes(options);
     control_->options = options;
@@ -272,8 +272,7 @@ private:
    * sanity check to make sure the options copied to the provided memory match, and also
    * that the slot, cell, and key-string structures look sane.
    */
-  bool attach(const SharedMemoryHashSetOptions& options, uint8_t* memory) {
-    mapMemorySegments(options, memory);
+  bool attach(const SharedMemoryHashSetOptions& options) {
     if (numBytes(options) != control_->num_bytes) {
       ENVOY_LOG(error, "SharedMemoryHashSet unexpected memory size {} != {}", numBytes(options),
                 control_->num_bytes);
