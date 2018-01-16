@@ -87,8 +87,8 @@ private:
   typedef uint32_t Ipv4;
   typedef absl::uint128 Ipv6;
 
-  // Helper methods to retrieve the string representation of the address in IpPrefix  using inet_ntop.
-  // These strings are used in the nested prefixes exception messages.
+  // Helper methods to retrieve the string representation of the address in IpPrefix using
+  // inet_ntop. These strings are used in the nested prefixes exception messages.
   // TODO(ccaraman): Remove once nested prefixes are supported.
   static std::string toString(const Ipv4& input) {
     sockaddr_in address;
