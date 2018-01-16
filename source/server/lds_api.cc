@@ -46,7 +46,8 @@ void LdsApi::onConfigUpdate(const ResourceVector& resources) {
     MessageUtil::validate(listener);
   }
   // We need to keep track of which listeners we might need to remove.
-  std::unordered_map<std::string, std::reference_wrapper<Listener>> listeners_to_remove;
+  std::unordered_map<std::string, std::reference_wrapper<Network::ListenerConfig>>
+      listeners_to_remove;
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);
   }
