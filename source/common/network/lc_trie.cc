@@ -32,10 +32,10 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
 std::string LcTrie::getTag(Network::Address::InstanceConstSharedPtr ip_address) const {
   if (ip_address->ip()->version() == Address::IpVersion::v4) {
     Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
-    return ipv4_trie_->search(ip);
+    return ipv4_trie_->getTag(ip);
   } else {
     Ipv6 ip = arrayToAsblUint128(ip_address->ip()->ipv6()->address());
-    return ipv6_trie_->search(ip);
+    return ipv6_trie_->getTag(ip);
   }
 }
 
