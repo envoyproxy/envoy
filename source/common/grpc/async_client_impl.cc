@@ -120,7 +120,7 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
         return;
       }
     }
-    callbacks_.onReceiveMessage(std::move(response));
+    callbacks_.onReceiveMessageUntyped(std::move(response));
   }
 }
 
@@ -226,7 +226,7 @@ void AsyncRequestImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
 
 void AsyncRequestImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&&) {}
 
-void AsyncRequestImpl::onReceiveMessage(ProtobufTypes::MessagePtr&& message) {
+void AsyncRequestImpl::onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) {
   response_ = std::move(message);
 }
 
@@ -242,7 +242,7 @@ void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std:
     current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
-    callbacks_.onSuccess(std::move(response_), *current_span_);
+    callbacks_.onSuccessUntyped(std::move(response_), *current_span_);
   }
 
   current_span_->finishSpan();

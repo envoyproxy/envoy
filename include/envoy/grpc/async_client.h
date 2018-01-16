@@ -78,7 +78,7 @@ public:
    * @param response the gRPC response.
    * @param span a tracing span to fill with extra tags.
    */
-  virtual void onSuccess(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) PURE;
+  virtual void onSuccessUntyped(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) PURE;
 
   /**
    * Called when the async gRPC request fails. No further callbacks will be invoked.
@@ -93,15 +93,13 @@ public:
 // Templatized variant of AsyncRequestCallbacks.
 template <class ResponseType> class TypedAsyncRequestCallbacks : public AsyncRequestCallbacks {
 public:
-  using AsyncRequestCallbacks::onSuccess;
-
   ProtobufTypes::MessagePtr createEmptyResponse() override {
     return std::make_unique<ResponseType>();
   }
 
   virtual void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) PURE;
 
-  void onSuccess(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) override {
+  void onSuccessUntyped(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) override {
     onSuccess(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(response.release())), span);
   }
 };
@@ -140,7 +138,7 @@ public:
    * Called when an async gRPC message is received.
    * @param response the gRPC message.
    */
-  virtual void onReceiveMessage(ProtobufTypes::MessagePtr&& message) PURE;
+  virtual void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) PURE;
 
   /**
    * Called when trailing metadata is recevied.
@@ -162,15 +160,13 @@ public:
 // Templatized variant of AsyncStreamCallbacks.
 template <class ResponseType> class TypedAsyncStreamCallbacks : public AsyncStreamCallbacks {
 public:
-  using AsyncStreamCallbacks::onReceiveMessage;
-
   ProtobufTypes::MessagePtr createEmptyResponse() override {
     return std::make_unique<ResponseType>();
   }
 
   virtual void onReceiveMessage(std::unique_ptr<ResponseType>&& message) PURE;
 
-  void onReceiveMessage(ProtobufTypes::MessagePtr&& message) override {
+  void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) override {
     onReceiveMessage(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(message.release())));
   }
 };

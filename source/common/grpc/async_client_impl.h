@@ -117,7 +117,7 @@ private:
   ProtobufTypes::MessagePtr createEmptyResponse() override;
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
-  void onReceiveMessage(ProtobufTypes::MessagePtr&& message) override;
+  void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
