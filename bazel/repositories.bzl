@@ -411,3 +411,8 @@ def _com_github_grpc_grpc():
       name = "grpc",
       actual = "@com_github_grpc_grpc//:grpc++"
     )
+
+    native.bind(
+      name = "grpc_health_proto",
+      actual = "//bazel:grpc_health_proto",
+    )

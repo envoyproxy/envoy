@@ -89,9 +89,11 @@ envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
-    external_deps = ["envoy_health_check"],
+    external_deps = [
+        "envoy_health_check",
+        "grpc_health_proto",
+    ],
     deps = [
-        ":health_proto",
         ":host_utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -352,9 +354,4 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
     ],
-)
-
-envoy_proto_library(
-    name = "health_proto",
-    srcs = ["health.proto"],
 )

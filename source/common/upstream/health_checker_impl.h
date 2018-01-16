@@ -23,9 +23,8 @@
 #include "common/network/filter_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "source/common/upstream/health.pb.h"
-
 #include "api/health_check.pb.h"
+#include "src/proto/grpc/health/v1/health.pb.h"
 
 namespace Envoy {
 namespace Upstream {
