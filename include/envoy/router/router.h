@@ -23,24 +23,25 @@ namespace Envoy {
 namespace Router {
 
 /**
- * A routing primitive that creates a redirect path.
+ * A routing primitive that specifies a direct (non-proxied) HTTP response.
  */
-class RedirectEntry {
+class DirectResponseEntry {
 public:
-  virtual ~RedirectEntry() {}
+  virtual ~DirectResponseEntry() {}
+
+  /**
+   * Returns the HTTP status code to return.
+   * @return Http::Code the response Code.
+   */
+  virtual Http::Code responseCode() const PURE;
 
   /**
    * Returns the redirect path based on the request headers.
    * @param headers supplies the request headers.
-   * @return std::string the redirect URL.
+   * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
+   *         or an empty string otherwise.
    */
   virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
-
-  /**
-   * Returns the HTTP status code to use when redirecting a request.
-   * @return Http::Code the redirect response Code.
-   */
-  virtual Http::Code redirectResponseCode() const PURE;
 };
 
 /**
@@ -417,16 +418,16 @@ public:
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
 
 /**
- * An interface that holds a RedirectEntry or a RouteEntry for a request.
+ * An interface that holds a DirectResponseEntry or RouteEntry for a request.
  */
 class Route {
 public:
   virtual ~Route() {}
 
   /**
-   * @return the redirect entry or nullptr if there is no redirect needed for the request.
+   * @return the direct response entry or nullptr if there is no direct response for the request.
    */
-  virtual const RedirectEntry* redirectEntry() const PURE;
+  virtual const DirectResponseEntry* directResponseEntry() const PURE;
 
   /**
    * @return the route entry or nullptr if there is no matching route for the request.
@@ -450,7 +451,7 @@ public:
 
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
-   * route entry or a redirect entry) for the request.
+   * route entry or a direct response entry) for the request.
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
