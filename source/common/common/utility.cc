@@ -216,6 +216,12 @@ std::string StringUtil::toUpper(const std::string& s) {
 }
 
 bool Primes::isPrime(uint32_t x) {
+  if (x < 4) {
+    return true; // eliminates special-casing 2.
+  } else if ((x & 1) == 0) {
+    return false; // eliminates even numbers >2.
+  }
+
   uint32_t limit = sqrt(x);
   for (uint32_t factor = 3; factor <= limit; factor += 2) {
     if ((x % factor) == 0) {

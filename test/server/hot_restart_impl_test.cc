@@ -87,6 +87,16 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_EQ(stat5, stat5_prime);
 }
 
+TEST_F(HotRestartImplTest, truncateKey) {
+  setup();
+
+  std::string key1(Stats::RawStatData::maxNameLength(), 'a');
+  Stats::RawStatData* stat1 = hot_restart_->alloc(key1);
+  std::string key2 = key1 + "a";
+  Stats::RawStatData* stat2 = hot_restart_->alloc(key2);
+  EXPECT_EQ(stat1, stat2);
+}
+
 TEST_F(HotRestartImplTest, allocFail) {
   EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(2));
   setup();

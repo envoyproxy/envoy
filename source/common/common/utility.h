@@ -216,7 +216,7 @@ public:
 class Primes {
 public:
   /**
-   * Determines whether x is prime, assuming it is not even.
+   * Determines whether x is prime.
    */
   static bool isPrime(uint32_t x);
 
