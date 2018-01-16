@@ -132,7 +132,9 @@ struct RawStatData {
   /**
    * Returns the name as a string_view. This is required by SharedMemoryHashSet.
    */
-  absl::string_view key() const { return absl::string_view(name_, strlen(name_)); }
+  absl::string_view key() const {
+    return absl::string_view(name_, strnlen(name_, maxNameLength()));
+  }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;

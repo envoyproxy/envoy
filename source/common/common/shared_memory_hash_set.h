@@ -55,12 +55,23 @@ public:
 
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
-   * Note that the map data itself is not constructed when the object is constructed.
-   * After the control-structure is constructed, the number of bytes can be computed so
-   * that a shared-memory segment can be allocated and passed to init() or attach().
+   * @param options describes the parameters comtrolling set layout.
+   * @param init true if the shared-memory should be initialized on construction. If false,
+   *             the data in the table will be sanity checked, and an exception thrown if
+   *             it is incoherent or mismatches the passed-in options.
+   * @param memory the memory buffer for the set data.
+   *
+   * Note that no locking of any kind is done by this class; this must be done at the
+   * call-site to support concurrent access.
    */
-  SharedMemoryHashSet(const SharedMemoryHashSetOptions& options)
-      : options_(options), cells_(nullptr), control_(nullptr), slots_(nullptr) {}
+  SharedMemoryHashSet(const SharedMemoryHashSetOptions& options, bool init, uint8_t* memory)
+      : cells_(nullptr), control_(nullptr), slots_(nullptr) {
+    if (init) {
+      initialize(options, memory);
+    } else if (!attach(options, memory)) {
+      throw std::runtime_error("Incompatible memory block");
+    }
+  }
 
   /**
    * Returns the numbers of byte required for the hash-table, based on
@@ -74,59 +85,31 @@ public:
     return align(size);
   }
 
-  uint32_t numBytes() const { return numBytes(options_); }
+  uint32_t numBytes() const { return numBytes(control_->options); }
 
   /**
    * Returns the options structure that was used to construct the set.
    */
-  const SharedMemoryHashSetOptions& options() const { return options_; }
-
-  /**
-   * Attempts to attach to an existing shared memory segment. Does a (relatively) quick
-   * sanity check to make sure the options copied to the provided memory match, and also
-   * that the slot, cell, and key-string structures look sane.
-   *
-   * Note that if mutex is in a locked state at the time of attachment, this function
-   * can hang.
-   */
-  bool attach(uint8_t* memory, uint32_t num_bytes) {
-    mapMemorySegments(memory);
-    if (num_bytes != control_->num_bytes) {
-      ENVOY_LOG(error, "SharedMemoryHashSet unexpected memory size {} != {}", num_bytes,
-                control_->num_bytes);
-      return false;
-    }
-    if (HashUtil::xxHash64(signatureStringToHash()) != control_->hash_signature) {
-      ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
-      return false;
-    }
-    return sanityCheck();
-  }
+  const SharedMemoryHashSetOptions& options() const { return control_->options; }
 
   /** Examines the data structures to see if they are sane. Tries hard not to crash or hang. */
   bool sanityCheck() {
     bool ret = true;
-    if (options_ != control_->options) {
-      // options doesn't match.
-      ENVOY_LOG(error, "SharedMemoryHashSet options don't match");
-      return false;
-    }
-
-    if (control_->size > options_.capacity) {
+    if (control_->size > control_->options.capacity) {
       ENVOY_LOG(error, "SharedMemoryHashSet size={} > capacity={}", control_->size,
-                options_.capacity);
+                control_->options.capacity);
       return false;
     }
 
     // As a sanity check, make sure there are control_->size values
     // reachable from the slots, each of which has a valid char_offset
     uint32_t num_values = 0;
-    for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
+    for (uint32_t slot = 0; slot < control_->options.num_slots; ++slot) {
       uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
-        if (cell_index >= options_.capacity) {
+        if (cell_index >= control_->options.capacity) {
           ENVOY_LOG(error, "SharedMemoryHashSet cell index too high={}, capacity={}", cell_index,
-                    options_.capacity);
+                    control_->options.capacity);
           ret = false;
           break;
         } else {
@@ -161,8 +144,9 @@ public:
    */
   std::string toString() {
     std::string ret;
-    ret = fmt::format("options={}\ncontrol={}\n", options_.toString(), control_->toString());
-    for (uint32_t i = 0; i < options_.num_slots; ++i) {
+    ret =
+        fmt::format("options={}\ncontrol={}\n", control_->options.toString(), control_->toString());
+    for (uint32_t i = 0; i < control_->options.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
       for (uint32_t j = slots_[i]; j != Sentinal; j = getCell(j).next_cell) {
         ret += " " + std::string(getCell(j).value.key());
@@ -170,32 +154,6 @@ public:
       ret += "\n";
     }
     return ret;
-  }
-
-  /**
-   * Initializes a hash-map on raw memory. No expectations are made about the state of the memory
-   * coming in.
-   * @param memory
-   */
-  void init(uint8_t* memory, uint32_t num_bytes) {
-    mapMemorySegments(memory);
-    RELEASE_ASSERT(num_bytes == numBytes(options_));
-    control_->hash_signature = HashUtil::xxHash64(signatureStringToHash());
-    control_->num_bytes = num_bytes;
-    control_->options = options_;
-    control_->size = 0;
-    control_->free_cell_index = 0;
-
-    // Initialize all the slots;
-    for (uint32_t slot = 0; slot < options_.num_slots; ++slot) {
-      slots_[slot] = Sentinal;
-    }
-
-    // Initialize all the key-char offsets.
-    for (uint32_t cell_index = 0; cell_index < options_.capacity; ++cell_index) {
-      Cell& cell = getCell(cell_index);
-      cell.next_cell = cell_index + 1;
-    }
   }
 
   /**
@@ -217,7 +175,7 @@ public:
     if (value != nullptr) {
       return ValueCreatedPair(value, false);
     }
-    if (control_->size >= options_.capacity) {
+    if (control_->size >= control_->options.capacity) {
       return ValueCreatedPair(nullptr, false);
     }
     const uint32_t slot = computeSlot(key);
@@ -233,7 +191,7 @@ public:
   }
 
   /**
-   * Removes the specified key from the map, returning bool if the key
+   * Removes the specified key from the map, returning true if the key
    * was found.
    * @param key the key to remove
    */
@@ -273,8 +231,52 @@ public:
   }
 
 private:
+  /**
+   * Initializes a hash-map on raw memory. No expectations are made about the state of the memory
+   * coming in.
+   * @param memory
+   */
+  void initialize(const SharedMemoryHashSetOptions& options, uint8_t* memory) {
+    mapMemorySegments(options, memory);
+    control_->hash_signature = HashUtil::xxHash64(signatureStringToHash());
+    control_->num_bytes = numBytes(options);
+    control_->options = options;
+    control_->size = 0;
+    control_->free_cell_index = 0;
+
+    // Initialize all the slots;
+    for (uint32_t slot = 0; slot < options.num_slots; ++slot) {
+      slots_[slot] = Sentinal;
+    }
+
+    // Initialize the free-cell list.
+    for (uint32_t cell_index = 0; cell_index < options.capacity; ++cell_index) {
+      Cell& cell = getCell(cell_index);
+      cell.next_cell = cell_index + 1;
+    }
+  }
+
+  /**
+   * Attempts to attach to an existing shared memory segment. Does a (relatively) quick
+   * sanity check to make sure the options copied to the provided memory match, and also
+   * that the slot, cell, and key-string structures look sane.
+   */
+  bool attach(const SharedMemoryHashSetOptions& options, uint8_t* memory) {
+    mapMemorySegments(options, memory);
+    if (numBytes(options) != control_->num_bytes) {
+      ENVOY_LOG(error, "SharedMemoryHashSet unexpected memory size {} != {}", numBytes(options),
+                control_->num_bytes);
+      return false;
+    }
+    if (HashUtil::xxHash64(signatureStringToHash()) != control_->hash_signature) {
+      ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
+      return false;
+    }
+    return sanityCheck();
+  }
+
   uint32_t computeSlot(absl::string_view key) {
-    return HashUtil::xxHash64(key) % options_.num_slots;
+    return HashUtil::xxHash64(key) % control_->options.num_slots;
   }
 
   /**
@@ -292,8 +294,7 @@ private:
   }
 
   /**
-   * Represents control-values for the hash-table, including a mutex, which
-   * must gate all access to the internals.
+   * Represents control-values for the hash-table.
    */
   struct Control {
     std::string toString() const {
@@ -317,11 +318,17 @@ private:
   };
 
   // It seems like this is an obvious constexpr, but it won't compile as one.
-  static size_t alignment() {
+  static size_t calculateAlignment() {
     return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
   }
 
-  static uint32_t align(uint32_t size) { return (size + alignment() - 1) & ~(alignment() - 1); }
+  static uint32_t align(uint32_t size) {
+    const size_t alignment = calculateAlignment();
+    // Check that alignment is a power of 2:
+    // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+    RELEASE_ASSERT((alignment > 0) && ((alignment & (alignment - 1)) == 0));
+    return (size + alignment - 1) & ~(alignment - 1);
+  }
 
   /**
    * Computes the byte offset of a cell into cells_. This is not
@@ -341,24 +348,20 @@ private:
   Cell& getCell(uint32_t cell_index) {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index);
-    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (alignment() - 1)) == 0);
+    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0);
     return *reinterpret_cast<Cell*>(ptr);
   }
 
   /** Maps out the segments of shared memory for us to work with. */
-  void mapMemorySegments(uint8_t* memory) {
+  void mapMemorySegments(const SharedMemoryHashSetOptions& options, uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
     cells_ = reinterpret_cast<Cell*>(memory); // First because Value may need to be aligned.
-    memory += cellOffset(options_.capacity);
+    memory += cellOffset(options.capacity);
     control_ = reinterpret_cast<Control*>(memory);
     memory += sizeof(Control);
     slots_ = reinterpret_cast<uint32_t*>(memory);
   }
-
-  // Copy of the options in process-local memory; which is used to help compute
-  // the required size in bytes after construction and before init/attach.
-  const SharedMemoryHashSetOptions options_;
 
   // Pointers into shared memory. Cells go first, because Value may need a more aggressive
   // aligmnment.

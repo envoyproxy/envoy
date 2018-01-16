@@ -43,31 +43,27 @@ protected:
 
 TEST_F(SharedMemoryHashSetTest, initAndAttach) {
   {
-    SharedMemoryHashSet<TestValue> hash_set1(options_);
-    hash_set1.init(memory_.get(), mem_size_);
-    SharedMemoryHashSet<TestValue> hash_set2(options_);
-    EXPECT_TRUE(hash_set2.attach(memory_.get(), mem_size_));
-  }
-
-  // If we pass in a memory-buffer with the wrong size, we can no longer attach it.
-  {
-    SharedMemoryHashSet<TestValue> hash_set3(options_);
-    EXPECT_FALSE(hash_set3.attach(memory_.get(), mem_size_ - 1));
+    SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());  // init
+    SharedMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get()); // attach
   }
 
   // If we tweak an option, we can no longer attach it.
-  {
+  bool constructor_completed = false;
+  bool constructor_threw = false;
+  try {
     options_.capacity = 99;
-    SharedMemoryHashSet<TestValue> hash_set4(options_);
-    EXPECT_FALSE(hash_set4.attach(memory_.get(), mem_size_));
+    SharedMemoryHashSet<TestValue> hash_set3(options_, false, memory_.get());
+    constructor_completed = false;
+  } catch (const std::exception& e) {
+    constructor_threw = true;
   }
+  EXPECT_TRUE(constructor_threw);
+  EXPECT_FALSE(constructor_completed);
 }
 
 TEST_F(SharedMemoryHashSetTest, putRemove) {
   {
-    SharedMemoryHashSet<TestValue> hash_set1(options_);
-
-    hash_set1.init(memory_.get(), mem_size_);
+    SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
     EXPECT_TRUE(hash_set1.sanityCheck());
     EXPECT_EQ(0, hash_set1.size());
     EXPECT_EQ(nullptr, hash_set1.get("no such key"));
@@ -88,9 +84,8 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
 
   {
     // Now init a new hash-map with the same memory.
-    SharedMemoryHashSet<TestValue> hash_set2(options_);
-    EXPECT_TRUE(hash_set2.attach(memory_.get(), mem_size_));
-
+    SharedMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get());
+    ;
     EXPECT_EQ(1, hash_set2.size());
     EXPECT_EQ(nullptr, hash_set2.get("no such key"));
     EXPECT_EQ(6789, hash_set2.get("good key")->number) << hash_set2.toString();
@@ -102,8 +97,7 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
 }
 
 TEST_F(SharedMemoryHashSetTest, tooManyValues) {
-  SharedMemoryHashSet<TestValue> hash_set1(options_);
-  hash_set1.init(memory_.get(), mem_size_);
+  SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
   std::vector<std::string> keys;
   for (uint32_t i = 0; i < options_.capacity + 1; ++i) {
     keys.push_back(fmt::format("key{}", i));

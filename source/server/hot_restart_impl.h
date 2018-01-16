@@ -198,9 +198,9 @@ private:
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
 
   Options& options_;
-  RawStatDataSet stats_set_;
-  uint32_t stats_set_data_size_;
+  SharedMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
+  RawStatDataSet stats_set_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;

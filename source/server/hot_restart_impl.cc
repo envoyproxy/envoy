@@ -116,21 +116,16 @@ std::string SharedMemory::version() {
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), stats_set_(sharedMemHashOptions(options)),
-      stats_set_data_size_(stats_set_.numBytes()),
-      shmem_(SharedMemory::initialize(stats_set_data_size_, options)), log_lock_(shmem_.log_lock_),
-      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
-      init_lock_(shmem_.init_lock_) {
+    : options_(options), stats_set_options_(sharedMemHashOptions(options)),
+      shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
+      stats_set_(stats_set_options_, options.restartEpoch() == 0, shmem_.stats_set_data_),
+      log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
+      stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
-  bool need_init = true;
   if (options.restartEpoch() != 0) {
     parent_address_ = createDomainSocketAddress((options.restartEpoch() + -1));
-    need_init = !stats_set_.attach(shmem_.stats_set_data_, stats_set_data_size_);
-  }
-  if (need_init) {
-    stats_set_.init(shmem_.stats_set_data_, stats_set_data_size_);
   }
 
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
