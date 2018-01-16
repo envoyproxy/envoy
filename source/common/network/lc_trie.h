@@ -20,32 +20,35 @@ namespace Network {
 namespace LcTrie {
 
 /**
- * Level Compressed Trie for tagging IP addresses. IPv4 and IPv6 addresses are supported without the
- * caller requiring to change calling pattern.
+ * Level Compressed Trie for tagging IP addresses. Both IPv4 and IPv6 addresses are supported
+ * within this class with no calling pattern changes.
  *
  * Refer to LcTrieInternal for implementation and algorithm details.
  */
 class LcTrie {
 public:
   /**
-   * @param fill_factor supplies the fraction of completeness to use when considering
-   *        if a subtrie should be compressed.
-   * @param root_branching_factor supplies the branching factor at the root. This is
-   *        an optimization as suggested in the paper.
-   * @param tag_data supplies the ip tag and the prefixes for associated with that tag.
+   * @param tag_data supplies a vector of tag and CIDR ranges.
+   * @param fill_factor supplies the fraction of completeness to use when calculating the branch
+   *                    value for a sub-trie.
+   * @param root_branching_factor supplies the branching factor at the root. The paper suggests for
+   *                              large LC-Tries to use the value '16' for the root branching
+   *                              factor. It reduces the depth of the trie.
    */
   LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
-         double fill_factor = 0.5, uint32_t root_branching_factor = 0);
+         double fill_factor = 0.5, uint32_t root_branching_factor = 16);
 
   /**
-   * Return the tag for the IP range that covers the input, ip_address. Both IPv4 and IPv6 addresses
-   * are supported.
+   * Retrieve the tag associated with the CIDR range that contains `ip_address`. Both IPv4 and IPv6
+   * addresses are supported.
+   * TODO(ccaraman): Change to getTags and std::vector<std::string> when nested prefixes are
+   * supported.
    * @param  ip_address supplies the IP address.
-   * @return tag from the prefix that encompasses the ip_address. An empty string is returned
-   *         if no prefix has the ip_address in range or there are no tags for the IP
-   *         version of the ip_address.
+   * @return tag from the CIDR range that contains 'ip_address'. An empty string is returned
+   *             if no prefix contains 'ip_address'or there is no data for the IP version of the
+   *             ip_address.
    */
-  std::string search(const Network::Address::InstanceConstSharedPtr ip_address) const;
+  std::string getTag(const Network::Address::InstanceConstSharedPtr ip_address) const;
 
 private:
   /**
@@ -53,7 +56,7 @@ private:
    * @param p supplies the position.
    * @param n supplies the number of bits to extract.
    * @param input supplies the IP address to extract bits from. The IP address is stored in host
-   * byte order.
+   *              byte order.
    * @return extracted bits in the format of IpType.
    */
   template <class IpType, uint32_t address_size = 8 * sizeof(IpType)>
@@ -69,14 +72,14 @@ private:
    * Removes n bits from input starting at 0.
    * @param n supplies the number of bits to remove.
    * @param input supplies the IP address to remove bits from. The IP address is stored in host
-   * byte order.
+   *              byte order.
    * @return input with 0 through n-1 bits cleared.
    */
   template <class IpType, uint32_t address_size = 8 * sizeof(IpType)>
   static IpType removeBits(uint32_t n, IpType input) {
     // The IP's are stored in host byte order.
     // By shifting the value to the left by n bits and back, the bits between 0 and n-1
-    // (inclusively) are zero'd out..
+    // (inclusively) are zero'd out.
     return input << n >> n;
   }
 
@@ -84,6 +87,9 @@ private:
   typedef uint32_t Ipv4;
   typedef absl::uint128 Ipv6;
 
+  // Helper methods to retrieve the string representation of the address in IpPrefix  using inet_ntop.
+  // These strings are used in the nested prefixes exception messages.
+  // TODO(ccaraman): Remove once nested prefixes are supported.
   static std::string toString(const Ipv4& input) {
     sockaddr_in address;
     address.sin_family = AF_INET;
@@ -98,15 +104,15 @@ private:
     sockaddr_in6 address;
     address.sin6_family = AF_INET6;
     address.sin6_port = htons(0);
-    std::array<uint8_t,16> ip6 = ipv6ToArray(input);
-    for(size_t i = 0 ; i < 16 ; i++) {
+
+    std::array<uint8_t, 16> ip6 = abslUint128ToArray(input);
+    for (size_t i = 0; i < 16; i++) {
       address.sin6_addr.s6_addr[i] = ip6[i];
     }
 
     char str[INET6_ADDRSTRLEN];
-    // FIXME: check the result
-    inet_ntop(AF_INET6, &address.sin6_addr, str, INET6_ADDRSTRLEN);
-
+    const char* ptr = inet_ntop(AF_INET6, &address.sin6_addr, str, INET6_ADDRSTRLEN);
+    ASSERT(ptr = str);
     return str;
   }
 
@@ -148,7 +154,7 @@ private:
 
     std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
-    // The address represented either in uint32_t or uint128.
+    // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
     IpType ip_{0};
     // Length of the cidr range.
     int length_;
@@ -158,7 +164,7 @@ private:
   };
 
   /**
-   * Level Compressed Trie (LC-Trie) implementation for IP(IPv4 or IPv6) prefixes.
+   * Level Compressed Trie (LC-Trie) that contains CIDR ranges and its corresponding tags.
    *
    * The following is an implementation of the algorithm described in the paper
    * 'IP-address lookup using LC-tries' by'S. Nilsson' and 'G. Karlsson'.
@@ -173,26 +179,27 @@ private:
   public:
     /**
      * Construct a LC-Trie for IpType.
-     * @param tag_data supplies the tag and the CIDR ranges for that tag.
-     * @param fill_factor supplies the fraction of completeness to use when considering
-     *        if a subtrie should be compressed.
-     * @param root_branching_factor supplies the branching factor at the root. This is
-     *        an optimization as suggested in the paper.
+     * @param tag_data supplies a vector of tag and CIDR ranges (in IpPrefix format).
+     * @param fill_factor supplies the fraction of completeness to use when calculating the branch
+     *                    value for a sub-trie.
+     * @param root_branching_factor supplies the branching factor at the root. The paper suggests
+     *                              for large LC-Tries to use the value '16' for the root branching
+     *                              factor. It reduces the depth of the trie.
      */
     LcTrieInternal(std::vector<IpPrefix<IpType>>& tag_data, double fill_factor = 0.5,
-                   uint32_t root_branching_factor = 0);
+                   uint32_t root_branching_factor = 16);
 
     /**
-     * Search the LC-Trie for a prefix that has the input, ip in range and return the tag for the prefix.
+     * Retrieve the tag associated with the CIDR range that contains `ip_address`.
      * @param  ip_address supplies the IP address in host byte order.
-     * @return tag from the prefix that encompasses the input. An empty string is returned
+     * @return the tag from the prefix that encompasses the input. An empty string is returned
      *         if no prefix in the LC Trie exists.
      */
-    std::string search(const IpType& ip_address) const;
+    std::string getTag(const IpType& ip_address) const;
 
   private:
     /**
-     * Builds the Level Compresesed Trie, by first sorting the base vector, removing duplicated
+     * Builds the Level Compresesed Trie, by first sorting the tag data, removing duplicated
      * prefixes and invoking buildRecursively() to build the trie.
      */
     void build(std::vector<IpPrefix<IpType>>& tag_data) {
@@ -205,11 +212,13 @@ private:
       // To prevent index out of bounds issues, only support a maximum of 2^19 CIDR ranges.
       // TODO(ccaraman): Add a test case for this.
       if (tag_data.size() > (1 << 19)) {
-        throw EnvoyException(fmt::format(
-            "Size of the input vector({0}) for LC-Trie is larger than the max size supported(2^19).",
-            tag_data.size()));
+        throw EnvoyException(fmt::format("Size of the input vector({0}) for LC-Trie is larger than "
+                                         "the max size supported(2^19).",
+                                         tag_data.size()));
       }
 
+      // TODO(ccaraman): Consider adding an optimization to short circuit building the trie, if
+      // tag_data[0].length_==0.
       std::sort(tag_data.begin(), tag_data.end());
       ip_prefixes_.push_back(tag_data[0]);
 
@@ -227,9 +236,9 @@ private:
         }
       }
 
-      // In theory, the trie_ vector can have at most twice the number of entries in the ip_prefixes_ vector.
-      // However, due to the fill factor a buffer is added to the size of the trie_.
-      // The buffer value(2000000) is reused from the reference implementation in
+      // In theory, the trie_ vector can have at most twice the number of entries in the
+      // ip_prefixes_ vector. However, due to the fill factor a buffer is added to the size of the
+      // trie_. The buffer value(2000000) is reused from the reference implementation in
       // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
       // TODO(ccaraman): Define a better buffer value when resizing the trie_.
       trie_.resize(2 * ip_prefixes_.size() + 2000000);
@@ -252,7 +261,7 @@ private:
 
     /**
      * Compute the branch and skip values for the trie starting at position 'first' through
-     * 'first+n' while disregarding the prefix.
+     * 'first+n-1' while disregarding the prefix.
      * @param prefix supplies the common prefix in the ip_prefixes_ array.
      * @param first supplies the index where computing the branch should begin with.
      * @param n supplies the number of nodes to use while computing the branch.
@@ -280,7 +289,7 @@ private:
         return compute;
       }
 
-      // According to the original LC-Trie paper, a large branching factor(es 16)
+      // According to the original LC-Trie paper, a large branching factor(suggested value: 16)
       // at the root increases performance.
       if (root_branching_factor_ > 0 && prefix == 0 && first == 0) {
         compute.branch_ = root_branching_factor_;
@@ -339,7 +348,7 @@ private:
     }
 
     /**
-     * Recursively build a trie for IP prefixes from position 'first' to 'first+n'.
+     * Recursively build a trie for IP prefixes from position 'first' to 'first+n-1'.
      * @param prefix supplies the prefix to ignore when building the sub-trie.
      * @param first supplies the ip_prefixes_ index into for this sub-trie.
      * @param n suppplies the number of entries for the sub-trie.
@@ -381,9 +390,9 @@ private:
           ++count;
         }
 
-        // FIXME add comments here.
+        // This logic was taken from
+        // https://github.com/beevek/libkrb/blob/24a224d3ea840e2e7d2926e17d8849aefecc1101/krb/lc_trie.hpp#L396.
         if (count == 0) {
-          // FIXME why is it that we then go to position - 1 when new_position == first + n.
           if (new_position == first + n) {
             buildRecursive(output.prefix_ + output.branch_, new_position - 1, 1,
                            address + bit_pattern, next_free_index);
@@ -393,8 +402,6 @@ private:
           }
         } else if (count == 1 &&
                    ip_prefixes_[new_position].length_ - output.prefix_ < output.branch_) {
-          // FIXME output.branch_(number of bits) + output.prefix_(number of bitstotal skipped) is the
-          // FIXME
           uint32_t bits = output.branch_ + output.prefix_ - ip_prefixes_[new_position].length_;
           for (uint32_t i = bit_pattern; i < bit_pattern + (1 << bits); ++i) {
             buildRecursive(output.prefix_ + output.branch_, new_position, 1, address + i,
@@ -402,7 +409,7 @@ private:
           }
         } else {
           // Recursively build sub-tries for ip_prefixes_[new_position] to
-          // ip_prefixes_[new_position+count].
+          // ip_prefixes_[new_position+count-1].
           buildRecursive(output.prefix_ + output.branch_, new_position, count,
                          address + bit_pattern, next_free_index);
         }
@@ -411,19 +418,21 @@ private:
     }
 
     /**
-     * LcNode is a uint32_t. A wrapper is provided to simplify getting/setting the branch, the skip and
-     * the address values held within the structure.
+     * LcNode is a uint32_t. A wrapper is provided to simplify getting/setting the branch, the skip
+     * and the address values held within the structure.
      *
      * The LcNode has three parts to it
-     * - Branch: the first 5 bits represent the branching factor. The branching factor is used to determine
-     * the number of descendants for the current node. The number represents a power of 2, so there can be
-     * at most 2^31 descendant nodes.
+     * - Branch: the first 5 bits represent the branching factor. The branching factor is used to
+     * determine the number of descendants for the current node. The number represents a power of 2,
+     * so there can be at most 2^31 descendant nodes.
      * - Skip: the next 7 bits represent the number of bits to skip when looking at an IP address.
      * This value can be between 0 and 127, so IPv6 is supported.
-     * - Address: the remaining 20 bits represent an index either into the trie_ or the ip_prefixes_.
-     * If branch_ != 0, the index is for the trie_. If branch == zero, the index is for the ip_prefixes_.
+     * - Address: the remaining 20 bits represent an index either into the trie_ or the
+     * ip_prefixes_. If branch_ != 0, the index is for the trie_. If branch == zero, the index is
+     * for the ip_prefixes_.
      *
-     * Note: If more than 2^19 CIDR ranges are to be stored in trie_, uint64_t should be used instead.
+     * Note: If more than 2^19 CIDR ranges are to be stored in trie_, uint64_t should be used
+     * instead.
      */
     struct LcNode {
       uint32_t branch_ : 5;
@@ -444,13 +453,14 @@ private:
   /**
    * Converts Ipv6 address in std::array<uint8_t, 16> to absl::uint128 in host byte order.
    * TODO (ccaraman): Remove this workaround once Ipv6Helper returns absl::uint128t.
-   * @param address IPv6 address in std::array<uint8_t,16> format.
-   * @return IPv6 address in host byte order.
+   * @param address supplies the IPv6 in std::array<uint8_t,16> data structure. This is the address
+   *                format returned by Address::Ipv6Instance.
+   * @return Ipv6(absl::uint128) address in host byte order.
    */
-  static Ipv6 arrayToIpv6(const std::array<uint8_t, 16>& address) {
-    Ipv6 ipv6{0}; //The default constructor for absl::uint128 doesn't set it to 0.
+  static Ipv6 arrayToAsblUint128(const std::array<uint8_t, 16>& address) {
+    Ipv6 ipv6{0};
     size_t i = 0;
-    for(;i < address.size() -1 ; i++){
+    for (; i < address.size() - 1; i++) {
       ipv6 |= static_cast<absl::uint128>(address[i]);
       ipv6 <<= 8;
     }
@@ -459,15 +469,16 @@ private:
   }
 
   /**
-   * Converts Ipv6 adddress in abs::uint128 to std::array<uint8_t, 16> in network byte order.
-   * @param input
-   * @return
+   * Converts Ipv6 adddress in absl::uint128 to std::array<uint8_t, 16> in network byte order.
+   * TODO (ccaraman): Remove this workaround once Ipv6Helper returns absl::uint128t.
+   * @param address supplies the Ipv6 address in Ipv6(absl::uint128).
+   * @return std::array<uint8_t, 16> address in network byte order.
    */
-  static std::array<uint8_t, 16> ipv6ToArray(const Ipv6& address) {
+  static std::array<uint8_t, 16> abslUint128ToArray(const Ipv6& address) {
     Ipv6 copy_address = address;
     std::array<uint8_t, 16> ipv6;
-    size_t i = ipv6.size() -1;
-    for(;0 < i; i--){
+    size_t i = ipv6.size() - 1;
+    for (; 0 < i; i--) {
       ipv6[i] = static_cast<uint8_t>(copy_address & 0x000000000000000000000000000000FF);
       copy_address >>= 8;
     }
@@ -487,7 +498,7 @@ LcTrie::LcTrieInternal<IpType, address_size>::LcTrieInternal(
 }
 
 template <class IpType, uint32_t address_size>
-std::string LcTrie::LcTrieInternal<IpType, address_size>::search(const IpType& ip_address) const {
+std::string LcTrie::LcTrieInternal<IpType, address_size>::getTag(const IpType& ip_address) const {
   if (trie_.empty()) {
     return EMPTY_STRING;
   }
@@ -499,7 +510,7 @@ std::string LcTrie::LcTrieInternal<IpType, address_size>::search(const IpType& i
 
   // branch == 0 is a leaf node.
   while (branch != 0) {
-    // branch is at most 2^5-1= 31 bits to extract so we can safely cast the
+    // branch is at most 2^5-1= 31 bits to extract, so we can safely cast the
     // output of extractBits to uint32_t without any data loss.
     node = trie_[address + static_cast<uint32_t>(
                                extractBits<IpType, address_size>(position, branch, ip_address))];

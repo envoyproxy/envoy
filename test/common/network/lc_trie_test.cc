@@ -30,7 +30,7 @@ public:
 
   void expectIPAndTag(const std::vector<std::pair<std::string, std::string>>& test_output) {
     for (const auto& kv : test_output) {
-      EXPECT_EQ(kv.second, trie_->search(Utility::parseInternetAddress(kv.first)));
+      EXPECT_EQ(kv.second, trie_->getTag(Utility::parseInternetAddress(kv.first)));
     }
   }
 
@@ -60,22 +60,14 @@ TEST_F(LcTrieTest, IPv4) {
   setup(cidr_range_strings);
 
   std::vector<std::pair<std::string, std::string>> test_case = {
-      {"0.0.0.0", "tag_0"},
-      {"16.0.0.1", "tag_1"},
-      {"40.0.0.255", "tag_2"},
-      {"64.0.130.0", "tag_3"},
-      {"96.0.0.10", "tag_4"},
-      {"112.0.0.0", "tag_5"},
-      {"128.0.0.1", "tag_6"},
-      {"160.0.0.1", "tag_7"},
-      {"164.255.0.0", "tag_8"},
-      {"168.0.0.0", "tag_9"},
-      {"176.0.0.1", "tag_10"},
-      {"184.0.0.1", "tag_11"},
-      {"192.0.0.0", "tag_12"},
-      {"232.0.80.0", "tag_13"},
-      {"233.0.0.1", "tag_14"},
-      {"::1", ""},
+      {"0.0.0.0", "tag_0"},     {"16.0.0.1", "tag_1"},
+      {"40.0.0.255", "tag_2"},  {"64.0.130.0", "tag_3"},
+      {"96.0.0.10", "tag_4"},   {"112.0.0.0", "tag_5"},
+      {"128.0.0.1", "tag_6"},   {"160.0.0.1", "tag_7"},
+      {"164.255.0.0", "tag_8"}, {"168.0.0.0", "tag_9"},
+      {"176.0.0.1", "tag_10"},  {"184.0.0.1", "tag_11"},
+      {"192.0.0.0", "tag_12"},  {"232.0.80.0", "tag_13"},
+      {"233.0.0.1", "tag_14"},  {"::1", ""},
   };
   expectIPAndTag(test_case);
 }
@@ -111,7 +103,6 @@ TEST_F(LcTrieTest, IPv4Boundaries) {
 }
 
 TEST_F(LcTrieTest, IPv6) {
-  // FIXME get more ipv6 test cases
   std::vector<std::vector<std::string>> cidr_range_strings = {
       {"2406:da00:2000::/40", "::1/128"},            // tag_0
       {"2001:abcd:ef01:2345:6789:abcd:ef01:234/64"}, // tag_1
@@ -212,21 +203,22 @@ TEST_F(LcTrieTest, BothIpvVersions) {
 }
 
 TEST_F(LcTrieTest, NestedPrefixes) {
-  EXPECT_THROW_WITH_MESSAGE(
-      setup({{"1.2.3.130/24", "1.2.3.255/32"}}), EnvoyException,
-      "LcTrie does not support nested prefixes. '1.2.3.255/32' is a nested prefix of '1.2.3.0/24'.");
+  EXPECT_THROW_WITH_MESSAGE(setup({{"1.2.3.130/24", "1.2.3.255/32"}}), EnvoyException,
+                            "LcTrie does not support nested prefixes. '1.2.3.255/32' is a nested "
+                            "prefix of '1.2.3.0/24'.");
 
   EXPECT_THROW_WITH_MESSAGE(
-      setup({{"1.2.3.4/0", "1.2.3.254/32"}}), EnvoyException,
+      setup({{"0.0.0.0/0", "1.2.3.254/32"}}), EnvoyException,
       "LcTrie does not support nested prefixes. '1.2.3.254/32' is a nested prefix of '0.0.0.0/0'.");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setup({{"2406:da00:2000::/40", "2406:da00:2000::1/100"}}), EnvoyException,
-      "LcTrie does not support nested prefixes. '2406:da00:2000::/100' is a nested prefix of '2406:da00:2000::/40'.");
+  EXPECT_THROW_WITH_MESSAGE(setup({{"2406:da00:2000::/40", "2406:da00:2000::1/100"}}),
+                            EnvoyException,
+                            "LcTrie does not support nested prefixes. '2406:da00:2000::/100' is a "
+                            "nested prefix of '2406:da00:2000::/40'.");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setup({{"::/0", "2406:da00:2000::1/100"}}), EnvoyException,
-      "LcTrie does not support nested prefixes. '2406:da00:2000::/100' is a nested prefix of '::/0'.");
+  EXPECT_THROW_WITH_MESSAGE(setup({{"::/0", "2406:da00:2000::1/100"}}), EnvoyException,
+                            "LcTrie does not support nested prefixes. '2406:da00:2000::/100' is a "
+                            "nested prefix of '::/0'.");
 }
 
 } // namespace LcTrie

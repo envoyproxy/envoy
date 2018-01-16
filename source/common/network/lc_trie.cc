@@ -6,7 +6,6 @@ namespace LcTrie {
 
 LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
                double fill_factor, uint32_t root_branching_factor) {
-
   std::vector<IpPrefix<Ipv4>> ipv4_prefixes;
   std::vector<IpPrefix<Ipv6>> ipv6_prefixes;
   for (const auto& pair_data : tag_data) {
@@ -21,7 +20,7 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
         IpPrefix<Ipv6> ip_prefix;
         ip_prefix.tag_ = pair_data.first;
         ip_prefix.length_ = cidr_range.length();
-        ip_prefix.ip_ = arrayToIpv6(cidr_range.ip()->ipv6()->address());
+        ip_prefix.ip_ = arrayToAsblUint128(cidr_range.ip()->ipv6()->address());
         ipv6_prefixes.push_back(ip_prefix);
       }
     }
@@ -30,12 +29,12 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
   ipv6_trie_.reset(new LcTrieInternal<Ipv6>(ipv6_prefixes, fill_factor, root_branching_factor));
 }
 
-std::string LcTrie::search(Network::Address::InstanceConstSharedPtr ip_address) const {
+std::string LcTrie::getTag(Network::Address::InstanceConstSharedPtr ip_address) const {
   if (ip_address->ip()->version() == Address::IpVersion::v4) {
     Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
     return ipv4_trie_->search(ip);
   } else {
-    Ipv6 ip = arrayToIpv6(ip_address->ip()->ipv6()->address());
+    Ipv6 ip = arrayToAsblUint128(ip_address->ip()->ipv6()->address());
     return ipv6_trie_->search(ip);
   }
 }
