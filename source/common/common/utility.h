@@ -108,6 +108,11 @@ public:
 class StringUtil {
 public:
   /**
+   * White space chars.
+   */
+  static const std::string WhitespaceChars;
+
+  /**
    * Convert a string to an unsigned long, checking for error.
    * @param return TRUE if successful, FALSE otherwise.
    */
@@ -165,15 +170,14 @@ public:
    *
    * E.g,
    *
-   * find("A=5; b", "=;", "5")   . true
-   * find("A=5; b", "=;", "A=5") . false
-   * find("A=5; b", "=;", "A")   . true
-   * find("A=5; b", "=;", "b")   . true
-   * find("", ".", "")           . true (spliting "" with "." returns "" which contains "")
-   * find("", ".", "a")          . false (spliting "" with "." returns "" which doesn't contain "a")
+   * findToken("A=5; b", "=;", "5")   . true
+   * findToken("A=5; b", "=;", "A=5") . false
+   * findToken("A=5; b", "=;", "A")   . true
+   * findToken("A=5; b", "=;", "b")   . true
+   * findToken("A=5", ".", "A=5")     . true
    */
-  static bool find(absl::string_view source, absl::string_view delimiters, absl::string_view token,
-                   bool trim_whitespace = true);
+  static bool findToken(absl::string_view source, absl::string_view delimiters,
+                        absl::string_view token, bool trim_whitespace = true);
 
   /**
    * Crop characters from a string view starting at the first character of the matched
@@ -200,19 +204,6 @@ public:
                                                    bool keep_empty_string = false);
 
   /**
-   * TODO(gsagula): remove this when call-sites have been replaced by splitToken().
-   *
-   * Split a string.
-   * @param source supplies the string to split.
-   * @param split supplies the string to split on.
-   * @param keep_empty_string result contains empty strings if the string starts or ends with
-   * 'split', or if instances of 'split' are adjacent.
-   * @return vector of strings computed after splitting `source` around all instances of `split`.
-   */
-  static std::vector<std::string> split(const std::string& source, const std::string& split,
-                                        bool keep_empty_string = false);
-
-  /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
@@ -224,14 +215,6 @@ public:
    * @return string combining elements of `source` with `delimiter` in between each element.
    */
   static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
-
-  /**
-   * Split a string.
-   * @param source supplies the string to split.
-   * @param split supplies the char to split on.
-   * @return vector of strings computed after splitting `source` around all instances of `split`.
-   */
-  static std::vector<std::string> split(const std::string& source, char split);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a

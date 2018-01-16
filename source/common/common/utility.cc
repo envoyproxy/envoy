@@ -55,6 +55,8 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
              .count() != 0;
 }
 
+const std::string StringUtil::WhitespaceChars{" \t\f\v\n\r"};
+
 bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return false;
@@ -70,20 +72,30 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
 }
 
 absl::string_view StringUtil::ltrim(absl::string_view source) {
-  source.remove_prefix(std::min(source.find_first_not_of(" \t\f\v\n\r"), source.size()));
+  const absl::string_view::size_type pos = source.find_first_not_of(WhitespaceChars);
+  if (pos != absl::string_view::npos) {
+    source.remove_prefix(pos);
+  } else {
+    source.remove_prefix(source.size());
+  }
   return source;
 }
 
 absl::string_view StringUtil::rtrim(absl::string_view source) {
-  source.remove_suffix(source.size() - source.find_last_not_of(" \t\f\v\n\r") - 1);
+  const absl::string_view::size_type pos = source.find_last_not_of(WhitespaceChars);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - source.find_last_not_of(WhitespaceChars) - 1);
+  } else {
+    source.remove_suffix(source.size());
+  }
   return source;
 }
 
 absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
 
-bool StringUtil::find(absl::string_view source, absl::string_view delimiters,
-                      absl::string_view key_token, bool trim_whitespace) {
-  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, !trim_whitespace);
+bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
+                           absl::string_view key_token, bool trim_whitespace) {
+  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, false);
   if (tokens.empty()) {
     return key_token.empty();
   }
@@ -106,7 +118,7 @@ absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_v
   if (pos != absl::string_view::npos) {
     source.remove_suffix(source.size() - pos);
   }
-  return trim_whitespace ? trim(source) : source;
+  return trim_whitespace ? rtrim(source) : source;
 }
 
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
@@ -144,37 +156,6 @@ size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   strncpy(dst, src, size - 1);
   dst[size - 1] = '\0';
   return strlen(src);
-}
-
-std::vector<std::string> StringUtil::split(const std::string& source, char split) {
-  return StringUtil::split(source, std::string{split});
-}
-
-std::vector<std::string> StringUtil::split(const std::string& source, const std::string& split,
-                                           bool keep_empty_string) {
-  std::vector<std::string> ret;
-  size_t last_index = 0;
-  size_t next_index;
-
-  if (split.empty()) {
-    ret.emplace_back(source);
-    return ret;
-  }
-
-  do {
-    next_index = source.find(split, last_index);
-    if (next_index == std::string::npos) {
-      next_index = source.size();
-    }
-
-    if (next_index != last_index || keep_empty_string) {
-      ret.emplace_back(subspan(source, last_index, next_index));
-    }
-
-    last_index = next_index + split.size();
-  } while (next_index != source.size());
-
-  return ret;
 }
 
 std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {

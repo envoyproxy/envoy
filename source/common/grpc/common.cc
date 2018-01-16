@@ -105,12 +105,12 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   if (path == nullptr || path->value().c_str() == nullptr) {
     return false;
   }
-  std::vector<std::string> parts = StringUtil::split(path->value().c_str(), '/');
+  auto parts = StringUtil::splitToken(path->value().c_str(), "/");
   if (parts.size() != 2) {
     return false;
   }
-  *service = std::move(parts[0]);
-  *method = std::move(parts[1]);
+  *service = std::move(std::string(parts[0]));
+  *method = std::move(std::string(parts[1]));
   return true;
 }
 

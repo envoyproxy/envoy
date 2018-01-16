@@ -156,6 +156,37 @@ envoy::api::v2::Bootstrap TestUtility::parseBootstrapFromJson(const std::string&
   return bootstrap;
 }
 
+std::vector<std::string> TestUtility::split(const std::string& source, char split) {
+  return TestUtility::split(source, std::string{split});
+}
+
+std::vector<std::string> TestUtility::split(const std::string& source, const std::string& split,
+                                            bool keep_empty_string) {
+  std::vector<std::string> ret;
+  size_t last_index = 0;
+  size_t next_index;
+
+  if (split.empty()) {
+    ret.emplace_back(source);
+    return ret;
+  }
+
+  do {
+    next_index = source.find(split, last_index);
+    if (next_index == std::string::npos) {
+      next_index = source.size();
+    }
+
+    if (next_index != last_index || keep_empty_string) {
+      ret.emplace_back(source.substr(last_index, next_index - last_index));
+    }
+
+    last_index = next_index + split.size();
+  } while (next_index != source.size());
+
+  return ret;
+}
+
 void ConditionalInitializer::setReady() {
   std::unique_lock<std::mutex> lock(mutex_);
   EXPECT_FALSE(ready_);

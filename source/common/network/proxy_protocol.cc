@@ -95,10 +95,11 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
   Address::IpVersion protocol_version;
   Address::InstanceConstSharedPtr remote_address;
   Address::InstanceConstSharedPtr local_address;
+
+  // TODO(gsagula): parseInternetAddressAndPort() could be modified to take two string_view
+  // arguments, so we can eliminate allocation here.
   if (line_parts[1] == "TCP4") {
     protocol_version = Address::IpVersion::v4;
-    // TODO(gsagula): Utility::parseInternetAddressAndPort() should be refactored to take a
-    // string_view as an argument which would eliminate the need for all this string convertions.
     remote_address = Utility::parseInternetAddressAndPort(std::string{line_parts[2]} + ":" +
                                                           std::string{line_parts[4]});
     local_address = Utility::parseInternetAddressAndPort(std::string{line_parts[3]} + ":" +
