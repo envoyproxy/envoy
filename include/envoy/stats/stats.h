@@ -56,7 +56,7 @@ public:
   virtual std::string extractTag(const std::string& name, std::vector<Tag>& tags) const PURE;
 };
 
-typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
+typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
 
 /**
  * General interface for all stats objects.
