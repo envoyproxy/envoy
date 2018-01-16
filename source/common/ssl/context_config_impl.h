@@ -45,6 +45,7 @@ protected:
 
   static const std::string readDataSource(const envoy::api::v2::DataSource& source,
                                           bool allow_empty);
+  static const std::string getDataSourcePath(const envoy::api::v2::DataSource& source);
 
 private:
   static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,

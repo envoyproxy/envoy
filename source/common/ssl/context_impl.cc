@@ -120,7 +120,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
     }
     // Read rest of the certificate chain.
-    for (;;) {
+    while (true) {
       bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
       if (cert == nullptr) {
         break;
