@@ -129,6 +129,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
         throw EnvoyException(
             fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
       }
+      // SSL_CTX_add_extra_chain_cert() takes ownership.
+      cert.release();
     }
     // Check for EOF.
     uint32_t err = ERR_peek_last_error();

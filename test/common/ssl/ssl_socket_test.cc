@@ -402,6 +402,28 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
+TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json,
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
 TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
   std::string client_ctx_json = R"EOF(
   {
@@ -993,6 +1015,38 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCert) {
   )EOF";
 
   testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, true,
+                              GetParam());
+}
+
+// Sessions cannot be resumed because the server certificates are different, CN/SANs are identical,
+// but the issuer is different.
+TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertIntermediateCA) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, false,
                               GetParam());
 }
 

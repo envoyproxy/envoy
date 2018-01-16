@@ -3,9 +3,12 @@ There are 6 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
   private key.
--- **Fake CA**: Fake Certificate Authority used to validate verification logic.
--  It has the self-signed certificate *fake_ca_cert.pem"*. *fake_ca_key.pem" is
--  its private key.
+- **Intermediate CA**: Intermediate Certificate Authority, signed by the **CA**.
+  It has the certificate *intermediate_ca_cert.pem". *intermediate_ca_key.pem*
+  is its private key.
+- **Fake CA**: Fake Certificate Authority used to validate verification logic.
+  It has the self-signed certificate *fake_ca_cert.pem"*. *fake_ca_key.pem" is
+  its private key.
 - **No SAN**: It has the certificate *no_san_cert.pem*, signed by the **CA**.
   The certificate does not have SAN field. *no_san_key.pem* is its private key.
 - **SAN With URI**: It has the certificate *san_uri_cert.pem*, which is signed
@@ -14,7 +17,9 @@ There are 6 identities:
 - **SAN With DNS**: It has the certificate *san_dns_cert.pem*, which is signed
   by the **CA** using the config *san_dns_cert.cfg*. The certificate has SAN
   field of DNS type. *san_dns_key.pem* is its private key. A second certificate
-  and key, using the same config, is *san_dns_cert2*.
+  and key, using the same config, is *san_dns_cert2*. A third certificate and key,
+  using the same config, but signed by the **Intermediate CA** is *san_dns_cert3*,
+  its certificate chain is *san_dns_chain3.pem*.
 - **SAN With Multiple DNS**: Same as *SAN With DNS* except there are multiple
   SANs (including wildcard domain). It has certificate *san_multiple_dns_cert.pem*,
   *san_multiple_dns_key.pem* is its private key.
