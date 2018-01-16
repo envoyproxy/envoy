@@ -17,6 +17,7 @@
 #include "common/common/utility.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -473,7 +474,7 @@ void HotRestartImpl::terminateParent() {
 
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
-std::string HotRestartImpl::version() { return shmem_.version(); }
+std::string HotRestartImpl::version() { return shmem_.version() + stats_set_.version(); }
 
 } // namespace Server
 } // namespace Envoy

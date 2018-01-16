@@ -22,6 +22,9 @@ struct SharedMemoryHashSetOptions {
   std::string toString() const {
     return fmt::format("capacity={}, num_slots={}", capacity, num_slots);
   }
+  std::string version() const {
+    return fmt::format("capacity={}, num_slots={}", capacity, num_slots);
+  }
   bool operator==(const SharedMemoryHashSetOptions& that) const {
     return capacity == that.capacity && num_slots == that.num_slots;
   }
@@ -69,7 +72,7 @@ public:
     if (init) {
       initialize(options, memory);
     } else if (!attach(options, memory)) {
-      throw std::runtime_error("Incompatible memory block");
+      throw EnvoyException("SharedMemoryHashSet: Incompatible memory block");
     }
   }
 
@@ -230,6 +233,14 @@ public:
     return nullptr;
   }
 
+  /**
+   * Computes a version signature based on the options and the hash function.
+   */
+  std::string version() {
+    return fmt::format("options={} hash={}", control_->options.toString(),
+                       control_->hash_signature);
+  }
+
 private:
   /**
    * Initializes a hash-map on raw memory. No expectations are made about the state of the memory
@@ -284,7 +295,7 @@ private:
    * This is used for detecting if the hash algorithm changes, which invalidates
    * any saved stats-set.
    */
-  std::string signatureStringToHash() {
+  static std::string signatureStringToHash() {
     std::string signature_string;
     signature_string.resize(255);
     for (int i = 1; i <= 255; ++i) {

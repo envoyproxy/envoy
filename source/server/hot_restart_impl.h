@@ -30,6 +30,9 @@ public:
   static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
   std::string version();
 
+  // Made public for testing.
+  static const uint64_t VERSION;
+
 private:
   struct Flags {
     static const uint64_t INITIALIZING = 0x1;
@@ -50,8 +53,6 @@ private:
    * Initialize a pthread mutex for process shared locking.
    */
   void initializeMutex(pthread_mutex_t& mutex);
-
-  static const uint64_t VERSION;
 
   uint64_t size_;
   uint64_t version_;
