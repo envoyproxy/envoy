@@ -68,15 +68,19 @@ private:
 
 typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerSharedPtr;
 
+typedef std::map<std::string, double> ClusterMinHealthyPercentages;
+typedef std::shared_ptr<const ClusterMinHealthyPercentages> ClusterMinHealthyPercentagesSharedPtr;
+
 /**
  * Health check responder filter.
  */
 class HealthCheckFilter : public Http::StreamFilter {
 public:
   HealthCheckFilter(Server::Configuration::FactoryContext& context, bool pass_through_mode,
-                    HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint)
+                    HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint,
+                    ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages)
       : context_(context), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
-        endpoint_(endpoint) {}
+        endpoint_(endpoint), cluster_min_healthy_percentages_(cluster_min_healthy_percentages) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -109,5 +113,6 @@ private:
   bool pass_through_mode_{};
   HealthCheckCacheManagerSharedPtr cache_manager_{};
   const std::string endpoint_;
+  ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages_{};
 };
 } // namespace Envoy

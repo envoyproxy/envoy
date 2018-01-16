@@ -43,10 +43,19 @@ HealthCheckFilterConfig::createFilter(const envoy::api::v2::filter::http::Health
                                                     std::chrono::milliseconds(cache_time_ms)));
   }
 
-  return [&context, pass_through_mode, cache_manager,
-          hc_endpoint](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
-        new HealthCheckFilter(context, pass_through_mode, cache_manager, hc_endpoint)});
+  ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages;
+  if (!pass_through_mode && !proto_config.cluster_min_healthy_percentages().empty()) {
+    auto* cluster_to_percentage = new ClusterMinHealthyPercentages();
+    for (const auto& item : proto_config.cluster_min_healthy_percentages()) {
+      cluster_to_percentage->emplace(std::make_pair(item.first, item.second.value()));
+    }
+    cluster_min_healthy_percentages.reset(cluster_to_percentage);
+  }
+
+  return [&context, pass_through_mode, cache_manager, hc_endpoint,
+          cluster_min_healthy_percentages](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new HealthCheckFilter(
+        context, pass_through_mode, cache_manager, hc_endpoint, cluster_min_healthy_percentages)});
   };
 }
 
@@ -155,6 +164,32 @@ void HealthCheckFilter::onComplete() {
     Http::Code final_status = Http::Code::OK;
     if (cache_manager_) {
       final_status = cache_manager_->getCachedResponseCode();
+    } else if (cluster_min_healthy_percentages_ != nullptr &&
+               !cluster_min_healthy_percentages_->empty()) {
+      const auto clusters(context_.clusterManager().clusters());
+      for (const auto& item : *cluster_min_healthy_percentages_) {
+        const std::string& cluster_name = item.first;
+        const double min_healthy_percentage = item.second;
+        auto match = clusters.find(cluster_name);
+        if (match == clusters.end()) {
+          final_status = Http::Code::ServiceUnavailable;
+          break;
+        }
+        const auto& stats = match->second.get().info()->stats();
+        const uint64_t membership_total = stats.membership_total_.value();
+        if (membership_total == 0) {
+          if (min_healthy_percentage == 0.0) {
+            continue;
+          } else {
+            final_status = Http::Code::ServiceUnavailable;
+            break;
+          }
+        }
+        if (100.0 * stats.membership_healthy_.value() < membership_total * min_healthy_percentage) {
+          final_status = Http::Code::ServiceUnavailable;
+          break;
+        }
+      }
     }
 
     if (!Http::CodeUtility::is2xx(enumToInt(final_status))) {

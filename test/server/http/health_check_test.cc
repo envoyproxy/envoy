@@ -2,10 +2,12 @@
 #include <memory>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "server/http/health_check.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -36,8 +38,11 @@ public:
     prepareFilter(pass_through);
   }
 
-  void prepareFilter(bool pass_through) {
-    filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, "/healthcheck"));
+  void
+  prepareFilter(bool pass_through,
+                ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages = nullptr) {
+    filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, "/healthcheck",
+                                        cluster_min_healthy_percentages));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -49,6 +54,30 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl request_headers_no_hc_;
+
+  class MockHealthCheckCluster : public Upstream::MockCluster {
+  public:
+    MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy)
+        : info_(new ClusterInfo(membership_total, membership_healthy)) {}
+
+    Upstream::ClusterInfoConstSharedPtr info() const override { return info_; }
+
+    class ClusterInfo : public Upstream::MockClusterInfo {
+    public:
+      ClusterInfo(uint64_t membership_total, uint64_t membership_healthy)
+          : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {
+        stats_.membership_total_.set(membership_total);
+        stats_.membership_healthy_.set(membership_healthy);
+      }
+
+      Upstream::ClusterStats& stats() const override { return stats_; }
+
+    private:
+      mutable Upstream::ClusterStats stats_;
+    };
+
+    Upstream::ClusterInfoConstSharedPtr info_;
+  };
 };
 
 class HealthCheckFilterNoPassThroughTest : public HealthCheckFilterTest {
@@ -82,6 +111,82 @@ TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_response, true));
   EXPECT_STREQ("true", service_response.EnvoyImmediateHealthCheckFail()->value().c_str());
+}
+
+TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
+  // Test health non-pass-through health checks without upstream cluster
+  // minimum health specified.
+  prepareFilter(false);
+  {
+    Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+        .Times(1);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+  {
+    Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+        .Times(1);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+
+  // Test health non-pass-through health checks with upstream cluster
+  // minimum health specified.
+  prepareFilter(false, ClusterMinHealthyPercentagesSharedPtr(
+                           new ClusterMinHealthyPercentages{{"www1", 50.0}, {"www2", 75.0}}));
+  {
+    // This should pass, because each upstream cluster has at least the
+    // minimum percentage of healthy servers.
+    Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
+    MockHealthCheckCluster cluster_www1(100, 50);
+    MockHealthCheckCluster cluster_www2(1000, 800);
+    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
+        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
+        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+        .Times(1);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+  {
+    // This should fail, because one upstream cluster has too few healthy servers.
+    Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
+    MockHealthCheckCluster cluster_www1(100, 49);
+    MockHealthCheckCluster cluster_www2(1000, 800);
+    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
+        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
+        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+        .Times(1);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+  {
+    // This should fail, because one upstream cluster has no servers at all.
+    Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
+    MockHealthCheckCluster cluster_www1(0, 0);
+    MockHealthCheckCluster cluster_www2(1000, 800);
+    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
+        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
+        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+        .Times(1);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
