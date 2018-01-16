@@ -34,3 +34,4 @@ final version.
 * Added support for route matching based on URL query string parameters.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
 * Added `/runtime` admin endpoint to read the current runtime values.
+* Added `gateway-error` retry-on policy.

@@ -119,6 +119,68 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote503Overloaded) {
   EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemote502) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "gateway-error"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "502"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemote503) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "gateway-error"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "503"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemote504) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "gateway-error"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "504"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorResetOverflow) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "gateway-error"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, overflow_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "gateway-error"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(nullptr, remote_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetry(nullptr, remote_reset_, callback_));
+}
+
 TEST_F(RouterRetryStateImplTest, PolicyGrpcCancelled) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-grpc-on", "cancelled"}};
   setup(request_headers);
