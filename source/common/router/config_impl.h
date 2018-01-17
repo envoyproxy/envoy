@@ -402,7 +402,7 @@ private:
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
-    const envoy::api::v2::Metadata& metadata() const { return parent_->metadata(); }
+    const envoy::api::v2::Metadata& metadata() const override { return parent_->metadata(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
