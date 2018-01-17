@@ -114,10 +114,6 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
                      max_stat_name_len);
 }
 
-std::string SharedMemory::version() {
-  return version(max_stats_, Stats::RawStatData::maxNameLength());
-}
-
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), stats_set_options_(sharedMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
@@ -477,15 +473,24 @@ void HotRestartImpl::terminateParent() {
 
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
-std::string HotRestartImpl::version() { return shmem_.version() + "." + stats_set_.version(); }
+std::string HotRestartImpl::version() {
+  // return shmem_.version() + "." + stats_set_.version();
+  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), stats_set_);
+}
 
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
 std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
   const SharedMemoryHashSetOptions options = sharedMemHashOptions(max_num_stats);
-  size_t bytes = RawStatDataSet::numBytes(options);
-  std::unique_ptr<uint8_t> mem_buffer_for_dry_run_(new uint8_t[bytes]);
+  const size_t bytes = RawStatDataSet::numBytes(options);
+  std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
   RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+
+  return versionHelper(max_num_stats, max_stat_name_len, stats_set);
+}
+
+std::string HotRestartImpl::versionHelper(size_t max_num_stats, size_t max_stat_name_len,
+                                          RawStatDataSet& stats_set) {
   return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
 }
 

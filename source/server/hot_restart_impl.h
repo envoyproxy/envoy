@@ -28,10 +28,11 @@ class SharedMemory {
 public:
   static void configure(size_t max_num_stats, size_t max_stat_name_len);
   static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
-  std::string version();
 
   // Made public for testing.
   static const uint64_t VERSION;
+
+  int64_t maxStats() const { return max_stats_; }
 
 private:
   struct Flags {
@@ -203,6 +204,8 @@ private:
   void onSocketEvent();
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
+  static std::string versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
+                                   RawStatDataSet& stats_set);
 
   Options& options_;
   SharedMemoryHashSetOptions stats_set_options_;
