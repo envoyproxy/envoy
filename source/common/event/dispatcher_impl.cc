@@ -26,13 +26,18 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
-    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {}
+    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
+  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
+  RELEASE_ASSERT(Libevent::Global::initialized());
+}
 
 DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
     : buffer_factory_(std::move(factory)), base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {}
+      current_to_delete_(&to_delete_1_) {
+  RELEASE_ASSERT(Libevent::Global::initialized());
+}
 
 DispatcherImpl::~DispatcherImpl() {}
 
@@ -70,19 +75,11 @@ void DispatcherImpl::clearDeferredDeleteList() {
 
 Network::ClientConnectionPtr
 DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                                       Network::Address::InstanceConstSharedPtr source_address) {
+                                       Network::Address::InstanceConstSharedPtr source_address,
+                                       Network::TransportSocketPtr&& transport_socket) {
   ASSERT(isThreadSafe());
-  return Network::ClientConnectionPtr{
-      new Network::ClientConnectionImpl(*this, address, source_address)};
-}
-
-Network::ClientConnectionPtr
-DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                          Network::Address::InstanceConstSharedPtr address,
-                                          Network::Address::InstanceConstSharedPtr source_address) {
-  ASSERT(isThreadSafe());
-  return Network::ClientConnectionPtr{
-      new Ssl::ClientConnectionImpl(*this, ssl_ctx, address, source_address)};
+  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
+                                                         std::move(transport_socket));
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

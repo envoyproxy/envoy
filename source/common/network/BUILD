@@ -57,6 +57,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/event:libevent_lib",
+        "//source/common/ssl:ssl_socket_lib",
     ],
 )
 
@@ -146,6 +147,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
+        "//source/common/http:headers_lib",
     ],
 )
 
@@ -169,7 +171,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "abseil_strings",
+        "envoy_base",
+    ],
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",

@@ -104,6 +104,7 @@ protected:
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
 
   void testRouterRedirect();
+  void testRouterDirectResponse();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterClusterNotFound404();
@@ -168,8 +169,6 @@ protected:
   Http::StreamEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
-
-private:
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
 };

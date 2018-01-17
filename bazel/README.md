@@ -243,10 +243,20 @@ remove log statements of lower importance during compilation to enhance performa
 bazel build --copt=-DNVLOG //source/exe:envoy-static
 ```
 
-## Hot Restart
+## Disabling optional features
 
-Hot restart can be disabled in any build by specifying `--define=hot_restart=disabled`
-on the Bazel command line.
+The following optional features can be disabled on the Bazel build command-line:
+
+* Hot restart with `--define hot_restart=disabled`
+* Google C++ gRPC client with `--define google_grpc=disabled`
+* Backtracing on signals with `--define signal_trace=disabled`
+
+## Enabling optional features
+
+The following optional features can be enabled on the Bazel build command-line:
+
+* Exported symbols during linking with `--define exported_symbols=enabled`.
+  This is useful in cases where you have a lua script that loads shared object libraries, such as those installed via luarocks.
 
 ## Stats Tunables
 

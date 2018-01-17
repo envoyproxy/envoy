@@ -35,7 +35,6 @@ envoy_cc_library(
     name = "access_log_lib",
     srcs = ["access_log_impl.cc"],
     hdrs = ["access_log_impl.h"],
-    external_deps = ["envoy_filter_network_http_connection_manager"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -51,5 +50,20 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "grpc_access_log_lib",
+    srcs = ["grpc_access_log_impl.cc"],
+    hdrs = ["grpc_access_log_impl.h"],
+    external_deps = ["envoy_filter_accesslog"],
+    deps = [
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/grpc:async_client_lib",
     ],
 )

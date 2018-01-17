@@ -25,6 +25,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/server:configuration_lib",
+        "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/stats:statsd_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
@@ -97,6 +98,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/server:options_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

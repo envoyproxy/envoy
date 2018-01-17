@@ -10,6 +10,9 @@ using testing::_;
 namespace Envoy {
 namespace AccessLog {
 
+MockFilter::MockFilter() {}
+MockFilter::~MockFilter() {}
+
 MockAccessLogManager::MockAccessLogManager() {
   ON_CALL(*this, createAccessLog(_)).WillByDefault(Return(file_));
 }

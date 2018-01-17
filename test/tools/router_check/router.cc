@@ -187,8 +187,8 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  if (tool_config.route_->redirectEntry() != nullptr) {
-    actual = tool_config.route_->redirectEntry()->newPath(*tool_config.headers_);
+  if (tool_config.route_->directResponseEntry() != nullptr) {
+    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
   return compareResults(actual, expected, "path_redirect");

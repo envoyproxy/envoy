@@ -37,7 +37,7 @@ public:
   void TearDown() override;
 
   Ssl::ServerContextPtr createUpstreamSslContext();
-  Ssl::ClientContextPtr createClientSslContext(bool mtls);
+  Network::TransportSocketFactoryPtr createClientSslContext(bool mtls);
   Network::ClientConnectionPtr makeClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
@@ -49,8 +49,8 @@ public:
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Ssl::ClientContextPtr client_tls_ssl_ctx_;
-  Ssl::ClientContextPtr client_mtls_ssl_ctx_;
+  Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
+  Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Ssl::ServerContextPtr upstream_ssl_ctx_;
 };
 } // namespace Xfcc

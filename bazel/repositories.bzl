@@ -140,6 +140,7 @@ def _envoy_api_deps():
         "eds",
         "health_check",
         "lds",
+        "metrics",
         "protocol",
         "rds",
         "sds",
@@ -152,7 +153,6 @@ def _envoy_api_deps():
             actual = "@envoy_api//api:" + t + "_cc",
         )
     filter_bind_targets = [
-        "accesslog",
         "fault",
     ]
     for t in filter_bind_targets:
@@ -188,6 +188,10 @@ def _envoy_api_deps():
             name = "envoy_filter_network_" + t,
             actual = "@envoy_api//api/filter/network:" + t + "_cc",
         )
+    native.bind(
+        name = "envoy_filter_accesslog",
+        actual = "@envoy_api//api/filter/accesslog:accesslog_cc",
+    )
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
@@ -239,6 +243,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_gcovr_gcovr()
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
+    _com_github_grpc_grpc()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -383,4 +388,31 @@ def _com_google_protobuf():
     native.bind(
         name = "protoc",
         actual = "@com_google_protobuf_cc//:protoc",
+    )
+
+def _com_github_grpc_grpc():
+    _repository_impl("com_github_grpc_grpc")
+
+    # Rebind some stuff to match what the gRPC Bazel is expecting.
+    native.bind(
+      name = "protobuf_headers",
+      actual = "@com_google_protobuf//:protobuf_headers",
+    )
+    native.bind(
+      name = "libssl",
+      actual = "//external:ssl",
+    )
+    native.bind(
+      name = "cares",
+      actual = "//external:ares",
+    )
+
+    native.bind(
+      name = "grpc",
+      actual = "@com_github_grpc_grpc//:grpc++"
+    )
+
+    native.bind(
+      name = "grpc_health_proto",
+      actual = "@envoy//bazel:grpc_health_proto",
     )

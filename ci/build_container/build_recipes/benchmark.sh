@@ -1,7 +1,6 @@
 #!/bin/bash
 
-set -x
-
+set -e
 export COMMIT="e1c3a83b8197cf02e794f61228461c27d4e78cfb"  # benchmark @ Jan 11, 2018
 
 git clone https://github.com/google/benchmark.git
@@ -16,7 +15,6 @@ make
 cp src/libbenchmark.a "$THIRDPARTY_BUILD"/lib
 cd ../benchmark
 
-pwd
-include_dir="$THIRDPARTY_BUILD/include/testing/base/public"
-mkdir -p "$include_dir"
-cp include/benchmark/benchmark.h "$include_dir"
+INCLUDE_DIR="$THIRDPARTY_BUILD/include/testing/base/public"
+mkdir -p "$INCLUDE_DIR"
+cp include/benchmark/benchmark.h "$INCLUDE_DIR"

@@ -41,3 +41,19 @@ envoy_cc_library(
         "//source/server:configuration_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "metrics_service_lib",
+    srcs = ["metrics_service.cc"],
+    hdrs = ["metrics_service.h"],
+    external_deps = [
+        "envoy_stats",
+        "envoy_metrics",
+    ],
+    deps = [
+        "//include/envoy/registry",
+        "//source/common/config:well_known_names",
+        "//source/common/stats:metrics_service_grpc_lib",
+        "//source/server:configuration_lib",
+    ],
+)

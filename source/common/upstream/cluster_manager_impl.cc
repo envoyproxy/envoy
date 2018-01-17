@@ -173,17 +173,17 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   const auto& ads_config = bootstrap.dynamic_resources().ads_config();
-  if (ads_config.cluster_name().empty()) {
+  if (ads_config.cluster_names().empty()) {
     ENVOY_LOG(debug, "No ADS clusters defined, ADS will not be initialized.");
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   } else {
-    if (ads_config.cluster_name().size() != 1) {
+    if (ads_config.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
     }
     ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(), *this, ads_config.cluster_name()[0], primary_dispatcher,
+        bootstrap.node(), *this, ads_config.cluster_names()[0], primary_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   }
@@ -251,7 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
           "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
     }
   }
-  if (!ads_config.cluster_name().empty()) {
+  if (!ads_config.cluster_names().empty()) {
     Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, ads_config);
   }
 
@@ -295,13 +295,13 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    if (load_stats_config.cluster_name().size() != 1) {
+    if (load_stats_config.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
     }
     load_stats_reporter_.reset(new LoadStatsReporter(
-        bootstrap.node(), *this, stats, load_stats_config.cluster_name()[0], primary_dispatcher));
+        bootstrap.node(), *this, stats, load_stats_config.cluster_names()[0], primary_dispatcher));
   }
 }
 
@@ -472,7 +472,7 @@ ThreadLocalCluster* ClusterManagerImpl::get(const std::string& cluster) {
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                           LoadBalancerContext* context) {
+                                           Http::Protocol protocol, LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -481,7 +481,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->connPool(priority, context);
+  return entry->second->connPool(priority, protocol, context);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(
@@ -625,7 +625,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
       container.drains_remaining_--;
       if (container.drains_remaining_ == 0) {
         for (Http::ConnectionPool::InstancePtr& pool : container.pools_) {
-          thread_local_dispatcher_.deferredDelete(std::move(pool));
+          if (pool) {
+            thread_local_dispatcher_.deferredDelete(std::move(pool));
+          }
         }
         host_http_conn_pool_map_.erase(old_host);
       }
@@ -666,7 +668,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host, ThreadLocal::Slot& tls) {
 
-  // Close all HTTP connection pool connections in the case of a host health failure. If outlier/
+  // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
   // health is due to ECMP flow hashing issues for example, a new set of connections might do
   // better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
@@ -680,7 +682,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         continue;
       }
 
-      pool->closeConnections();
+      pool->drainConnections();
     }
   }
 }
@@ -762,7 +764,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
+    ResourcePriority priority, Http::Protocol protocol, LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -771,13 +773,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  ASSERT(enumToInt(priority) < container.pools_.size());
-  if (!container.pools_[enumToInt(priority)]) {
-    container.pools_[enumToInt(priority)] =
-        parent_.parent_.factory_.allocateConnPool(parent_.thread_local_dispatcher_, host, priority);
+  const auto idx = container.index(priority, protocol);
+  if (!container.pools_[idx]) {
+    container.pools_[idx] = parent_.parent_.factory_.allocateConnPool(
+        parent_.thread_local_dispatcher_, host, priority, protocol);
   }
 
-  return container.pools_[enumToInt(priority)].get();
+  return container.pools_[idx].get();
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
@@ -790,8 +792,8 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 
 Http::ConnectionPool::InstancePtr
 ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                            ResourcePriority priority) {
-  if ((host->cluster().features() & ClusterInfo::Features::HTTP2) &&
+                                            ResourcePriority priority, Http::Protocol protocol) {
+  if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::ConnectionPool::InstancePtr{
         new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority)};

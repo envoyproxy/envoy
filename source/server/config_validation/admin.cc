@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Server {
 
-bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool) {
+bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) {
   return false;
 };
 

@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "owned_impl_test",
+    srcs = ["owned_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
     deps = [

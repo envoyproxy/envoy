@@ -99,6 +99,11 @@ public:
    * called on the thread that is shutting down.
    */
   virtual void shutdownThread() PURE;
+
+  /**
+   * @return Event::Dispatcher& the thread local dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
 };
 
 } // namespace ThreadLocal

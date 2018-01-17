@@ -111,7 +111,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   FakeRawConnectionPtr fake_upstream_connection;
   testing::NiceMock<Runtime::MockLoader> runtime;
   std::unique_ptr<Ssl::ContextManager> context_manager(new Ssl::ContextManagerImpl(runtime));
-  Ssl::ClientContextPtr context;
+  Network::TransportSocketFactoryPtr context;
   ConnectionStatusCallbacks connect_callbacks;
   MockWatermarkBuffer* client_write_buffer;
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
@@ -131,9 +131,9 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   // Set up the SSl client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context = Ssl::createClientSslContext(false, false, *context_manager);
-  ssl_client = dispatcher_->createSslClientConnection(*context, address,
-                                                      Network::Address::InstanceConstSharedPtr());
+  context = Ssl::createClientSslTransportSocketFactory(false, false, *context_manager);
+  ssl_client = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(), context->createTransportSocket());
 
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.

@@ -17,10 +17,7 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     Runtime::RandomGenerator& random,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
     : LoadBalancerBase(priority_set, stats, runtime, random), config_(config),
-      factory_(new LoadBalancerFactoryImpl(stats, random)) {
-  // Make sure we correctly return nullptr for any early chooseHost() calls.
-  factory_->current_ring_ = std::make_shared<Ring>(config_, std::vector<HostSharedPtr>{});
-}
+      factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 void RingHashLoadBalancer::initialize() {
   // TODO(mattklein123): In the future, once initialized and the initial ring is built, it would be
@@ -37,32 +34,10 @@ void RingHashLoadBalancer::initialize() {
 
 HostConstSharedPtr
 RingHashLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
-  if (global_panic_) {
-    stats_.lb_healthy_panic_.inc();
-  }
-  return ring_->chooseHost(context, random_);
-}
-
-LoadBalancerPtr RingHashLoadBalancer::LoadBalancerFactoryImpl::create() {
-  // We must protect current_ring_ via a RW lock since it is accessed and written to by multiple
-  // threads. All complex processing happens outside of locking however.
-  RingConstSharedPtr ring_to_use;
-  bool global_panic_to_use;
-  {
-    std::shared_lock<std::shared_timed_mutex> lock(mutex_);
-    ring_to_use = current_ring_;
-    global_panic_to_use = global_panic_;
-  }
-
-  return std::make_unique<LoadBalancerImpl>(stats_, random_, ring_to_use, global_panic_to_use);
-}
-
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* context,
-                                                          Runtime::RandomGenerator& random) const {
-  if (ring_.empty()) {
+  // Make sure we correctly return nullptr for any early chooseHost() calls.
+  if (per_priority_state_ == nullptr) {
     return nullptr;
   }
-
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
@@ -70,7 +45,31 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(LoadBalancerContext* c
   if (context) {
     hash = context->computeHashKey();
   }
-  const uint64_t h = hash.valid() ? hash.value() : random.random();
+  const uint64_t h = hash.valid() ? hash.value() : random_.random();
+
+  const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
+  if ((*per_priority_state_)[priority]->global_panic_) {
+    stats_.lb_healthy_panic_.inc();
+  }
+  return (*per_priority_state_)[priority]->current_ring_->chooseHost(h);
+}
+
+LoadBalancerPtr RingHashLoadBalancer::LoadBalancerFactoryImpl::create() {
+  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
+
+  // We must protect current_ring_ via a RW lock since it is accessed and written to by multiple
+  // threads. All complex processing has already been precalculated however.
+  std::shared_lock<std::shared_timed_mutex> lock(mutex_);
+  lb->per_priority_load_ = per_priority_load_;
+  lb->per_priority_state_ = per_priority_state_;
+
+  return std::move(lb);
+}
+
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
+  if (ring_.empty()) {
+    return nullptr;
+  }
 
   // Ported from https://github.com/RJ/ketama/blob/master/libketama/ketama.c (ketama_get_server)
   // I've generally kept the variable names to make the code easier to compare.
@@ -181,23 +180,32 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
 }
 
 void RingHashLoadBalancer::refresh() {
+  auto per_priority_state = std::make_shared<std::vector<PerPriorityStatePtr>>(
+      priority_set_.hostSetsPerPriority().size());
+  auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
+
   // Note that we only compute global panic on host set refresh. Given that the runtime setting will
-  // rarely change, this is a reasonable compromise to avoid creating multiple rings when we only
-  // need to create one for LB.
-  RingConstSharedPtr new_ring;
-  bool new_global_panic;
-  const auto& host_set = chooseHostSet();
-  if (isGlobalPanic(host_set, runtime_)) {
-    new_ring = std::make_shared<Ring>(config_, host_set.hosts());
-    new_global_panic = true;
-  } else {
-    new_ring = std::make_shared<Ring>(config_, host_set.healthyHosts());
-    new_global_panic = false;
+  // rarely change, this is a reasonable compromise to avoid creating extra rings when we only
+  // need to create one per priority level.
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    uint32_t priority = host_set->priority();
+    (*per_priority_state)[priority].reset(new PerPriorityState);
+    if (isGlobalPanic(*host_set, runtime_)) {
+      (*per_priority_state)[priority]->current_ring_ =
+          std::make_shared<Ring>(config_, host_set->hosts());
+      (*per_priority_state)[priority]->global_panic_ = true;
+    } else {
+      (*per_priority_state)[priority]->current_ring_ =
+          std::make_shared<Ring>(config_, host_set->healthyHosts());
+      (*per_priority_state)[priority]->global_panic_ = false;
+    }
   }
 
-  std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
-  factory_->current_ring_ = new_ring;
-  factory_->global_panic_ = new_global_panic;
+  {
+    std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
+    factory_->per_priority_load_ = per_priority_load;
+    factory_->per_priority_state_ = per_priority_state;
+  }
 }
 
 } // namespace Upstream

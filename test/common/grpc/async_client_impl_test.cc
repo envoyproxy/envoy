@@ -1,4 +1,6 @@
+#include "common/common/enum_to_int.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/grpc/common.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -20,10 +22,6 @@ using testing::_;
 
 namespace Envoy {
 namespace Grpc {
-
-template class AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>;
-template class AsyncStreamImpl<helloworld::HelloRequest, helloworld::HelloReply>;
-
 namespace {
 
 const std::string HELLO_REQUEST = "ABC";
@@ -127,7 +125,7 @@ public:
 
   Http::AsyncClient::StreamCallbacks* http_callbacks_{};
   Http::MockAsyncClientStream* http_stream_;
-  AsyncStream<helloworld::HelloRequest>* grpc_stream_{};
+  AsyncStream* grpc_stream_{};
 };
 
 class HelloworldRequest : public MockAsyncRequestCallbacks<helloworld::HelloReply> {
@@ -163,8 +161,7 @@ class GrpcAsyncClientImplTest : public testing::Test {
 public:
   GrpcAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        grpc_client_(new AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>(
-            cm_, "test_cluster")) {
+        grpc_client_(new AsyncClientImpl(cm_, "test_cluster")) {
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
@@ -272,7 +269,7 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  std::unique_ptr<AsyncClientImpl<helloworld::HelloRequest, helloworld::HelloReply>> grpc_client_;
+  std::unique_ptr<AsyncClientImpl> grpc_client_;
 };
 
 // Validate that a simple request-reply stream works.

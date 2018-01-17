@@ -118,3 +118,33 @@ envoy_cc_library(
         "//source/common/filter:tcp_proxy_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "raw_buffer_socket_lib",
+    srcs = ["raw_buffer_socket.cc"],
+    hdrs = ["raw_buffer_socket.h"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/common/network:raw_buffer_socket_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_lib",
+    srcs = ["ssl_socket.cc"],
+    hdrs = ["ssl_socket.h"],
+    external_deps = [
+        "envoy_sds",
+    ],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/ssl:connection_lib",
+    ],
+)

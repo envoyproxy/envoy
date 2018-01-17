@@ -57,6 +57,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = ["//source/common/common:utility_lib"],
 )
 
@@ -72,8 +75,12 @@ envoy_cc_test(
     deps = ["//source/common/common:callback_impl_lib"],
 )
 
-# This is broken out as a separate library because envoy_cc_binary does
-# not allow for external_deps.
+envoy_cc_test(
+    name = "shared_memory_hash_set_test",
+    srcs = ["shared_memory_hash_set_test.cc"],
+    deps = ["//source/common/common:shared_memory_hash_set_lib"],
+)
+
 envoy_cc_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
@@ -82,6 +89,7 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
 )

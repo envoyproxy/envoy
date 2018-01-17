@@ -15,6 +15,7 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 namespace Envoy {
 namespace Network {
@@ -81,8 +82,8 @@ public:
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setConnectionStats(const ConnectionStats& stats) override;
-  Ssl::Connection* ssl() override { return nullptr; }
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  Ssl::Connection* ssl() override { return transport_socket_->ssl(); }
+  const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
@@ -116,6 +117,7 @@ protected:
   void onLowWatermark();
   void onHighWatermark();
 
+  TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
@@ -124,7 +126,6 @@ protected:
   // a generic pointer.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
-  TransportSocketPtr transport_socket_;
 
 private:
   void onFileEvent(uint32_t events);
@@ -167,7 +168,8 @@ class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnect
 public:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const Address::InstanceConstSharedPtr& source_address);
+                       const Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

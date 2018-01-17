@@ -32,7 +32,7 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
     ASSERT(api_type == ApiType::get().Grpc);
     api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
   }
-  api_config_source.add_cluster_name(cluster);
+  api_config_source.add_cluster_names(cluster);
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
@@ -80,13 +80,13 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterInfoMap& clusters,
     const envoy::api::v2::ApiConfigSource& api_config_source) {
-  if (api_config_source.cluster_name().size() != 1) {
+  if (api_config_source.cluster_names().size() != 1) {
     // TODO(htuch): Add support for multiple clusters, #1170.
     throw EnvoyException(
         "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
   }
 
-  const auto& cluster_name = api_config_source.cluster_name()[0];
+  const auto& cluster_name = api_config_source.cluster_names()[0];
   const auto& it = clusters.find(cluster_name);
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {

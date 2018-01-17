@@ -112,7 +112,7 @@ public:
                   eds_cluster_config:
                     eds_config:
                       api_config_source:
-                        cluster_name: "eds-cluster"
+                        cluster_names: "eds-cluster"
                         api_type: GRPC
               )EOF"));
 

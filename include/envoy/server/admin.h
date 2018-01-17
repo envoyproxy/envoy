@@ -47,10 +47,11 @@ public:
    * @param help_text supplies the help text for the handler.
    * @param callback supplies the callback to invoke when the prefix matches.
    * @param removable if true allows the handler to be removed via removeHandler.
+   * @param mutates_server_state indicates whether callback will mutate server state.
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
-                          HandlerCb callback, bool removable) PURE;
+                          HandlerCb callback, bool removable, bool mutates_server_state) PURE;
 
   /**
    * Remove an admin handler if it is removable.

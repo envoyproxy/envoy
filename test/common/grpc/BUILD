@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_google_grpc",
 )
 
 envoy_package()
@@ -12,7 +13,9 @@ envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
     deps = [
+        "//source/common/common:enum_to_int",
         "//source/common/grpc:async_client_lib",
+        "//source/common/grpc:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
@@ -56,6 +59,12 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "google_grpc_test",
+    srcs = envoy_select_google_grpc(["google_grpc_test.cc"]),
+    external_deps = ["grpc"],
 )
 
 envoy_cc_test(
