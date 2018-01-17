@@ -295,6 +295,10 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
+  if (!Common::isGrpcResponseHeader(headers, end_stream)) {
+    error_ = true;
+  }
+
   if (error_ || !transcoder_) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -329,7 +333,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
-  if (!method_->server_streaming()) {
+  if (!method_->server_streaming() && !end_stream) {
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }

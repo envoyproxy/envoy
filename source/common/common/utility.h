@@ -10,6 +10,8 @@
 
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 /**
  * Utility class for formatting dates given a strftime style format string.
@@ -105,6 +107,8 @@ public:
  */
 class StringUtil {
 public:
+  static const char WhitespaceChars[];
+
   /**
    * Convert a string to an unsigned long, checking for error.
    * @param return TRUE if successful, FALSE otherwise.
@@ -132,25 +136,74 @@ public:
   static uint32_t itoa(char* out, size_t out_len, uint64_t i);
 
   /**
-   * Trim trailing whitespace from a string in place.
+   * Trim leading whitespace from a string view.
+   * @param source supplies the string view to be trimmed.
+   * @return trimmed string view.
    */
-  static void rtrim(std::string& source);
+  static absl::string_view ltrim(absl::string_view source);
+
+  /**
+   * Trim trailing whitespaces from a string view.
+   * @param source supplies the string view to be trimmed.
+   * @return trimmed string view.
+   */
+  static absl::string_view rtrim(absl::string_view source);
+
+  /**
+   * Trim leading and trailing whitespaces from a string view.
+   * @param source supplies the string view to be trimmed.
+   * @return trimmed string view.
+   */
+  static absl::string_view trim(absl::string_view source);
+
+  /**
+   * Look up for an exactly token in a delimiter-separated string view.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
+   * @param token supplies the lookup string view.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = true.
+   * @return true if found and false otherwise.
+   *
+   * E.g,
+   *
+   * findToken("A=5; b", "=;", "5")   . true
+   * findToken("A=5; b", "=;", "A=5") . false
+   * findToken("A=5; b", "=;", "A")   . true
+   * findToken("A=5; b", "=;", "b")   . true
+   * findToken("A=5", ".", "A=5")     . true
+   */
+  static bool findToken(absl::string_view source, absl::string_view delimiters,
+                        absl::string_view token, bool trim_whitespace = true);
+
+  /**
+   * Crop characters from a string view starting at the first character of the matched
+   * delimiter string view until the end of the source string view.
+   * @param source supplies the string view to be processed.
+   * @param delimiter supplies the string view that delimits the starting point for deletion.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = true.
+   * @return sub-string of the string view if any.
+   */
+  static absl::string_view cropRight(absl::string_view source, absl::string_view delimiters,
+                                     bool trim_whitespace = true);
+
+  /**
+   * Split a delimiter-separated string view.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
+   * @param keep_empty_string result contains empty strings if the string starts or ends with
+   * 'split', or if instances of 'split' are adjacent; default = false.
+   * @return true if found and false otherwise.
+   */
+  static std::vector<absl::string_view> splitToken(absl::string_view source,
+                                                   absl::string_view delimiters,
+                                                   bool keep_empty_string = false);
 
   /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
-
-  /**
-   * Split a string.
-   * @param source supplies the string to split.
-   * @param split supplies the string to split on.
-   * @param keep_empty_string result contains empty strings if the string starts or ends with
-   * 'split', or if instances of 'split' are adjacent.
-   * @return vector of strings computed after splitting `source` around all instances of `split`.
-   */
-  static std::vector<std::string> split(const std::string& source, const std::string& split,
-                                        bool keep_empty_string = false);
 
   /**
    * Join elements of a vector into a string delimited by delimiter.
@@ -159,14 +212,6 @@ public:
    * @return string combining elements of `source` with `delimiter` in between each element.
    */
   static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
-
-  /**
-   * Split a string.
-   * @param source supplies the string to split.
-   * @param split supplies the char to split on.
-   * @return vector of strings computed after splitting `source` around all instances of `split`.
-   */
-  static std::vector<std::string> split(const std::string& source, char split);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a
@@ -207,7 +252,7 @@ public:
    * @param s string.
    * @return std::string s converted to upper case.
    */
-  static std::string toUpper(const std::string& s);
+  static std::string toUpper(absl::string_view s);
 };
 
 } // namespace Envoy
