@@ -93,13 +93,9 @@ absl::string_view StringUtil::rtrim(absl::string_view source) {
 
 absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
 
-bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
+bool StringUtil::findToken(absl::string_view source, absl::string_view delimeters,
                            absl::string_view key_token, bool trim_whitespace) {
-  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, false);
-  if (tokens.empty()) {
-    return key_token.empty();
-  }
-
+  const std::vector<absl::string_view> tokens = splitToken(source, delimeters, trim_whitespace);
   if (trim_whitespace) {
     for (auto token : tokens) {
       if (key_token == trim(token)) {
@@ -108,7 +104,6 @@ bool StringUtil::findToken(absl::string_view source, absl::string_view delimiter
     }
     return false;
   }
-
   return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
 }
 

@@ -221,7 +221,8 @@ TEST(StringUtil, StringViewFindToken) {
   EXPECT_FALSE(StringUtil::findToken("hello; world", ".", "hello"));
   EXPECT_TRUE(StringUtil::findToken("", ",", ""));
   EXPECT_FALSE(StringUtil::findToken("", "", "a"));
-  EXPECT_TRUE(StringUtil::findToken(" ", " ", "", false));
+  EXPECT_TRUE(StringUtil::findToken(" ", " ", "", true));
+  EXPECT_FALSE(StringUtil::findToken(" ", " ", "", false));
   EXPECT_TRUE(StringUtil::findToken("A=5", ".", "A=5"));
 }
 

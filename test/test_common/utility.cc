@@ -15,6 +15,7 @@
 #include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
@@ -22,6 +23,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/string_view.h"
 #include "fmt/format.h"
 #include "gtest/gtest.h"
 
@@ -163,27 +165,9 @@ std::vector<std::string> TestUtility::split(const std::string& source, char spli
 std::vector<std::string> TestUtility::split(const std::string& source, const std::string& split,
                                             bool keep_empty_string) {
   std::vector<std::string> ret;
-  size_t last_index = 0;
-  size_t next_index;
-
-  if (split.empty()) {
-    ret.emplace_back(source);
-    return ret;
-  }
-
-  do {
-    next_index = source.find(split, last_index);
-    if (next_index == std::string::npos) {
-      next_index = source.size();
-    }
-
-    if (next_index != last_index || keep_empty_string) {
-      ret.emplace_back(source.substr(last_index, next_index - last_index));
-    }
-
-    last_index = next_index + split.size();
-  } while (next_index != source.size());
-
+  const auto tokens_sv = StringUtil::splitToken(source, split, keep_empty_string);
+  std::transform(tokens_sv.begin(), tokens_sv.end(), std::back_inserter(ret),
+                 [](absl::string_view sv) { return std::string(sv); });
   return ret;
 }
 
