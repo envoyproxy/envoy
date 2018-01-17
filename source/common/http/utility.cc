@@ -92,7 +92,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
         // Find the cookie headers in the request (typically, there's only one).
         if (header.key() == Http::Headers::get().Cookie.get().c_str()) {
           // Split the cookie header into individual cookies.
-          for (auto s : StringUtil::splitToken(header.value().c_str(), ";")) {
+          for (const auto s : StringUtil::splitToken(header.value().c_str(), ";")) {
             // Find the key part of the cookie (i.e. the name of the cookie).
             size_t first_non_space = s.find_first_not_of(" ");
             size_t equals_index = s.find('=');
@@ -101,7 +101,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
               // checking other cookies in this header.
               continue;
             }
-            absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+            const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
             State* state = static_cast<State*>(context);
             // If the key matches, parse the value from the rest of the cookie string.
             if (k == state->key_) {

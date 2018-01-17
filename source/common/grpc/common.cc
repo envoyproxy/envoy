@@ -105,12 +105,12 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   if (path == nullptr || path->value().c_str() == nullptr) {
     return false;
   }
-  auto parts = StringUtil::splitToken(path->value().c_str(), "/");
+  const auto parts = StringUtil::splitToken(path->value().c_str(), "/");
   if (parts.size() != 2) {
     return false;
   }
-  *service = std::string(parts[0]);
-  *method = std::string(parts[1]);
+  service->assign(parts[0].data(), parts[0].size());
+  method->assign(parts[1].data(), parts[1].size());
   return true;
 }
 
