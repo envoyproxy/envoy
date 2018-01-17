@@ -48,6 +48,17 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
   return false;
 }
 
+bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
+  if (end_stream) {
+    // Trailers-only response, only grpc-status is required.
+    return headers.GrpcStatus() != nullptr;
+  }
+  if (Http::Utility::getResponseStatus(headers) != enumToInt(Http::Code::OK)) {
+    return false;
+  }
+  return hasGrpcContentType(headers);
+}
+
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
                         const std::string& grpc_service, const std::string& grpc_method,
                         const Http::HeaderEntry* grpc_status) {
