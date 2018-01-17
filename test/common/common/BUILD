@@ -72,3 +72,9 @@ envoy_cc_test(
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
 )
+
+envoy_cc_test(
+    name = "shared_memory_hash_set_test",
+    srcs = ["shared_memory_hash_set_test.cc"],
+    deps = ["//source/common/common:shared_memory_hash_set_lib"],
+)

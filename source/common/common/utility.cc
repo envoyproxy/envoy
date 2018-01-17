@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <iterator>
 #include <string>
@@ -230,6 +231,30 @@ std::string StringUtil::toUpper(absl::string_view s) {
   upper_s.reserve(s.size());
   std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+bool Primes::isPrime(uint32_t x) {
+  if (x < 4) {
+    return true; // eliminates special-casing 2.
+  } else if ((x & 1) == 0) {
+    return false; // eliminates even numbers >2.
+  }
+
+  uint32_t limit = sqrt(x);
+  for (uint32_t factor = 3; factor <= limit; factor += 2) {
+    if ((x % factor) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint32_t Primes::findPrimeLargerThan(uint32_t x) {
+  x += (x % 2) + 1;
+  while (!isPrime(x)) {
+    x += 2;
+  }
+  return x;
 }
 
 } // namespace Envoy

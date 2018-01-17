@@ -165,3 +165,16 @@ envoy_cc_library(
         "//include/envoy/common:callback",
     ],
 )
+
+envoy_cc_library(
+    name = "shared_memory_hash_set_lib",
+    hdrs = ["shared_memory_hash_set.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        ":assert_lib",
+        ":hash_lib",
+        ":logger_lib",
+    ],
+)
