@@ -24,7 +24,9 @@ namespace LcTrie {
  * Level Compressed Trie for tagging IP addresses. Both IPv4 and IPv6 addresses are supported
  * within this class with no calling pattern changes.
  *
- * Refer to LcTrieInternal for implementation and algorithm details.
+ * The algorithm to build the LC-Trie is desribed in the paper 'IP-address lookup using LC-tries'
+ * by'S. Nilsson' and 'G. Karlsson'. Refer to LcTrieInternal for implementation and algorithm
+ * details.
  */
 class LcTrie {
 public:
@@ -46,7 +48,7 @@ public:
    * supported.
    * @param  ip_address supplies the IP address.
    * @return tag from the CIDR range that contains 'ip_address'. An empty string is returned
-   *             if no prefix contains 'ip_address'or there is no data for the IP version of the
+   *             if no prefix contains 'ip_address' or there is no data for the IP version of the
    *             ip_address.
    */
   std::string getTag(const Network::Address::InstanceConstSharedPtr ip_address) const;
@@ -175,7 +177,8 @@ private:
    * 'http://www.csc.kth.se/~snilsson/software/router/C/' were used as reference during
    * implementation.
    *
-   * Note: The trie can only support up 524288(2^19) nodes.
+   * Note: The trie can only support up 524287(2^19-1) prefixes with a fill_factor of 1 and
+   * root_branching_factor not set. Refer to LcTrieInternal::build() method for more details.
    */
   template <class IpType, uint32_t address_size = 8 * sizeof(IpType)> class LcTrieInternal {
   public:
@@ -202,7 +205,7 @@ private:
   private:
     /**
      * Builds the Level Compresesed Trie, by first sorting the tag data, removing duplicated
-     * prefixes and invoking buildRecursively() to build the trie.
+     * prefixes and invoking buildRecursive() to build the trie.
      */
     void build(std::vector<IpPrefix<IpType>>& tag_data) {
       if (tag_data.empty()) {
@@ -211,12 +214,12 @@ private:
 
       // LcNode uses the last 20 bits to store either the index into ip_prefixes_ or trie_.
       // In theory, the trie_ should only need twice the amount of entries of CIDR ranges.
-      // To prevent index out of bounds issues, only support a maximum of 2^19 CIDR ranges.
+      // To prevent index out of bounds issues, only support a maximum of (2^19-1) CIDR ranges.
       // TODO(ccaraman): Add a test case for this.
-      if (tag_data.size() > (1 << 19)) {
-        throw EnvoyException(fmt::format("Size of the input vector({0}) for LC-Trie is larger than "
-                                         "the max size supported(2^19).",
-                                         tag_data.size()));
+      if (tag_data.size() > MAXIMUM_CIDR_RANGE_ENTRIES) {
+        throw EnvoyException(fmt::format("The input vector has '{0}' CIDR ranges entires. LC-Trie "
+                                         "can only support '{1}' CIDR ranges.",
+                                         tag_data.size(), MAXIMUM_CIDR_RANGE_ENTRIES));
       }
 
       // TODO(ccaraman): Consider adding an optimization to short circuit building the trie, if
@@ -258,6 +261,7 @@ private:
       ComputePair(int branch, int prefix) : branch_(branch), prefix_(prefix) {}
 
       uint32_t branch_;
+      // The total number of bits that have the same prefix for subset of ip_prefixes_.
       uint32_t prefix_;
     };
 
@@ -269,7 +273,7 @@ private:
      * @param n supplies the number of nodes to use while computing the branch.
      * @return pair of integers for the branching factor and the skip.
      */
-    ComputePair computeBranch(uint32_t prefix, uint32_t first, uint32_t n) const {
+    ComputePair computeBranchAndSkip(uint32_t prefix, uint32_t first, uint32_t n) const {
       ComputePair compute(0, 0);
 
       // Compute the new prefix for the range between ip_prefixes_[first] and
@@ -298,9 +302,8 @@ private:
         return compute;
       }
 
-      // Compute the number of bits required for branching by checking for all
-      // patterns (b=2 {00, 01, 10, 11}; b=3 {000,001,010,011,100,101,110,111}, etc)
-      // are covered in the set.
+      // Compute the number of bits required for branching by checking all patterns in the set are
+      // covered. Ex (b=2 {00, 01, 10, 11}; b=3 {000,001,010,011,100,101,110,111}, etc)
       uint32_t branch = 1;
       uint32_t count;
       do {
@@ -352,7 +355,7 @@ private:
     /**
      * Recursively build a trie for IP prefixes from position 'first' to 'first+n-1'.
      * @param prefix supplies the prefix to ignore when building the sub-trie.
-     * @param first supplies the ip_prefixes_ index into for this sub-trie.
+     * @param first supplies the index into ip_prefixes_ for this sub-trie.
      * @param n suppplies the number of entries for the sub-trie.
      * @param position supplies the root for this sub-trie.
      * @param next_free_index supplies the next available index in the trie_.
@@ -361,14 +364,28 @@ private:
                         uint32_t& next_free_index) {
       // Setting a leaf, the branch and skip are 0.
       if (n == 1) {
+        // There is no way to predictably determine the number of trie nodes required to build a
+        // LC-Trie. If while building the trie the position that is being set exceeds the maximum
+        // number of supported entries, throw an Envoy Exception instead of letting an out_of_range
+        // exception be thrown.
+        // TODO(ccaraman): Add a test case.
+        if (position > MAXIMUM_TRIE_NODES) {
+          throw EnvoyException(fmt::format("The number of internal nodes required for the LC-Trie "
+                                           "exceeded the maximum number of "
+                                           "supported nodes. Number of internal nodes required: "
+                                           "'{0}'. Maximum number of supported nodes: '{1}'.",
+                                           position, MAXIMUM_TRIE_NODES));
+        }
         trie_[position].address_ = first;
         return;
       }
 
-      ComputePair output = computeBranch(prefix, first, n);
+      ComputePair output = computeBranchAndSkip(prefix, first, n);
 
       uint32_t address = next_free_index;
       trie_[position].branch_ = output.branch_;
+      // The skip value is the number of bits between the newly calculated prefix(output.prefix_)
+      // and the previous prefix(prefix).
       trie_[position].skip_ = output.prefix_ - prefix;
       trie_[position].address_ = address;
 
@@ -409,6 +426,8 @@ private:
             buildRecursive(output.prefix_ + output.branch_, new_position, 1, address + i,
                            next_free_index);
           }
+          // Update the bit_pattern to skip over the trie_ entries initialized above.
+          bit_pattern += (1 << bits) - 1;
         } else {
           // Recursively build sub-tries for ip_prefixes_[new_position] to
           // ip_prefixes_[new_position+count-1].
@@ -433,7 +452,7 @@ private:
      * ip_prefixes_. If branch_ != 0, the index is for the trie_. If branch == zero, the index is
      * for the ip_prefixes_.
      *
-     * Note: If more than 2^19 CIDR ranges are to be stored in trie_, uint64_t should be used
+     * Note: If more than 2^19-1 CIDR ranges are to be stored in trie_, uint64_t should be used
      * instead.
      */
     struct LcNode {
@@ -442,7 +461,15 @@ private:
       uint32_t address_ : 20;
     };
 
-    // Vector that contains the CIDR ranges and tags.
+    // Refer to LcNode to for further explanation on the current limitations for the maximum number
+    // of CIDR ranges supported and the maximum amount of nodes of supported in the trie.
+    static constexpr uint32_t MAXIMUM_TRIE_NODES = ((1 << 20) - 1);
+    static constexpr uint32_t MAXIMUM_CIDR_RANGE_ENTRIES = ((1 << 19) - 1);
+
+    // The CIDR range and tags needs to be maintained separately from the LC-Trie. A LC-Trie skips
+    // chunks of data while searching for a match. This means that the node found in the LC-Trie is
+    // not guaranteed to have the IP address in range. The last step prior to returning a tag is to
+    // check the CIDR range pointed to by the node in the LC-Trie has the IP address in range.
     std::vector<IpPrefix<IpType>> ip_prefixes_;
 
     // Main trie search structure.
@@ -526,8 +553,8 @@ std::string LcTrie::LcTrieInternal<IpType, address_size>::getTag(const IpType& i
     return ip_prefixes_[address].tag_;
   }
 
-  // Check the input ip is contained by node at ip_prefixes_[adr] by XOR'ing the two values and
-  // checking that up until the length of the range the value is 0.
+  // Check the input IP address is within the CIDR range stored in ip_prefixes_[adr] by XOR'ing the
+  // two values and checking that up until the length of the CIDR range the value is 0.
   IpType bitmask = ip_prefixes_[address].ip_ ^ ip_address;
   if (extractBits<IpType, address_size>(0, ip_prefixes_[address].length_, bitmask) == 0) {
     return ip_prefixes_[address].tag_;

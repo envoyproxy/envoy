@@ -15,7 +15,8 @@ class LcTrieTest : public testing::Test {
 public:
   LcTrieTest() {}
 
-  void setup(const std::vector<std::vector<std::string>>& cidr_range_strings) {
+  void setup(const std::vector<std::vector<std::string>>& cidr_range_strings,
+             double fill_factor = 0, uint32_t root_branch_factor = 0) {
     std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> output;
     for (size_t i = 0; i < cidr_range_strings.size(); i++) {
       std::pair<std::string, std::vector<Address::CidrRange>> ip_tags;
@@ -25,7 +26,12 @@ public:
       }
       output.push_back(ip_tags);
     }
-    trie_.reset(new LcTrie(output));
+    // Use custom fill factors and root branch factors if they are in the valid range.
+    if ((fill_factor > 0) && (fill_factor <= 1) && (root_branch_factor > 0)) {
+      trie_.reset(new LcTrie(output, fill_factor, root_branch_factor));
+    } else {
+      trie_.reset(new LcTrie(output));
+    }
   }
 
   void expectIPAndTag(const std::vector<std::pair<std::string, std::string>>& test_output) {
@@ -37,9 +43,10 @@ public:
   std::unique_ptr<LcTrie> trie_;
 };
 
-// TODO(ccaraman): Add a performance benchmark test.
+// TODO(ccaraman): Add a performance and memory benchmark test.
 
-TEST_F(LcTrieTest, IPv4) {
+// Use the default constructor values.
+TEST_F(LcTrieTest, IPv4Defaults) {
   std::vector<std::vector<std::string>> cidr_range_strings = {
       {"0.0.0.0/4"},   // tag_0
       {"16.0.0.0/4"},  // tag_1
@@ -58,6 +65,43 @@ TEST_F(LcTrieTest, IPv4) {
       {"233.0.0.0/8"}, // tag_14
   };
   setup(cidr_range_strings);
+
+  std::vector<std::pair<std::string, std::string>> test_case = {
+      {"0.0.0.0", "tag_0"},     {"16.0.0.1", "tag_1"},
+      {"40.0.0.255", "tag_2"},  {"64.0.130.0", "tag_3"},
+      {"96.0.0.10", "tag_4"},   {"112.0.0.0", "tag_5"},
+      {"128.0.0.1", "tag_6"},   {"160.0.0.1", "tag_7"},
+      {"164.255.0.0", "tag_8"}, {"168.0.0.0", "tag_9"},
+      {"176.0.0.1", "tag_10"},  {"184.0.0.1", "tag_11"},
+      {"192.0.0.0", "tag_12"},  {"232.0.80.0", "tag_13"},
+      {"233.0.0.1", "tag_14"},  {"::1", ""},
+  };
+  expectIPAndTag(test_case);
+}
+
+// There was a bug in the C++ port that didn't update the index for the next address in the trie.
+// For the data set below, the address "164.255.0.0" returned no tag instead of "tag_8".
+TEST_F(LcTrieTest, RootBranchingFactor) {
+  double fill_factor = 0.75;
+  uint32_t root_branching_factor = 16;
+  std::vector<std::vector<std::string>> cidr_range_strings = {
+      {"0.0.0.0/4"},   // tag_0
+      {"16.0.0.0/4"},  // tag_1
+      {"40.0.0.0/5"},  // tag_2
+      {"64.0.0.0/3"},  // tag_3
+      {"96.0.0.0/4"},  // tag_4
+      {"112.0.0.0/4"}, // tag_5
+      {"128.0.0.0/3"}, // tag_6
+      {"160.0.0.0/6"}, // tag_7
+      {"164.0.0.0/6"}, // tag_8
+      {"168.0.0.0/5"}, // tag_9
+      {"176.0.0.0/5"}, // tag_10
+      {"184.0.0.0/5"}, // tag_11
+      {"192.0.0.0/3"}, // tag_12
+      {"232.0.0.0/8"}, // tag_13
+      {"233.0.0.0/8"}, // tag_14
+  };
+  setup(cidr_range_strings, fill_factor, root_branching_factor);
 
   std::vector<std::pair<std::string, std::string>> test_case = {
       {"0.0.0.0", "tag_0"},     {"16.0.0.1", "tag_1"},
