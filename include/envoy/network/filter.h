@@ -206,7 +206,7 @@ public:
    * first is called first).
    * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(ListenerFilter* filter) PURE;
+  virtual void addAcceptFilter(ListenerFilterPtr&& filter) PURE;
 };
 
 /**

@@ -21,7 +21,8 @@ public:
     Filter::Listener::ProxyProtocol::ConfigSharedPtr config(
         new Filter::Listener::ProxyProtocol::Config(context.scope()));
     return [config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(new Filter::Listener::ProxyProtocol::Instance(config));
+      filter_manager.addAcceptFilter(
+          Network::ListenerFilterPtr{new Filter::Listener::ProxyProtocol::Instance(config)});
     };
   }
 

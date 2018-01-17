@@ -1085,10 +1085,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     return socket;
   }));
 
-  EXPECT_CALL(manager, addAcceptFilter(_))
-      .WillOnce(Invoke([&](Network::ListenerFilter* filter) -> void {
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-        delete filter;
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
@@ -1109,7 +1108,7 @@ public:
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                        FactoryContext&) override {
     return [](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(new OriginalDstTest());
+      filter_manager.addAcceptFilter(Network::ListenerFilterPtr{new OriginalDstTest()});
     };
   }
 
@@ -1160,10 +1159,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     return socket;
   }));
 
-  EXPECT_CALL(manager, addAcceptFilter(_))
-      .WillOnce(Invoke([&](Network::ListenerFilter* filter) -> void {
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-        delete filter;
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));

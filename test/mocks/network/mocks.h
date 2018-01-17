@@ -235,7 +235,9 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager();
 
-  MOCK_METHOD1(addAcceptFilter, void(Network::ListenerFilter*));
+  void addAcceptFilter(Network::ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
+
+  MOCK_METHOD1(addAcceptFilter_, void(Network::ListenerFilterPtr&));
 };
 
 class MockFilterChainFactory : public FilterChainFactory {

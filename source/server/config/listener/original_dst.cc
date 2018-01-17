@@ -19,7 +19,8 @@ public:
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                        FactoryContext&) override {
     return [](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(new Filter::Listener::OriginalDst());
+      filter_manager.addAcceptFilter(
+          Network::ListenerFilterPtr{new Filter::Listener::OriginalDst()});
     };
   }
 

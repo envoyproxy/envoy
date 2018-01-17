@@ -144,8 +144,8 @@ private:
     }
 
     // Network::ListenerFilterManager
-    void addAcceptFilter(Network::ListenerFilter* filter) override {
-      accept_filters_.emplace_back(filter);
+    void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {
+      accept_filters_.emplace_back(std::move(filter));
     }
 
     // Network::ListenerFilterCallbacks
