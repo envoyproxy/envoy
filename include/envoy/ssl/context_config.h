@@ -44,7 +44,7 @@ public:
   virtual const std::string& caCert() const PURE;
 
   /**
-   * @return Path of the CA certificate to use for peer validation or an empty string
+   * @return Path of the CA certificate to use for peer validation or "<inline>"
    * if the CA certificate was inlined.
    */
   virtual const std::string& caCertPath() const PURE;
@@ -55,7 +55,7 @@ public:
   virtual const std::string& certChain() const PURE;
 
   /**
-   * @return Path of the certificate chain used to identify the local side or an empty string
+   * @return Path of the certificate chain used to identify the local side or "<inline>"
    * if the certificate chain was inlined.
    */
   virtual const std::string& certChainPath() const PURE;
@@ -66,7 +66,7 @@ public:
   virtual const std::string& privateKey() const PURE;
 
   /**
-   * @return Path of the private key used to identify the local side or an empty string
+   * @return Path of the private key used to identify the local side or "<inline>"
    * if the private key was inlined.
    */
   virtual const std::string& privateKeyPath() const PURE;
