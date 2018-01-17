@@ -55,7 +55,7 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
              .count() != 0;
 }
 
-const std::string StringUtil::WhitespaceChars{" \t\f\v\n\r"};
+const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
 bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {

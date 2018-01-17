@@ -232,14 +232,15 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
-      auto text_file{Filesystem::fileReadToEnd(full_path)};
+      const std::string text_file{Filesystem::fileReadToEnd(full_path)};
       auto lines = StringUtil::splitToken(text_file, "\n");
       for (auto line : lines) {
         if (!line.empty() && line.front() == '#') {
           continue;
         }
         if (line == lines.back()) {
-          entry.string_value_.append(std::string(StringUtil::rtrim(line)));
+          absl::string_view trimmed = StringUtil::rtrim(line);
+          entry.string_value_.append(trimmed.data(), trimmed.size());
         } else {
           entry.string_value_.append(std::string{line} + "\n");
         }

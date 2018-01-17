@@ -58,7 +58,14 @@ TEST(InputConstMemoryStream, All) {
   }
 }
 
-TEST(StringUtil, WhitespaceChars) { EXPECT_EQ(" \t\f\v\n\r", StringUtil::WhitespaceChars); }
+TEST(StringUtil, WhitespaceChars) {
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, ' '));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\t'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\f'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\v'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\n'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
+}
 
 TEST(StringUtil, caseInsensitiveCompare) {
   EXPECT_EQ(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "content-length"));

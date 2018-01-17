@@ -33,8 +33,8 @@ void TlsContextJson::translateUpstreamTlsContext(
 
 void TlsContextJson::translateCommonTlsContext(
     const Json::Object& json_tls_context, envoy::api::v2::CommonTlsContext& common_tls_context) {
-  for (auto alpn_protocol :
-       StringUtil::splitToken(json_tls_context.getString("alpn_protocols", ""), ",")) {
+  const std::string alpn_protocols_str{json_tls_context.getString("alpn_protocols", "")};
+  for (auto alpn_protocol : StringUtil::splitToken(alpn_protocols_str, ",")) {
     common_tls_context.add_alpn_protocols(std::string{alpn_protocol});
   }
 

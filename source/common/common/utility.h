@@ -107,10 +107,7 @@ public:
  */
 class StringUtil {
 public:
-  /**
-   * White space chars.
-   */
-  static const std::string WhitespaceChars;
+  static const char WhitespaceChars[];
 
   /**
    * Convert a string to an unsigned long, checking for error.
