@@ -474,7 +474,6 @@ void HotRestartImpl::terminateParent() {
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() {
-  // return shmem_.version() + "." + stats_set_.version();
   return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), stats_set_);
 }
 
