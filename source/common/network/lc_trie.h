@@ -180,7 +180,7 @@ private:
    * 'http://www.csc.kth.se/~snilsson/software/router/C/' were used as reference during
    * implementation.
    *
-   * Note: The trie can only support up 524287(2^19-1) prefixes with a fill_factor of 1 and
+   * Note: The trie can only support up 524288(2^19) prefixes with a fill_factor of 1 and
    * root_branching_factor not set. Refer to LcTrieInternal::build() method for more details.
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class LcTrieInternal {
@@ -217,7 +217,7 @@ private:
 
       // LcNode uses the last 20 bits to store either the index into ip_prefixes_ or trie_.
       // In theory, the trie_ should only need twice the amount of entries of CIDR ranges.
-      // To prevent index out of bounds issues, only support a maximum of (2^19-1) CIDR ranges.
+      // To prevent index out of bounds issues, only support a maximum of (2^19) CIDR ranges.
       // TODO(ccaraman): Add a test case for this.
       if (tag_data.size() > MAXIMUM_CIDR_RANGE_ENTRIES) {
         throw EnvoyException(fmt::format("The input vector has '{0}' CIDR ranges entires. LC-Trie "
@@ -244,8 +244,8 @@ private:
         }
       }
 
-      // In theory, the trie_ vector can have at most twice the number of entries in the
-      // ip_prefixes_ vector. However, due to the fill factor a buffer is added to the size of the
+      // In theory, the trie_ vector can have at most twice the number of  ip_prefixes entries - 1.
+      // However, due to the fill factor a buffer is added to the size of the
       // trie_. The buffer value(2000000) is reused from the reference implementation in
       // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
       // TODO(ccaraman): Define a better buffer value when resizing the trie_.
@@ -346,12 +346,19 @@ private:
           }
           ++pattern;
         }
-        // Stop iterating once the size of the branch (with the fill factor ratio) is able to
-        // contain all of the prefixes within the current range of ip_prefixes_[first] to
-        // ip_prefixes_[first+n-1].
+        // Stop iterating once the size of the branch (with the fill factor ratio)
+        // can no longer contain all of the prefixes within the current range of
+        // ip_prefixes_[first] to ip_prefixes_[first+n-1].
       } while (count >= fill_factor_ * (1 << branch));
 
-      // Set the branching factor.
+      // The branching factor is decremented because the algorithm requires the largest branching
+      // factor that covers all(most when a fill factor is specified) of the CIDR ranges in the
+      // current sub-trie. When the loops above exits, the branch factor value is
+      // 1. greater than the address size with the prefix.
+      // 2. greater than the number of entries.
+      // 3. less than the total number of patterns seen in the range.
+      // In all of the cases above, branch - 1 is guaranteed to cover all of CIDR
+      // ranges in the sub-trie.
       compute.branch_ = branch - 1;
       return compute;
     }
@@ -474,7 +481,7 @@ private:
 
     // Refer to LcNode to for further explanation on the current limitations for the maximum number
     // of CIDR ranges supported and the maximum amount of nodes of supported in the trie.
-    static constexpr uint32_t MAXIMUM_CIDR_RANGE_ENTRIES = ((1 << 19) - 1);
+    static constexpr uint32_t MAXIMUM_CIDR_RANGE_ENTRIES = (1 << 19);
 
     // During build(), an estimate of the number of nodes required will be made and set this value.
     // This is used to ensure no out_of_range exception is thrown.
