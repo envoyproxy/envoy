@@ -27,9 +27,9 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-static SharedMemoryHashSetOptions sharedMemHashOptions(Options& options) {
+static SharedMemoryHashSetOptions sharedMemHashOptions(uint64_t max_stats) {
   SharedMemoryHashSetOptions hash_set_options;
-  hash_set_options.capacity = options.maxStats();
+  hash_set_options.capacity = max_stats;
 
   // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
   hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
@@ -119,7 +119,7 @@ std::string SharedMemory::version() {
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), stats_set_options_(sharedMemHashOptions(options)),
+    : options_(options), stats_set_options_(sharedMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
       stats_set_(stats_set_options_, options.restartEpoch() == 0, shmem_.stats_set_data_),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
@@ -167,7 +167,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
     return;
   }
   bool key_removed = stats_set_.remove(data.key());
-  RELEASE_ASSERT(key_removed);
+  ASSERT(key_removed);
   UNREFERENCED_PARAMETER(key_removed);
   memset(&data, 0, Stats::RawStatData::size());
 }
@@ -478,6 +478,16 @@ void HotRestartImpl::terminateParent() {
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() { return shmem_.version() + "." + stats_set_.version(); }
+
+// Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
+// can generate the version string.
+std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
+  const SharedMemoryHashSetOptions options = sharedMemHashOptions(max_num_stats);
+  size_t bytes = RawStatDataSet::numBytes(options);
+  std::unique_ptr<uint8_t> mem_buffer_for_dry_run_(new uint8_t[bytes]);
+  RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+  return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
+}
 
 } // namespace Server
 } // namespace Envoy
