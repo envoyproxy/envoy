@@ -72,6 +72,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   fake_upstream_connection->waitForData(10);
   fake_upstream_connection->waitForHalfClose();
   fake_upstream_connection->halfClose();
+  fake_upstream_connection->waitForDisconnect(true);
   tcp_client->waitForDisconnect();
 }
 
@@ -170,6 +171,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   ssl_client->close(Network::ConnectionCloseType::HalfClose);
   fake_upstream_connection->waitForHalfClose();
   fake_upstream_connection->halfClose();
+  fake_upstream_connection->waitForDisconnect();
   while (!connect_callbacks.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
