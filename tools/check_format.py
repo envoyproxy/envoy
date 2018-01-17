@@ -140,7 +140,7 @@ def executeCommand(command, error_message, file_path,
       if (e.returncode != 0 and e.returncode != 1):
           print "ERROR: something went wrong while executing: %s" % e.cmd
           sys.exit(1)
-      # In case we can't find line number, call printError at first.
+      # In case we can't find any line numbers, call printError at first.
       printError(error_message + " for file: %s" % (file_path))
       for line in e.output.splitlines():
         for num in regex.findall(line):
