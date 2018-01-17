@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -78,16 +77,5 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_binary(
-    name = "stats_speed_test",
-    srcs = ["stats_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
-    deps = [
-        "//source/common/stats:stats_lib",
     ],
 )

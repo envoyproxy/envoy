@@ -4,6 +4,7 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
+#include "common/common/assert.h"
 #include "testing/base/public/benchmark.h"
 
 static const char TextToTrim[] = "\t  the quick brown fox jumps over the lazy dog\n\r\n";
@@ -12,43 +13,16 @@ static size_t TextToTrimLength = sizeof(TextToTrim) - 1;
 static const char AlreadyTrimmed[] = "the quick brown fox jumps over the lazy dog";
 static size_t AlreadyTrimmedLength = sizeof(AlreadyTrimmed) - 1;
 
+static const char CacheControl[] = "private, max-age=300, no-transform";
+static size_t CacheControlLength = sizeof(CacheControl) - 1;
+
 // NOLINT(namespace-envoy)
-
-static void BM_RTrimString(benchmark::State& state) {
-  int accum = 0;
-  for (auto _ : state) {
-    std::string text(TextToTrim, TextToTrimLength);
-    Envoy::StringUtil::rtrim(text);
-    accum += TextToTrimLength - text.size();
-  }
-  benchmark::DoNotOptimize(accum);
-}
-BENCHMARK(BM_RTrimString);
-
-static void BM_RTrimStringAlreadyTrimmed(benchmark::State& state) {
-  int accum = 0;
-  for (auto _ : state) {
-    std::string text(AlreadyTrimmed, AlreadyTrimmedLength);
-    Envoy::StringUtil::rtrim(text);
-    accum += AlreadyTrimmedLength - text.size();
-  }
-  benchmark::DoNotOptimize(accum);
-}
-BENCHMARK(BM_RTrimStringAlreadyTrimmed);
-
-// TODO(jmarantz): delete this and call gsagula's version from
-// https://github.com/gsagula/envoy/blob/02ba40dd236645b89aec7689a81c9ff89f71dfc2/source/common/common/utility.cc#L222
-// once it's merged.
-static absl::string_view rightTrim(absl::string_view source) {
-  source.remove_suffix(source.size() - source.find_last_not_of(" \t\f\v\n\r") - 1);
-  return source;
-}
 
 static void BM_RTrimStringView(benchmark::State& state) {
   int accum = 0;
   for (auto _ : state) {
     absl::string_view text(TextToTrim, TextToTrimLength);
-    text = rightTrim(text);
+    text = Envoy::StringUtil::rtrim(text);
     accum += TextToTrimLength - text.size();
   }
   benchmark::DoNotOptimize(accum);
@@ -59,7 +33,7 @@ static void BM_RTrimStringViewAlreadyTrimmed(benchmark::State& state) {
   int accum = 0;
   for (auto _ : state) {
     absl::string_view text(AlreadyTrimmed, AlreadyTrimmedLength);
-    text = rightTrim(text);
+    text = Envoy::StringUtil::rtrim(text);
     accum += AlreadyTrimmedLength - text.size();
   }
   benchmark::DoNotOptimize(accum);
@@ -70,12 +44,35 @@ static void BM_RTrimStringViewAlreadyTrimmedAndMakeString(benchmark::State& stat
   int accum = 0;
   for (auto _ : state) {
     absl::string_view text(AlreadyTrimmed, AlreadyTrimmedLength);
-    std::string string_copy = std::string(rightTrim(text));
+    std::string string_copy = std::string(Envoy::StringUtil::rtrim(text));
     accum += AlreadyTrimmedLength - string_copy.size();
   }
   benchmark::DoNotOptimize(accum);
 }
 BENCHMARK(BM_RTrimStringViewAlreadyTrimmedAndMakeString);
+
+static void BM_FindToken(benchmark::State& state) {
+  const absl::string_view cache_control(CacheControl, CacheControlLength);
+  for (auto _ : state) {
+    RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "no-transform"));
+  }
+}
+BENCHMARK(BM_FindToken);
+
+static void BM_FindTokenValue(benchmark::State& state) {
+  const absl::string_view cache_control(CacheControl, CacheControlLength);
+  absl::string_view max_age;
+  for (auto _ : state) {
+    for (absl::string_view token : Envoy::StringUtil::splitToken(cache_control, ",")) {
+      auto name_value = Envoy::StringUtil::splitToken(token, "=");
+      if ((name_value.size() == 2) && (Envoy::StringUtil::trim(name_value[0]) == "max-age")) {
+        max_age = Envoy::StringUtil::trim(name_value[1]);
+      }
+    }
+    RELEASE_ASSERT(max_age == "300");
+  }
+}
+BENCHMARK(BM_FindTokenValue);
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
