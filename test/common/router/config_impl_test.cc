@@ -3165,8 +3165,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true), EnvoyException,
-      "Incorrect header configuration. Expected variable format %<variable_name>%, actual format "
-      "%CLIENT_IP");
+      "Incorrect header configuration. Un-terminated variable expression in '%CLIENT_IP'");
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {

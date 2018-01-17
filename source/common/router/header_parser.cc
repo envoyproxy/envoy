@@ -1,6 +1,12 @@
 #include "common/router/header_parser.h"
 
+#include <string>
+
+#include "common/common/assert.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Router {
@@ -11,18 +17,70 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
   const std::string& format = header_value_option.header().value();
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
 
-  if (format.find("%") == 0) {
-    const size_t last_occ_pos = format.rfind("%");
-    if (last_occ_pos == std::string::npos || last_occ_pos <= 1) {
-      throw EnvoyException(fmt::format("Incorrect header configuration. Expected variable format "
-                                       "%<variable_name>%, actual format {}",
-                                       format));
+  std::vector<HeaderFormatterPtr> formatters;
+
+  const absl::string_view format_view(format);
+  std::string buf;
+  buf.reserve(format_view.size());
+
+  size_t prev = 0;
+  do {
+    bool flush_buf = false;
+    HeaderFormatterPtr formatter;
+    size_t pos = format_view.find("%", prev);
+    if (pos == absl::string_view::npos) {
+      // End of format.
+      absl::StrAppend(&buf, format_view.substr(prev));
+      prev = format_view.size();
+      flush_buf = true;
+    } else if (pos + 1 < format_view.size() && format_view[pos + 1] == '%') {
+      // Found "%%", copy the first % into the buffer and skip the second.
+      absl::StrAppend(&buf, format_view.substr(prev, pos + 1 - prev));
+      prev = pos + 2;
+      flush_buf = prev >= format_view.size();
+    } else {
+      // Found the start of a %variable%.
+      absl::StrAppend(&buf, format_view.substr(prev, pos - prev));
+      flush_buf = true;
+
+      size_t len = std::string::npos;
+      absl::string_view var_view = format_view.substr(pos);
+      formatter = RequestInfoHeaderFormatter::parse(var_view, append, len);
+      if (!formatter) {
+        if (len == std::string::npos) {
+          throw EnvoyException(fmt::format(
+              "Incorrect header configuration. Un-terminated variable expression in '{}'",
+              absl::StrCat(var_view)));
+        }
+
+        throw EnvoyException(
+            fmt::format("Incorrect header configuration. Variable '{}' is not supported",
+                        absl::StrCat(var_view.substr(0, len))));
+      }
+
+      ASSERT(len != std::string::npos);
+      prev = pos + len;
+      ASSERT(prev <= format_view.size());
     }
-    return HeaderFormatterPtr{
-        new RequestInfoHeaderFormatter(format.substr(1, last_occ_pos - 1), append)};
-  } else {
-    return HeaderFormatterPtr{new PlainHeaderFormatter(format, append)};
+
+    if (flush_buf && !buf.empty()) {
+      formatters.emplace_back(new PlainHeaderFormatter(buf, append));
+      buf.clear();
+    }
+
+    if (formatter) {
+      formatters.push_back(std::move(formatter));
+    }
+  } while (prev < format_view.size());
+
+  ASSERT(buf.empty());
+  ASSERT(formatters.size() > 0);
+
+  if (formatters.size() == 1) {
+    return std::move(formatters[0]);
   }
+
+  return HeaderFormatterPtr{new CompoundHeaderFormatter(std::move(formatters), append)};
 }
 
 } // namespace
