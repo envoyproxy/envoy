@@ -3,9 +3,13 @@
 #include <chrono>
 #include <list>
 #include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -116,8 +120,11 @@ private:
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats);
-
+  static std::string
+  runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
+  static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
+  sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
 
   /**
    * URL handlers.
@@ -152,6 +159,8 @@ private:
                                Buffer::Instance& response);
   Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
+  Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                            Buffer::Instance& response);
 
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;

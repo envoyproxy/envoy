@@ -28,7 +28,8 @@ public:
    * @param completion supplies the completion to call when the listener has been added (or not) on
    *                   the worker.
    */
-  virtual void addListener(Listener& listener, AddListenerCompletion completion) PURE;
+  virtual void addListener(Network::ListenerConfig& listener,
+                           AddListenerCompletion completion) PURE;
 
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.
@@ -52,7 +53,8 @@ public:
    * @param completion supplies the completion to be called when the listener has been removed.
    *        This completion is called on the worker thread. No locking is performed by the worker.
    */
-  virtual void removeListener(Listener& listener, std::function<void()> completion) PURE;
+  virtual void removeListener(Network::ListenerConfig& listener,
+                              std::function<void()> completion) PURE;
 
   /**
    * Stop a listener from accepting new connections. This is used for server draining.
@@ -61,7 +63,7 @@ public:
    * all connections are gone. This would allow us to remove the listener more quickly depending on
    * drain speed.
    */
-  virtual void stopListener(Listener& listener) PURE;
+  virtual void stopListener(Network::ListenerConfig& listener) PURE;
 
   /**
    * Stop all listeners from accepting new connections. This is used for server draining.
