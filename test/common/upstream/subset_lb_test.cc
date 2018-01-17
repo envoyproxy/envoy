@@ -758,11 +758,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
                      {"tcp://127.0.0.1:92", {{"version", "1.0"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 }
 
@@ -801,11 +801,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
                      {"tcp://127.0.0.1:92", {{"version", "1.0"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_[0]},
@@ -814,11 +814,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}})}, {local_hosts_->at(0)},
                    0);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
 }
 
@@ -868,11 +868,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
                      {"tcp://127.0.0.1:95", {{"version", "default"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 }
 
@@ -922,11 +922,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
                      {"tcp://127.0.0.1:95", {{"version", "default"}}},
                  }});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {host_set_.hosts_[1]},
@@ -935,11 +935,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
 }
 
@@ -988,11 +988,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 }
 
@@ -1041,11 +1041,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {host_set_.hosts_[1]},
@@ -1054,11 +1054,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   modifyLocalHosts({local_hosts_->at(1)}, {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}})},
                    0);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(100));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
 }
 

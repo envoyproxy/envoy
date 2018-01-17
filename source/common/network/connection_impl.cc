@@ -66,15 +66,16 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
                                Address::InstanceConstSharedPtr bind_to_address,
                                TransportSocketPtr&& transport_socket, bool using_original_dst,
                                bool connected)
-    : filter_manager_(*this, *this), remote_address_(remote_address),
+    : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
+      remote_address_(remote_address),
       local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
                                                 : local_address),
 
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      transport_socket_(std::move(transport_socket)), dispatcher_(dispatcher), fd_(fd),
-      id_(++next_global_id_), using_original_dst_(using_original_dst) {
+      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_),
+      using_original_dst_(using_original_dst) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -421,7 +422,11 @@ void ConnectionImpl::onReadReady() {
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
-  onRead(new_buffer_size);
+  if (result.bytes_processed_ != 0) {
+    // Skip onRead if no bytes were processed. For instance, if the connection was closed without
+    // producing more data.
+    onRead(new_buffer_size);
+  }
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close) {
@@ -531,11 +536,13 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            connection_stats_->write_current_);
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher,
-                                           const Address::InstanceConstSharedPtr& remote_address,
-                                           const Address::InstanceConstSharedPtr& source_address)
+ClientConnectionImpl::ClientConnectionImpl(
+    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
+    const Network::Address::InstanceConstSharedPtr& source_address,
+    Network::TransportSocketPtr&& transport_socket)
     : ConnectionImpl(dispatcher, remote_address->socket(Address::SocketType::Stream),
-                     remote_address, nullptr, source_address, false, false) {}
+                     remote_address, nullptr, source_address, std::move(transport_socket), false,
+                     false) {}
 
 } // namespace Network
 } // namespace Envoy

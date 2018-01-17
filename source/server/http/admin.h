@@ -3,9 +3,13 @@
 #include <chrono>
 #include <list>
 #include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -42,7 +46,7 @@ public:
 
   // Server::Admin
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  bool removable) override;
+                  bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
 
   // Network::FilterChainFactory
@@ -88,6 +92,7 @@ private:
     const std::string help_text_;
     const HandlerCb handler_;
     const bool removable_;
+    const bool mutates_server_state_;
   };
 
   /**
@@ -115,12 +120,11 @@ private:
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats);
-  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                const std::list<Stats::GaugeSharedPtr>& gauges,
-                                Buffer::Instance& response);
-  static std::string sanitizePrometheusName(const std::string& name);
-  static std::string formatTagsForPrometheus(const std::vector<Stats::Tag>& tags);
-  static std::string prometheusMetricName(const std::string& extractedName);
+  static std::string
+  runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
+  std::vector<const UrlHandler*> sortedHandlers() const;
+  static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
+  sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
 
   /**
    * URL handlers.
@@ -155,6 +159,8 @@ private:
                                Buffer::Instance& response);
   Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
+  Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                            Buffer::Instance& response);
 
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -199,6 +205,37 @@ private:
   AdminImpl& parent_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
+};
+
+/**
+ * Formatter for metric/labels exported to Prometheus.
+ *
+ * See: https://prometheus.io/docs/concepts/data_model
+ */
+class PrometheusStatsFormatter {
+public:
+  /**
+   * Extracts counters and gauges and relevant tags, appending them to
+   * the response buffer after sanitizing the metric / label names.
+   */
+  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                const std::list<Stats::GaugeSharedPtr>& gauges,
+                                Buffer::Instance& response);
+  /**
+   * Format the given tags, returning a string as a comma-separated list
+   * of <tag_name>="<tag_value>" pairs.
+   */
+  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
+  /**
+   * Format the given metric name, prefixed with "envoy_".
+   */
+  static std::string metricName(const std::string& extractedName);
+
+private:
+  /**
+   * Take a string and sanitize it according to Prometheus conventions.
+   */
+  static std::string sanitizeName(const std::string& name);
 };
 
 } // namespace Server

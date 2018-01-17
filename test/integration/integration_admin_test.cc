@@ -214,6 +214,18 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime?format=json",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("application/json", ContentType(response));
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -253,5 +265,33 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 #endif
+
+class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public testing::Test {
+public:
+  IntegrationAdminIpv4Ipv6Test()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+      auto* socket_address = bootstrap.mutable_admin()->mutable_address()->mutable_socket_address();
+      socket_address->set_ipv4_compat(true);
+      socket_address->set_address("::");
+    });
+    HttpIntegrationTest::initialize();
+  }
+};
+
+// Verify an IPv4 client can connect to the admin interface listening on :: when
+// IPv4 compat mode is enabled.
+TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4) &&
+      TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
+    initialize();
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "GET", "/server_info", "", downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
+}
 
 } // namespace Envoy

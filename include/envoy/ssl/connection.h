@@ -26,6 +26,12 @@ public:
   virtual std::string uriSanLocalCertificate() PURE;
 
   /**
+   * @return the subject field of the local certificate in RFC 2253 format. Returns "" if there is
+   *         no local certificate, or no subject.
+   **/
+  virtual std::string subjectLocalCertificate() const PURE;
+
+  /**
    * @return the SHA256 digest of the peer certificate. Returns "" if there is no peer certificate
    *         which can happen in TLS (non mTLS) connections.
    */

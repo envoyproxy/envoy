@@ -32,12 +32,10 @@ public:
 class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
-      : async_client_(new Grpc::MockAsyncClient<pb::lyft::ratelimit::RateLimitRequest,
-                                                pb::lyft::ratelimit::RateLimitResponse>()),
-        client_(RateLimitAsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
+      : async_client_(new Grpc::MockAsyncClient()),
+        client_(Grpc::AsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
 
-  Grpc::MockAsyncClient<pb::lyft::ratelimit::RateLimitRequest,
-                        pb::lyft::ratelimit::RateLimitResponse>* async_client_;
+  Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
   GrpcClientImpl client_;
   MockRequestCallbacks request_callbacks_;
@@ -52,12 +50,10 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
-        .WillOnce(Invoke([this](
-                             const Protobuf::MethodDescriptor& service_method,
-                             const pb::lyft::ratelimit::RateLimitRequest&,
-                             Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse>&,
-                             Tracing::Span&,
-                             const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+        .WillOnce(Invoke([this](const Protobuf::MethodDescriptor& service_method,
+                                const Protobuf::Message&, Grpc::AsyncRequestCallbacks&,
+                                Tracing::Span&,
+                                const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
           EXPECT_EQ("pb.lyft.ratelimit.RateLimitService", service_method.service()->full_name());
           EXPECT_EQ("ShouldRateLimit", service_method.name());
           return &async_request_;

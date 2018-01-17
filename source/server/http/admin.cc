@@ -1,11 +1,16 @@
 #include "server/http/admin.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -93,6 +98,10 @@ const char AdminHtmlStart[] = R"(
       border: 1px solid #dddddd;
       text-align: left;
       padding: 8px;
+    }
+
+    .home-form {
+      margin-bottom: 0;
     }
   </style>
 </head>
@@ -385,7 +394,8 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      AdminImpl::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(), response);
+      PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(),
+                                                  server_.stats().gauges(), response);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -395,40 +405,41 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
   return rc;
 }
 
-std::string AdminImpl::sanitizePrometheusName(const std::string& name) {
+std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), '.', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '-', '_');
   return stats_name;
 }
 
-std::string AdminImpl::formatTagsForPrometheus(const std::vector<Stats::Tag>& tags) {
+std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizePrometheusName(tag.name_),
-                              sanitizePrometheusName(tag.value_)));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
   return StringUtil::join(buf, ",");
 }
 
-std::string AdminImpl::prometheusMetricName(const std::string& extractedName) {
+std::string PrometheusStatsFormatter::metricName(const std::string& extractedName) {
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
-  return fmt::format("envoy_{0}", sanitizePrometheusName(extractedName));
+  // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
+  return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
-void AdminImpl::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                  const std::list<Stats::GaugeSharedPtr>& gauges,
-                                  Buffer::Instance& response) {
+void PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                                 const std::list<Stats::GaugeSharedPtr>& gauges,
+                                                 Buffer::Instance& response) {
   for (const auto& counter : counters) {
-    const std::string tags = formatTagsForPrometheus(counter->tags());
-    const std::string metric_name = prometheusMetricName(counter->tagExtractedName());
+    const std::string tags = formattedTags(counter->tags());
+    const std::string metric_name = metricName(counter->tagExtractedName());
     response.add(fmt::format("# TYPE {0} counter\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
-    const std::string tags = formatTagsForPrometheus(gauge->tags());
-    const std::string metric_name = prometheusMetricName(gauge->tagExtractedName());
+    const std::string tags = formattedTags(gauge->tags());
+    const std::string metric_name = metricName(gauge->tagExtractedName());
     response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
@@ -495,6 +506,75 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerRuntime(const std::string& url, Http::HeaderMap& response_headers,
+                                     Buffer::Instance& response) {
+  Http::Code rc = Http::Code::OK;
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const auto& entries = server_.runtime().snapshot().getAll();
+  const auto pairs = sortedRuntime(entries);
+
+  if (params.size() == 0) {
+    for (const auto& entry : pairs) {
+      response.add(fmt::format("{}: {}\n", entry.first, entry.second.string_value_));
+    }
+  } else {
+    if (params.begin()->first == "format" && params.begin()->second == "json") {
+      response_headers.insertContentType().value().setReference(
+          Http::Headers::get().ContentTypeValues.Json);
+      response.add(runtimeAsJson(pairs));
+      response.add("\n");
+    } else {
+      response.add("usage: /runtime?format=json\n");
+      rc = Http::Code::BadRequest;
+    }
+  }
+
+  return rc;
+}
+
+const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::sortedRuntime(
+    const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries) {
+  std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> pairs(entries.begin(),
+                                                                      entries.end());
+
+  std::sort(pairs.begin(), pairs.end(),
+            [](const std::pair<std::string, const Runtime::Snapshot::Entry>& a,
+               const std::pair<std::string, const Runtime::Snapshot::Entry>& b) -> bool {
+              return a.first < b.first;
+            });
+
+  return pairs;
+}
+
+std::string AdminImpl::runtimeAsJson(
+    const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Value entries_array(rapidjson::kArrayType);
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  for (const auto& entry : entries) {
+    Value entry_obj;
+    entry_obj.SetObject();
+
+    entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
+
+    Value entry_value;
+    if (entry.second.uint_value_.valid()) {
+      entry_value.SetUint64(entry.second.uint_value_.value());
+    } else {
+      entry_value.SetString(entry.second.string_value_.c_str(), allocator);
+    }
+    entry_obj.AddMember("value", entry_value, allocator);
+
+    entries_array.PushBack(entry_obj, allocator);
+  }
+  document.AddMember("runtime", entries_array, allocator);
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  return strbuf.GetString();
+}
+
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
@@ -536,27 +616,32 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
       handlers_{
-          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false},
-          {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false},
-          {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false},
+          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
+          {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
+          {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false,
+           false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false},
+           MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false},
+           MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false},
-          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false},
+           MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false, true},
+          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
+           false},
           {"/hot_restart_version", "print the hot restart compatability version",
-           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false},
-          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false},
-          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false},
+           MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
+          {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
+           true},
+          {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
+           true},
           {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(handlerResetCounters), false},
+           MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
           {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(handlerServerInfo), false},
-          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false},
-          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo),
-           false}},
+           MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
+          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
+          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+           false},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
       listener_stats_(
           Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
 
@@ -622,18 +707,24 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query,
   return code;
 }
 
+std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
+  std::vector<const UrlHandler*> sorted_handlers;
+  for (const UrlHandler& handler : handlers_) {
+    sorted_handlers.push_back(&handler);
+  }
+  // Note: it's generally faster to sort a vector with std::vector than to construct a std::map.
+  std::sort(sorted_handlers.begin(), sorted_handlers.end(),
+            [&](const UrlHandler* h1, const UrlHandler* h2) { return h1->prefix_ < h2->prefix_; });
+  return sorted_handlers;
+}
+
 Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
                                   Buffer::Instance& response) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
-  std::map<std::string, const UrlHandler*> sorted_handlers;
-  for (const UrlHandler& handler : handlers_) {
-    sorted_handlers[handler.prefix_] = &handler;
-  }
-
-  for (const auto handler : sorted_handlers) {
-    response.add(fmt::format("  {}: {}\n", handler.first, handler.second->help_text_));
+  for (const UrlHandler* handler : sortedHandlers()) {
+    response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
   }
   return Http::Code::OK;
 }
@@ -643,20 +734,26 @@ Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& resp
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Html);
 
-  // Prefix order is used during searching, but for printing do them in alpha order.
-  std::map<std::string, const UrlHandler*> sorted_handlers;
-  for (const UrlHandler& handler : handlers_) {
-    sorted_handlers[handler.prefix_] = &handler;
-  }
-
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-  for (const auto handler : sorted_handlers) {
+
+  // Prefix order is used during searching, but for printing do them in alpha order.
+  for (const UrlHandler* handler : sortedHandlers()) {
+    const std::string& url = handler->prefix_;
+
+    // For handlers that mutate state, render the link as a button in a POST form,
+    // rather than an anchor tag. This should discourage crawlers that find the /
+    // page from accidentally mutating all the server state by GETting all the hrefs.
+    const char* link_format =
+        handler->mutates_server_state_
+            ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
+            : "<a href='{}'>{}</a>";
+    const std::string link = fmt::format(link_format, url, url);
+
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
-    response.add(fmt::format("<tr class='home-row'><td class='home-data'><a href='{}'>{}</a></td>"
+    response.add(fmt::format("<tr class='home-row'><td class='home-data'>{}</td>"
                              "<td class='home-data'>{}</td></tr>\n",
-                             handler.first, handler.first,
-                             Html::Utility::sanitize(handler.second->help_text_)));
+                             link, Html::Utility::sanitize(handler->help_text_)));
   }
   response.add(AdminHtmlEnd);
   return Http::Code::OK;
@@ -667,7 +764,7 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable) {
+                           HandlerCb callback, bool removable, bool mutates_state) {
   // Sanitize prefix and help_text to ensure no XSS can be injected, as
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state. Also rule out some characters that
@@ -681,7 +778,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   auto it = std::find_if(handlers_.cbegin(), handlers_.cend(),
                          [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
   if (it == handlers_.end()) {
-    handlers_.push_back({prefix, help_text, callback, removable});
+    handlers_.push_back({prefix, help_text, callback, removable, mutates_state});
     return true;
   }
   return false;

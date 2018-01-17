@@ -69,6 +69,7 @@ public:
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString Referer{"referer"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};
@@ -124,6 +125,7 @@ public:
 
   struct {
     const std::string _5xx{"5xx"};
+    const std::string GatewayError{"gateway-error"};
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};

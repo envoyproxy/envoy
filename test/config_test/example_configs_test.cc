@@ -8,6 +8,6 @@ namespace Envoy {
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
-  EXPECT_EQ(16UL, ConfigTest::run(TestEnvironment::temporaryDirectory() + "/test/config_test"));
+  EXPECT_EQ(26UL, ConfigTest::run(TestEnvironment::temporaryDirectory() + "/test/config_test"));
 }
 } // namespace Envoy

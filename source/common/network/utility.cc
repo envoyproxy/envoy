@@ -81,7 +81,7 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
-                                                              uint16_t port) {
+                                                              uint16_t port, bool v6only) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
@@ -92,14 +92,14 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
-    return std::make_shared<Address::Ipv6Instance>(sa6);
+    return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   throwWithMalformedIp(ip_address);
   NOT_REACHED;
 }
 
-Address::InstanceConstSharedPtr
-Utility::parseInternetAddressAndPort(const std::string& ip_address) {
+Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
+                                                                     bool v6only) {
   if (ip_address.empty()) {
     throwWithMalformedIp(ip_address);
   }
@@ -121,7 +121,7 @@ Utility::parseInternetAddressAndPort(const std::string& ip_address) {
     }
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port64);
-    return std::make_shared<Address::Ipv6Instance>(sa6);
+    return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   // Treat it as an IPv4 address followed by a port.
   auto pos = ip_address.rfind(":");
@@ -303,14 +303,15 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #endif
 }
 
-void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>& list) {
-  std::vector<std::string> ranges = StringUtil::split(string.c_str(), ',');
-  for (const std::string& s : ranges) {
-    std::stringstream ss(s);
+void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>& list) {
+  const auto ranges = StringUtil::splitToken(string, ",");
+  for (auto s : ranges) {
+    const std::string s_string{s};
+    std::stringstream ss(s_string);
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (s.find("-") != std::string::npos) {
       char dash = 0;
       ss >> min;
       ss >> dash;
@@ -321,7 +322,7 @@ void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>
     }
 
     if (s.empty() || (min > 65535) || (max > 65535) || ss.fail() || !ss.eof()) {
-      throw EnvoyException(fmt::format("invalid port number or range '{}'", s));
+      throw EnvoyException(fmt::format("invalid port number or range '{}'", s_string));
     }
 
     list.emplace_back(PortRange(min, max));

@@ -228,6 +228,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "    config: {}", filter_config->asJsonString());
 
     // Now see if there is a factory that will accept the config.
     auto& factory = Config::Utility::getAndCheckFactory<NamedHttpFilterConfigFactory>(string_name);

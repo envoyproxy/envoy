@@ -44,7 +44,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
 
   // Before a worker is started adding a listener will be posted and will get added when the
   // thread starts running.
-  NiceMock<MockListener> listener;
+  NiceMock<Network::MockListenerConfig> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1));
   EXPECT_CALL(*handler_, addListener(_, _, _, 1, _))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
@@ -59,7 +59,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.
-  NiceMock<MockListener> listener2;
+  NiceMock<Network::MockListenerConfig> listener2;
   ON_CALL(listener2, listenerTag()).WillByDefault(Return(2));
   EXPECT_CALL(*handler_, addListener(_, _, _, 2, _))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
@@ -90,7 +90,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
   ci.waitReady();
 
   // Now test adding and removing a listener without stopping it first.
-  NiceMock<MockListener> listener3;
+  NiceMock<Network::MockListenerConfig> listener3;
   ON_CALL(listener3, listenerTag()).WillByDefault(Return(3));
   EXPECT_CALL(*handler_, addListener(_, _, _, 3, _))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
@@ -116,7 +116,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
 TEST_F(WorkerImplTest, ListenerException) {
   InSequence s;
 
-  NiceMock<MockListener> listener;
+  NiceMock<Network::MockListenerConfig> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1));
   EXPECT_CALL(*handler_, addListener(_, _, _, 1, _))
       .WillOnce(Throw(Network::CreateListenerException("failed")));

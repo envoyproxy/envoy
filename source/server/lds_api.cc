@@ -1,5 +1,7 @@
 #include "server/lds_api.h"
 
+#include <unordered_map>
+
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
@@ -44,7 +46,8 @@ void LdsApi::onConfigUpdate(const ResourceVector& resources) {
     MessageUtil::validate(listener);
   }
   // We need to keep track of which listeners we might need to remove.
-  std::unordered_map<std::string, std::reference_wrapper<Listener>> listeners_to_remove;
+  std::unordered_map<std::string, std::reference_wrapper<Network::ListenerConfig>>
+      listeners_to_remove;
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);
   }
@@ -52,7 +55,7 @@ void LdsApi::onConfigUpdate(const ResourceVector& resources) {
   for (const auto& listener : resources) {
     const std::string listener_name = listener.name();
     listeners_to_remove.erase(listener_name);
-    if (listener_manager_.addOrUpdateListener(listener)) {
+    if (listener_manager_.addOrUpdateListener(listener, true)) {
       ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
     } else {
       ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
