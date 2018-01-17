@@ -30,6 +30,8 @@ const uint64_t SharedMemory::VERSION = 9;
 static SharedMemoryHashSetOptions sharedMemHashOptions(Options& options) {
   SharedMemoryHashSetOptions hash_set_options;
   hash_set_options.capacity = options.maxStats();
+
+  // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
   hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
   return hash_set_options;
 }
@@ -166,6 +168,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   }
   bool key_removed = stats_set_.remove(data.key());
   RELEASE_ASSERT(key_removed);
+  UNREFERENCED_PARAMETER(key_removed);
   memset(&data, 0, Stats::RawStatData::size());
 }
 
@@ -474,7 +477,7 @@ void HotRestartImpl::terminateParent() {
 
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
-std::string HotRestartImpl::version() { return shmem_.version() + stats_set_.version(); }
+std::string HotRestartImpl::version() { return shmem_.version() + "." + stats_set_.version(); }
 
 } // namespace Server
 } // namespace Envoy
