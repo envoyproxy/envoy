@@ -1,7 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/filter/original_dst.h"
+#include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 

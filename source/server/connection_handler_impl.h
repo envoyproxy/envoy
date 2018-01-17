@@ -17,7 +17,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
-#include "common/filter/proxy_protocol.h"
+#include "common/filter/listener/proxy_protocol.h"
 
 #include "spdlog/spdlog.h"
 

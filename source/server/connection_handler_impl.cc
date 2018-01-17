@@ -5,8 +5,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/filter/original_dst.h"
-#include "common/filter/proxy_protocol.h"
+#include "common/filter/listener/original_dst.h"
+#include "common/filter/listener/proxy_protocol.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 

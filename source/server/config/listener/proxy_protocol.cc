@@ -4,7 +4,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-#include "common/filter/proxy_protocol.h"
+#include "common/filter/listener/proxy_protocol.h"
 
 namespace Envoy {
 namespace Server {

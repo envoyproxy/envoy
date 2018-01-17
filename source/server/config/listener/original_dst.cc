@@ -4,7 +4,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-#include "common/filter/original_dst.h"
+#include "common/filter/listener/original_dst.h"
 
 namespace Envoy {
 namespace Server {
