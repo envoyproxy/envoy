@@ -33,6 +33,12 @@ public:
   static bool hasGrpcContentType(const Http::HeaderMap& headers);
 
   /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a gRPC reseponse header
+   */
+  static bool isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream);
+
+  /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
    * @param trailers the trailers to parse.
    * @return Optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid status

@@ -72,14 +72,6 @@ private:
   std::unique_ptr<TranscoderInputStream> response_stream_;
 };
 
-bool isGrpcResponse(const Http::HeaderMap& headers) {
-  if (Http::Utility::getResponseStatus(headers) != 200) {
-    return false;
-  }
-  return headers.ContentType() &&
-         headers.ContentType()->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str();
-}
-
 } // namespace
 
 JsonTranscoderConfig::JsonTranscoderConfig(
@@ -305,7 +297,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
-  if (!isGrpcResponse(headers)) {
+  if (!Common::isGrpcResponseHeader(headers, end_stream)) {
     error_ = true;
   }
 
