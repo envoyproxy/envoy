@@ -217,7 +217,7 @@ public:
   virtual ~FilterChainFactory() {}
 
   /**
-   * Called to create the filter chain.
+   * Called to create the network filter chain.
    * @param connection supplies the connection to create the chain on.
    * @return true if filter chain was created successfully. Otherwise
    *   false, e.g. filter chain is empty.
@@ -227,8 +227,7 @@ public:
   /**
    * Called to create the listener filter chain.
    * @param listener supplies the listener to create the chain on.
-   * @return true if filter chain was created successfully. Otherwise
-   *   false.
+   * @return true if filter chain was created successfully. Otherwise false.
    */
   virtual bool createListenerFilterChain(ListenerFilterManager& listener) PURE;
 };

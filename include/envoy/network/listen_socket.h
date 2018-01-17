@@ -71,6 +71,9 @@ typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
 
 /**
  * An abstract accepted socket.
+ *
+ * TODO(jrajahalme): Hide internals (e.g., fd) from the filters by providing callbacks filters
+ * may need (set/getsockopt(), peek(), recv(), etc.)
  */
 class AcceptedSocket : virtual public ConnectionSocket {
 public:
