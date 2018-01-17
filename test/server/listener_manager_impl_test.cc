@@ -1094,7 +1094,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
-class OriginalDstTest : public Filter::OriginalDst {
+class OriginalDstTest : public Filter::Listener::OriginalDst {
   Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.0.0.2", 2345)};

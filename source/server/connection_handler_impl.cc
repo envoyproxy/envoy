@@ -71,7 +71,8 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
                                                       Network::ListenerConfig& config)
     : parent_(parent), listener_(std::move(listener)),
       stats_(generateStats(config.listenerScope())), listener_tag_(config.listenerTag()),
-      config_(config), legacy_stats_(new Filter::ProxyProtocol::Config(config.listenerScope())) {}
+      config_(config),
+      legacy_stats_(new Filter::Listener::ProxyProtocol::Config(config.listenerScope())) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   while (!sockets_.empty()) {
@@ -169,10 +170,11 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&
 
   // Implicitly add legacy filters
   if (config_.useOriginalDst()) {
-    active_socket->accept_filters_.emplace_back(new Filter::OriginalDst());
+    active_socket->accept_filters_.emplace_back(new Filter::Listener::OriginalDst());
   }
   if (config_.useProxyProto()) {
-    active_socket->accept_filters_.emplace_back(new Filter::ProxyProtocol::Instance(legacy_stats_));
+    active_socket->accept_filters_.emplace_back(
+        new Filter::Listener::ProxyProtocol::Instance(legacy_stats_));
   }
 
   // Create and run the filters

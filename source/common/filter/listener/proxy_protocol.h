@@ -8,6 +8,7 @@
 
 namespace Envoy {
 namespace Filter {
+namespace Listener {
 namespace ProxyProtocol {
 
 /**
@@ -77,5 +78,6 @@ private:
 };
 
 } // namespace ProxyProtocol
+} // namespace Listener
 } // namespace Filter
 } // namespace Envoy

@@ -6,6 +6,7 @@
 
 namespace Envoy {
 namespace Filter {
+namespace Listener {
 
 /**
  * Implementation of an original destination listener filter.
@@ -18,5 +19,6 @@ public:
   virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
 };
 
+} // namespace Listener
 } // namespace Filter
 } // namespace Envoy

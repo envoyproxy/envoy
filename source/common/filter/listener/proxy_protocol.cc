@@ -19,6 +19,7 @@
 
 namespace Envoy {
 namespace Filter {
+namespace Listener {
 namespace ProxyProtocol {
 
 Config::Config(Stats::Scope& scope) : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
@@ -156,5 +157,6 @@ bool Instance::readLine(int fd, std::string& s) {
 }
 
 } // namespace ProxyProtocol
+} // namespace Listener
 } // namespace Filter
 } // namespace Envoy

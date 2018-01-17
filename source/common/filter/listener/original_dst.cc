@@ -7,6 +7,7 @@
 
 namespace Envoy {
 namespace Filter {
+namespace Listener {
 
 Network::Address::InstanceConstSharedPtr OriginalDst::getOriginalDst(int fd) {
   return Network::Utility::getOriginalDst(fd);
@@ -32,5 +33,6 @@ Network::FilterStatus OriginalDst::onAccept(Network::ListenerFilterCallbacks& cb
   return Network::FilterStatus::Continue;
 }
 
+} // namespace Listener
 } // namespace Filter
 } // namespace Envoy

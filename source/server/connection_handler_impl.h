@@ -98,7 +98,7 @@ private:
     std::list<ActiveConnectionPtr> connections_;
     const uint64_t listener_tag_;
     Network::ListenerConfig& config_;
-    Filter::ProxyProtocol::ConfigSharedPtr legacy_stats_;
+    Filter::Listener::ProxyProtocol::ConfigSharedPtr legacy_stats_;
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;

@@ -18,10 +18,10 @@ public:
   // NamedListenerFilterConfigFactory
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                        FactoryContext& context) override {
-    Filter::ProxyProtocol::ConfigSharedPtr config(
-        new Filter::ProxyProtocol::Config(context.scope()));
+    Filter::Listener::ProxyProtocol::ConfigSharedPtr config(
+        new Filter::Listener::ProxyProtocol::Config(context.scope()));
     return [config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(new Filter::ProxyProtocol::Instance(config));
+      filter_manager.addAcceptFilter(new Filter::Listener::ProxyProtocol::Instance(config));
     };
   }
 
