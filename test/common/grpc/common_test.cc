@@ -148,11 +148,13 @@ TEST(GrpcCommonTest, IsGrpcResponseHeader) {
   EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
   EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
 
-  Http::TestHeaderMapImpl grpc_response_header{{":status", "200"}, {"content-type", "application/grpc"}};
+  Http::TestHeaderMapImpl grpc_response_header{{":status", "200"},
+                                               {"content-type", "application/grpc"}};
   EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_response_header, true));
   EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_response_header, false));
 
-  Http::TestHeaderMapImpl json_response_header{{":status", "200"}, {"content-type", "application/json"}};
+  Http::TestHeaderMapImpl json_response_header{{":status", "200"},
+                                               {"content-type", "application/json"}};
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, true));
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
 }
