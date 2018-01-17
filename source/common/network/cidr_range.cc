@@ -139,12 +139,12 @@ CidrRange CidrRange::create(const envoy::api::v2::CidrRange& cidr) {
 
 // static
 CidrRange CidrRange::create(const std::string& range) {
-  auto parts = StringUtil::splitToken(range, "/");
+  const auto parts = StringUtil::splitToken(range, "/");
   if (parts.size() == 2) {
     InstanceConstSharedPtr ptr = Utility::parseInternetAddress(std::string{parts[0]});
     if (ptr->type() == Type::Ip) {
       uint64_t length64;
-      std::string part{parts[1]};
+      const std::string part{parts[1]};
       if (StringUtil::atoul(part.c_str(), length64, 10)) {
         if ((ptr->ip()->version() == IpVersion::v6 && length64 <= 128) ||
             (ptr->ip()->version() == IpVersion::v4 && length64 <= 32)) {

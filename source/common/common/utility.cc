@@ -84,7 +84,7 @@ absl::string_view StringUtil::ltrim(absl::string_view source) {
 absl::string_view StringUtil::rtrim(absl::string_view source) {
   const absl::string_view::size_type pos = source.find_last_not_of(WhitespaceChars);
   if (pos != absl::string_view::npos) {
-    source.remove_suffix(source.size() - source.find_last_not_of(WhitespaceChars) - 1);
+    source.remove_suffix(source.size() - pos - 1);
   } else {
     source.remove_suffix(source.size());
   }

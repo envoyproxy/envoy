@@ -304,9 +304,9 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 }
 
 void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>& list) {
-  auto ranges = StringUtil::splitToken(string, ",");
+  const auto ranges = StringUtil::splitToken(string, ",");
   for (auto s : ranges) {
-    std::string s_string{s};
+    const std::string s_string{s};
     std::stringstream ss(s_string);
     uint32_t min = 0;
     uint32_t max = 0;

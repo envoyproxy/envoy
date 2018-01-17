@@ -109,10 +109,8 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   if (parts.size() != 2) {
     return false;
   }
-  std::string service_str{parts[0]};
-  std::string method_str{parts[1]};
-  *service = std::move(service_str);
-  *method = std::move(method_str);
+  *service = std::string(parts[0]);
+  *method = std::string(parts[1]);
   return true;
 }
 
