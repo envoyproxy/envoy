@@ -17,8 +17,6 @@
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/bootstrap.pb.h"
-
 namespace Envoy {
 namespace Stats {
 
