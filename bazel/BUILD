@@ -41,3 +41,8 @@ config_setting(
     name = "disable_google_grpc",
     values = {"define": "google_grpc=disabled"},
 )
+
+cc_proto_library(
+    name = "grpc_health_proto",
+    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
+)

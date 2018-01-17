@@ -4,7 +4,9 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/config/cds_json.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
@@ -47,6 +49,16 @@ envoy::api::v2::HealthCheck parseHealthCheckFromJson(const std::string& json_str
   return health_check;
 }
 
+envoy::api::v2::HealthCheck createGrpcHealthCheckConfig() {
+  envoy::api::v2::HealthCheck health_check;
+  health_check.mutable_timeout()->set_seconds(1);
+  health_check.mutable_interval()->set_seconds(1);
+  health_check.mutable_unhealthy_threshold()->set_value(2);
+  health_check.mutable_healthy_threshold()->set_value(2);
+  health_check.mutable_grpc_health_check();
+  return health_check;
+}
+
 TEST(HealthCheckerFactoryTest, createRedis) {
   std::string json = R"EOF(
   {
@@ -84,6 +96,36 @@ TEST(HealthCheckerFactoryTest, MissingFieldiException) {
   // No timeout field set.
   EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
                MissingFieldException);
+}
+
+TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
+  NiceMock<Upstream::MockCluster> cluster;
+  EXPECT_CALL(*cluster.info_, features()).WillRepeatedly(Return(0));
+
+  Runtime::MockLoader runtime;
+  Runtime::MockRandomGenerator random;
+  Event::MockDispatcher dispatcher;
+
+  EXPECT_THROW_WITH_MESSAGE(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
+                                                         runtime, random, dispatcher),
+                            EnvoyException,
+                            "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
+}
+
+TEST(HealthCheckerFactoryTest, createGrpc) {
+
+  NiceMock<Upstream::MockCluster> cluster;
+  EXPECT_CALL(*cluster.info_, features())
+      .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
+
+  Runtime::MockLoader runtime;
+  Runtime::MockRandomGenerator random;
+  Event::MockDispatcher dispatcher;
+
+  EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
+                         HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
+                                                      runtime, random, dispatcher)
+                             .get()));
 }
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
@@ -1450,6 +1492,818 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
+class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
+public:
+  using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
+
+  Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
+    auto codec_client = createCodecClient_(conn_data);
+    return Http::CodecClientPtr(codec_client);
+  };
+
+  // GrpcHealthCheckerImpl
+  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+};
+
+class GrpcHealthCheckerImplTestBase {
+public:
+  struct TestSession {
+    TestSession() {}
+
+    Event::MockTimer* interval_timer_{};
+    Event::MockTimer* timeout_timer_{};
+    Http::MockClientConnection* codec_{};
+    Stats::IsolatedStoreImpl stats_store_;
+    Network::MockClientConnection* client_connection_{};
+    NiceMock<Http::MockStreamEncoder> request_encoder_;
+    Http::StreamDecoder* stream_response_callbacks_{};
+    CodecClientForTest* codec_client_{};
+  };
+
+  typedef std::unique_ptr<TestSession> TestSessionPtr;
+
+  struct ResponseSpec {
+    struct ChunkSpec {
+      bool valid;
+      std::vector<uint8_t> data;
+    };
+    static ChunkSpec invalidChunk() {
+      ChunkSpec spec;
+      spec.valid = false;
+      return spec;
+    }
+    static ChunkSpec invalidPayload(uint8_t flags, bool valid_message) {
+      ChunkSpec spec;
+      spec.valid = true;
+      spec.data = serializeResponse(grpc::health::v1::HealthCheckResponse::SERVING);
+      spec.data[0] = flags;
+      if (!valid_message) {
+        const size_t kGrpcHeaderSize = 5;
+        for (size_t i = kGrpcHeaderSize; i < spec.data.size(); i++) {
+          // Fill payload with some random data.
+          spec.data[i] = i % 256;
+        }
+      }
+      return spec;
+    }
+    static ChunkSpec validChunk(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
+      ChunkSpec spec;
+      spec.valid = true;
+      spec.data = serializeResponse(status);
+      return spec;
+    }
+
+    static ChunkSpec servingResponse() {
+      return validChunk(grpc::health::v1::HealthCheckResponse::SERVING);
+    }
+
+    static ChunkSpec notServingResponse() {
+      return validChunk(grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+    }
+
+    static std::vector<uint8_t>
+    serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status) {
+      grpc::health::v1::HealthCheckResponse response;
+      response.set_status(status);
+      const auto data = Grpc::Common::serializeBody(response);
+      auto ret = std::vector<uint8_t>(data->length(), 0);
+      data->copyOut(0, data->length(), &ret[0]);
+      return ret;
+    }
+
+    std::vector<std::pair<std::string, std::string>> response_headers;
+    std::vector<ChunkSpec> body_chunks;
+    std::vector<std::pair<std::string, std::string>> trailers;
+  };
+
+  GrpcHealthCheckerImplTestBase() : cluster_(new NiceMock<MockCluster>()) {
+    EXPECT_CALL(*cluster_->info_, features())
+        .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
+  }
+
+  void setupHC() {
+    const auto config = createGrpcHealthCheckConfig();
+    health_checker_.reset(
+        new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
+  void setupHCWithUnhealthyThreshold(int value) {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_unhealthy_threshold()->set_value(value);
+    health_checker_.reset(
+        new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
+  void setupServiceNameHC() {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_grpc_health_check()->set_service_name("service");
+    health_checker_.reset(
+        new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
+  void setupNoReuseConnectionHC() {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_reuse_connection()->set_value(false);
+    health_checker_.reset(
+        new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
+  void expectSessionCreate() {
+    // Expectations are in LIFO order.
+    TestSessionPtr new_test_session(new TestSession());
+    test_sessions_.emplace_back(std::move(new_test_session));
+    TestSession& test_session = *test_sessions_.back();
+    test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
+    expectClientCreate(test_sessions_.size() - 1);
+  }
+
+  void expectClientCreate(size_t index) {
+    TestSession& test_session = *test_sessions_[index];
+    test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+    test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
+    connection_index_.push_back(index);
+    codec_index_.push_back(index);
+
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+          uint32_t index = connection_index_.front();
+          connection_index_.pop_front();
+          return test_sessions_[index]->client_connection_;
+        }));
+    EXPECT_CALL(*health_checker_, createCodecClient_(_))
+        .WillRepeatedly(
+            Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+              uint32_t index = codec_index_.front();
+              codec_index_.pop_front();
+              TestSession& test_session = *test_sessions_[index];
+              test_session.codec_client_ = new CodecClientForTest(
+                  std::move(conn_data.connection_), test_session.codec_, nullptr, nullptr);
+              return test_session.codec_client_;
+            }));
+  }
+
+  void expectStreamCreate(size_t index) {
+    test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
+    EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
+        .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),
+                        ReturnRef(test_sessions_[index]->request_encoder_)));
+  }
+
+  // Starts healthchecker and sets up timer expectations, leaving up future specification of
+  // healthcheck response for the caller. Useful when there is only one healthcheck attempt
+  // performed during test case (but possibly on many hosts).
+  void expectHealthchecks(bool host_state_changed, size_t num_healthchecks) {
+    for (size_t i = 0; i < num_healthchecks; i++) {
+      cluster_->info_->stats().upstream_cx_total_.inc();
+      expectSessionCreate();
+      expectHealthcheckStart(i);
+    }
+    health_checker_->start();
+
+    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _))
+        .Times(num_healthchecks);
+    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+        .Times(num_healthchecks)
+        .WillRepeatedly(Return(45000));
+    for (size_t i = 0; i < num_healthchecks; i++) {
+      expectHealthcheckStop(i, 45000);
+    }
+    EXPECT_CALL(*this, onHostStatus(_, host_state_changed)).Times(num_healthchecks);
+  }
+
+  void expectSingleHealthcheck(bool host_state_changed) {
+    cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+        makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+    expectHealthchecks(host_state_changed, 1);
+  }
+
+  // Hides timer/stream-related boilerplate of healthcheck start.
+  void expectHealthcheckStart(size_t index) {
+    expectStreamCreate(index);
+    EXPECT_CALL(*test_sessions_[index]->timeout_timer_, enableTimer(_));
+  }
+
+  // Hides timer-related boilerplate of healthcheck stop.
+  void expectHealthcheckStop(size_t index, int interval_ms = 0) {
+    if (interval_ms > 0) {
+      EXPECT_CALL(*test_sessions_[index]->interval_timer_,
+                  enableTimer(std::chrono::milliseconds(interval_ms)));
+    } else {
+      EXPECT_CALL(*test_sessions_[index]->interval_timer_, enableTimer(_));
+    }
+    EXPECT_CALL(*test_sessions_[index]->timeout_timer_, disableTimer());
+  }
+
+  // Hides host status checking boilerplate when only single host is used in test.
+  void expectHostHealthy(bool healthy) {
+    const auto host = cluster_->prioritySet().getMockHostSet(0)->hosts_[0];
+    if (!healthy) {
+      EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      EXPECT_FALSE(host->healthy());
+    } else {
+      EXPECT_TRUE(host->healthy());
+    }
+  }
+
+  void respondServiceStatus(size_t index,
+                            grpc::health::v1::HealthCheckResponse::ServingStatus status) {
+    respondResponseSpec(index,
+                        ResponseSpec{{{":status", "200"}, {"content-type", "application/grpc"}},
+                                     {ResponseSpec::validChunk(status)},
+                                     {{"grpc-status", "0"}}});
+  }
+
+  void respondResponseSpec(size_t index, ResponseSpec&& spec) {
+    const bool trailers_empty = spec.trailers.size() == 0U;
+    const bool end_stream_on_headers = spec.body_chunks.empty() && trailers_empty;
+    auto response_headers = std::make_unique<Http::TestHeaderMapImpl>();
+    for (const auto& header : spec.response_headers) {
+      response_headers->addCopy(header.first, header.second);
+    }
+    test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                                     end_stream_on_headers);
+    for (size_t i = 0; i < spec.body_chunks.size(); i++) {
+      const bool end_stream = i == spec.body_chunks.size() - 1 && trailers_empty;
+      const auto& chunk = spec.body_chunks[i];
+      if (chunk.valid) {
+        const auto data = std::make_unique<Buffer::OwnedImpl>(chunk.data.data(), chunk.data.size());
+        test_sessions_[index]->stream_response_callbacks_->decodeData(*data, end_stream);
+      } else {
+        Buffer::OwnedImpl incorrect_data("incorrect");
+        test_sessions_[index]->stream_response_callbacks_->decodeData(incorrect_data, end_stream);
+      }
+    }
+    if (!trailers_empty) {
+      auto trailers = std::make_unique<Http::TestHeaderMapImpl>();
+      for (const auto& header : spec.trailers) {
+        trailers->addCopy(header.first, header.second);
+      }
+      test_sessions_[index]->stream_response_callbacks_->decodeTrailers(std::move(trailers));
+    }
+  }
+
+  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, bool changed_state));
+
+  std::shared_ptr<MockCluster> cluster_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::vector<TestSessionPtr> test_sessions_;
+  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
+};
+
+class GrpcHealthCheckerImplTest : public GrpcHealthCheckerImplTestBase, public testing::Test {};
+
+// Test single host check success.
+TEST_F(GrpcHealthCheckerImplTest, Success) {
+  setupServiceNameHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+                  headers.ContentType()->value().c_str());
+        EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.Path()->value().c_str());
+      }));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        std::vector<Grpc::Frame> decoded_frames;
+        Grpc::Decoder decoder;
+        ASSERT_TRUE(decoder.decode(data, decoded_frames));
+        ASSERT_EQ(1U, decoded_frames.size());
+        auto& frame = decoded_frames[0];
+        Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+        grpc::health::v1::HealthCheckRequest request;
+        ASSERT_TRUE(request.ParseFromZeroCopyStream(&stream));
+        EXPECT_EQ("service", request.service());
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  expectHealthcheckStop(0, 45000);
+
+  // Host state should not be changed (remains healty).
+  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0], false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test host check success when gRPC response payload is split between several incoming data chunks.
+TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
+  setupServiceNameHC();
+  expectSingleHealthcheck(false);
+
+  auto response_headers = std::make_unique<Http::TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":status", "200"},
+          {"content-type", "application/grpc"},
+      });
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), false);
+
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  auto data = Grpc::Common::serializeBody(response);
+
+  const char* raw_data = static_cast<char*>(data->linearize(data->length()));
+  const uint64_t chunk_size = data->length() / 5;
+  for (uint64_t offset = 0; offset < data->length(); offset += chunk_size) {
+    const uint64_t effective_size = std::min(chunk_size, data->length() - offset);
+    const auto chunk = std::make_unique<Buffer::OwnedImpl>(raw_data + offset, effective_size);
+    test_sessions_[0]->stream_response_callbacks_->decodeData(*chunk, false);
+  }
+
+  auto trailers = std::make_unique<Http::TestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{"grpc-status", "0"}});
+  test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(trailers));
+
+  expectHostHealthy(true);
+}
+
+// Test host check success with multiple hosts.
+TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHosts) {
+  setupHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80"),
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
+
+  expectHealthchecks(false, 2);
+
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  respondServiceStatus(1, grpc::health::v1::HealthCheckResponse::SERVING);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->healthy());
+}
+
+// Test host check success with multiple hosts across multiple priorities.
+TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHostSets) {
+  setupHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->prioritySet().getMockHostSet(1)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
+
+  expectHealthchecks(false, 2);
+
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  respondServiceStatus(1, grpc::health::v1::HealthCheckResponse::SERVING);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(1)->hosts_[0]->healthy());
+}
+
+// Test stream-level watermarks does not interfere with health check.
+TEST_F(GrpcHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
+  setupHC();
+  expectSingleHealthcheck(false);
+
+  test_sessions_[0]->request_encoder_.stream_.runHighWatermarkCallbacks();
+  test_sessions_[0]->request_encoder_.stream_.runLowWatermarkCallbacks();
+
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test connection-level watermarks does not interfere with health check.
+TEST_F(GrpcHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
+  setupHC();
+  expectSingleHealthcheck(false);
+
+  test_sessions_[0]->client_connection_->runHighWatermarkCallbacks();
+  test_sessions_[0]->client_connection_->runLowWatermarkCallbacks();
+
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test health check on host without traffic sets larger unconfigurable interval for the next check.
+TEST_F(GrpcHealthCheckerImplTest, SuccessNoTraffic) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  // Default healthcheck interval for hosts without traffic is 60 seconds.
+  expectHealthcheckStop(0, 60000);
+  // Host state should not be changed (remains healty).
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test first successful check immediately makes failed host available (without 2nd probe).
+TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
+  expectHealthcheckStop(0, 500);
+  // Fast success immediately moves us to healthy.
+  EXPECT_CALL(*this, onHostStatus(_, true));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test host recovery after first failed check requires several successul checks.
+TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  // Failing first disables fast success.
+  expectHealthcheckStop(0);
+  // Host was unhealthy from the start, no state change.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  expectHostHealthy(false);
+
+  // Next successful healthcheck does not move host int healthy state (because we configured
+  // healthchecker this way).
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Host still unhealthy, need yet another healthcheck.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(false);
+
+  // 2nd successful healthcheck renders host healthy.
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, true));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test host recovery after explicit check failure requires several successul checks.
+TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  // Explicit healthcheck failure immediately renders host unhealthy.
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, true));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  expectHostHealthy(false);
+
+  // Next, we need 2 successful checks for host to become available again.
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Host still considered unhealthy.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(false);
+
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Host should has become healthy.
+  EXPECT_CALL(*this, onHostStatus(_, true));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test disconnects produce network-type failures which does not lead to immediate unhealthy state.
+TEST_F(GrpcHealthCheckerImplTest, Disconnect) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Network-type healthcheck failure should make host unhealthy only after 2nd event in a row.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  expectHostHealthy(true);
+
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Now, host should be unhealthy.
+  EXPECT_CALL(*this, onHostStatus(_, true));
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  expectHostHealthy(false);
+}
+
+// Test timeouts produce network-type failures which does not lead to immediate unhealthy state.
+TEST_F(GrpcHealthCheckerImplTest, Timeout) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  // Timeouts are considered network failures and make host unhealthy also after 2nd event.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  test_sessions_[0]->timeout_timer_->callback_();
+  expectHostHealthy(true);
+
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, true));
+  // Close connection. Timeouts and connection closes counts together.
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  expectHostHealthy(false);
+}
+
+// Test adding and removal of hosts starts and closes healthcheck sessions.
+TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
+  setupHC();
+  health_checker_->start();
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
+      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
+
+  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
+}
+
+// Test connection close between checks affects nothing.
+TEST_F(GrpcHealthCheckerImplTest, RemoteCloseBetweenChecks) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+
+  // Connection closed between checks - nothing happens, just re-create client.
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Test host state haven't changed.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test that we close connections on a healthy check when reuse_connection is false.
+TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
+  setupNoReuseConnectionHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+
+  // A new client is created because we close the connection ourselves.
+  // See GrpcHealthCheckerImplTest.RemoteCloseBetweenChecks for how this works when the remote end
+  // closes the connection.
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Test host state haven't changed.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+// Test UNKNOWN health status is considered unhealthy.
+TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknown) {
+  setupHC();
+  expectSingleHealthcheck(true);
+
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::UNKNOWN);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+// Test receiving GOAWAY is interpreted as connection close event.
+TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
+  // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
+  // is reached.
+  setupHCWithUnhealthyThreshold(1);
+  expectSingleHealthcheck(true);
+
+  test_sessions_[0]->codec_client_->raiseGoAway();
+
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+// Test receing GOAWAY between checks affects nothing.
+TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+
+  // GOAWAY between checks should go unnoticed.
+  test_sessions_[0]->codec_client_->raiseGoAway();
+
+  expectClientCreate(0);
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  expectHealthcheckStop(0);
+  // Test host state haven't changed.
+  EXPECT_CALL(*this, onHostStatus(_, false));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  expectHostHealthy(true);
+}
+
+class BadResponseGrpcHealthCheckerImplTest
+    : public GrpcHealthCheckerImplTestBase,
+      public testing::TestWithParam<GrpcHealthCheckerImplTest::ResponseSpec> {};
+
+INSTANTIATE_TEST_CASE_P(
+    BadResponse, BadResponseGrpcHealthCheckerImplTest,
+    testing::ValuesIn(std::vector<GrpcHealthCheckerImplTest::ResponseSpec>{
+        // Non-200 response.
+        {
+            {{":status", "500"}},
+            {},
+            {},
+        },
+        // Non-200 response with gRPC status.
+        {
+            {{":status", "500"}, {"grpc-status", "2"}},
+            {},
+            {},
+        },
+        // Missing content-type.
+        {
+            {{":status", "200"}},
+            {},
+            {},
+        },
+        // End stream on response headers.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {},
+            {},
+        },
+        // Non-OK gRPC status in headers.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}, {"grpc-status", "2"}},
+            {},
+            {},
+        },
+        // Non-OK gRPC status
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
+            {{"grpc-status", "2"}},
+        },
+        // Missing body.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}, {"grpc-status", "0"}},
+            {},
+            {},
+        },
+        // Compressed body.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::invalidPayload(Grpc::GRPC_FH_COMPRESSED,
+                                                                     true)},
+            {},
+        },
+        // Invalid proto message.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::invalidPayload(Grpc::GRPC_FH_DEFAULT, false)},
+            {},
+        },
+        // Duplicate response.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse(),
+             GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
+            {},
+        },
+        // Invalid response.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::invalidChunk()},
+            {},
+        },
+        // No trailers.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
+            {},
+        },
+        // No gRPC status in trailer.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
+            {{"some-header", "1"}},
+        },
+        // Invalid gRPC status.
+        {
+            {{":status", "200"}, {"content-type", "application/grpc"}},
+            {GrpcHealthCheckerImplTest::ResponseSpec::servingResponse()},
+            {{"grpc-status", "invalid"}},
+        },
+    }));
+
+// Test different cases of invalid gRPC response makes host unhealthy.
+TEST_P(BadResponseGrpcHealthCheckerImplTest, GrpcBadResponse) {
+  setupHC();
+  expectSingleHealthcheck(true);
+
+  ResponseSpec spec = GetParam();
+  respondResponseSpec(0, std::move(spec));
+  expectHostHealthy(false);
 }
 
 } // namespace

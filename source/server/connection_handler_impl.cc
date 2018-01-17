@@ -9,7 +9,13 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
-    : logger_(logger), dispatcher_(dispatcher) {}
+    :
+#ifndef NVLOG
+      logger_(logger),
+#endif
+      dispatcher_(dispatcher) {
+  UNREFERENCED_PARAMETER(logger);
+}
 
 void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
                                         Network::ListenSocket& socket, Stats::Scope& scope,

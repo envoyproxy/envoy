@@ -125,6 +125,7 @@ public:
 
   struct {
     const std::string _5xx{"5xx"};
+    const std::string GatewayError{"gateway-error"};
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};

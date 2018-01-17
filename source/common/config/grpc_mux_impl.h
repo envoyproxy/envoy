@@ -19,16 +19,13 @@ namespace Config {
  * ADS API implementation that fetches via gRPC.
  */
 class GrpcMuxImpl : public GrpcMux,
-                    Grpc::AsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
+                    Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   GrpcMuxImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cluster_manager,
               const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method);
-  GrpcMuxImpl(const envoy::api::v2::Node& node,
-              std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
-                                                envoy::api::v2::DiscoveryResponse>>
-                  async_client,
+  GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method);
   ~GrpcMuxImpl();
 
@@ -91,10 +88,8 @@ private:
   };
 
   envoy::api::v2::Node node_;
-  std::unique_ptr<
-      Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
-      async_client_;
-  Grpc::AsyncStream<envoy::api::v2::DiscoveryRequest>* stream_{};
+  Grpc::AsyncClientPtr async_client_;
+  Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependendency ordering.

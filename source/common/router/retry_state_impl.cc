@@ -15,9 +15,10 @@
 namespace Envoy {
 namespace Router {
 
-// These are defined in envoy/server/router.h, however during certain cases the compiler is
+// These are defined in envoy/router/router.h, however during certain cases the compiler is
 // refusing to use the header version so allocate space here.
 const uint32_t RetryPolicy::RETRY_ON_5XX;
+const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
@@ -93,6 +94,8 @@ uint32_t RetryStateImpl::parseRetryOn(const std::string& config) {
   for (const std::string& retry_on : retry_on_list) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
       ret |= RetryPolicy::RETRY_ON_5XX;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.GatewayError) {
+      ret |= RetryPolicy::RETRY_ON_GATEWAY_ERROR;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.ConnectFailure) {
       ret |= RetryPolicy::RETRY_ON_CONNECT_FAILURE;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Retriable4xx) {
@@ -183,6 +186,13 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
     // into its own type. I.e., RETRY_ON_RESET.
     if (!response_headers ||
         Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(*response_headers))) {
+      return true;
+    }
+  }
+
+  if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
+    if (!response_headers ||
+        Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(*response_headers))) {
       return true;
     }
   }
