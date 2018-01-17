@@ -165,6 +165,7 @@ def envoy_cc_binary(name,
                     data = [],
                     testonly = 0,
                     visibility = None,
+                    external_deps = [],
                     repository = "",
                     stamped = False,
                     deps = [],
@@ -173,6 +174,7 @@ def envoy_cc_binary(name,
     if stamped:
         _git_stamped_genrule(repository, name)
         _git_stamped_genrule(repository, name + ".stripped")
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
     native.cc_binary(
         name = name,
         srcs = srcs,
