@@ -106,6 +106,7 @@ public:
   /**
    * Enable half-close semantics on this connection. Reading a remote half-close
    * will not fully close the connection. This is off by default.
+   * @param enabled Whether to set half-close semantics as enabled or disabled.
    */
   virtual void enableHalfClose(bool enabled) PURE;
 
