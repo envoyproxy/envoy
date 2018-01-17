@@ -94,6 +94,9 @@ public:
 
 typedef std::unique_ptr<AcceptedSocket> AcceptedSocketPtr;
 
+/**
+ * An abstract client socket used with ClientConnections.
+ */
 class ClientSocket : virtual public ConnectionSocket {
 public:
   virtual ~ClientSocket() {}
