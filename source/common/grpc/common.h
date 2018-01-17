@@ -28,13 +28,13 @@ class Common {
 public:
   /**
    * @param headers the headers to parse.
-   * @param bool indicating wether the header is at end_stream.
    * @return bool indicating whether content-type is gRPC.
    */
   static bool hasGrpcContentType(const Http::HeaderMap& headers);
 
   /**
    * @param headers the headers to parse.
+   * @param bool indicating wether the header is at end_stream.
    * @return bool indicating whether the header is a gRPC reseponse header
    */
   static bool isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream);
