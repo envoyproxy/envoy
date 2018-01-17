@@ -1,6 +1,5 @@
 #include "common/grpc/json_transcoder_filter.h"
 
-
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
 
