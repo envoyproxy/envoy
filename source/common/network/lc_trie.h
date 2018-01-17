@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 
 #include <algorithm>
+#include <climits>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -62,7 +63,7 @@ private:
    *              byte order.
    * @return extracted bits in the format of IpType.
    */
-  template <class IpType, uint32_t address_size = 8 * sizeof(IpType)>
+  template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)>
   static IpType extractBits(uint32_t p, uint32_t n, IpType input) {
     // The IP's are stored in host byte order.
     // By shifting the value to the left by p bits(and back), the bits between 0 and p-1 are zero'd
@@ -78,7 +79,7 @@ private:
    *              byte order.
    * @return input with 0 through n-1 bits cleared.
    */
-  template <class IpType, uint32_t address_size = 8 * sizeof(IpType)>
+  template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)>
   static IpType removeBits(uint32_t n, IpType input) {
     // The IP's are stored in host byte order.
     // By shifting the value to the left by n bits and back, the bits between 0 and n-1
@@ -123,7 +124,7 @@ private:
   /**
    * Structure to hold a CIDR range and the tag associated with it.
    */
-  template <class IpType, uint32_t address_size = 8 * sizeof(IpType)> struct IpPrefix {
+  template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> struct IpPrefix {
 
     /**
      * @return -1 if the current object is less than other. 0 if they are the same. 1
@@ -146,6 +147,8 @@ private:
     }
 
     bool operator<(const IpPrefix& other) const { return (this->compare(other) == -1); }
+
+    bool operator!=(const IpPrefix& other) const { return (this->compare(other) != 0); }
 
     /**
      * @return true if other is a prefix of this.
@@ -180,7 +183,7 @@ private:
    * Note: The trie can only support up 524287(2^19-1) prefixes with a fill_factor of 1 and
    * root_branching_factor not set. Refer to LcTrieInternal::build() method for more details.
    */
-  template <class IpType, uint32_t address_size = 8 * sizeof(IpType)> class LcTrieInternal {
+  template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class LcTrieInternal {
   public:
     /**
      * Construct a LC-Trie for IpType.
@@ -236,7 +239,7 @@ private:
               tag_data[i].asString(), tag_data[i - 1].asString()));
         }
 
-        if (tag_data[i - 1].compare(tag_data[i]) != 0) {
+        if (tag_data[i - 1] != tag_data[i]) {
           ip_prefixes_.push_back(tag_data[i]);
         }
       }
@@ -246,7 +249,8 @@ private:
       // trie_. The buffer value(2000000) is reused from the reference implementation in
       // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
       // TODO(ccaraman): Define a better buffer value when resizing the trie_.
-      trie_.resize(2 * ip_prefixes_.size() + 2000000);
+      maximum_trie_node_size = 2 * ip_prefixes_.size() + 2000000;
+      trie_.resize(maximum_trie_node_size);
 
       // Build the trie_.
       uint32_t next_free_index = 1;
@@ -366,15 +370,15 @@ private:
       if (n == 1) {
         // There is no way to predictably determine the number of trie nodes required to build a
         // LC-Trie. If while building the trie the position that is being set exceeds the maximum
-        // number of supported entries, throw an Envoy Exception instead of letting an out_of_range
-        // exception be thrown.
+        // number of supported trie_ entries, throw an Envoy Exception instead of letting an
+        // out_of_range exception be thrown.
         // TODO(ccaraman): Add a test case.
-        if (position > MAXIMUM_TRIE_NODES) {
+        if (position > maximum_trie_node_size) {
           throw EnvoyException(fmt::format("The number of internal nodes required for the LC-Trie "
                                            "exceeded the maximum number of "
                                            "supported nodes. Number of internal nodes required: "
                                            "'{0}'. Maximum number of supported nodes: '{1}'.",
-                                           position, MAXIMUM_TRIE_NODES));
+                                           position, maximum_trie_node_size));
         }
         trie_[position].address_ = first;
         return;
@@ -399,8 +403,8 @@ private:
       for (uint32_t bit_pattern = 0; bit_pattern < static_cast<uint32_t>(1 << output.branch_);
            ++bit_pattern) {
 
-        // count is the number of entries in the base vector that have the same bit pattern as the
-        // ip_prefixes_[new_position].
+        // count is the number of entries in the ip_prefixes_ vector that have the same bit pattern
+        // as the ip_prefixes_[new_position].
         int count = 0;
         while (new_position + count < first + n &&
                static_cast<uint32_t>(extractBits<IpType, address_size>(
@@ -411,7 +415,12 @@ private:
 
         // This logic was taken from
         // https://github.com/beevek/libkrb/blob/24a224d3ea840e2e7d2926e17d8849aefecc1101/krb/lc_trie.hpp#L396.
+        // When there are no entries that match the current pattern, set a leaf at trie_[address +
+        // bit_pattern].
         if (count == 0) {
+          // This case is hit when the last CIDR range(ip_prefixes_[first+n-1]) is being inserted
+          // into the trie_. new_position is decremented by one because the count added to
+          // new_position at line 445 are the number of entries already visited.
           if (new_position == first + n) {
             buildRecursive(output.prefix_ + output.branch_, new_position - 1, 1,
                            address + bit_pattern, next_free_index);
@@ -421,6 +430,8 @@ private:
           }
         } else if (count == 1 &&
                    ip_prefixes_[new_position].length_ - output.prefix_ < output.branch_) {
+          // All Ip address that have the prefix of `bit_pattern` will map to the only CIDR range
+          // with the bit_pattern as a prefix.
           uint32_t bits = output.branch_ + output.prefix_ - ip_prefixes_[new_position].length_;
           for (uint32_t i = bit_pattern; i < bit_pattern + (1 << bits); ++i) {
             buildRecursive(output.prefix_ + output.branch_, new_position, 1, address + i,
@@ -463,8 +474,11 @@ private:
 
     // Refer to LcNode to for further explanation on the current limitations for the maximum number
     // of CIDR ranges supported and the maximum amount of nodes of supported in the trie.
-    static constexpr uint32_t MAXIMUM_TRIE_NODES = ((1 << 20) - 1);
     static constexpr uint32_t MAXIMUM_CIDR_RANGE_ENTRIES = ((1 << 19) - 1);
+
+    // During build(), an estimate of the number of nodes required will be made and set this value.
+    // This is used to ensure no out_of_range exception is thrown.
+    uint32_t maximum_trie_node_size;
 
     // The CIDR range and tags needs to be maintained separately from the LC-Trie. A LC-Trie skips
     // chunks of data while searching for a match. This means that the node found in the LC-Trie is
