@@ -96,7 +96,7 @@ public:
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) override;
-  std::vector<std::reference_wrapper<Listener>> listeners() override;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
@@ -165,7 +165,7 @@ private:
 /**
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
-class ListenerImpl : public Listener,
+class ListenerImpl : public Network::ListenerConfig,
                      public Configuration::FactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainFactory,
@@ -208,7 +208,7 @@ public:
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::ListenSocketSharedPtr& socket);
 
-  // Server::Listener
+  // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }

@@ -19,12 +19,8 @@
 namespace Envoy {
 namespace RateLimit {
 
-typedef Grpc::AsyncClient<pb::lyft::ratelimit::RateLimitRequest,
-                          pb::lyft::ratelimit::RateLimitResponse>
-    RateLimitAsyncClient;
-typedef std::unique_ptr<RateLimitAsyncClient> RateLimitAsyncClientPtr;
-
-typedef Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
+typedef Grpc::TypedAsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse>
+    RateLimitAsyncCallbacks;
 
 struct ConstantValues {
   const std::string TraceStatus = "ratelimit_status";
@@ -39,7 +35,7 @@ typedef ConstSingleton<ConstantValues> Constants;
 // one today).
 class GrpcClientImpl : public Client, public RateLimitAsyncCallbacks {
 public:
-  GrpcClientImpl(RateLimitAsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                  const Optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
@@ -60,7 +56,7 @@ public:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  RateLimitAsyncClientPtr async_client_;
+  Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncRequest* request_{};
   Optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};

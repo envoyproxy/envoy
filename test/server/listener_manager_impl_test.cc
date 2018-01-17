@@ -1069,7 +1069,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  Server::Listener& listener = manager_->listeners().back().get();
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
@@ -1144,7 +1144,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  Server::Listener& listener = manager_->listeners().back().get();
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;

@@ -24,8 +24,6 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef Grpc::MockAsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>
-    SubscriptionMockAsyncClient;
 typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubscriptionImpl;
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
@@ -33,15 +31,15 @@ public:
   GrpcSubscriptionTestHarness()
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new SubscriptionMockAsyncClient()), timer_(new Event::MockTimer()) {
+        async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(new GrpcEdsSubscriptionImpl(
-        node_, std::unique_ptr<SubscriptionMockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_, stats_));
+    subscription_.reset(
+        new GrpcEdsSubscriptionImpl(node_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+                                    dispatcher_, *method_descriptor_, stats_));
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -117,14 +115,14 @@ public:
 
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  SubscriptionMockAsyncClient* async_client_;
+  Grpc::MockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  Grpc::MockAsyncStream<envoy::api::v2::DiscoveryRequest> async_stream_;
+  Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;

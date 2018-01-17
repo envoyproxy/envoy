@@ -25,7 +25,7 @@ public:
   ConnectionHandlerTest() : handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)) {}
 
   // Listener
-  class TestListener : public Listener, public LinkedObject<TestListener> {
+  class TestListener : public Network::ListenerConfig, public LinkedObject<TestListener> {
   public:
     TestListener(ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
                  bool use_original_dst, const std::string& name)

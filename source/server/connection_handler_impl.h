@@ -49,7 +49,7 @@ public:
 
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
-  void addListener(Listener& config) override;
+  void addListener(Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
@@ -69,10 +69,10 @@ private:
    * Wrapper for an active listener owned by this handler.
    */
   struct ActiveListener : public Network::ListenerCallbacks {
-    ActiveListener(ConnectionHandlerImpl& parent, Listener& config);
+    ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
 
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
-                   Listener& config);
+                   Network::ListenerConfig& config);
 
     ~ActiveListener();
 
@@ -97,7 +97,7 @@ private:
     std::list<ActiveSocketPtr> sockets_;
     std::list<ActiveConnectionPtr> connections_;
     const uint64_t listener_tag_;
-    Listener& config_;
+    Network::ListenerConfig& config_;
     Filter::ProxyProtocol::ConfigSharedPtr legacy_stats_;
   };
 
@@ -162,7 +162,9 @@ private:
 
   static ListenerStats generateStats(Stats::Scope& scope);
 
+#ifndef NVLOG
   spdlog::logger& logger_;
+#endif
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::atomic<uint64_t> num_connections_{};

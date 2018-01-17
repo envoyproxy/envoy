@@ -9,6 +9,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/transport_socket.h"
 
+#include "common/stats/stats_impl.h"
+
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -269,10 +271,30 @@ public:
   MOCK_METHOD1(resetRemoteAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(takeFd, int());
-  MOCK_METHOD0(clearReset, void());
-  MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
+};
+
+class MockListenerConfig : public ListenerConfig {
+public:
+  MockListenerConfig();
+  ~MockListenerConfig();
+
+  MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
+  MOCK_METHOD0(socket, ListenSocket&());
+  MOCK_METHOD0(defaultSslContext, Ssl::ServerContext*());
+  MOCK_METHOD0(useProxyProto, bool());
+  MOCK_METHOD0(bindToPort, bool());
+  MOCK_METHOD0(useOriginalDst, bool());
+  MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
+  MOCK_METHOD0(listenerScope, Stats::Scope&());
+  MOCK_CONST_METHOD0(listenerTag, uint64_t());
+  MOCK_CONST_METHOD0(name, const std::string&());
+
+  testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
+  testing::NiceMock<MockListenSocket> socket_;
+  Stats::IsolatedStoreImpl scope_;
+  std::string name_;
 };
 
 class MockListener : public Listener {
@@ -289,7 +311,7 @@ public:
   ~MockConnectionHandler();
 
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD1(addListener, void(Server::Listener& config));
+  MOCK_METHOD1(addListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));

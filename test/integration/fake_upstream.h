@@ -306,12 +306,12 @@ private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
                FakeHttpConnection::Type type);
 
-  class FakeListener : public Server::Listener {
+  class FakeListener : public Network::ListenerConfig {
   public:
     FakeListener(FakeUpstream& parent) : parent_(parent), name_("fake_upstream") {}
 
   private:
-    // Server::Listener
+    // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocket& socket() override { return *parent_.socket_; }
     Ssl::ServerContext* defaultSslContext() override { return parent_.ssl_ctx_; }

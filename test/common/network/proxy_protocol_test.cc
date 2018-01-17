@@ -32,7 +32,7 @@ namespace Network {
 // Build again on the basis of the connection_handler_test.cc
 
 class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
-                          public Server::Listener,
+                          public Network::ListenerConfig,
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
@@ -307,7 +307,7 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
 }
 
 class WildcardProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
-                                  public Server::Listener,
+                                  public Network::ListenerConfig,
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
@@ -324,7 +324,7 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
-  // Server::Listener
+  // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
   Ssl::ServerContext* defaultSslContext() override { return nullptr; }

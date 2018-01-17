@@ -10,11 +10,6 @@
 #include "envoy/ssl/context.h"
 
 namespace Envoy {
-
-namespace Server {
-class Listener;
-}
-// XXX: Move to Server namespace?
 namespace Network {
 
 /**
@@ -33,7 +28,7 @@ public:
    * Adds listener to the handler.
    * @param config listener configuration options.
    */
-  virtual void addListener(Server::Listener& config) PURE;
+  virtual void addListener(ListenerConfig& config) PURE;
 
   /**
    * Find a listener based on the provided listener address value.

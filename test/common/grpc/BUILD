@@ -13,7 +13,9 @@ envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
     deps = [
+        "//source/common/common:enum_to_int",
         "//source/common/grpc:async_client_lib",
+        "//source/common/grpc:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",

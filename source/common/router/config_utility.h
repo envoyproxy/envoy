@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optional.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
@@ -102,6 +103,15 @@ public:
    */
   static Http::Code
   parseRedirectResponseCode(const envoy::api::v2::RedirectAction::RedirectResponseCode& code);
+
+  /**
+   * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
+   * @param route supplies the Route configuration.
+   * @return Optional<Http::Code> the HTTP status from the route's direct_response if specified,
+   *         or the HTTP status code from the route's redirect if specified,
+   *         or an empty Option otherwise.
+   */
+  static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::Route& route);
 
   /**
    * Returns the HTTP Status Code enum parsed from proto.

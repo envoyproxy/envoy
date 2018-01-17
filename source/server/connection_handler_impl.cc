@@ -14,9 +14,15 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
-    : logger_(logger), dispatcher_(dispatcher) {}
+    :
+#ifndef NVLOG
+      logger_(logger),
+#endif
+      dispatcher_(dispatcher) {
+  UNREFERENCED_PARAMETER(logger);
+}
 
-void ConnectionHandlerImpl::addListener(Listener& config) {
+void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerPtr l(new ActiveListener(*this, config));
   listeners_.emplace_back(config.socket().localAddress(), std::move(l));
 }
@@ -55,14 +61,14 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 }
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
-                                                      Listener& config)
+                                                      Network::ListenerConfig& config)
     : ActiveListener(parent,
                      parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort()),
                      config) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
-                                                      Listener& config)
+                                                      Network::ListenerConfig& config)
     : parent_(parent), listener_(std::move(listener)),
       stats_(generateStats(config.listenerScope())), listener_tag_(config.listenerTag()),
       config_(config), legacy_stats_(new Filter::ProxyProtocol::Config(config.listenerScope())) {}

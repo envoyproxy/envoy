@@ -29,21 +29,17 @@ struct LoadReporterStats {
   ALL_LOAD_REPORTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-typedef Grpc::AsyncClient<envoy::api::v2::LoadStatsRequest, envoy::api::v2::LoadStatsResponse>
-    LoadStatsAsyncClient;
-typedef std::unique_ptr<LoadStatsAsyncClient> LoadStatsAsyncClientPtr;
-
-class LoadStatsReporter : Grpc::AsyncStreamCallbacks<envoy::api::v2::LoadStatsResponse>,
+class LoadStatsReporter : Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::LoadStatsResponse>,
                           Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const envoy::api::v2::Node& node, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, LoadStatsAsyncClientPtr async_client,
+                    Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
                     Event::Dispatcher& dispatcher);
   LoadStatsReporter(const envoy::api::v2::Node& node, ClusterManager& cluster_manager,
                     Stats::Scope& scope, const std::string& remote_cluster_name,
                     Event::Dispatcher& dispatcher);
 
-  // Grpc::AsyncStreamCallbacks
+  // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
   void onReceiveMessage(std::unique_ptr<envoy::api::v2::LoadStatsResponse>&& message) override;
@@ -62,8 +58,8 @@ private:
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
-  LoadStatsAsyncClientPtr async_client_;
-  Grpc::AsyncStream<envoy::api::v2::LoadStatsRequest>* stream_{};
+  Grpc::AsyncClientPtr async_client_;
+  Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;

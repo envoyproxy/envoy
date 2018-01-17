@@ -44,7 +44,7 @@ public:
                          Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }
   Network::ListenSocket& mutable_socket() { return *socket_; }
-  Server::Listener& listener() { return listener_; }
+  Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
@@ -165,13 +165,13 @@ private:
   Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
 
-  class AdminListener : public Server::Listener {
+  class AdminListener : public Network::ListenerConfig {
   public:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
 
-    // Server::Listener
+    // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocket& socket() override { return parent_.mutable_socket(); }
     Ssl::ServerContext* defaultSslContext() override { return nullptr; }

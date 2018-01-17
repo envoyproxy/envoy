@@ -8,6 +8,7 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added gRPC healthcheck based on [grpc.health.v1.Health](https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto) service.
 * Added Metrics Service implementation.
 * Added gRPC access logging.
 * Added DOWNSTREAM_REMOTE_ADDRESS, DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT, and
@@ -34,3 +35,4 @@ final version.
 * Added support for route matching based on URL query string parameters.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
 * Added `/runtime` admin endpoint to read the current runtime values.
+* Added `gateway-error` retry-on policy.

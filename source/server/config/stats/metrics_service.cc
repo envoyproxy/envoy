@@ -23,10 +23,8 @@ public:
       : cluster_manager_(cluster_manager), cluster_name_(cluster_name) {}
 
   // Metrics::GrpcMetricsServiceClientPtr
-  Stats::Metrics::GrpcMetricsServiceClientPtr create() override {
-    return std::make_unique<Grpc::AsyncClientImpl<envoy::api::v2::StreamMetricsMessage,
-                                                  envoy::api::v2::StreamMetricsResponse>>(
-        cluster_manager_, cluster_name_);
+  Grpc::AsyncClientPtr create() override {
+    return std::make_unique<Grpc::AsyncClientImpl>(cluster_manager_, cluster_name_);
   };
 
   Upstream::ClusterManager& cluster_manager_;
