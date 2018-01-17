@@ -76,14 +76,10 @@ void DispatcherImpl::clearDeferredDeleteList() {
 Network::ConnectionPtr DispatcherImpl::createServerConnection(Network::AcceptedSocketPtr&& socket,
                                                               Ssl::Context* ssl_ctx) {
   ASSERT(isThreadSafe());
-  return Network::ConnectionPtr{
-      ssl_ctx ? new Ssl::ConnectionImpl(
-                    *this, socket->takeFd(), socket->remoteAddress(), socket->localAddress(),
-                    Network::Address::InstanceConstSharedPtr(), socket->localAddressReset(), true,
-                    *ssl_ctx, Ssl::InitialState::Server)
-              : new Network::ConnectionImpl(
-                    *this, socket->takeFd(), socket->remoteAddress(), socket->localAddress(),
-                    Network::Address::InstanceConstSharedPtr(), socket->localAddressReset(), true)};
+  return Network::ConnectionPtr{ssl_ctx
+                                    ? new Ssl::ConnectionImpl(*this, std::move(socket), true,
+                                                              *ssl_ctx, Ssl::InitialState::Server)
+                                    : new Network::ConnectionImpl(*this, std::move(socket), true)};
 }
 
 Network::ClientConnectionPtr

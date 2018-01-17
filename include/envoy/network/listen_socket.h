@@ -35,17 +35,46 @@ typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
 typedef std::shared_ptr<ListenSocket> ListenSocketSharedPtr;
 
 /**
- * An abstract accepted socket.
+ * A socket passed to a connection.
  */
-class AcceptedSocket {
+class ConnectionSocket {
 public:
-  virtual ~AcceptedSocket() {}
+  virtual ~ConnectionSocket() {}
 
   /**
-   * @return the address that the socket was received at, or an original destination address if
-   * applicable.
+   * @return the local address of the socket.
    */
-  virtual Address::InstanceConstSharedPtr localAddress() const PURE;
+  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+
+  /**
+   * @return the remote address of the socket.
+   */
+  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * @return true if the local address has been reset.
+   */
+  virtual bool localAddressReset() const PURE;
+
+  /**
+   * @return fd the socket's file descriptor.
+   */
+  virtual int fd() const PURE;
+
+  /**
+   * Close the underlying socket.
+   */
+  virtual void close() PURE;
+};
+
+typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
+
+/**
+ * An abstract accepted socket.
+ */
+class AcceptedSocket : virtual public ConnectionSocket {
+public:
+  virtual ~AcceptedSocket() {}
 
   /**
    * Reset the destination address of the socket to a different address than the one
@@ -54,35 +83,23 @@ public:
   virtual void resetLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
   /**
-   * @return true if the local address has been reset.
-   */
-  virtual bool localAddressReset() const PURE;
-
-  /**
-   * @return the address that the socket was received from, or an original source address if
-   * applicable.
-   */
-  virtual Address::InstanceConstSharedPtr remoteAddress() const PURE;
-
-  /**
    * Reset the source address of the socket to a different address than the one
    * the socket was accepted at.
    */
   virtual void resetRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
-
-  /**
-   * @return fd the accepted socket's file descriptor.
-   */
-  virtual int fd() const PURE;
-
-  /**
-   * Transfer ownership of the file descriptor to the caller, so that the underlying socket will
-   * not be closed on delete.
-   */
-  virtual int takeFd() PURE;
 };
 
 typedef std::unique_ptr<AcceptedSocket> AcceptedSocketPtr;
+
+class ClientSocket : virtual public ConnectionSocket {
+public:
+  virtual ~ClientSocket() {}
+
+  /**
+   * Set the local address of the socket.
+   */
+  virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
+};
 
 } // namespace Network
 } // namespace Envoy

@@ -50,44 +50,62 @@ public:
   UdsListenSocket(const std::string& uds_path);
 };
 
-class AcceptedSocketImpl : public AcceptedSocket {
+class ConnectionSocketImpl : virtual public ConnectionSocket {
 public:
-  AcceptedSocketImpl(int fd, Address::InstanceConstSharedPtr&& local_address,
-                     Address::InstanceConstSharedPtr&& remote_address)
-      : fd_(fd), local_address_reset_(false), local_address_(std::move(local_address)),
-        remote_address_(std::move(remote_address)) {}
-  ~AcceptedSocketImpl() {
+  ConnectionSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
+                       const Address::InstanceConstSharedPtr& remote_address)
+      : fd_(fd), local_address_(local_address), remote_address_(remote_address) {}
+  ~ConnectionSocketImpl() { close(); }
+
+  // Network::ConnectionSocket
+  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  bool localAddressReset() const override { return local_address_reset_; }
+  int fd() const override { return fd_; }
+  void close() override {
     if (fd_ != -1) {
       ::close(fd_);
+      fd_ = -1;
     }
   }
 
+protected:
+  int fd_;
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
+  bool local_address_reset_{false};
+};
+
+class AcceptedSocketImpl : public AcceptedSocket, public ConnectionSocketImpl {
+public:
+  AcceptedSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
+                     const Address::InstanceConstSharedPtr& remote_address)
+      : ConnectionSocketImpl(fd, local_address, remote_address) {}
+  ~AcceptedSocketImpl() {}
+
   // Network::AcceptedSocket
-  Address::InstanceConstSharedPtr localAddress() const override { return local_address_; }
   void resetLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     if (*local_address != *local_address_) {
       local_address_ = local_address;
       local_address_reset_ = true;
     }
   }
-  bool localAddressReset() const override { return local_address_reset_; }
-  Address::InstanceConstSharedPtr remoteAddress() const override { return remote_address_; }
   void resetRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
     remote_address_ = remote_address;
   }
-  int fd() const override { return fd_; }
+};
 
-  int takeFd() override {
-    int fd = fd_;
-    fd_ = -1;
-    return fd;
+class ClientSocketImpl : public ClientSocket, public ConnectionSocketImpl {
+public:
+  ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address)
+      : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream), nullptr,
+                             remote_address) {}
+  ~ClientSocketImpl() {}
+
+  // ClientSocket
+  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+    local_address_ = local_address;
   }
-
-protected:
-  int fd_;
-  bool local_address_reset_;
-  Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr remote_address_;
 };
 
 } // namespace Network

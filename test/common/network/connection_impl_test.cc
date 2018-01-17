@@ -70,11 +70,10 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  EXPECT_DEATH(ConnectionImpl(dispatcher, -1,
-                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                              Network::Address::InstanceConstSharedPtr(), false, false),
-               ".*assert failure: fd_ != -1.*");
+  EXPECT_DEATH(ConnectionImpl(dispatcher,
+                              ConnectionSocketPtr{new ConnectionSocketImpl(-1, nullptr, nullptr)},
+                              false),
+               ".*assert failure: fd\\(\\) != -1.*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -655,10 +654,8 @@ public:
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(new Event::MockFileEvent)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
     connection_.reset(new ConnectionImpl(
-        dispatcher_, 0, Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4),
-        Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4),
-        Network::Address::InstanceConstSharedPtr(), TransportSocketPtr(transport_socket_), false,
-        true));
+        dispatcher_, ConnectionSocketPtr{new ConnectionSocketImpl(0, nullptr, nullptr)},
+        TransportSocketPtr(transport_socket_), true));
     connection_->addConnectionCallbacks(callbacks_);
   }
 
