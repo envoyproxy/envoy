@@ -36,7 +36,7 @@ def checkNamespace(file_path):
   with open(file_path) as f:
     text = f.read()
     if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
-       not re.search('NOLINT\(namespace-envoy\)', text, re.MULTILINE):
+       not 'NOLINT(namespace-envoy)' in text:
       printError("Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path)
       return False
   return True
@@ -52,13 +52,12 @@ def checkProtobufExternalDepsBuild(file_path):
   pattern = '"protobuf"'
   with open(file_path) as f:
     text = f.read()
-    if re.search(pattern, text, re.MULTILINE):
+    if pattern in text:
       printError(
           "%s has unexpected direct external dependency on protobuf, use "
           "//source/common/protobuf instead." % file_path)
-      regex = re.compile(pattern)
       for i, line in enumerate(text.splitlines()):
-        if regex.search(line):
+        if pattern in line:
           printError("  %s:%s" % (file_path, i + 1))
       return False
     return True
@@ -69,8 +68,7 @@ def checkProtobufExternalDeps(file_path):
     return True
   with open(file_path) as f:
     text = f.read()
-    if re.search('"google/protobuf', text, re.MULTILINE) or re.search(
-        "google::protobuf", text, re.MULTILINE):
+    if '"google/protobuf' in text or "google::protobuf" in text:
       printError(
           "%s has unexpected direct dependency on google.protobuf, use "
           "the definitions in common/protobuf/protobuf.h instead." % file_path)
@@ -86,14 +84,13 @@ def isBuildFile(file_path):
 
 
 def checkFileContents(file_path):
-  pattern = '\.  '
+  pattern = '.  '
   with open(file_path) as f:
     text = f.read()
-    if re.search(pattern, text, re.MULTILINE):
+    if pattern in text:
       printError("%s has over-enthusiastic spaces:" % file_path)
-      regex = re.compile(pattern)
       for i, line in enumerate(text.splitlines()):
-        if regex.search(line):
+        if pattern in line:
           printError("  %s:%s" % (file_path, i + 1))
       return False
   return True
