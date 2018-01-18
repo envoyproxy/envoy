@@ -175,9 +175,7 @@ private:
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocket& socket() override { return parent_.mutable_socket(); }
     Ssl::ServerContext* defaultSslContext() override { return nullptr; }
-    bool useProxyProto() override { return false; }
     bool bindToPort() override { return true; }
-    bool useOriginalDst() override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }

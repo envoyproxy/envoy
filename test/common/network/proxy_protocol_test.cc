@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/filter/listener/proxy_protocol.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
@@ -45,16 +46,21 @@ public:
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
 
-    ON_CALL(factory_, createListenerFilterChain(_)).WillByDefault(Return(true));
+    EXPECT_CALL(factory_, createListenerFilterChain(_))
+        .WillOnce(Invoke([&](ListenerFilterManager& filter_manager) -> bool {
+          filter_manager.addAcceptFilter(
+              std::make_unique<Envoy::Filter::Listener::ProxyProtocol::Instance>(
+                  std::make_shared<Envoy::Filter::Listener::ProxyProtocol::Config>(
+                      listenerScope())));
+          return true;
+        }));
   }
 
   // Listener
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
   Ssl::ServerContext* defaultSslContext() override { return nullptr; }
-  bool useProxyProto() override { return true; }
   bool bindToPort() override { return true; }
-  bool useOriginalDst() override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -63,8 +69,6 @@ public:
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](ListenerFilterManager&) -> bool { return true; }));
     EXPECT_CALL(factory_, createNetworkFilterChain(_))
         .WillOnce(Invoke([&](Connection& connection) -> bool {
           server_connection_ = &connection;
@@ -79,7 +83,6 @@ public:
 
   void connectNoRead() {
     conn_->connect();
-    EXPECT_CALL(factory_, createListenerFilterChain(_));
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -301,7 +304,6 @@ TEST_P(ProxyProtocolTest, Closed) {
 
 TEST_P(ProxyProtocolTest, ClosedEmpty) {
   conn_->connect();
-  EXPECT_CALL(factory_, createListenerFilterChain(_));
   conn_->close(ConnectionCloseType::NoFlush);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
@@ -322,15 +324,22 @@ public:
                                                Network::Address::InstanceConstSharedPtr(),
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
+
+    EXPECT_CALL(factory_, createListenerFilterChain(_))
+        .WillOnce(Invoke([&](ListenerFilterManager& filter_manager) -> bool {
+          filter_manager.addAcceptFilter(
+              std::make_unique<Envoy::Filter::Listener::ProxyProtocol::Instance>(
+                  std::make_shared<Envoy::Filter::Listener::ProxyProtocol::Config>(
+                      listenerScope())));
+          return true;
+        }));
   }
 
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
   Ssl::ServerContext* defaultSslContext() override { return nullptr; }
-  bool useProxyProto() override { return true; }
   bool bindToPort() override { return true; }
-  bool useOriginalDst() override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -339,8 +348,6 @@ public:
   void connect() {
     conn_->connect();
     read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](ListenerFilterManager&) -> bool { return true; }));
     EXPECT_CALL(factory_, createNetworkFilterChain(_))
         .WillOnce(Invoke([&](Connection& connection) -> bool {
           server_connection_ = &connection;

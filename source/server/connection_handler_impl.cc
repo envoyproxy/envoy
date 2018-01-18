@@ -5,8 +5,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/filter/listener/original_dst.h"
-#include "common/filter/listener/proxy_protocol.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 
@@ -71,8 +69,7 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
                                                       Network::ListenerConfig& config)
     : parent_(parent), listener_(std::move(listener)),
       stats_(generateStats(config.listenerScope())), listener_tag_(config.listenerTag()),
-      config_(config),
-      legacy_stats_(new Filter::Listener::ProxyProtocol::Config(config.listenerScope())) {}
+      config_(config) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   // Purge sockets that have not progressed to connections. This should only happen when
@@ -172,15 +169,6 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(Network::ConnectionSocketPt
                                                      bool redirected) {
   Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
   auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket), redirected);
-
-  // Implicitly add legacy filters
-  if (config_.useOriginalDst()) {
-    active_socket->accept_filters_.emplace_back(new Filter::Listener::OriginalDst());
-  }
-  if (config_.useProxyProto()) {
-    active_socket->accept_filters_.emplace_back(
-        new Filter::Listener::ProxyProtocol::Instance(legacy_stats_));
-  }
 
   // Create and run the filters
   config_.filterChainFactory().createListenerFilterChain(*active_socket);

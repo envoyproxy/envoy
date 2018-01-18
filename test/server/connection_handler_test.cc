@@ -29,16 +29,13 @@ public:
   class TestListener : public Network::ListenerConfig, public LinkedObject<TestListener> {
   public:
     TestListener(ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
-                 bool use_original_dst, const std::string& name)
-        : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
-          use_original_dst_(use_original_dst), name_(name) {}
+                 const std::string& name)
+        : parent_(parent), tag_(tag), bind_to_port_(bind_to_port), name_(name) {}
 
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocket& socket() override { return socket_; }
     Ssl::ServerContext* defaultSslContext() override { return nullptr; }
-    bool useProxyProto() override { return false; }
     bool bindToPort() override { return bind_to_port_; }
-    bool useOriginalDst() override { return use_original_dst_; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
@@ -48,15 +45,13 @@ public:
     Network::MockListenSocket socket_;
     uint64_t tag_;
     bool bind_to_port_;
-    bool use_original_dst_;
     const std::string name_;
   };
 
   typedef std::unique_ptr<TestListener> TestListenerPtr;
 
-  TestListener* addListener(uint64_t tag, bool bind_to_port, bool use_original_dst,
-                            const std::string& name) {
-    TestListener* listener = new TestListener(*this, tag, bind_to_port, use_original_dst, name);
+  TestListener* addListener(uint64_t tag, bool bind_to_port, const std::string& name) {
+    TestListener* listener = new TestListener(*this, tag, bind_to_port, name);
     listener->moveIntoListBack(TestListenerPtr{listener}, listeners_);
     return listener;
   }
@@ -80,7 +75,7 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
             return listener;
 
           }));
-  TestListener* test_listener = addListener(1, true, false, "test_listener");
+  TestListener* test_listener = addListener(1, true, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -118,7 +113,7 @@ TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
             return listener;
 
           }));
-  TestListener* test_listener = addListener(1, true, false, "test_listener");
+  TestListener* test_listener = addListener(1, true, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -145,7 +140,7 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
             return listener;
 
           }));
-  TestListener* test_listener = addListener(1, true, false, "test_listener");
+  TestListener* test_listener = addListener(1, true, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -171,7 +166,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
             return listener;
 
           }));
-  TestListener* test_listener = addListener(1, true, false, "test_listener");
+  TestListener* test_listener = addListener(1, true, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -185,7 +180,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
 }
 
 TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
-  TestListener* test_listener1 = addListener(1, true, false, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, "test_listener1");
   Network::Address::InstanceConstSharedPtr alt_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
 
@@ -198,7 +193,7 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
 
   EXPECT_EQ(listener, handler_->findListenerByAddress(ByRef(*alt_address)));
 
-  TestListener* test_listener2 = addListener(2, true, false, "test_listener2");
+  TestListener* test_listener2 = addListener(2, true, "test_listener2");
   Network::Address::InstanceConstSharedPtr alt_address2(
       new Network::Address::Ipv4Instance("0.0.0.0", 10001));
   Network::Address::InstanceConstSharedPtr alt_address3(
@@ -235,8 +230,7 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
 }
 
 TEST_F(ConnectionHandlerTest, NormalRedirect) {
-  // 'false' for use_original_dst since we add a mock filter manually below.
-  TestListener* test_listener1 = addListener(1, true, false, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
   EXPECT_CALL(dispatcher_, createListener_(_, _, _))
@@ -250,7 +244,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(Return(normal_address));
   handler_->addListener(*test_listener1);
 
-  TestListener* test_listener2 = addListener(1, false, false, "test_listener2");
+  TestListener* test_listener2 = addListener(1, false, "test_listener2");
   Network::MockListener* listener2 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks2;
   EXPECT_CALL(dispatcher_, createListener_(_, _, _))
@@ -295,8 +289,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
 }
 
 TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
-  // 'false' for use_original_dst since we add a mock filter manually below.
-  TestListener* test_listener1 = addListener(1, true, false, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
   EXPECT_CALL(dispatcher_, createListener_(_, _, _))
@@ -310,7 +303,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(Return(normal_address));
   handler_->addListener(*test_listener1);
 
-  TestListener* test_listener2 = addListener(1, false, false, "test_listener2");
+  TestListener* test_listener2 = addListener(1, false, "test_listener2");
   Network::MockListener* listener2 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks2;
   EXPECT_CALL(dispatcher_, createListener_(_, _, _))
@@ -357,8 +350,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
-  // 'false' for use_original_dst since we add a mock filter manually below.
-  TestListener* test_listener1 = addListener(1, true, false, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
   EXPECT_CALL(dispatcher_, createListener_(_, _, _))
@@ -403,8 +395,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
-  // 'false' for use_original_dst since we add a mock filter manually below.
-  TestListener* test_listener1 = addListener(1, true, false, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
   EXPECT_CALL(dispatcher_, createListener_(_, _, _))

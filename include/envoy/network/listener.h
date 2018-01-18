@@ -37,23 +37,11 @@ public:
   virtual Ssl::ServerContext* defaultSslContext() PURE;
 
   /**
-   * @return bool whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   */
-  virtual bool useProxyProto() PURE;
-
-  /**
    * @return bool specifies whether the listener should actually listen on the port.
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
    */
   virtual bool bindToPort() PURE;
-
-  /**
-   * @return bool if a connection was redirected to this listener address using iptables,
-   *         allow the listener to hand it off to the listener associated to the original address
-   */
-  virtual bool useOriginalDst() PURE;
 
   /**
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write

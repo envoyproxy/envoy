@@ -17,7 +17,6 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
-#include "common/filter/listener/proxy_protocol.h"
 
 #include "spdlog/spdlog.h"
 
@@ -98,7 +97,6 @@ private:
     std::list<ActiveConnectionPtr> connections_;
     const uint64_t listener_tag_;
     Network::ListenerConfig& config_;
-    Filter::Listener::ProxyProtocol::ConfigSharedPtr legacy_stats_;
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;

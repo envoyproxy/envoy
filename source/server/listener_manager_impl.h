@@ -215,8 +215,6 @@ public:
   Ssl::ServerContext* defaultSslContext() override {
     return tls_contexts_.empty() ? nullptr : tls_contexts_[0].get();
   }
-  bool useProxyProto() override { return use_proxy_proto_; }
-  bool useOriginalDst() override { return use_original_dst_; }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
@@ -259,8 +257,6 @@ private:
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   std::vector<Ssl::ServerContextPtr> tls_contexts_;
   const bool bind_to_port_;
-  const bool use_proxy_proto_;
-  const bool use_original_dst_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
