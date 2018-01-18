@@ -1,6 +1,5 @@
 #include "common/http/filter/gzip_filter.h"
 
-#include <forward_list>
 #include <regex>
 
 #include "common/common/macros.h"
@@ -25,7 +24,7 @@ const uint64_t MinimumContentLength{30};
 const uint64_t GzipHeaderValue{16};
 
 // Used for verifying accept-encoding values.
-const std::string ZeroQvalueString{"q=0"};
+const char ZeroQvalueString[] = "q=0";
 
 // Default content types will be used if any is provided by the user.
 const std::unordered_set<std::string> defaultContentEncoding() {
@@ -44,8 +43,8 @@ GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzi
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
-      disable_on_etag_(gzip.disable_on_etag().value()),
-      disable_on_last_modified_(gzip.disable_on_last_modified().value()) {}
+      disable_on_etag_(gzip.disable_on_etag()),
+      disable_on_last_modified_(gzip.disable_on_last_modified()) {}
 
 ZlibCompressionLevelEnum
 GzipFilterConfig::compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level) {
@@ -105,7 +104,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
       isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
       !headers.ContentEncoding()) {
 
-    insertVary(headers);
+    insertVaryHeader(headers);
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
@@ -118,11 +117,6 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
   return Http::FilterHeadersStatus::Continue;
 }
 
-// TODO(gsagula): We need to test whether or not the compressed output is larger than
-// the uncompressed input. This could potentially be done by forcing flush on the first
-// few buffers received and keeping a copy of the uncompressed ones. If compression is
-// below certain expected ratio, the compressed buffer is disposed and the original
-// response/headers are passed to the client instead.
 FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (skip_compression_) {
     return Http::FilterDataStatus::Continue;
@@ -158,23 +152,21 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
     bool is_wildcard{false}; // true if found and not followed by `q=0`.
     bool is_gzip{false};     // true if exists and not followed by `q=0`.
 
-    std::vector<absl::string_view> tokens =
-        StringViewUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ";,", false);
+    for (const auto token :
+         StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",", true)) {
+      const auto values = StringUtil::splitToken(token, ";");
+      const auto value = StringUtil::trim(values.at(0));
+      const auto q_value =
+          values.size() > 1 ? StringUtil::trim(values.at(1)) : absl::string_view{nullptr, 0};
 
-    for (auto& token : tokens) {
-      absl::string_view next_token{};
-      absl::string_view trimmed_token = StringViewUtil::trim(token);
-      if (token != tokens.back()) {
-        next_token = StringViewUtil::trim(*(&token + 1));
+      if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
+        is_gzip = q_value.empty() ? true : (q_value != ZeroQvalueString);
       }
-      if (trimmed_token == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        is_gzip = next_token.empty() ? true : (next_token != ZeroQvalueString);
+      if (value == Http::Headers::get().AcceptEncodingValues.Identity) {
+        is_identity = q_value.empty() ? false : (q_value == ZeroQvalueString);
       }
-      if (trimmed_token == Http::Headers::get().AcceptEncodingValues.Identity) {
-        is_identity = next_token.empty() ? false : (next_token == ZeroQvalueString);
-      }
-      if (trimmed_token == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = !next_token.empty() ? true : (next_token != ZeroQvalueString);
+      if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
+        is_wildcard = q_value.empty() ? true : (q_value != ZeroQvalueString);
       }
     }
 
@@ -187,8 +179,8 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
 bool GzipFilter::isCacheControlAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
-    return !StringViewUtil::findToken(cache_control->value().c_str(), ";=",
-                                      Http::Headers::get().CacheControlValues.NoTransform.c_str());
+    return !StringUtil::findToken(cache_control->value().c_str(), ",",
+                                  Http::Headers::get().CacheControlValues.NoTransform.c_str());
   }
   return true;
 }
@@ -197,7 +189,7 @@ bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
     // TODO(gsagula): do this lookup without allocating a new string.
-    std::string value{StringViewUtil::cropRight(content_type->value().c_str(), ";")};
+    std::string value{StringUtil::cropRight(content_type->value().c_str(), ";")};
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
   return true;
@@ -223,23 +215,24 @@ bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    return StringUtil::atoul(content_length->value().c_str(), length)
-               ? length >= config_->minimumLength()
-               : false;
+    return StringUtil::atoul(content_length->value().c_str(), length) &&
+           length >= config_->minimumLength();
   }
 
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   return (transfer_encoding &&
-          StringViewUtil::findToken(transfer_encoding->value().c_str(), ",",
-                                    Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
+          StringUtil::findToken(transfer_encoding->value().c_str(), ",",
+                                Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
 }
 
 bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (transfer_encoding) {
-    for (auto header_value : StringViewUtil::splitToken(transfer_encoding->value().c_str(), ",")) {
-      if (header_value == Http::Headers::get().TransferEncodingValues.Gzip ||
-          header_value == Http::Headers::get().TransferEncodingValues.Deflate) {
+    for (auto header_value :
+         StringUtil::splitToken(transfer_encoding->value().c_str(), ",", true)) {
+      const auto trimmed_value = StringUtil::trim(header_value);
+      if (trimmed_value == Http::Headers::get().TransferEncodingValues.Gzip ||
+          trimmed_value == Http::Headers::get().TransferEncodingValues.Deflate) {
         return false;
       }
     }
@@ -247,30 +240,24 @@ bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
   return true;
 }
 
-void GzipFilter::insertVary(HeaderMap& headers) {
+void GzipFilter::insertVaryHeader(HeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
   if (vary) {
-    auto header_values = StringViewUtil::splitToken(vary->value().c_str(), ",");
-    bool has_accept_encoding{false};
+    std::string header_values;
+    if (!StringUtil::findToken(vary->value().c_str(), ",",
+                               Http::Headers::get().VaryValues.AcceptEncoding, true)) {
+      header_values.assign(Http::Headers::get().VaryValues.AcceptEncoding);
+    }
 
-    std::ostringstream oss;
-    for (auto it = header_values.begin(); it != header_values.end(); it++) {
-      if (*it != Http::Headers::get().VaryValues.Wildcard) {
-        oss << *it;
-      }
-      if (*it != header_values.back() && it != header_values.begin()) {
-        oss << ", ";
-      }
-      if (*it == Http::Headers::get().VaryValues.AcceptEncoding) {
-        has_accept_encoding = true;
+    for (const auto value : StringUtil::splitToken(vary->value().c_str(), ",", true)) {
+      const auto trimmed_value = StringUtil::trim(value);
+      if (trimmed_value != Http::Headers::get().VaryValues.Wildcard) {
+        header_values.empty() ? header_values.assign(trimmed_value.data(), trimmed_value.size())
+                              : header_values.append(", " + std::string{trimmed_value});
       }
     }
 
-    if (!has_accept_encoding) {
-      oss << ", " << Http::Headers::get().VaryValues.AcceptEncoding;
-    }
-
-    headers.insertVary().value(oss.str());
+    headers.insertVary().value(header_values);
   } else {
     headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
   }

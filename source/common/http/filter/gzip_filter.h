@@ -105,7 +105,7 @@ private:
   bool isMinimumContentLength(HeaderMap& headers) const;
   bool isTransferEncodingAllowed(HeaderMap& headers) const;
 
-  void insertVary(HeaderMap& headers);
+  void insertVaryHeader(HeaderMap& headers);
 
   bool skip_compression_;
 

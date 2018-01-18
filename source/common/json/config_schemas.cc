@@ -1075,7 +1075,7 @@ const std::string Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
+const char Json::Schema::GZIP_HTTP_FILTER_SCHEMA[] = R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
@@ -1115,7 +1115,7 @@ const std::string Json::Schema::GZIP_HTTP_FILTER_SCHEMA(R"EOF(
     },
     "additionalProperties" : false
   }
-  )EOF");
+  )EOF";
 
 const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
   {
