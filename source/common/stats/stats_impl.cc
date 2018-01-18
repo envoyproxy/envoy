@@ -153,9 +153,7 @@ TagProducerImpl::TagProducerImpl()
 TagProducerImpl::~TagProducerImpl() {}
 
 std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
-  if (!default_tags_->empty()) {
-    tags.insert(tags.end(), default_tags_->begin(), default_tags_->end());
-  }
+  tags.insert(tags.end(), default_tags_->begin(), default_tags_->end());
 
   std::string tag_extracted_name = name;
   for (const TagExtractorPtr& tag_extractor : *tag_extractors_) {
