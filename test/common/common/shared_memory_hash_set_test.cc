@@ -32,12 +32,12 @@ protected:
   void SetUp() override {
     options_.capacity = 100;
     options_.num_slots = 67;
-    mem_size_ = SharedMemoryHashSet<TestValue>::numBytes(options_);
-    memory_.reset(new uint8_t[mem_size_]);
+    const uint32_t mem_size = SharedMemoryHashSet<TestValue>::numBytes(options_);
+    memory_.reset(new uint8_t[mem_size]);
+    memset(memory_.get(), 0, mem_size);
   }
 
   SharedMemoryHashSetOptions options_;
-  uint32_t mem_size_;
   std::unique_ptr<uint8_t[]> memory_;
 };
 
