@@ -41,7 +41,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   std::unique_ptr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
   std::unique_lock<std::mutex> lock(lock_);
   scopes_.emplace(new_scope.get());
-  return std::move(new_scope);
+  return new_scope;
 }
 
 std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {

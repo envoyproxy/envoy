@@ -63,7 +63,7 @@ LoadBalancerPtr RingHashLoadBalancer::LoadBalancerFactoryImpl::create() {
   lb->per_priority_load_ = per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
 
-  return std::move(lb);
+  return lb;
 }
 
 HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
