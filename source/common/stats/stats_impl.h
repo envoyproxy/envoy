@@ -19,6 +19,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
+#include "api/stats.pb.h"
 
 namespace Envoy {
 namespace Stats {
@@ -49,10 +50,9 @@ public:
   typedef std::unique_ptr<std::vector<TagExtractorPtr>> ExtractorsPtr;
   typedef std::unique_ptr<std::vector<Tag>> TagsPtr;
 
-  TagProducerImpl(ExtractorsPtr&& tag_extractors, TagsPtr&& default_tags);
+  TagProducerImpl(const envoy::api::v2::StatsConfig& config);
+  TagProducerImpl();
   ~TagProducerImpl() override;
-
-  static TagProducerPtr createEmptyTagProducer();
 
   /*
    * Take a metric name and a vector then add proper tags into the vector and
@@ -63,6 +63,10 @@ public:
   std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
 
 private:
+  void reserveResources(const envoy::api::v2::StatsConfig& config);
+  void addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
+                            std::unordered_set<std::string>& names);
+
   ExtractorsPtr tag_extractors_;
   TagsPtr default_tags_;
 };

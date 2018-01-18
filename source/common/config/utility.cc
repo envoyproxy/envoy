@@ -160,65 +160,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-void detectTagNameConflict(const envoy::api::v2::Bootstrap& bootstrap) {
-  std::unordered_set<std::string> names;
-
-  if (!bootstrap.stats_config().has_use_all_default_tags() ||
-      bootstrap.stats_config().use_all_default_tags().value()) {
-    for (const auto& default_tag : TagNames::get().name_regex_pairs_) {
-      names.emplace(default_tag.first);
-    }
-  }
-
-  for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
-    const std::string name = tag_specifier.tag_name();
-    if (!names.emplace(name).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
-    }
-  }
-}
-
-std::vector<Stats::TagExtractorPtr>
-buildDefaultTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
-  std::vector<Stats::TagExtractorPtr> tag_extractors;
-
-  if (!bootstrap.stats_config().has_use_all_default_tags() ||
-      bootstrap.stats_config().use_all_default_tags().value()) {
-    tag_extractors.reserve(TagNames::get().name_regex_pairs_.size());
-
-    for (const auto& extractor : TagNames::get().name_regex_pairs_) {
-      tag_extractors.emplace_back(
-          Stats::TagExtractorImpl::createTagExtractor(extractor.first, extractor.second));
-    }
-  }
-
-  return tag_extractors;
-}
-
 Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
-  detectTagNameConflict(bootstrap);
-
-  auto tag_extractors =
-      std::make_unique<std::vector<Stats::TagExtractorPtr>>(buildDefaultTagExtractors(bootstrap));
-  // Roughly estimate the size of the vectors.
-  auto default_tags = std::make_unique<std::vector<Stats::Tag>>();
-  tag_extractors->reserve(tag_extractors->size() + bootstrap.stats_config().stats_tags().size());
-  default_tags->reserve(bootstrap.stats_config().stats_tags().size());
-
-  for (const auto& tag_specifier : bootstrap.stats_config().stats_tags()) {
-    // If no tag value are found, fallback to default regex to keep backward compatibility.
-    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
-        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
-      tag_extractors->emplace_back(Stats::TagExtractorImpl::createTagExtractor(
-          tag_specifier.tag_name(), tag_specifier.regex()));
-
-    } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
-      default_tags->emplace_back(Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
-    }
-  }
-
-  return Stats::TagProducerPtr{
-      new Stats::TagProducerImpl(std::move(tag_extractors), std::move(default_tags))};
+  return Stats::TagProducerPtr{new Stats::TagProducerImpl(bootstrap.stats_config())};
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {

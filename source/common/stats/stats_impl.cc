@@ -122,15 +122,35 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   return data;
 }
 
-TagProducerImpl::TagProducerImpl(ExtractorsPtr&& tag_extractors, TagsPtr&& default_tags)
-    : tag_extractors_(std::move(tag_extractors)), default_tags_(std::move(default_tags)) {}
+TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : TagProducerImpl() {
+  // To check name conflict.
+  std::unordered_set<std::string> names;
+  reserveResources(config);
+  addDefaultExtractors(config, names);
+
+  for (const auto& tag_specifier : config.stats_tags()) {
+    if (!names.emplace(tag_specifier.tag_name()).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", tag_specifier.tag_name()));
+    }
+
+    // If no tag value are found, fallback to default regex to keep backward compatibility.
+    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
+        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
+      tag_extractors_->emplace_back(Stats::TagExtractorImpl::createTagExtractor(
+          tag_specifier.tag_name(), tag_specifier.regex()));
+
+    } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
+      default_tags_->emplace_back(
+          Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
+    }
+  }
+}
+
+TagProducerImpl::TagProducerImpl()
+    : tag_extractors_(ExtractorsPtr{new std::vector<TagExtractorPtr>()}),
+      default_tags_(TagsPtr{new std::vector<Tag>()}) {}
 
 TagProducerImpl::~TagProducerImpl() {}
-
-TagProducerPtr TagProducerImpl::createEmptyTagProducer() {
-  return TagProducerPtr{new TagProducerImpl(ExtractorsPtr{new std::vector<TagExtractorPtr>()},
-                                            TagsPtr{new std::vector<Tag>()})};
-}
 
 std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
   if (!default_tags_->empty()) {
@@ -142,6 +162,29 @@ std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Ta
     tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
   }
   return tag_extracted_name;
+}
+
+// Roughly estimate the size of the vectors.
+void TagProducerImpl::reserveResources(const envoy::api::v2::StatsConfig& config) {
+  default_tags_->reserve(config.stats_tags().size());
+
+  if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
+    tag_extractors_->reserve(Config::TagNames::get().name_regex_pairs_.size() +
+                             config.stats_tags().size());
+  } else {
+    tag_extractors_->reserve(config.stats_tags().size());
+  }
+}
+
+void TagProducerImpl::addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
+                                           std::unordered_set<std::string>& names) {
+  if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
+    for (const auto& extractor : Config::TagNames::get().name_regex_pairs_) {
+      names.emplace(extractor.first);
+      tag_extractors_->emplace_back(
+          Stats::TagExtractorImpl::createTagExtractor(extractor.first, extractor.second));
+    }
+  }
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {

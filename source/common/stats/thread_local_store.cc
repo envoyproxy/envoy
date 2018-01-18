@@ -13,7 +13,7 @@ namespace Stats {
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
-      tag_producer_(TagProducerImpl::createEmptyTagProducer()),
+      tag_producer_(TagProducerPtr{new TagProducerImpl()}),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
