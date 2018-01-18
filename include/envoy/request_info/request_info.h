@@ -164,8 +164,15 @@ public:
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
 
+  /**
+   * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
+   * will be nullptr if no route was selected.
+   */
   virtual const Router::RouteEntry* routeEntry() const PURE;
 
+  /**
+   * Set the route entry once it's selected.
+   */
   virtual void onRouteSelected(const Router::RouteEntry& route_entry) PURE;
 };
 

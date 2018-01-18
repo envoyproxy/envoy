@@ -3402,6 +3402,30 @@ virtual_hosts:
   }
 }
 
+TEST(RouteConfigurationV2, Metadata) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/"}
+        route: { cluster: www2 }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  auto* route_entry = config.route(genHeaders("www.foo.com", "/", "GET"), 0)->routeEntry();
+
+  const auto& metadata = route_entry->metadata();
+
+  EXPECT_EQ("test_value",
+            Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
