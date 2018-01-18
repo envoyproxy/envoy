@@ -38,3 +38,5 @@ final version.
   <envoy_api_field_TagSpecifier.fixed_value>` which will be added to all metrics.
 * Added `/runtime` admin endpoint to read the current runtime values.
 * Added `gateway-error` retry-on policy.
+* Added support for building envoy with exported symbols
+  This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.

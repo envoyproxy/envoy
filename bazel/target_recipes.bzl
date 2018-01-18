@@ -3,6 +3,7 @@
 # ci/build_container/build_recipes.
 TARGET_RECIPES = {
     "ares": "cares",
+    "benchmark": "benchmark",
     "event": "libevent",
     "event_pthreads": "libevent",
     "tcmalloc_and_profiler": "gperftools",

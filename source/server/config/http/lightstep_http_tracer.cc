@@ -21,8 +21,9 @@ LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
                                              Upstream::ClusterManager& cluster_manager) {
 
   std::unique_ptr<lightstep::LightStepTracerOptions> opts(new lightstep::LightStepTracerOptions());
-  opts->access_token = server.api().fileReadToEnd(json_config.getString("access_token_file"));
-  StringUtil::rtrim(opts->access_token);
+  const auto access_token_sv =
+      StringUtil::rtrim(server.api().fileReadToEnd(json_config.getString("access_token_file")));
+  opts->access_token.assign(access_token_sv.data(), access_token_sv.size());
   opts->component_name = server.localInfo().clusterName();
 
   Tracing::DriverPtr lightstep_driver{new Tracing::LightStepDriver{

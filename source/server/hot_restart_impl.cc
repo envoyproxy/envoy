@@ -17,6 +17,7 @@
 #include "common/common/utility.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -26,11 +27,20 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-SharedMemory& SharedMemory::initialize(Options& options) {
+static SharedMemoryHashSetOptions sharedMemHashOptions(uint64_t max_stats) {
+  SharedMemoryHashSetOptions hash_set_options;
+  hash_set_options.capacity = max_stats;
+
+  // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
+  hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
+  return hash_set_options;
+}
+
+SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   const uint64_t entry_size = Stats::RawStatData::size();
-  const uint64_t total_size = sizeof(SharedMemory) + (entry_size * options.maxStats());
+  const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
   int flags = O_RDWR;
   const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
@@ -61,7 +71,7 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   if (options.restartEpoch() == 0) {
     shmem->size_ = total_size;
     shmem->version_ = VERSION;
-    shmem->num_stats_ = options.maxStats();
+    shmem->max_stats_ = options.maxStats();
     shmem->entry_size_ = entry_size;
     shmem->initializeMutex(shmem->log_lock_);
     shmem->initializeMutex(shmem->access_log_lock_);
@@ -70,12 +80,12 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   } else {
     RELEASE_ASSERT(shmem->size_ == total_size);
     RELEASE_ASSERT(shmem->version_ == VERSION);
-    RELEASE_ASSERT(shmem->num_stats_ == options.maxStats());
+    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats());
     RELEASE_ASSERT(shmem->entry_size_ == entry_size);
   }
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_slots_) % alignof(Stats::RawStatData)) ==
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) ==
                  0);
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
@@ -104,14 +114,12 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
                      max_stat_name_len);
 }
 
-std::string SharedMemory::version() {
-  return version(num_stats_, Stats::RawStatData::maxNameLength());
-}
-
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
-      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
-      init_lock_(shmem_.init_lock_) {
+    : options_(options), stats_set_options_(sharedMemHashOptions(options.maxStats())),
+      shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
+      stats_set_(stats_set_options_, options.restartEpoch() == 0, shmem_.stats_set_data_),
+      log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
+      stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
@@ -128,25 +136,23 @@ HotRestartImpl::HotRestartImpl(Options& options)
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
-  Stats::RawStatData* unused = nullptr;
   std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
-  for (uint64_t i = 0; i < shmem_.num_stats_; i++) {
-    const size_t offset = shmem_.entry_size_ * i;
-    Stats::RawStatData* data = reinterpret_cast<Stats::RawStatData*>(shmem_.stats_slots_ + offset);
-    if (!data->initialized()) {
-      unused = data;
-    } else if (data->matches(name)) {
-      data->ref_count_++;
-      return data;
-    }
+  absl::string_view key = name;
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
+    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
   }
-
-  if (unused != nullptr) {
-    unused->initialize(name);
-    return unused;
+  auto value_created = stats_set_.insert(key);
+  Stats::RawStatData* data = value_created.first;
+  if (data == nullptr) {
+    return nullptr;
   }
-
-  return nullptr;
+  // For new entries (value-created.second==true), SharedMemoryHashSet calls Value::initialize()
+  // automatically, but on recycled entries (value-created.second==false) we need to bump the
+  // ref-count.
+  if (!value_created.second) {
+    ++data->ref_count_;
+  }
+  return data;
 }
 
 void HotRestartImpl::free(Stats::RawStatData& data) {
@@ -156,7 +162,9 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   if (--data.ref_count_ > 0) {
     return;
   }
-
+  bool key_removed = stats_set_.remove(data.key());
+  ASSERT(key_removed);
+  UNREFERENCED_PARAMETER(key_removed);
   memset(&data, 0, Stats::RawStatData::size());
 }
 
@@ -465,7 +473,25 @@ void HotRestartImpl::terminateParent() {
 
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
-std::string HotRestartImpl::version() { return shmem_.version(); }
+std::string HotRestartImpl::version() {
+  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), stats_set_);
+}
+
+// Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
+// can generate the version string.
+std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
+  const SharedMemoryHashSetOptions options = sharedMemHashOptions(max_num_stats);
+  const size_t bytes = RawStatDataSet::numBytes(options);
+  std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
+  RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+
+  return versionHelper(max_num_stats, max_stat_name_len, stats_set);
+}
+
+std::string HotRestartImpl::versionHelper(size_t max_num_stats, size_t max_stat_name_len,
+                                          RawStatDataSet& stats_set) {
+  return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
+}
 
 } // namespace Server
 } // namespace Envoy
