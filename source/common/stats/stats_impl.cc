@@ -136,27 +136,24 @@ TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : Ta
     // If no tag value are found, fallback to default regex to keep backward compatibility.
     if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
         tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
-      tag_extractors_->emplace_back(Stats::TagExtractorImpl::createTagExtractor(
+      tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
           tag_specifier.tag_name(), tag_specifier.regex()));
 
     } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
-      default_tags_->emplace_back(
-          Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
+      default_tags_.emplace_back(Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
     }
   }
 }
 
-TagProducerImpl::TagProducerImpl()
-    : tag_extractors_(ExtractorsPtr{new std::vector<TagExtractorPtr>()}),
-      default_tags_(TagsPtr{new std::vector<Tag>()}) {}
+TagProducerImpl::TagProducerImpl() {}
 
 TagProducerImpl::~TagProducerImpl() {}
 
 std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
-  tags.insert(tags.end(), default_tags_->begin(), default_tags_->end());
+  tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
 
   std::string tag_extracted_name = name;
-  for (const TagExtractorPtr& tag_extractor : *tag_extractors_) {
+  for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
     tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
   }
   return tag_extracted_name;
@@ -164,13 +161,13 @@ std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Ta
 
 // Roughly estimate the size of the vectors.
 void TagProducerImpl::reserveResources(const envoy::api::v2::StatsConfig& config) {
-  default_tags_->reserve(config.stats_tags().size());
+  default_tags_.reserve(config.stats_tags().size());
 
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
-    tag_extractors_->reserve(Config::TagNames::get().name_regex_pairs_.size() +
-                             config.stats_tags().size());
+    tag_extractors_.reserve(Config::TagNames::get().name_regex_pairs_.size() +
+                            config.stats_tags().size());
   } else {
-    tag_extractors_->reserve(config.stats_tags().size());
+    tag_extractors_.reserve(config.stats_tags().size());
   }
 }
 
@@ -179,7 +176,7 @@ void TagProducerImpl::addDefaultExtractors(const envoy::api::v2::StatsConfig& co
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& extractor : Config::TagNames::get().name_regex_pairs_) {
       names.emplace(extractor.first);
-      tag_extractors_->emplace_back(
+      tag_extractors_.emplace_back(
           Stats::TagExtractorImpl::createTagExtractor(extractor.first, extractor.second));
     }
   }

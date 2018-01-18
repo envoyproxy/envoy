@@ -47,9 +47,6 @@ private:
 
 class TagProducerImpl : public TagProducer {
 public:
-  typedef std::unique_ptr<std::vector<TagExtractorPtr>> ExtractorsPtr;
-  typedef std::unique_ptr<std::vector<Tag>> TagsPtr;
-
   TagProducerImpl(const envoy::api::v2::StatsConfig& config);
   TagProducerImpl();
   ~TagProducerImpl() override;
@@ -67,8 +64,8 @@ private:
   void addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
                             std::unordered_set<std::string>& names);
 
-  ExtractorsPtr tag_extractors_;
-  TagsPtr default_tags_;
+  std::vector<TagExtractorPtr> tag_extractors_{};
+  std::vector<Tag> default_tags_{};
 };
 
 /**
