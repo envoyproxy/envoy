@@ -244,7 +244,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
       *new_cluster, cluster, dispatcher, runtime, outlier_event_logger));
-  return std::move(new_cluster);
+  return new_cluster;
 }
 
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,

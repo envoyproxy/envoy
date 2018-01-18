@@ -56,7 +56,7 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
     return nullptr;
   }
 
-  return std::move(request_ptr);
+  return request_ptr;
 }
 
 SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
@@ -77,7 +77,7 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
     return nullptr;
   }
 
-  return std::move(request_ptr);
+  return request_ptr;
 }
 
 FragmentedRequest::~FragmentedRequest() {
