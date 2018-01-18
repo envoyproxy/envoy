@@ -13,10 +13,10 @@ namespace Listener {
  */
 class OriginalDst : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
+  virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
+
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
-
-  virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
 };
 
 } // namespace Listener

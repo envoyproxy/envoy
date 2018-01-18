@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Network {
 
 class Connection;
-class AcceptedSocket;
+class ConnectionSocket;
 
 /**
  * Status codes returned by filters that can cause future filters to not get iterated to.
@@ -157,12 +157,12 @@ public:
   virtual ~ListenerFilterCallbacks() {}
 
   /**
-   * @return the AcceptedSocket that owns this manager and the managed filters.
+   * @return ConnectionSocket the socket the filter is operating on.
    */
-  virtual AcceptedSocket& socket() PURE;
+  virtual ConnectionSocket& socket() PURE;
 
   /**
-   * @return the Dispatcher for this manager.
+   * @return the Dispatcher for issuing events.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
 

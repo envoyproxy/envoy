@@ -1059,7 +1059,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains: {}
     listener_filters:
-    - name: "envoy.original_dst"
+    - name: "envoy.listener.original_dst"
       config: {}
   )EOF", // "
                                                        Network::Address::IpVersion::v4);
@@ -1081,7 +1081,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
                                      Network::Address::InstanceConstSharedPtr{
                                          new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
 
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::AcceptedSocket& {
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
   }));
 
@@ -1108,15 +1108,15 @@ public:
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                        FactoryContext&) override {
     return [](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(Network::ListenerFilterPtr{new OriginalDstTest()});
+      filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  std::string name() override { return "test.original_dst"; }
+  std::string name() override { return "test.listener.original_dst"; }
 };
 
 /**
@@ -1133,7 +1133,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains: {}
     listener_filters:
-    - name: "test.original_dst"
+    - name: "test.listener.original_dst"
       config: {}
   )EOF", // "
                                                        Network::Address::IpVersion::v4);
@@ -1149,13 +1149,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Network::AcceptedSocketImpl socket(-1,
-                                     Network::Address::InstanceConstSharedPtr{
-                                         new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
-                                     Network::Address::InstanceConstSharedPtr{
-                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+  Network::AcceptedSocketImpl socket(
+      -1, std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::AcceptedSocket& {
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
   }));
 
@@ -1165,7 +1163,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.localAddressReset());
+  EXPECT_TRUE(socket.localAddressRestored());
   EXPECT_EQ("127.0.0.2:2345", socket.localAddress()->asString());
 }
 

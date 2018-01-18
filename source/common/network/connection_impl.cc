@@ -45,7 +45,7 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                bool connected)
-    : ConnectionImpl(dispatcher, std::move(socket), TransportSocketPtr{new RawBufferSocket},
+    : ConnectionImpl(dispatcher, std::move(socket), std::make_unique<RawBufferSocket>(),
                      connected) {}
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
@@ -478,7 +478,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket)
-    : ConnectionImpl(dispatcher, ConnectionSocketPtr{new ClientSocketImpl(remote_address)},
+    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
   if (source_address != nullptr) {
     int rc = source_address->bind(fd());
@@ -517,7 +517,7 @@ void ClientConnectionImpl::connect() {
   // The local address can only be retrieved for IP connections. Other
   // types, such as UDS, don't have a notion of a local address.
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    dynamic_cast<ClientSocket*>(socket_.get())->setLocalAddress(Address::addressFromFd(fd()));
+    socket_->setLocalAddress(Address::addressFromFd(fd()));
   }
 }
 

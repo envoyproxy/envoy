@@ -184,7 +184,7 @@ private:
     const std::string& name() const override { return name_; }
 
     AdminImpl& parent_;
-    std::string name_;
+    const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
   };

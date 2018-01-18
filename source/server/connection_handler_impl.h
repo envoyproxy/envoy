@@ -77,7 +77,7 @@ private:
     ~ActiveListener();
 
     // Network::ListenerCallbacks
-    void onAccept(Network::AcceptedSocketPtr&& socket, bool redirected) override;
+    void onAccept(Network::ConnectionSocketPtr&& socket, bool redirected) override;
     void onNewConnection(Network::ConnectionPtr&& new_connection) override;
 
     /**
@@ -89,7 +89,7 @@ private:
     /**
      * Create a new connection from a socket accepted by the listener.
      */
-    void newConnection(Network::AcceptedSocketPtr&& socket);
+    void newConnection(Network::ConnectionSocketPtr&& socket);
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
@@ -135,8 +135,8 @@ private:
                         public Network::ListenerFilterCallbacks,
                         LinkedObject<ActiveSocket>,
                         public Event::DeferredDeletable {
-    ActiveSocket(ActiveListener& listener, Network::AcceptedSocketPtr&& socket, bool redirected)
-        : listener_(&listener), socket_(std::move(socket)), redirected_(redirected),
+    ActiveSocket(ActiveListener& listener, Network::ConnectionSocketPtr&& socket, bool redirected)
+        : listener_(listener), socket_(std::move(socket)), redirected_(redirected),
           iter_(accept_filters_.end()) {}
     ~ActiveSocket() {
       ASSERT(iter_ == accept_filters_.end());
@@ -149,12 +149,12 @@ private:
     }
 
     // Network::ListenerFilterCallbacks
-    Network::AcceptedSocket& socket() override { return *socket_.get(); }
-    Event::Dispatcher& dispatcher() override { return listener_->parent_.dispatcher_; }
+    Network::ConnectionSocket& socket() override { return *socket_.get(); }
+    Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
 
-    ActiveListener* listener_;
-    Network::AcceptedSocketPtr socket_;
+    ActiveListener& listener_;
+    Network::ConnectionSocketPtr socket_;
     bool redirected_;
     std::list<Network::ListenerFilterPtr> accept_filters_;
     std::list<Network::ListenerFilterPtr>::iterator iter_;

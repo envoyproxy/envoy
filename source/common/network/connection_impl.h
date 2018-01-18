@@ -85,7 +85,7 @@ public:
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool usingOriginalDst() const override { return socket_->localAddressReset(); }
+  bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return above_high_watermark_; }
 
   // Network::BufferSource

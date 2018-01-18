@@ -23,10 +23,10 @@ Address::InstanceConstSharedPtr ListenerImpl::getLocalAddress(int fd) {
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
-  AcceptedSocketPtr socket(new AcceptedSocketImpl(
+  ConnectionSocketPtr socket(new AcceptedSocketImpl(
       fd,
-      // Get the local address from the new socket if the listener is listening on the all hosts
-      // address (e.g., 0.0.0.0 for IPv4).
+      // Get the local address from the new socket if the listener is listening on IP ANY
+      // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
       !listener->local_address_ ? listener->getLocalAddress(fd) : listener->local_address_,
       // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
       // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
@@ -42,7 +42,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket,
                            ListenerCallbacks& cb, bool bind_to_port)
     : local_address_(nullptr), cb_(cb), listener_(nullptr) {
-  auto ip = socket.localAddress()->ip();
+  const auto ip = socket.localAddress()->ip();
 
   // Only use the listen socket's local address for new connections if it is not the all hosts
   // address (e.g., 0.0.0.0 for IPv4).

@@ -22,12 +22,12 @@ public:
         new Filter::Listener::ProxyProtocol::Config(context.scope()));
     return [config](Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(
-          Network::ListenerFilterPtr{new Filter::Listener::ProxyProtocol::Instance(config)});
+          std::make_unique<Filter::Listener::ProxyProtocol::Instance>(config));
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
   std::string name() override { return Config::ListenerFilterNames::get().PROXY_PROTOCOL; }

@@ -189,7 +189,7 @@ public:
     client_.reset(new CodecClientForTest(std::move(client_connection), codec_, nullptr, host_));
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-        .WillOnce(Invoke([&](Network::AcceptedSocketPtr& socket, bool) -> void {
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
           Network::ConnectionPtr new_connection =
               dispatcher_->createServerConnection(std::move(socket), nullptr);
           listener_callbacks_.onNewConnection(std::move(new_connection));

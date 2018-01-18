@@ -78,7 +78,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(usingOriginalDst, bool());
+  MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
 };
 
@@ -115,7 +115,7 @@ public:
   MOCK_METHOD1(write, void(Buffer::Instance& data));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(usingOriginalDst, bool());
+  MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
 
   // Network::ClientConnection
@@ -195,12 +195,12 @@ public:
   MockListenerCallbacks();
   ~MockListenerCallbacks();
 
-  void onAccept(AcceptedSocketPtr&& socket, bool redirected) override {
+  void onAccept(ConnectionSocketPtr&& socket, bool redirected) override {
     onAccept_(socket, redirected);
   }
   void onNewConnection(ConnectionPtr&& conn) override { onNewConnection_(conn); }
 
-  MOCK_METHOD2(onAccept_, void(AcceptedSocketPtr& socket, bool redirected));
+  MOCK_METHOD2(onAccept_, void(ConnectionSocketPtr& socket, bool redirected));
   MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
 };
 
@@ -225,7 +225,7 @@ public:
   MockListenerFilterCallbacks();
   ~MockListenerFilterCallbacks();
 
-  MOCK_METHOD0(socket, AcceptedSocket&());
+  MOCK_METHOD0(socket, ConnectionSocket&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD1(continueFilterChain, void(bool));
 };
@@ -261,16 +261,16 @@ public:
   Address::InstanceConstSharedPtr local_address_;
 };
 
-class MockAcceptedSocket : public AcceptedSocket {
+class MockConnectionSocket : public ConnectionSocket {
 public:
-  MockAcceptedSocket();
-  ~MockAcceptedSocket();
+  MockConnectionSocket();
+  ~MockConnectionSocket();
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(resetLocalAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_CONST_METHOD0(localAddressReset, bool());
+  MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
+  MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_METHOD1(resetRemoteAddress, void(const Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
 

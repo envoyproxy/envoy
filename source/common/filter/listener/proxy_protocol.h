@@ -44,7 +44,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  */
 class Instance : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Instance(ConfigSharedPtr config) : search_index_(1), config_(config) {}
+  Instance(const ConfigSharedPtr& config) : search_index_(1), config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;

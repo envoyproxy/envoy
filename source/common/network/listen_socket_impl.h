@@ -60,7 +60,15 @@ public:
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  bool localAddressReset() const override { return local_address_reset_; }
+  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
+                       bool restored) override {
+    local_address_ = local_address;
+    local_address_restored_ = restored;
+  }
+  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
+    remote_address_ = remote_address;
+  }
+  bool localAddressRestored() const override { return local_address_restored_; }
   int fd() const override { return fd_; }
   void close() override {
     if (fd_ != -1) {
@@ -73,39 +81,23 @@ protected:
   int fd_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
-  bool local_address_reset_{false};
+  bool local_address_restored_{false};
 };
 
-class AcceptedSocketImpl : public AcceptedSocket, public ConnectionSocketImpl {
+// ConnectionSocket used with server connections.
+class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
   AcceptedSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address)
       : ConnectionSocketImpl(fd, local_address, remote_address) {}
-  ~AcceptedSocketImpl() {}
-
-  // Network::AcceptedSocket
-  void resetLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
-    if (*local_address != *local_address_) {
-      local_address_ = local_address;
-      local_address_reset_ = true;
-    }
-  }
-  void resetRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
-    remote_address_ = remote_address;
-  }
 };
 
-class ClientSocketImpl : public ClientSocket, public ConnectionSocketImpl {
+// ConnectionSocket used with client connections.
+class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address)
       : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream), nullptr,
                              remote_address) {}
-  ~ClientSocketImpl() {}
-
-  // ClientSocket
-  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
-    local_address_ = local_address;
-  }
 };
 
 } // namespace Network

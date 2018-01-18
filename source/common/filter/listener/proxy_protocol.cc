@@ -26,7 +26,7 @@ Config::Config(Stats::Scope& scope) : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNT
 
 Network::FilterStatus Instance::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(info, "proxy_protocol: New connection accepted");
-  Network::AcceptedSocket& socket = cb.socket();
+  Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_.get() == nullptr);
   file_event_ =
       cb.dispatcher().createFileEvent(socket.fd(),
@@ -50,7 +50,7 @@ void Instance::onRead() {
 }
 
 void Instance::onReadWorker() {
-  Network::AcceptedSocket& socket = cb_->socket();
+  Network::ConnectionSocket& socket = cb_->socket();
   std::string proxy_line;
   if (!readLine(socket.fd(), proxy_line)) {
     return;
@@ -115,8 +115,8 @@ void Instance::onReadWorker() {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  socket.resetLocalAddress(local_address);
-  socket.resetRemoteAddress(remote_address);
+  socket.setLocalAddress(local_address);
+  socket.setRemoteAddress(remote_address);
   cb_->continueFilterChain(true);
 }
 

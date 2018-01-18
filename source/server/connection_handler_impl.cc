@@ -75,6 +75,8 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
       legacy_stats_(new Filter::Listener::ProxyProtocol::Config(config.listenerScope())) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
+  // Purge sockets that have not progressed to connections. This should only happen when
+  // a listener filter stops iteration and never resumes.
   while (!sockets_.empty()) {
     ActiveSocketPtr removed = sockets_.front()->removeFromList(sockets_);
     parent_.dispatcher_.deferredDelete(std::move(removed));
@@ -98,7 +100,7 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
   // We do not return stopped listeners.
-  auto iter = std::find_if(
+  auto listener_it = std::find_if(
       listeners_.begin(), listeners_.end(),
       [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.second->listener_ != nullptr && p.first->type() == Network::Address::Type::Ip &&
@@ -106,20 +108,20 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
       });
 
   // If there is exact address match, return the corresponding listener.
-  if (iter != listeners_.end()) {
-    return iter->second.get();
+  if (listener_it != listeners_.end()) {
+    return listener_it->second.get();
   }
 
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
-  iter = std::find_if(
+  listener_it = std::find_if(
       listeners_.begin(), listeners_.end(),
       [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.second->listener_ != nullptr && p.first->type() == Network::Address::Type::Ip &&
                p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
       });
-  return (iter != listeners_.end()) ? iter->second.get() : nullptr;
+  return (listener_it != listeners_.end()) ? listener_it->second.get() : nullptr;
 }
 
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
@@ -143,9 +145,9 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     // Successfully ran all the accept filters.
 
     // Check if the socket may need to be redirected to another listener.
-    if (!redirected_ && socket_->localAddressReset()) {
+    if (!redirected_ && socket_->localAddressRestored()) {
       // Find a listener associated with the original destination address.
-      new_listener = listener_->parent_.findActiveListenerByAddress(*socket_->localAddress());
+      new_listener = listener_.parent_.findActiveListenerByAddress(*socket_->localAddress());
     }
     if (new_listener != nullptr) {
       // Hands off connections redirecrted by iptables to the listener associated with the
@@ -153,20 +155,23 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       new_listener->onAccept(std::move(socket_), true);
     } else {
       // Create a new connection on this listener.
-      listener_->newConnection(std::move(socket_));
+      listener_.newConnection(std::move(socket_));
     }
   }
 
   // Filter execution concluded, clear state.
   iter_ = accept_filters_.end();
-  ActiveSocketPtr removed = removeFromList(listener_->sockets_);
-  listener_->parent_.dispatcher_.deferredDelete(std::move(removed));
+  // Unlink and delete this ActiveSocket if it was linked.
+  if (inserted()) {
+    ActiveSocketPtr removed = removeFromList(listener_.sockets_);
+    listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+  }
 }
 
-void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&& socket,
+void ConnectionHandlerImpl::ActiveListener::onAccept(Network::ConnectionSocketPtr&& socket,
                                                      bool redirected) {
   Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
-  ActiveSocket* active_socket(new ActiveSocket(*this, std::move(socket), redirected));
+  auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket), redirected);
 
   // Implicitly add legacy filters
   if (config_.useOriginalDst()) {
@@ -179,12 +184,16 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(Network::AcceptedSocketPtr&
 
   // Create and run the filters
   config_.filterChainFactory().createListenerFilterChain(*active_socket);
-  ActiveSocketPtr as(active_socket);
-  as->moveIntoListBack(std::move(as), sockets_);
   active_socket->continueFilterChain(true);
+
+  // Move active_socket to the sockets_ list if filter iteration needs to continue later.
+  // Otherwise we let active_socket be destructed when it goes out of scope.
+  if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+    active_socket->moveIntoListBack(std::move(active_socket), sockets_);
+  }
 }
 
-void ConnectionHandlerImpl::ActiveListener::newConnection(Network::AcceptedSocketPtr&& socket) {
+void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSocketPtr&& socket) {
   Network::ConnectionPtr new_connection =
       parent_.dispatcher_.createServerConnection(std::move(socket), config_.defaultSslContext());
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());
