@@ -11,6 +11,7 @@ set -e
 # openssl genrsa -out san_multiple_dns_key.pem 1024
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
+# openssl genrsa -out unittest_expired_key.pem 1024
 
 # Generate ca_cert.pem.
 openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
@@ -54,6 +55,10 @@ openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pe
 openssl rand 80 > ticket_key_a
 openssl rand 80 > ticket_key_b
 openssl rand 79 > ticket_key_wrong_len
+
+# Generate unittest_expired_cert.pem (will fail on Mac OS 10.13+, see README.md).
+openssl req -new -key unittest_expired_key.pem -out unittest_expired_cert.csr -config unittest_expired_cert.cfg -batch -sha256
+openssl x509 -req -days -365 -in unittest_expired_cert.csr -signkey unittest_expired_key.pem -out unittest_expired_cert.pem
 
 rm *csr
 rm *srl
