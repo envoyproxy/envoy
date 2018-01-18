@@ -59,7 +59,7 @@ static void BM_FindToken(benchmark::State& state) {
 }
 BENCHMARK(BM_FindToken);
 
-static void BM_FindTokenValue(benchmark::State& state) {
+static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   absl::string_view max_age;
   for (auto _ : state) {
@@ -72,7 +72,23 @@ static void BM_FindTokenValue(benchmark::State& state) {
     RELEASE_ASSERT(max_age == "300");
   }
 }
-BENCHMARK(BM_FindTokenValue);
+BENCHMARK(BM_FindTokenValueNestedSplit);
+
+static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
+  const absl::string_view cache_control(CacheControl, CacheControlLength);
+  absl::string_view max_age;
+  for (auto _ : state) {
+    for (absl::string_view token : Envoy::StringUtil::splitToken(cache_control, ",")) {
+      absl::string_view::size_type equals = token.find('=');
+      if (equals != absl::string_view::npos &&
+          Envoy::StringUtil::trim(token.substr(0, equals)) == "max-age") {
+        max_age = Envoy::StringUtil::trim(token.substr(equals + 1));
+      }
+    }
+    RELEASE_ASSERT(max_age == "300");
+  }
+}
+BENCHMARK(BM_FindTokenValueSearchForEqual);
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
