@@ -128,17 +128,16 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   ::free(&data);
 }
 
-void RawStatData::initialize(const std::string& name) {
+void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  ASSERT(name.size() <= maxNameLength());
-  ASSERT(std::string::npos == name.find(':'));
+  ASSERT(key.size() <= maxNameLength());
+  ASSERT(absl::string_view::npos == key.find(':'));
   ref_count_ = 1;
-  StringUtil::strlcpy(name_, name.substr(0, maxNameLength()).c_str(), nameSize());
-}
 
-bool RawStatData::matches(const std::string& name) {
-  // In case a stat got truncated, match on the truncated name.
-  return 0 == strcmp(name.substr(0, maxNameLength()).c_str(), name_);
+  // key is not necessarily nul-terminated, but we want to make sure name_ is.
+  size_t xfer_size = std::min(nameSize() - 1, key.size());
+  memcpy(name_, key.data(), xfer_size);
+  name_[xfer_size] = '\0';
 }
 
 } // namespace Stats

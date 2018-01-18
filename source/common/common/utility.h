@@ -255,4 +255,20 @@ public:
   static std::string toUpper(absl::string_view s);
 };
 
+/**
+ * Utilities for finding primes
+ */
+class Primes {
+public:
+  /**
+   * Determines whether x is prime.
+   */
+  static bool isPrime(uint32_t x);
+
+  /**
+   * Finds the next prime number larger than x.
+   */
+  static uint32_t findPrimeLargerThan(uint32_t x);
+};
+
 } // namespace Envoy
