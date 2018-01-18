@@ -1,5 +1,5 @@
 # What are the identities, certificates and keys
-There are 8 identities:
+There are 9 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
   private key.
@@ -23,10 +23,9 @@ There are 8 identities:
   is its private key.
 - **Self-signed**: The self-signed certificate *selfsigned_cert.pem*, using the
   config *selfsigned_cert.cfg*. *selfsigned_key.pem* is its private key.
-- **Unit Test Expired**: A self-signed, expired certificate *unittest_expired_cert.pem*,
-  using the config *unittest_expired_cert.cnf*. *unitest_expired_key.pem* is its private
+- **Expired**: A self-signed, expired certificate *expired_cert.pem*,
+  using the config *selfsigned_cert.cfg*. *expired_key.pem* is its private
   key.
-
 
 # How to update certificates
 **certs.sh** has the commands to generate all files except the private key
@@ -35,4 +34,6 @@ regenerated. So if you want to regenerate a particular file, please copy the
 corresponding commands from certs.sh and execute them in command line.
 
 Note that Mac OS is unable to generate the expired unit test cert starting
-with its switch from OpenSSL to LibreSSL in High Sierra (10.13).
+with its switch from OpenSSL to LibreSSL in High Sierra (10.13). Specifically,
+that version of the openssl command will not accept a non-positive "-days"
+parameter.
