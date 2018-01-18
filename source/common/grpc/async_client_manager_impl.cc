@@ -8,8 +8,9 @@ namespace Grpc {
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const std::string& cluster_name)
     : cm_(cm), cluster_name_(cluster_name) {
-  auto it = cm_.clusters().find(cluster_name_);
-  if (it == cm_.clusters().end()) {
+  auto clusters = cm_.clusters();
+  const auto& it = clusters.find(cluster_name_);
+  if (it == clusters.end()) {
     throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name_));
   }
   if (it->second.get().info()->addedViaApi()) {

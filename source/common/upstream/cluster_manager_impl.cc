@@ -173,6 +173,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
+  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -202,21 +203,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
       loadCluster(cluster, false);
     }
-  }
-
-  // Now setup ADS if needed, this might rely on a primary cluster.
-  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
-  if (bootstrap.dynamic_resources().has_ads_config()) {
-    ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(),
-        Config::Utility::factoryForApiConfigSource(
-            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
-            ->create(),
-        primary_dispatcher,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
-  } else {
-    ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }
 
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
@@ -268,6 +254,21 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
+
+  // Now setup ADS if needed, this might rely on a primary cluster and the
+  // thread local cluster manager.
+  if (bootstrap.dynamic_resources().has_ads_config()) {
+    ads_mux_.reset(new Config::GrpcMuxImpl(
+        bootstrap.node(),
+        Config::Utility::factoryForApiConfigSource(
+            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+            ->create(),
+        primary_dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+  } else {
+    ads_mux_.reset(new Config::NullGrpcMuxImpl());
+  }
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {

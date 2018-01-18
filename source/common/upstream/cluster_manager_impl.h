@@ -303,7 +303,7 @@ private:
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
-  Grpc::AsyncClientManagerPtr async_client_manager_{};
+  Grpc::AsyncClientManagerPtr async_client_manager_;
 };
 
 } // namespace Upstream

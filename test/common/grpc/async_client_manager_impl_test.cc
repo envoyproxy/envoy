@@ -29,7 +29,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi());
 
@@ -41,7 +41,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
   envoy::api::v2::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  EXPECT_CALL(cm_, clusters()).Times(2);
+  EXPECT_CALL(cm_, clusters());
   EXPECT_THROW_WITH_MESSAGE(async_client_manager.factoryForGrpcService(grpc_service, scope_),
                             EnvoyException, "Unknown gRPC client cluster 'foo'");
 }
@@ -54,7 +54,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(async_client_manager.factoryForGrpcService(grpc_service, scope_),
