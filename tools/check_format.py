@@ -46,7 +46,7 @@ def checkNamespace(file_path):
 def whitelistedForProtobufDeps(file_path):
   return any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST)
 
-def findPatternAndPrintError(pattern, file_path, error_message):
+def findSubstringAndPrintError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
     if pattern in text:
@@ -62,7 +62,7 @@ def checkProtobufExternalDepsBuild(file_path):
     return True
   message = ("%s has unexpected direct external dependency on protobuf, use "
     "//source/common/protobuf instead." % file_path)
-  return findPatternAndPrintError('"protobuf"', file_path, message)
+  return findSubstringAndPrintError('"protobuf"', file_path, message)
 
 
 def checkProtobufExternalDeps(file_path):
@@ -87,7 +87,7 @@ def isBuildFile(file_path):
 
 def checkFileContents(file_path):
   message = "%s has over-enthusiastic spaces:" % file_path
-  findPatternAndPrintError('.  ', file_path, message)
+  findSubstringAndPrintError('.  ', file_path, message)
 
 
 def fixFileContents(file_path):
