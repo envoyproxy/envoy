@@ -220,7 +220,7 @@ public:
     const uint32_t slot = computeSlot(key);
     uint32_t* next = nullptr;
     for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinal; cptr = next) {
-      uint32_t cell_index = *cptr;
+      const uint32_t cell_index = *cptr;
       Cell& cell = getCell(cell_index);
       if (cell.value.key() == key) {
         // Splice current cell out of slot-chain.
@@ -283,7 +283,7 @@ private:
     }
 
     // Initialize the free-cell list.
-    uint32_t last_cell = options.capacity - 1;
+    const uint32_t last_cell = options.capacity - 1;
     for (uint32_t cell_index = 0; cell_index < last_cell; ++cell_index) {
       Cell& cell = getCell(cell_index);
       cell.next_cell = cell_index + 1;

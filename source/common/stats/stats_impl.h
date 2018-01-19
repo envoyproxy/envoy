@@ -134,6 +134,7 @@ struct RawStatData {
    * Returns true if object is in use.
    */
   bool initialized() { return name_[0] != '\0'; }
+
   /**
    * Returns the name as a string_view. This is required by SharedMemoryHashSet.
    */
