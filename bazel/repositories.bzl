@@ -168,6 +168,7 @@ def _envoy_api_deps():
         "rate_limit",
         "router",
         "transcoder",
+        "ext_authz",
     ]
     for t in http_filter_bind_targets:
         native.bind(
@@ -181,6 +182,7 @@ def _envoy_api_deps():
         "redis_proxy",
         "rate_limit",
         "client_ssl_auth",
+        "ext_authz",
     ]
     for t in network_filter_bind_targets:
         native.bind(
@@ -195,6 +197,14 @@ def _envoy_api_deps():
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
     )
+    auth_bind_targets = [
+        "auth"
+    ]
+    for t in auth_bind_targets:
+        native.bind(
+            name = "envoy_api_auth_" + t,
+            actual = "@envoy_api//api/auth:" + t + "_cc",
+        )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     envoy_repository = repository_rule(

@@ -82,7 +82,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::api::v2::filter::accesslog::AccessLogCommon& common_access_log,
     const RequestInfo::RequestInfo& request_info) {
 
-  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x800,
+  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
                 "A flag has been added. Fix this code.");
 
   if (request_info.getResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -132,6 +132,13 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   if (request_info.getResponseFlag(RequestInfo::ResponseFlag::RateLimited)) {
     common_access_log.mutable_response_flags()->set_rate_limited(true);
   }
+
+  // TODO(saumoh): Uncomment once unauthorization has been added to accesslog.proto
+  //
+  // if (request_info.getResponseFlag(RequestInfo::ResponseFlag::Unauthorized)) {
+  //  common_access_log.mutable_response_flags()->set_unauthorized(true);
+  // }
+
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
