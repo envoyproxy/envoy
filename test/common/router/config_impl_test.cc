@@ -508,7 +508,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(
       ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster), runtime, cm, true),
-      EnvoyException, "Invalid regex '\\^/\\(\\+invalid)\\':");
+      EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
