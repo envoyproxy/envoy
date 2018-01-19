@@ -133,7 +133,7 @@ TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : Ta
       throw EnvoyException(fmt::format("Tag name '{}' specified twice.", tag_specifier.tag_name()));
     }
 
-    // If no tag value are found, fallback to default regex to keep backward compatibility.
+    // If no tag value is found, fallback to default regex to keep backward compatibility.
     if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
         tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
       tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
