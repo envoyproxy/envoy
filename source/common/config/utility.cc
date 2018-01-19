@@ -161,7 +161,7 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
 }
 
 Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
-  return Stats::TagProducerPtr{new Stats::TagProducerImpl(bootstrap.stats_config())};
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {
