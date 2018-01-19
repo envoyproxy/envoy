@@ -465,7 +465,6 @@ envoy_cc_test(
     ],
     data = [
         "//test/config/integration:squash_filter.json",
-        "//test/config/integration:squash_filter.yaml",
     ],
     deps = [
         ":http_integration_lib",

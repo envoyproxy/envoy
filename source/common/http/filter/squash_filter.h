@@ -28,9 +28,14 @@ public:
   const std::chrono::milliseconds& requestTimeout() { return request_timeout_; }
 
 private:
+  // Get the attachment body, and returns a JSON representations with envrionment variables
+  // interpolated.
   static std::string getAttachment(const ProtobufWkt::Struct& attachment_template);
-  static void getAttachmentFromStruct(ProtobufWkt::Struct& attachment_template);
-  static void getAttachmentFromValue(ProtobufWkt::Value& curvalue);
+  // Recursively interpolates envrionment variables inline in the struct.
+  static void updateTemplateInStruct(ProtobufWkt::Struct& attachment_template);
+  // Recursively interpolates envrionment variables inline in the value.
+  static void updateTemplateInValue(ProtobufWkt::Value& curvalue);
+  // Interpolates envrionment variables in a string, and returns the new interpolated string.
   static std::string replaceEnv(const std::string& attachment_template);
 
   std::string cluster_name_;
@@ -44,9 +49,21 @@ private:
 
 typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
 
-class SquashFilter : public StreamDecoderFilter,
-                     protected Logger::Loggable<Logger::Id::filter>,
-                     public AsyncClient::Callbacks {
+class AsyncClientCallbackShim : public AsyncClient::Callbacks {
+public:
+  AsyncClientCallbackShim(std::function<void(MessagePtr&&)>&& on_success,
+                          std::function<void(AsyncClient::FailureReason)>&& on_fail)
+      : on_success_(on_success), on_fail_(on_fail) {}
+  // Http::AsyncClient::Callbacks
+  void onSuccess(MessagePtr&& m) override { on_success_(std::forward<MessagePtr>(m)); }
+  void onFailure(AsyncClient::FailureReason f) override { on_fail_(f); }
+
+private:
+  std::function<void(MessagePtr&&)> on_success_;
+  std::function<void(AsyncClient::FailureReason)> on_fail_;
+};
+
+class SquashFilter : public StreamDecoderFilter, protected Logger::Loggable<Logger::Id::filter> {
 public:
   SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
   ~SquashFilter();
@@ -60,21 +77,30 @@ public:
   FilterTrailersStatus decodeTrailers(HeaderMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
-  // Http::AsyncClient::Callbacks
-  void onSuccess(MessagePtr&&) override;
-  void onFailure(AsyncClient::FailureReason) override;
-
 private:
+  // Current state of the squash filter:
+  // NotSquashing - Let the the request pass-through.
+  // Squashing - Hold the request while we communicate with the squash server to attach a debugger.
   enum class State {
-    Initial,
-    CreateConfig,
-    CheckAttachment,
+    NotSquashing,
+    Squashing,
   };
 
-  void retry();
+  // AsyncClient callbacks for create attachment request
+  void onCreateAttachmentSuccess(MessagePtr&&);
+  void onCreateAttachmentFailure(AsyncClient::FailureReason);
+  // AsyncClient callbacks for get attachment request
+  void onGetAttachmentSuccess(MessagePtr&&);
+  void onGetAttachmentFailure(AsyncClient::FailureReason);
+
+  // Schedules a pollForAttachment
+  void scheduleRetry();
+  // Contacts Squash server to get the latest version of a debug attachment.
   void pollForAttachment();
+  // Cleanup and continue the filter chain.
   void doneSquashing();
   void cleanup();
+  // Creates a JSON from the message body.
   Json::ObjectSharedPtr getJsonBody(MessagePtr&& m);
 
   const SquashFilterConfigSharedPtr config_;
@@ -84,6 +110,8 @@ private:
   Event::TimerPtr delay_timer_;
   Event::TimerPtr attachment_timeout_timer_;
   AsyncClient::Request* in_flight_request_;
+  AsyncClientCallbackShim createAttachmentCallback_;
+  AsyncClientCallbackShim checkAttachmentCallback_;
 
   Upstream::ClusterManager& cm_;
   StreamDecoderFilterCallbacks* decoder_callbacks_;

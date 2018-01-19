@@ -224,23 +224,28 @@ protected:
         }));
   }
 
+  void completeRequest(const std::string& status, const std::string& body) {
+    Http::MessagePtr msg(new Http::ResponseMessageImpl(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status}}}));
+    msg->body().reset(new Buffer::OwnedImpl(body));
+    popPendingCallback()->onSuccess(std::move(msg));
+  }
+
   void completeCreateRequest() {
     // return the create request
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "201"}}}));
-    msg->body().reset(new Buffer::OwnedImpl(R"EOF({"metadata":{"name":"a"}})EOF"));
-    popPendingCallback()->onSuccess(std::move(msg));
+    completeRequest("201", R"EOF({"metadata":{"name":"a"}})EOF");
   }
 
   void completeGetStatusRequest(const std::string& status) {
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-    msg->body().reset(
-        new Buffer::OwnedImpl(fmt::format(R"EOF({{"status":{{"state":"{}"}}}})EOF", status)));
-    popPendingCallback()->onSuccess(std::move(msg));
+    completeRequest("200", fmt::format(R"EOF({{"status":{{"state":"{}"}}}})EOF", status));
   }
 
   Envoy::Http::AsyncClient::Callbacks* popPendingCallback() {
+    if (0 == callbacks_.size()) {
+      // Can't use ASSERT_* as this is not a test function
+      throw std::underflow_error("empty deque");
+    }
+
     auto callbacks = callbacks_.front();
     callbacks_.pop_front();
     return callbacks;
@@ -379,9 +384,8 @@ TEST_F(SquashFilterTest, DestroyedInTheMiddle) {
   // Expect the get attachment request
   expectAsyncClientSend();
   completeCreateRequest();
-  NiceMock<Envoy::Event::MockTimer>* retry_timer;
 
-  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
   completeGetStatusRequest("attaching");
 
@@ -389,6 +393,23 @@ TEST_F(SquashFilterTest, DestroyedInTheMiddle) {
   EXPECT_CALL(*retry_timer, disableTimer());
 
   filter_->onDestroy();
+}
+
+TEST_F(SquashFilterTest, InvalidJsonForCreateAttachment) {
+  doDownstreamRequest();
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  completeRequest("201", "This is not a JSON object");
+}
+
+TEST_F(SquashFilterTest, InvalidJsonForGetAttachment) {
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
+
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  completeRequest("200", "This is not a JSON object");
 }
 
 TEST_F(SquashFilterTest, DestroyedInFlight) {

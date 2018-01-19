@@ -16,6 +16,8 @@
 namespace Envoy {
 namespace Http {
 
+using std::placeholders::_1;
+
 const std::regex SquashFilterConfig::ENV_REGEX("\\{\\{ (\\w+) \\}\\}");
 
 const std::string SquashFilter::POST_ATTACHMENT_PATH = "/api/v2/debugattachment/";
@@ -40,31 +42,27 @@ SquashFilterConfig::SquashFilterConfig(const envoy::api::v2::filter::http::Squas
 
 std::string SquashFilterConfig::getAttachment(const ProtobufWkt::Struct& attachment_template) {
   ProtobufWkt::Struct attachment_json(attachment_template);
-  getAttachmentFromStruct(attachment_json);
+  updateTemplateInStruct(attachment_json);
   return MessageUtil::getJsonStringFromMessage(attachment_json);
 }
 
-void SquashFilterConfig::getAttachmentFromStruct(ProtobufWkt::Struct& attachment_template) {
+void SquashFilterConfig::updateTemplateInStruct(ProtobufWkt::Struct& attachment_template) {
   for (auto& value_it : *attachment_template.mutable_fields()) {
     auto& curvalue = value_it.second;
-    if (curvalue.kind_case() == ProtobufWkt::Value::kStructValue) {
-      getAttachmentFromStruct(*curvalue.mutable_struct_value());
-    } else {
-      getAttachmentFromValue(curvalue);
-    }
+    updateTemplateInValue(curvalue);
   }
 }
 
-void SquashFilterConfig::getAttachmentFromValue(ProtobufWkt::Value& curvalue) {
+void SquashFilterConfig::updateTemplateInValue(ProtobufWkt::Value& curvalue) {
   switch (curvalue.kind_case()) {
   case ProtobufWkt::Value::kStructValue: {
-    getAttachmentFromStruct(*curvalue.mutable_struct_value());
+    updateTemplateInStruct(*curvalue.mutable_struct_value());
     break;
   }
   case ProtobufWkt::Value::kListValue: {
     ProtobufWkt::ListValue& values = *curvalue.mutable_list_value();
     for (int i = 0; i < values.values_size(); i++) {
-      getAttachmentFromValue(*values.mutable_values(i));
+      updateTemplateInValue(*values.mutable_values(i));
     }
     break;
   }
@@ -76,7 +74,7 @@ void SquashFilterConfig::getAttachmentFromValue(ProtobufWkt::Value& curvalue) {
   case ProtobufWkt::Value::kNullValue:
   case ProtobufWkt::Value::kBoolValue:
   case ProtobufWkt::Value::kNumberValue: {
-    // nothing here... we only need to transform strings
+    // Nothing here... we only need to transform strings
   }
   }
 }
@@ -120,17 +118,20 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
 }
 
 SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
-    : config_(config), state_(State::Initial), debugAttachmentPath_(), delay_timer_(nullptr),
-      attachment_timeout_timer_(nullptr), in_flight_request_(nullptr), cm_(cm),
-      decoder_callbacks_(nullptr) {}
+    : config_(config), state_(State::NotSquashing), debugAttachmentPath_(), delay_timer_(nullptr),
+      attachment_timeout_timer_(nullptr), in_flight_request_(nullptr),
+      createAttachmentCallback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
+                                std::bind(&SquashFilter::onCreateAttachmentFailure, this, _1)),
+      checkAttachmentCallback_(std::bind(&SquashFilter::onGetAttachmentSuccess, this, _1),
+                               std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
+      cm_(cm), decoder_callbacks_(nullptr) {}
 
 SquashFilter::~SquashFilter() {}
 
 void SquashFilter::onDestroy() { cleanup(); }
 
 FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
-
-  // check for squash header
+  // Check for squash header
   if (!headers.get(Headers::get().XSquashDebug)) {
     return FilterHeadersStatus::Continue;
   }
@@ -145,21 +146,22 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
   request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Post);
   request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
 
-  state_ = State::CreateConfig;
-  in_flight_request_ = cm_.httpAsyncClientForCluster(config_->clusterName())
-                           .send(std::move(request), *this, config_->requestTimeout());
+  state_ = State::Squashing;
+  in_flight_request_ =
+      cm_.httpAsyncClientForCluster(config_->clusterName())
+          .send(std::move(request), createAttachmentCallback_, config_->requestTimeout());
 
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(info, "Squash: can't create request for squash server");
-    state_ = State::Initial;
+    state_ = State::NotSquashing;
     return FilterHeadersStatus::Continue;
   }
 
   attachment_timeout_timer_ =
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
   attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
-  // check if the timer expired inline.
-  if (state_ == State::Initial) {
+  // Check if the timer expired inline.
+  if (state_ == State::NotSquashing) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -167,7 +169,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 }
 
 FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
-  if (state_ == State::Initial) {
+  if (state_ == State::NotSquashing) {
     return FilterDataStatus::Continue;
   } else {
     return FilterDataStatus::StopIterationAndBuffer;
@@ -175,7 +177,7 @@ FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
 }
 
 FilterTrailersStatus SquashFilter::decodeTrailers(HeaderMap&) {
-  if (state_ == State::Initial) {
+  if (state_ == State::NotSquashing) {
     return FilterTrailersStatus::Continue;
   } else {
     return FilterTrailersStatus::StopIteration;
@@ -186,97 +188,74 @@ void SquashFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
 }
 
-void SquashFilter::onSuccess(MessagePtr&& m) {
+void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
   in_flight_request_ = nullptr;
 
-  switch (state_) {
-
-  case State::Initial: {
-    // Should never happen.
-    ENVOY_LOG(info, "Squash: received send success callback when no request is in progress");
-    break;
-  }
-  case State::CreateConfig: {
-    // get the config object that was created
-    if (Utility::getResponseStatus(m->headers()) != enumToInt(Code::Created)) {
-      ENVOY_LOG(info, "Squash: can't create attachment object. status {} - not squashing",
-                m->headers().Status()->value().c_str());
-      doneSquashing();
-    } else {
-      state_ = State::CheckAttachment;
-
-      std::string debugAttachmentId;
-      try {
-        Json::ObjectSharedPtr json_config = getJsonBody(std::move(m));
-        debugAttachmentId =
-            json_config->getObject("metadata", true)->getString("name", EMPTY_STRING);
-      } catch (Json::Exception&) {
-        debugAttachmentId = EMPTY_STRING;
-      }
-
-      if (debugAttachmentId.empty()) {
-        ENVOY_LOG(info, "Squash: failed to parse debug attachment object - check server settings.");
-        doneSquashing();
-      } else {
-        debugAttachmentPath_ = POST_ATTACHMENT_PATH + debugAttachmentId;
-        pollForAttachment();
-      }
-    }
-
-    break;
-  }
-  case State::CheckAttachment: {
-
-    std::string attachmentstate;
+  // Get the config object that was created
+  if (Utility::getResponseStatus(m->headers()) != enumToInt(Code::Created)) {
+    ENVOY_LOG(info, "Squash: can't create attachment object. status {} - not squashing",
+              m->headers().Status()->value().c_str());
+    doneSquashing();
+  } else {
+    std::string debugAttachmentId;
     try {
       Json::ObjectSharedPtr json_config = getJsonBody(std::move(m));
-      attachmentstate = json_config->getObject("status", true)->getString("state", EMPTY_STRING);
+      debugAttachmentId = json_config->getObject("metadata", true)->getString("name", EMPTY_STRING);
     } catch (Json::Exception&) {
-      // no state yet.. leave it empty for the retry logic.
+      debugAttachmentId = EMPTY_STRING;
     }
 
-    bool attached = attachmentstate == ATTACHED_STATE;
-    bool error = attachmentstate == ERROR_STATE;
-    bool finalstate = attached || error;
-
-    if (finalstate) {
+    if (debugAttachmentId.empty()) {
+      ENVOY_LOG(info, "Squash: failed to parse debug attachment object - check server settings.");
       doneSquashing();
     } else {
-      retry();
+      debugAttachmentPath_ = POST_ATTACHMENT_PATH + debugAttachmentId;
+      pollForAttachment();
     }
-    break;
-  }
   }
 }
 
-void SquashFilter::onFailure(AsyncClient::FailureReason) {
+void SquashFilter::onCreateAttachmentFailure(AsyncClient::FailureReason) {
   // in_flight_request_ will be null if we are called inline of async client send()
   bool request_created = in_flight_request_ != nullptr;
   in_flight_request_ = nullptr;
-  switch (state_) {
-  case State::Initial: {
-    // Should never happen.
-    ENVOY_LOG(info, "Squash: received send failure callback when no request is in progress");
-    break;
-  }
-  case State::CreateConfig: {
-    // no retries here, as we couldnt create the attachment object.
-    if (request_created) {
-      // cleanup not needed if onFailure called inline in async client send.
-      // this means that decodeHeaders is down the stack and will return Continue.
-      doneSquashing();
-    }
-    break;
-  }
-  case State::CheckAttachment: {
-    retry();
-    break;
-  }
+
+  // No retries here, as we couldnt create the attachment object.
+  if (request_created) {
+    // Cleanup not needed if onFailure called inline in async client send, as this means that
+    // decodeHeaders is down the stack and will return Continue.
+    doneSquashing();
   }
 }
 
-void SquashFilter::retry() {
+void SquashFilter::onGetAttachmentSuccess(MessagePtr&& m) {
+  in_flight_request_ = nullptr;
 
+  std::string attachmentstate;
+  try {
+    Json::ObjectSharedPtr json_config = getJsonBody(std::move(m));
+    attachmentstate = json_config->getObject("status", true)->getString("state", EMPTY_STRING);
+  } catch (Json::Exception&) {
+    // No state yet.. leave it empty for the retry logic.
+  }
+
+  bool attached = attachmentstate == ATTACHED_STATE;
+  bool error = attachmentstate == ERROR_STATE;
+  bool finalstate = attached || error;
+
+  if (finalstate) {
+    doneSquashing();
+  } else {
+    scheduleRetry();
+  }
+}
+
+void SquashFilter::onGetAttachmentFailure(AsyncClient::FailureReason) {
+  in_flight_request_ = nullptr;
+  scheduleRetry();
+}
+
+void SquashFilter::scheduleRetry() {
   if (delay_timer_.get() == nullptr) {
     delay_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
@@ -290,9 +269,10 @@ void SquashFilter::pollForAttachment() {
   request->headers().insertPath().value().setReference(debugAttachmentPath_);
   request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
 
-  in_flight_request_ = cm_.httpAsyncClientForCluster(config_->clusterName())
-                           .send(std::move(request), *this, config_->requestTimeout());
-  // no need to check if in_flight_request_ is null as onFailure will take care of
+  in_flight_request_ =
+      cm_.httpAsyncClientForCluster(config_->clusterName())
+          .send(std::move(request), checkAttachmentCallback_, config_->requestTimeout());
+  // No need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }
 
@@ -302,7 +282,7 @@ void SquashFilter::doneSquashing() {
 }
 
 void SquashFilter::cleanup() {
-  state_ = State::Initial;
+  state_ = State::NotSquashing;
 
   if (delay_timer_) {
     delay_timer_->disableTimer();
@@ -323,7 +303,6 @@ void SquashFilter::cleanup() {
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(MessagePtr&& m) {
-
   Buffer::InstancePtr& data = m->body();
   uint64_t num_slices = data->getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
