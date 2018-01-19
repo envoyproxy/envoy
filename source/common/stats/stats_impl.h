@@ -16,6 +16,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
+#include "common/common/hash.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
@@ -120,9 +121,14 @@ struct RawStatData {
   /**
    * Initializes this object to have the specified key,
    * a refcount of 1, and all other values zero. This is required by
-   * SharedMemoryHashSet
+   * SharedMemoryHashSet.
    */
   void initialize(absl::string_view key);
+
+  /**
+   * Returns a hash of the key. This is required by SharedMemoryHashSet.
+   */
+  static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
 
   /**
    * Returns true if object is in use.

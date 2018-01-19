@@ -76,5 +76,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "shared_memory_hash_set_test",
     srcs = ["shared_memory_hash_set_test.cc"],
-    deps = ["//source/common/common:shared_memory_hash_set_lib"],
+    deps = [
+        "//source/common/common:hash_lib",
+        "//source/common/common:shared_memory_hash_set_lib",
+    ],
 )
