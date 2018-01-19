@@ -1640,17 +1640,22 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
   setupFilterChain(2, 2);
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(2);
+  Router::RouteConstSharedPtr route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  Router::RouteConstSharedPtr route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).WillOnce(Return(route1)).WillOnce(Return(route2));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        decoder_filters_[0]->callbacks_->route();
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->requestInfo().routeEntry());
         decoder_filters_[0]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        decoder_filters_[1]->callbacks_->route();
+        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->requestInfo().routeEntry());
         return FilterHeadersStatus::StopIteration;
       }));
 
