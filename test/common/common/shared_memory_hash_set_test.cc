@@ -170,7 +170,7 @@ TEST_F(SharedMemoryHashSetTest, severalKeysZeroHash) {
   hash_set1.sanityCheck();
 }
 
-TEST_F(SharedMemoryHashSetTest, sanityCheckZeroedMemory) {
+TEST_F(SharedMemoryHashSetTest, sanityCheckZeroedMemoryDeathTest) {
   setUp<TestValueZeroHash>();
   SharedMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
   memset(memory_.get(), 0, hash_set1.numBytes());
