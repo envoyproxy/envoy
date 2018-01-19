@@ -59,6 +59,48 @@ static void BM_FindToken(benchmark::State& state) {
 }
 BENCHMARK(BM_FindToken);
 
+static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
+                      absl::string_view* token) {
+  while (!str.empty()) {
+    absl::string_view::size_type pos = str.find(delim);
+    if (pos == absl::string_view::npos) {
+      *token = str.substr(0, str.size());
+      str.remove_prefix(str.size());  // clears str
+    } else {
+      *token = str.substr(0, pos);
+      str.remove_prefix(pos + 1);  // move past token and delim
+    }
+    if (stripWhitespace) {
+      *token = Envoy::StringUtil::trim(*token);
+    }
+    if (!token->empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Experimental alternative implementation of StringUtil::findToken which doesn't create
+// a temp vector, but just iterates through the string_view, tokenizing, and matching against
+// the token we want.  It appears to be about 2.5x to 3x faster on this testcase.
+static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::string_view token,
+                                      bool stripWhitespace) {
+  for (absl::string_view tok; nextToken(str, delim, stripWhitespace, &tok); ) {
+    if (tok == token) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void BM_FindTokenWithoutSplitting(benchmark::State& state) {
+  const absl::string_view cache_control(CacheControl, CacheControlLength);
+  for (auto _ : state) {
+    RELEASE_ASSERT(findTokenWithoutSplitting(cache_control, ',', "no-transform", true));
+  }
+}
+BENCHMARK(BM_FindTokenWithoutSplitting);
+
 static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   absl::string_view max_age;
@@ -75,9 +117,9 @@ static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
 BENCHMARK(BM_FindTokenValueNestedSplit);
 
 static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
-  const absl::string_view cache_control(CacheControl, CacheControlLength);
-  absl::string_view max_age;
   for (auto _ : state) {
+    const absl::string_view cache_control(CacheControl, CacheControlLength);
+    absl::string_view max_age;
     for (absl::string_view token : Envoy::StringUtil::splitToken(cache_control, ",")) {
       absl::string_view::size_type equals = token.find('=');
       if (equals != absl::string_view::npos &&
@@ -89,6 +131,21 @@ static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FindTokenValueSearchForEqual);
+
+static void BM_FindTokenValueNoSplit(benchmark::State& state) {
+  for (auto _ : state) {
+    absl::string_view cache_control(CacheControl, CacheControlLength);
+    absl::string_view max_age;
+    for (absl::string_view token; nextToken(cache_control, ',', true, &token); ) {
+      absl::string_view name;
+      if (nextToken(token, '=', true, &name) && (name == "max-age")) {
+        max_age = Envoy::StringUtil::trim(token);
+      }
+    }
+    RELEASE_ASSERT(max_age == "300");
+  }
+}
+BENCHMARK(BM_FindTokenValueNoSplit);
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
