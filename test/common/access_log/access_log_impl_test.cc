@@ -92,10 +92,6 @@ public:
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  void onRouteSelected(const Router::RouteEntry& route_entry) override {
-    route_entry_ = &route_entry;
-  }
-
   SystemTime start_time_;
   Optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
   Optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};

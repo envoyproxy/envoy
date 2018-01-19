@@ -124,7 +124,6 @@ public:
 
 TEST_F(RouterTest, RouteNotFound) {
   EXPECT_CALL(callbacks_.request_info_, setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound));
-  EXPECT_CALL(callbacks_.request_info_, onRouteSelected(_)).Times(0);
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -137,7 +136,6 @@ TEST_F(RouterTest, RouteNotFound) {
 
 TEST_F(RouterTest, ClusterNotFound) {
   EXPECT_CALL(callbacks_.request_info_, setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound));
-  EXPECT_CALL(callbacks_.request_info_, onRouteSelected(_));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -171,7 +169,6 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
         EXPECT_EQ(host_address_, host->address());
       }));
-  EXPECT_CALL(callbacks_.request_info_, onRouteSelected(_));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);

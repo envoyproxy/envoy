@@ -226,7 +226,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
-  callbacks_->requestInfo().onRouteSelected(*route_entry_);
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
   if (!cluster) {
     config_.stats_.no_cluster_.inc();

@@ -129,7 +129,7 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
 
     EXPECT_EQ(nullptr, request_info.routeEntry());
     NiceMock<Router::MockRouteEntry> route_entry;
-    request_info.onRouteSelected(route_entry);
+    request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
   }
 

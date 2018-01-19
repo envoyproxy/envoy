@@ -714,6 +714,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
             EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
             EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+            EXPECT_NE(nullptr, request_info.routeEntry());
           }));
 
   StreamDecoder* decoder = nullptr;

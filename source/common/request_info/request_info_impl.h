@@ -76,10 +76,6 @@ struct RequestInfoImpl : public RequestInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  void onRouteSelected(const Router::RouteEntry& route_entry) override {
-    route_entry_ = &route_entry;
-  }
-
   Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;

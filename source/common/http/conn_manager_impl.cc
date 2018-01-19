@@ -511,34 +511,37 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   ASSERT(!cached_route_.valid());
   cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
-
-  // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
-  // TODO if there are no filters when starting a filter iteration, the connection manager
-  // should return 404. The current returns no response if there is no router filter.
-  if ((protocol == Protocol::Http11) && cached_route_.value()) {
+  if (cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    const bool websocket_allowed = (route_entry != nullptr) && route_entry->useWebSocket();
-    const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
+    request_info_.route_entry_ = route_entry;
 
-    if (websocket_requested && websocket_allowed) {
-      ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
+    // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
+    // TODO if there are no filters when starting a filter iteration, the connection manager
+    // should return 404. The current returns no response if there is no router filter.
+    if (protocol == Protocol::Http11) {
+      const bool websocket_allowed = (route_entry != nullptr) && route_entry->useWebSocket();
+      const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-      connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-          *request_headers_, request_info_, *route_entry, *this,
-          connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
-      connection_manager_.ws_connection_->onNewConnection();
-      connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
-      connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
-      connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
-      return;
-    } else if (websocket_requested) {
-      // Do not allow WebSocket upgrades if the route does not support it.
-      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
-      encodeHeaders(nullptr, headers, true);
-      return;
+      if (websocket_requested && websocket_allowed) {
+        ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
+
+        connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
+            *request_headers_, request_info_, *route_entry, *this,
+            connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
+        connection_manager_.ws_connection_->onNewConnection();
+        connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
+        connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
+        connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
+        return;
+      } else if (websocket_requested) {
+        // Do not allow WebSocket upgrades if the route does not support it.
+        connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+        HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
+        encodeHeaders(nullptr, headers, true);
+        return;
+      }
+      // Allow non websocket requests to go through websocket enabled routes.
     }
-    // Allow non websocket requests to go through websocket enabled routes.
   }
 
   // Check if tracing is enabled at all.
