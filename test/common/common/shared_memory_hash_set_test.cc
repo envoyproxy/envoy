@@ -1,5 +1,3 @@
-#include "common/common/shared_memory_hash_set.h"
-
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -7,6 +5,7 @@
 #include <string>
 
 #include "common/common/hash.h"
+#include "common/common/shared_memory_hash_set.h"
 
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
@@ -38,16 +37,12 @@ protected:
 
   // TestValue that uses a real hash function.
   struct TestValue : public TestValueBase {
-    static uint64_t hash(absl::string_view key) {
-      return HashUtil::xxHash64(key);
-    }
+    static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
   };
-
 
   typedef SharedMemoryHashSet<TestValue>::ValueCreatedPair ValueCreatedPair;
 
-  template<class TestValueClass>
-  void setUp() {
+  template <class TestValueClass> void setUp() {
     options_.capacity = 100;
     options_.num_slots = 5;
     const uint32_t mem_size = SharedMemoryHashSet<TestValueClass>::numBytes(options_);
