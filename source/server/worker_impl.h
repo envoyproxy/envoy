@@ -41,16 +41,16 @@ public:
              Network::ConnectionHandlerPtr handler);
 
   // Server::Worker
-  void addListener(Listener& listener, AddListenerCompletion completion) override;
+  void addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) override;
   uint64_t numConnections() override;
-  void removeListener(Listener& listener, std::function<void()> completion) override;
+  void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
   void stop() override;
-  void stopListener(Listener& listener) override;
+  void stopListener(Network::ListenerConfig& listener) override;
   void stopListeners() override;
 
 private:
-  void addListenerWorker(Listener& listener);
+  void addListenerWorker(Network::ListenerConfig& listener);
   void threadRoutine(GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;

@@ -2,6 +2,7 @@
 
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/async_client.h"
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"
@@ -14,22 +15,7 @@ namespace Config {
 template <class ResourceType>
 class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
-  GrpcSubscriptionImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cm,
-                       const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : GrpcSubscriptionImpl(
-            node,
-            std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                  envoy::api::v2::DiscoveryResponse>>(
-                new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                          envoy::api::v2::DiscoveryResponse>(cm,
-                                                                             remote_cluster_name)),
-            dispatcher, service_method, stats) {}
-
-  GrpcSubscriptionImpl(const envoy::api::v2::Node& node,
-                       std::unique_ptr<Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest,
-                                                         envoy::api::v2::DiscoveryResponse>>
-                           async_client,
+  GrpcSubscriptionImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : grpc_mux_(node, std::move(async_client), dispatcher, service_method),

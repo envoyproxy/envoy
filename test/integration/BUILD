@@ -67,12 +67,6 @@ envoy_sh_test(
         "//test/config/integration:server_config_files",
         "//tools:socket_passing",
     ],
-    # Need to disable test execution sandboxing for this test, since it uses shmem.
-    # TODO(htuch): When most folks are using a Bazel with the recent
-    # https://github.com/bazelbuild/bazel/commit/8d739f2fad3fd0135b940170691b0119c5baca1e,
-    # we should be able to remove this workaround. See the various issues closed in the commit
-    # message for further details.
-    local = 1,
 )
 
 envoy_cc_test(

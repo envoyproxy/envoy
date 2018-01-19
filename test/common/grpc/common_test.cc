@@ -143,5 +143,21 @@ TEST(GrpcCommonTest, HasGrpcContentType) {
   EXPECT_FALSE(isGrpcContentType("application/grpc-web+foo"));
 }
 
+TEST(GrpcCommonTest, IsGrpcResponseHeader) {
+  Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
+  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
+  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
+
+  Http::TestHeaderMapImpl grpc_response_header{{":status", "200"},
+                                               {"content-type", "application/grpc"}};
+  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_response_header, true));
+  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_response_header, false));
+
+  Http::TestHeaderMapImpl json_response_header{{":status", "200"},
+                                               {"content-type", "application/json"}};
+  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, true));
+  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
+}
+
 } // namespace Grpc
 } // namespace Envoy

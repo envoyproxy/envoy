@@ -104,6 +104,7 @@ protected:
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
 
   void testRouterRedirect();
+  void testRouterDirectResponse();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterClusterNotFound404();

@@ -9,7 +9,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -24,6 +26,11 @@ public:
 
     message_ = factory_->createEmptyConfigProto();
     ASSERT_NE(nullptr, message_);
+
+    EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
+        .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+        }));
 
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
@@ -44,23 +51,6 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
       factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<AccessLog::HttpGrpcAccessLog*>(instance.get()));
-}
-
-// Configuration with no matching cluster.
-TEST_F(HttpGrpcAccessLogConfigTest, NoCluster) {
-  ON_CALL(context_.cluster_manager_, get("bar")).WillByDefault(Return(nullptr));
-  EXPECT_THROW_WITH_MESSAGE(
-      factory_->createAccessLogInstance(*message_, std::move(filter_), context_), EnvoyException,
-      "invalid access log cluster 'bar'. Missing or not a static cluster.");
-}
-
-// Configuration with cluster but not a static cluster.
-TEST_F(HttpGrpcAccessLogConfigTest, ClusterAddedViaApi) {
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, addedViaApi())
-      .WillByDefault(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(
-      factory_->createAccessLogInstance(*message_, std::move(filter_), context_), EnvoyException,
-      "invalid access log cluster 'bar'. Missing or not a static cluster.");
 }
 
 } // namespace Configuration

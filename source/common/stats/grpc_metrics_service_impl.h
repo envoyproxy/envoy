@@ -21,26 +21,7 @@ namespace Envoy {
 namespace Stats {
 namespace Metrics {
 
-typedef std::unique_ptr<
-    Grpc::AsyncClient<envoy::api::v2::StreamMetricsMessage, envoy::api::v2::StreamMetricsResponse>>
-    GrpcMetricsServiceClientPtr;
-
 // TODO : Move the common code to a base class so that Accesslog and Metrics Service can reuse.
-
-/**
- * Factory for creating a gRPC metrics service streaming client.
- */
-class GrpcMetricsServiceClientFactory {
-public:
-  virtual ~GrpcMetricsServiceClientFactory() {}
-
-  /**
-   * @return GrpcMetricsServiceClientPtr a new client.
-   */
-  virtual GrpcMetricsServiceClientPtr create() PURE;
-};
-
-typedef std::unique_ptr<GrpcMetricsServiceClientFactory> GrpcMetricsServiceClientFactoryPtr;
 
 /**
  * Interface for metrics streamer. The streamer deals with threading and sends
@@ -65,8 +46,8 @@ typedef std::shared_ptr<GrpcMetricsStreamer> GrpcMetricsStreamerSharedPtr;
  */
 class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
 public:
-  GrpcMetricsStreamerImpl(GrpcMetricsServiceClientFactoryPtr&& factory,
-                          ThreadLocal::SlotAllocator& tls, const LocalInfo::LocalInfo& local_info);
+  GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory, ThreadLocal::SlotAllocator& tls,
+                          const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
   void send(envoy::api::v2::StreamMetricsMessage& message) override {
@@ -79,11 +60,10 @@ private:
    * main streamer/TLS slot to be destroyed while the streamers hold onto the shared state.
    */
   struct SharedState {
-    SharedState(GrpcMetricsServiceClientFactoryPtr&& factory,
-                const LocalInfo::LocalInfo& local_info)
+    SharedState(Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info)
         : factory_(std::move(factory)), local_info_(local_info) {}
 
-    GrpcMetricsServiceClientFactoryPtr factory_;
+    Grpc::AsyncClientFactoryPtr factory_;
     const LocalInfo::LocalInfo& local_info_;
   };
 
@@ -95,10 +75,10 @@ private:
    * Per-thread stream state.
    */
   struct ThreadLocalStream
-      : public Grpc::AsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse> {
+      : public Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse> {
     ThreadLocalStream(ThreadLocalStreamer& parent) : parent_(parent) {}
 
-    // Grpc::AsyncStreamCallbacks
+    // Grpc::TypedAsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
     void onReceiveMessage(std::unique_ptr<envoy::api::v2::StreamMetricsResponse>&&) override {}
@@ -106,7 +86,7 @@ private:
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
     ThreadLocalStreamer& parent_;
-    Grpc::AsyncStream<envoy::api::v2::StreamMetricsMessage>* stream_{};
+    Grpc::AsyncStream* stream_{};
   };
 
   typedef std::shared_ptr<ThreadLocalStream> ThreadLocalStreamSharedPtr;
@@ -118,7 +98,7 @@ private:
     ThreadLocalStreamer(const SharedStateSharedPtr& shared_state);
     void send(envoy::api::v2::StreamMetricsMessage& message);
 
-    GrpcMetricsServiceClientPtr client_;
+    Grpc::AsyncClientPtr client_;
     ThreadLocalStreamSharedPtr thread_local_stream_ = nullptr;
     SharedStateSharedPtr shared_state_;
   };
