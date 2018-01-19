@@ -5,7 +5,6 @@
 #include <utility>
 
 #include "common/common/assert.h"
-#include "common/common/hash.h"
 #include "common/common/logger.h"
 
 #include "absl/strings/string_view.h"
@@ -41,6 +40,7 @@ struct SharedMemoryHashSetOptions {
  *    absl::string_view Value::key()
  *    void Value::initialize(absl::string_view key)
  *    static size_t Value::size()
+ *    static uint64_t Value::hash()
  *
  * This set may also be suitable for persisting a hash-table to long
  * term storage, but not across machine architectures, as it doesn't
@@ -139,6 +139,23 @@ public:
                 num_values, control_->size);
       ret = false;
     }
+
+    uint32_t num_free_entries = 0;
+    for (uint32_t cell_index = control_->free_cell_index; cell_index != Sentinal;
+         cell_index = getCell(cell_index).next_cell) {
+      ++num_free_entries;
+      if (num_free_entries > control_->options.capacity) {
+        // Don't infinite-loop with a corruption, but break immediately.
+        break;
+      }
+    }
+    uint32_t expected_free_entries = control_->options.capacity - control_->size;
+    if (num_free_entries != expected_free_entries) {
+      ENVOY_LOG(error, "SharedMemoryHashSet has wrong number of free entries: {}, expected {}",
+                num_free_entries, expected_free_entries);
+      ret = false;
+    }
+
     return ret;
   }
 
@@ -203,15 +220,20 @@ public:
     const uint32_t slot = computeSlot(key);
     uint32_t* next = nullptr;
     for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinal; cptr = next) {
-      Cell& cell = getCell(*cptr);
-      next = &cell.next_cell;
+      uint32_t cell_index = *cptr;
+      Cell& cell = getCell(cell_index);
       if (cell.value.key() == key) {
-        control_->free_cell_index = *cptr;
+        // Splice current cell out of slot-chain.
+        *cptr = cell.next_cell;
+
+        // Splice current cell into free-list.
+        cell.next_cell = control_->free_cell_index;
+        control_->free_cell_index = cell_index;
+
         --control_->size;
-        *cptr = *next; // Splices current cell out of slot-chain.
-        *next = control_->free_cell_index;
         return true;
       }
+      next = &cell.next_cell;
     }
     return false;
   }
@@ -249,7 +271,7 @@ private:
    * @param memory
    */
   void initialize(const SharedMemoryHashSetOptions& options) {
-    control_->hash_signature = HashUtil::xxHash64(signatureStringToHash());
+    control_->hash_signature = Value::hash(signatureStringToHash());
     control_->num_bytes = numBytes(options);
     control_->options = options;
     control_->size = 0;
@@ -261,10 +283,12 @@ private:
     }
 
     // Initialize the free-cell list.
-    for (uint32_t cell_index = 0; cell_index < options.capacity; ++cell_index) {
+    uint32_t last_cell = options.capacity - 1;
+    for (uint32_t cell_index = 0; cell_index < last_cell; ++cell_index) {
       Cell& cell = getCell(cell_index);
       cell.next_cell = cell_index + 1;
     }
+    getCell(last_cell).next_cell = Sentinal;
   }
 
   /**
@@ -278,7 +302,7 @@ private:
                 control_->num_bytes);
       return false;
     }
-    if (HashUtil::xxHash64(signatureStringToHash()) != control_->hash_signature) {
+    if (Value::hash(signatureStringToHash()) != control_->hash_signature) {
       ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
       return false;
     }
@@ -286,7 +310,7 @@ private:
   }
 
   uint32_t computeSlot(absl::string_view key) {
-    return HashUtil::xxHash64(key) % control_->options.num_slots;
+    return Value::hash(key) % control_->options.num_slots;
   }
 
   /**
