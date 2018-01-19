@@ -114,6 +114,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST);
   api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);
@@ -135,6 +136,23 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
       }));
   EXPECT_CALL(http_request_, cancel());
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+}
+
+// Confirm error when no refresh delay is set (not checked by schema).
+TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
+  envoy::api::v2::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST);
+  api_config_source->add_cluster_names("eds_cluster");
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("eds_cluster", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "refresh_delay is required for REST API configuration sources");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcSubscription) {

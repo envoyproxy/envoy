@@ -99,6 +99,10 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
 
 std::chrono::milliseconds
 Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source) {
+  if (!api_config_source.has_refresh_delay()) {
+    throw EnvoyException("refresh_delay is required for REST API configuration sources");
+  }
+
   return std::chrono::milliseconds(
       Protobuf::util::TimeUtil::DurationToMilliseconds(api_config_source.refresh_delay()));
 }
