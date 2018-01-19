@@ -63,8 +63,8 @@ private:
   void addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
                             std::unordered_set<std::string>& names);
 
-  std::vector<TagExtractorPtr> tag_extractors_{};
-  std::vector<Tag> default_tags_{};
+  std::vector<TagExtractorPtr> tag_extractors_;
+  std::vector<Tag> default_tags_;
 };
 
 /**
