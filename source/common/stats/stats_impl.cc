@@ -145,10 +145,6 @@ TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : Ta
   }
 }
 
-TagProducerImpl::TagProducerImpl() {}
-
-TagProducerImpl::~TagProducerImpl() {}
-
 std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
 
