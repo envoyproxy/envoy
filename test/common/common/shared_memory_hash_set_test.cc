@@ -1,10 +1,12 @@
+#include "common/common/shared_memory_hash_set.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <string>
 
-#include "common/common/shared_memory_hash_set.h"
+#include "common/common/hash.h"
 
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
@@ -15,7 +17,8 @@ namespace Envoy {
 // Tests SharedMemoryHashSet.
 class SharedMemoryHashSetTest : public testing::Test {
 protected:
-  struct TestValue {
+  // TestValue that doesn't define a hash.
+  struct TestValueBase {
     absl::string_view key() const { return name; }
     void initialize(absl::string_view key) {
       size_t xfer = std::min(sizeof(name) - 1, key.size());
@@ -23,18 +26,31 @@ protected:
       name[xfer] = '\0';
     }
     static size_t size() { return sizeof(TestValue); }
-    static uint64_t hash(absl::string_view /* key */) { return 0; }
 
     int64_t number;
     char name[256];
   };
 
+  // TestValue that uses an always-zero hash.
+  struct TestValueZeroHash : public TestValueBase {
+    static uint64_t hash(absl::string_view /* key */) { return 0; }
+  };
+
+  // TestValue that uses a real hash function.
+  struct TestValue : public TestValueBase {
+    static uint64_t hash(absl::string_view key) {
+      return HashUtil::xxHash64(key);
+    }
+  };
+
+
   typedef SharedMemoryHashSet<TestValue>::ValueCreatedPair ValueCreatedPair;
 
-  void SetUp() override {
+  template<class TestValueClass>
+  void setUp() {
     options_.capacity = 100;
     options_.num_slots = 5;
-    const uint32_t mem_size = SharedMemoryHashSet<TestValue>::numBytes(options_);
+    const uint32_t mem_size = SharedMemoryHashSet<TestValueClass>::numBytes(options_);
     memory_.reset(new uint8_t[mem_size]);
     memset(memory_.get(), 0, mem_size);
   }
@@ -44,6 +60,7 @@ protected:
 };
 
 TEST_F(SharedMemoryHashSetTest, initAndAttach) {
+  setUp<TestValue>();
   {
     SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());  // init
     SharedMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get()); // attach
@@ -64,6 +81,7 @@ TEST_F(SharedMemoryHashSetTest, initAndAttach) {
 }
 
 TEST_F(SharedMemoryHashSetTest, putRemove) {
+  setUp<TestValue>();
   {
     SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
     ASSERT_TRUE(hash_set1.sanityCheck());
@@ -100,6 +118,7 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
 }
 
 TEST_F(SharedMemoryHashSetTest, tooManyValues) {
+  setUp<TestValue>();
   SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
   std::vector<std::string> keys;
   for (uint32_t i = 0; i < options_.capacity + 1; ++i) {
@@ -142,8 +161,9 @@ TEST_F(SharedMemoryHashSetTest, tooManyValues) {
   ASSERT_TRUE(hash_set1.sanityCheck());
 }
 
-TEST_F(SharedMemoryHashSetTest, severalKeys) {
-  SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
+TEST_F(SharedMemoryHashSetTest, severalKeysZeroHash) {
+  setUp<TestValueZeroHash>();
+  SharedMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
   hash_set1.insert("one").first->number = 1;
   hash_set1.insert("two").first->number = 2;
   hash_set1.insert("three").first->number = 3;
