@@ -141,15 +141,15 @@ public:
     }
 
     uint32_t num_free_entries = 0;
+    uint32_t expected_free_entries = control_->options.capacity - control_->size;
     for (uint32_t cell_index = control_->free_cell_index; cell_index != Sentinal;
          cell_index = getCell(cell_index).next_cell) {
       ++num_free_entries;
-      if (num_free_entries > control_->options.capacity) {
-        // Don't infinite-loop with a corruption, but break immediately.
+      if (num_free_entries > expected_free_entries) {
+        // Don't infinite-loop with a corruption; break when we see there's a problem.
         break;
       }
     }
-    uint32_t expected_free_entries = control_->options.capacity - control_->size;
     if (num_free_entries != expected_free_entries) {
       ENVOY_LOG(error, "SharedMemoryHashSet has wrong number of free entries: {}, expected {}",
                 num_free_entries, expected_free_entries);
