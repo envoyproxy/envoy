@@ -35,9 +35,6 @@ public:
   LoadStatsReporter(const envoy::api::v2::Node& node, ClusterManager& cluster_manager,
                     Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
                     Event::Dispatcher& dispatcher);
-  LoadStatsReporter(const envoy::api::v2::Node& node, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, const std::string& remote_cluster_name,
-                    Event::Dispatcher& dispatcher);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;

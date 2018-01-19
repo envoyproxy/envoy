@@ -7,6 +7,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;
@@ -54,11 +56,33 @@ public:
 };
 
 TEST_F(HotRestartImplTest, versionString) {
-  setup();
-  EXPECT_EQ(hot_restart_->version(),
-            Envoy::Server::SharedMemory::version(options_.maxStats(),
-                                                 options_.maxObjNameLength() +
-                                                     Stats::RawStatData::maxStatSuffixLength()));
+  // Tests that the version-string will be consistent and SharedMemory::VERSION,
+  // between multiple instantiations.
+  std::string version;
+  uint64_t max_stats;
+
+  // The mocking infrastructure requires a test setup and teardown every time we
+  // want to re-instantiate HotRestartImpl.
+  {
+    setup();
+    version = hot_restart_->version();
+    EXPECT_TRUE(absl::StartsWith(version, fmt::format("{}.", SharedMemory::VERSION))) << version;
+    max_stats = options_.maxStats(); // Save this so we can double it below.
+    TearDown();
+  }
+
+  {
+    setup();
+    EXPECT_EQ(version, hot_restart_->version()) << "Version string deterministic from options";
+    TearDown();
+  }
+
+  {
+    ON_CALL(options_, maxStats()).WillByDefault(Return(2 * max_stats));
+    setup();
+    EXPECT_NE(version, hot_restart_->version()) << "Version changes when options change";
+    // TearDown is called automatically at end of test.
+  }
 }
 
 TEST_F(HotRestartImplTest, crossAlloc) {
@@ -85,6 +109,16 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_EQ(stat1, stat1_prime);
   EXPECT_EQ(stat3, stat3_prime);
   EXPECT_EQ(stat5, stat5_prime);
+}
+
+TEST_F(HotRestartImplTest, truncateKey) {
+  setup();
+
+  std::string key1(Stats::RawStatData::maxNameLength(), 'a');
+  Stats::RawStatData* stat1 = hot_restart_->alloc(key1);
+  std::string key2 = key1 + "a";
+  Stats::RawStatData* stat2 = hot_restart_->alloc(key2);
+  EXPECT_EQ(stat1, stat2);
 }
 
 TEST_F(HotRestartImplTest, allocFail) {
@@ -164,7 +198,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   };
 
   auto verify = [](TestStat& ts) {
-    EXPECT_TRUE(ts.stat_->matches(ts.name_));
+    EXPECT_EQ(ts.stat_->key(), ts.name_);
     EXPECT_EQ(ts.stat_->value_, ts.index_);
     EXPECT_EQ(ts.stat_->pending_increment_, ts.index_);
     EXPECT_EQ(ts.stat_->flags_, ts.index_);
