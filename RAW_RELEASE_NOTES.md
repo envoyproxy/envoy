@@ -38,3 +38,4 @@ final version.
 * Added `gateway-error` retry-on policy.
 * Added support for building envoy with exported symbols
   This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.
+* Added support for custom request/response headers with mixed static and dynamic values.
