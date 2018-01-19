@@ -118,3 +118,27 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "ext_authz_test",
+    srcs = ["ext_authz_test.cc"],
+    external_deps = ["envoy_filter_http_ext_authz"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
+        "//source/common/config:filter_json_lib",
+        "//source/common/ext_authz:ext_authz_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http/filter:ext_authz_includes",
+        "//source/common/http/filter:ext_authz_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/ext_authz:ext_authz_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
