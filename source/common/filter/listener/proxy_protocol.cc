@@ -25,7 +25,7 @@ namespace ProxyProtocol {
 Config::Config(Stats::Scope& scope) : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
 
 Network::FilterStatus Instance::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(info, "proxy_protocol: New connection accepted");
+  ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_.get() == nullptr);
   file_event_ =
