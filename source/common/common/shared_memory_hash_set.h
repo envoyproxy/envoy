@@ -96,14 +96,9 @@ public:
    */
   const SharedMemoryHashSetOptions& options() const { return control_->options; }
 
-  /** Examines the data structures to see if they are sane. Tries hard not to crash or hang. */
-  bool sanityCheck() {
-    bool ret = true;
-    if (control_->size > control_->options.capacity) {
-      ENVOY_LOG(error, "SharedMemoryHashSet size={} > capacity={}", control_->size,
-                control_->options.capacity);
-      return false;
-    }
+  /** Examines the data structures to see if they are sane, assert-failing on any trouble. */
+  void sanityCheck() {
+    RELEASE_ASSERT(control_->size <= control_->options.capacity);
 
     // As a sanity check, make sure there are control_->size values
     // reachable from the slots, each of which has a valid char_offset
@@ -111,34 +106,21 @@ public:
     for (uint32_t slot = 0; slot < control_->options.num_slots; ++slot) {
       uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
-        if (cell_index >= control_->options.capacity) {
-          ENVOY_LOG(error, "SharedMemoryHashSet cell index too high={}, capacity={}", cell_index,
-                    control_->options.capacity);
-          ret = false;
+        RELEASE_ASSERT(cell_index < control_->options.capacity);
+        Cell& cell = getCell(cell_index);
+        absl::string_view key = cell.value.key();
+        RELEASE_ASSERT(computeSlot(key) == slot);
+        next = cell.next_cell;
+        ++num_values;
+        // Avoid infinite loops if there is a next_cell cycle within
+        // a slot. Note that the num_values message will be emitted
+        // outside the loop.
+        if (num_values > control_->size) {
           break;
-        } else {
-          Cell& cell = getCell(cell_index);
-          absl::string_view key = cell.value.key();
-          if (computeSlot(key) != slot) {
-            ENVOY_LOG(error, "SharedMemoryHashSet hash mismatch for key={}", std::string(key));
-            ret = false;
-          }
-          next = cell.next_cell;
-          ++num_values;
-          // Avoid infinite loops if there is a next_cell cycle within
-          // a slot. Note that the num_values message will be emitted
-          // outside the loop.
-          if (num_values > control_->size) {
-            break;
-          }
         }
       }
     }
-    if (num_values != control_->size) {
-      ENVOY_LOG(error, "SharedMemoryHashSet has wrong number of live cells: {}, expected {}",
-                num_values, control_->size);
-      ret = false;
-    }
+    RELEASE_ASSERT(num_values == control_->size);
 
     uint32_t num_free_entries = 0;
     uint32_t expected_free_entries = control_->options.capacity - control_->size;
@@ -150,13 +132,7 @@ public:
         break;
       }
     }
-    if (num_free_entries != expected_free_entries) {
-      ENVOY_LOG(error, "SharedMemoryHashSet has wrong number of free entries: {}, expected {}",
-                num_free_entries, expected_free_entries);
-      ret = false;
-    }
-
-    return ret;
+    RELEASE_ASSERT(num_free_entries == expected_free_entries);
   }
 
   /**
@@ -306,7 +282,8 @@ private:
       ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
       return false;
     }
-    return sanityCheck();
+    sanityCheck();
+    return true;
   }
 
   uint32_t computeSlot(absl::string_view key) {

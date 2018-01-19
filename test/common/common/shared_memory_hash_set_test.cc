@@ -79,13 +79,13 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
   setUp<TestValue>();
   {
     SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
-    ASSERT_TRUE(hash_set1.sanityCheck());
+    hash_set1.sanityCheck();
     EXPECT_EQ(0, hash_set1.size());
     EXPECT_EQ(nullptr, hash_set1.get("no such key"));
     ValueCreatedPair vc = hash_set1.insert("good key");
     EXPECT_TRUE(vc.second);
     vc.first->number = 12345;
-    ASSERT_TRUE(hash_set1.sanityCheck());
+    hash_set1.sanityCheck();
     EXPECT_EQ(1, hash_set1.size());
     EXPECT_EQ(12345, hash_set1.get("good key")->number);
     EXPECT_EQ(nullptr, hash_set1.get("no such key"));
@@ -104,9 +104,9 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
     EXPECT_EQ(nullptr, hash_set2.get("no such key"));
     EXPECT_EQ(6789, hash_set2.get("good key")->number) << hash_set2.toString();
     EXPECT_FALSE(hash_set2.remove("no such key"));
-    ASSERT_TRUE(hash_set2.sanityCheck());
+    hash_set2.sanityCheck();
     EXPECT_TRUE(hash_set2.remove("good key"));
-    ASSERT_TRUE(hash_set2.sanityCheck());
+    hash_set2.sanityCheck();
     EXPECT_EQ(nullptr, hash_set2.get("good key"));
     EXPECT_EQ(0, hash_set2.size());
   }
@@ -125,7 +125,7 @@ TEST_F(SharedMemoryHashSetTest, tooManyValues) {
     ASSERT_NE(nullptr, value);
     value->number = i;
   }
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
   EXPECT_EQ(options_.capacity, hash_set1.size());
 
   for (uint32_t i = 0; i < options_.capacity; ++i) {
@@ -133,18 +133,18 @@ TEST_F(SharedMemoryHashSetTest, tooManyValues) {
     ASSERT_NE(nullptr, value);
     EXPECT_EQ(i, value->number);
   }
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
 
   // We can't fit one more value.
   EXPECT_EQ(nullptr, hash_set1.insert(keys[options_.capacity]).first);
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
   EXPECT_EQ(options_.capacity, hash_set1.size());
 
   // Now remove everything one by one.
   for (uint32_t i = 0; i < options_.capacity; ++i) {
     EXPECT_TRUE(hash_set1.remove(keys[i]));
   }
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
   EXPECT_EQ(0, hash_set1.size());
 
   // Now we can put in that last key we weren't able to before.
@@ -153,7 +153,7 @@ TEST_F(SharedMemoryHashSetTest, tooManyValues) {
   value->number = 314519;
   EXPECT_EQ(1, hash_set1.size());
   EXPECT_EQ(314519, hash_set1.get(keys[options_.capacity])->number);
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
 }
 
 TEST_F(SharedMemoryHashSetTest, severalKeysZeroHash) {
@@ -163,11 +163,18 @@ TEST_F(SharedMemoryHashSetTest, severalKeysZeroHash) {
   hash_set1.insert("two").first->number = 2;
   hash_set1.insert("three").first->number = 3;
   EXPECT_TRUE(hash_set1.remove("two"));
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
   hash_set1.insert("four").first->number = 4;
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
   EXPECT_FALSE(hash_set1.remove("two"));
-  ASSERT_TRUE(hash_set1.sanityCheck());
+  hash_set1.sanityCheck();
+}
+
+TEST_F(SharedMemoryHashSetTest, sanityCheckZeroedMemory) {
+  setUp<TestValueZeroHash>();
+  SharedMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
+  memset(memory_.get(), 0, hash_set1.numBytes());
+  EXPECT_DEATH(hash_set1.sanityCheck(), "");
 }
 
 } // namespace Envoy
