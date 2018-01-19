@@ -3,6 +3,7 @@
 #include "envoy/json/json_object.h"
 
 #include "api/filter/http/buffer.pb.h"
+#include "api/filter/http/ext_authz.pb.h"
 #include "api/filter/http/fault.pb.h"
 #include "api/filter/http/health_check.pb.h"
 #include "api/filter/http/lua.pb.h"
@@ -10,6 +11,7 @@
 #include "api/filter/http/router.pb.h"
 #include "api/filter/http/transcoder.pb.h"
 #include "api/filter/network/client_ssl_auth.pb.h"
+#include "api/filter/network/ext_authz.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
 #include "api/filter/network/mongo_proxy.pb.h"
 #include "api/filter/network/rate_limit.pb.h"
@@ -157,6 +159,24 @@ public:
   static void
   translateClientSslAuthFilter(const Json::Object& json_config,
                                envoy::api::v2::filter::network::ClientSSLAuth& proto_config);
+
+  /**
+   * Translate a v1 JSON TCP external Authorization filter object to v2
+   * envoy::api::v2::filter::network::ExtAuthz.
+   * @param json_config source v1 JSON Tc Authorization Filter object.
+   * @param proto_config destination v2 envoy::api::v2::filter::network::Authz
+   */
+  static void translateTcpExtAuthzFilter(const Json::Object &json_config,
+                                         envoy::api::v2::filter::network::ExtAuthz& proto_config);
+
+  /**
+   * Translate a v1 JSON HTTP external Authorization filter object to v2
+   * envoy::api::v2::filter::http::ExtAuthz.
+   * @param json_config source v1 JSON HTTP Authorization Filter object.
+   * @param proto_config destination v2 envoy::api::v2::filter::http::Authz.
+   */
+  static void translateHttpExtAuthzFilter(const Json::Object& json_config,
+                                          envoy::api::v2::filter::http::ExtAuthz& proto_config);
 };
 
 } // namespace Config

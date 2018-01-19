@@ -67,3 +67,21 @@ envoy_cc_library(
         "//source/common/request_info:request_info_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "ext_authz_lib",
+    srcs = ["ext_authz.cc"],
+    hdrs = ["ext_authz.h"],
+    external_deps = ["envoy_filter_network_ext_authz"],
+    deps = [
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/ext_authz:ext_authz_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/ext_authz:ext_authz_lib",
+    ],
+)

@@ -399,5 +399,36 @@ void FilterJson::translateClientSslAuthFilter(
                                       *proto_config.mutable_ip_white_list());
 }
 
+void FilterJson::translateTcpExtAuthzFilter(
+    const Json::Object& json_config, envoy::api::v2::filter::network::ExtAuthz& proto_config) {
+  json_config.validateSchema(Json::Schema::EXT_AUTHZ_NETWORK_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  proto_config.set_failure_mode_allow(json_config.getBoolean("failure_mode_allow", false));
+
+  const auto &json_grpc_cluster = json_config.getObject("grpc_cluster", false);
+  auto *grpc_service = proto_config.mutable_grpc_service();
+  JSON_UTIL_SET_DURATION(*json_grpc_cluster, *grpc_service, timeout);
+
+  auto *grpc_cluster = grpc_service->mutable_envoy_grpc();
+  JSON_UTIL_SET_STRING(*json_grpc_cluster, *grpc_cluster, cluster_name);
+}
+
+void FilterJson::translateHttpExtAuthzFilter(
+    const Json::Object& json_config, envoy::api::v2::filter::http::ExtAuthz& proto_config) {
+  json_config.validateSchema(Json::Schema::EXT_AUTHZ_HTTP_FILTER_SCHEMA);
+
+  proto_config.set_failure_mode_allow(json_config.getBoolean("failure_mode_allow", false));
+
+
+  const auto &json_grpc_cluster = json_config.getObject("grpc_cluster", false);
+  auto *grpc_service = proto_config.mutable_grpc_service();
+  JSON_UTIL_SET_DURATION(*json_grpc_cluster, *grpc_service, timeout);
+
+  auto *grpc_cluster = grpc_service->mutable_envoy_grpc();
+  JSON_UTIL_SET_STRING(*json_grpc_cluster, *grpc_cluster, cluster_name);
+}
+
+
 } // namespace Config
 } // namespace Envoy
