@@ -62,7 +62,7 @@ std::string Utility::sanitizeStatsName(const std::string& name) {
 }
 
 TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex)
-    : name_(name), regex_(regex) {}
+    : name_(name), regex_(RegexUtil::parseRegex(regex)) {}
 
 TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
                                                      const std::string& regex) {
