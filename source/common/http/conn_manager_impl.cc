@@ -1152,7 +1152,8 @@ Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() 
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!parent_.cached_route_.valid()) {
-    Router::RouteConstSharedPtr route = parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_);
+    Router::RouteConstSharedPtr route =
+        parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_);
     if (route) {
       parent_.request_info_.route_entry_ = route->routeEntry();
     }
