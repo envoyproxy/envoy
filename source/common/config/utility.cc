@@ -202,5 +202,37 @@ void Utility::checkObjNameLength(const std::string& error_prefix, const std::str
   }
 }
 
+Grpc::AsyncClientFactoryPtr
+Utility::factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                                   const envoy::api::v2::ApiConfigSource& api_config_source,
+                                   Stats::Scope& scope) {
+  ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::GRPC);
+  envoy::api::v2::GrpcService grpc_service;
+  if (api_config_source.cluster_names().empty()) {
+    if (api_config_source.grpc_services().empty()) {
+      throw EnvoyException(
+          fmt::format("Missing gRPC services in envoy::api::v2::ApiConfigSource: {}",
+                      api_config_source.DebugString()));
+    }
+    // TODO(htuch): Implement multiple gRPC services.
+    if (api_config_source.grpc_services().size() != 1) {
+      throw EnvoyException(fmt::format(
+          "Only singleton gRPC service lists supported in envoy::api::v2::ApiConfigSource: {}",
+          api_config_source.DebugString()));
+    }
+    grpc_service.MergeFrom(api_config_source.grpc_services(0));
+  } else {
+    // TODO(htuch): cluster_names is deprecated, remove after 1.6.0.
+    if (api_config_source.cluster_names().size() != 1) {
+      throw EnvoyException(fmt::format(
+          "Only singleton cluster name lists supported in envoy::api::v2::ApiConfigSource: {}",
+          api_config_source.DebugString()));
+    }
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
+  }
+
+  return async_client_manager.factoryForGrpcService(grpc_service, scope);
+}
+
 } // namespace Config
 } // namespace Envoy

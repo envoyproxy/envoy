@@ -24,21 +24,6 @@ namespace Metrics {
 // TODO : Move the common code to a base class so that Accesslog and Metrics Service can reuse.
 
 /**
- * Factory for creating a gRPC metrics service streaming client.
- */
-class GrpcMetricsServiceClientFactory {
-public:
-  virtual ~GrpcMetricsServiceClientFactory() {}
-
-  /**
-   * @return GrpcMetricsServiceClientPtr a new client.
-   */
-  virtual Grpc::AsyncClientPtr create() PURE;
-};
-
-typedef std::unique_ptr<GrpcMetricsServiceClientFactory> GrpcMetricsServiceClientFactoryPtr;
-
-/**
  * Interface for metrics streamer. The streamer deals with threading and sends
  * metrics on the correct stream.
  */
@@ -61,8 +46,8 @@ typedef std::shared_ptr<GrpcMetricsStreamer> GrpcMetricsStreamerSharedPtr;
  */
 class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
 public:
-  GrpcMetricsStreamerImpl(GrpcMetricsServiceClientFactoryPtr&& factory,
-                          ThreadLocal::SlotAllocator& tls, const LocalInfo::LocalInfo& local_info);
+  GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory, ThreadLocal::SlotAllocator& tls,
+                          const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
   void send(envoy::api::v2::StreamMetricsMessage& message) override {
@@ -75,11 +60,10 @@ private:
    * main streamer/TLS slot to be destroyed while the streamers hold onto the shared state.
    */
   struct SharedState {
-    SharedState(GrpcMetricsServiceClientFactoryPtr&& factory,
-                const LocalInfo::LocalInfo& local_info)
+    SharedState(Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info)
         : factory_(std::move(factory)), local_info_(local_info) {}
 
-    GrpcMetricsServiceClientFactoryPtr factory_;
+    Grpc::AsyncClientFactoryPtr factory_;
     const LocalInfo::LocalInfo& local_info_;
   };
 

@@ -14,6 +14,7 @@
 #include "common/common/callback_impl.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -165,6 +166,7 @@ public:
   MOCK_METHOD0(shutdown, void());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
+  MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
 
@@ -173,6 +175,7 @@ public:
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   Network::Address::InstanceConstSharedPtr source_address_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
+  NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
 };
 

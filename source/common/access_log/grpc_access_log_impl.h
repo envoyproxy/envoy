@@ -4,6 +4,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
@@ -14,21 +15,6 @@ namespace Envoy {
 namespace AccessLog {
 
 // TODO(mattklein123): Stats
-
-/**
- * Factory for creating a gRPC access log streaming client.
- */
-class GrpcAccessLogClientFactory {
-public:
-  virtual ~GrpcAccessLogClientFactory() {}
-
-  /**
-   * @return GrpcAccessLogClientPtr a new client.
-   */
-  virtual Grpc::AsyncClientPtr create() PURE;
-};
-
-typedef std::unique_ptr<GrpcAccessLogClientFactory> GrpcAccessLogClientFactoryPtr;
 
 /**
  * Interface for an access log streamer. The streamer deals with threading and sends access logs
@@ -55,8 +41,7 @@ typedef std::shared_ptr<GrpcAccessLogStreamer> GrpcAccessLogStreamerSharedPtr;
  */
 class GrpcAccessLogStreamerImpl : public Singleton::Instance, public GrpcAccessLogStreamer {
 public:
-  GrpcAccessLogStreamerImpl(GrpcAccessLogClientFactoryPtr&& factory,
-                            ThreadLocal::SlotAllocator& tls,
+  GrpcAccessLogStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory, ThreadLocal::SlotAllocator& tls,
                             const LocalInfo::LocalInfo& local_info);
 
   // GrpcAccessLogStreamer
@@ -71,10 +56,10 @@ private:
    * slot to be destroyed while the streamers hold onto the shared state.
    */
   struct SharedState {
-    SharedState(GrpcAccessLogClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info)
+    SharedState(Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info)
         : factory_(std::move(factory)), local_info_(local_info) {}
 
-    GrpcAccessLogClientFactoryPtr factory_;
+    Grpc::AsyncClientFactoryPtr factory_;
     const LocalInfo::LocalInfo& local_info_;
   };
 

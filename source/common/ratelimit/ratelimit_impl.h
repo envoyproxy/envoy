@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -65,14 +66,13 @@ private:
 class GrpcFactoryImpl : public ClientFactory {
 public:
   GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
-                  Upstream::ClusterManager& cm);
+                  Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
   // RateLimit::ClientFactory
   ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) override;
 
 private:
-  const std::string cluster_name_;
-  Upstream::ClusterManager& cm_;
+  Grpc::AsyncClientFactoryPtr async_client_factory_;
 };
 
 class NullClientImpl : public Client {
