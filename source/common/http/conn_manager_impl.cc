@@ -510,12 +510,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ASSERT(request_info_.downstream_remote_address_ != nullptr);
 
   ASSERT(!cached_route_.valid());
-  cached_route_.value(snapped_route_config_->route(*request_headers_, stream_id_));
+  refreshCachedRoute();
 
   // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
-  if ((protocol == Protocol::Http11) && cached_route_.value()) {
+  if (protocol == Protocol::Http11 && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     const bool websocket_allowed = (route_entry != nullptr) && route_entry->useWebSocket();
     const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
@@ -763,6 +763,12 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(
       [this]() -> void { onDrainTimeout(); });
   drain_timer_->enableTimer(config_.drainTimeout());
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
+  Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
+  request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
+  cached_route_.value(std::move(route));
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
@@ -1149,8 +1155,7 @@ Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() 
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!parent_.cached_route_.valid()) {
-    parent_.cached_route_.value(
-        parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));
+    parent_.refreshCachedRoute();
   }
 
   return parent_.cached_route_.value();

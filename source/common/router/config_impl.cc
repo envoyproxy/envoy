@@ -246,6 +246,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  if (route.has_metadata()) {
+    metadata_ = route.metadata();
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
