@@ -136,10 +136,7 @@ private:
     ActiveSocket(ActiveListener& listener, Network::ConnectionSocketPtr&& socket, bool redirected)
         : listener_(listener), socket_(std::move(socket)), redirected_(redirected),
           iter_(accept_filters_.end()) {}
-    ~ActiveSocket() {
-      ASSERT(iter_ == accept_filters_.end());
-      accept_filters_.clear();
-    }
+    ~ActiveSocket() { accept_filters_.clear(); }
 
     // Network::ListenerFilterManager
     void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {

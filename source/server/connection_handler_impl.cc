@@ -156,9 +156,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     }
   }
 
-  // Filter execution concluded, clear state.
-  iter_ = accept_filters_.end();
-  // Unlink and delete this ActiveSocket if it was linked.
+  // Filter execution concluded, unlink and delete this ActiveSocket if it was linked.
   if (inserted()) {
     ActiveSocketPtr removed = removeFromList(listener_.sockets_);
     listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
