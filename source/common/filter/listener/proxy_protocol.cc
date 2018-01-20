@@ -65,58 +65,57 @@ void Instance::onReadWorker() {
     throw EnvoyException("failed to read proxy protocol");
   }
 
-  if (line_parts[1] == "UNKNOWN") {
-    // At this point we know it's a proxy protocol line, so we can remove it from the socket
-    // and continue.
-    // According to spec "real connection's parameters" should be used, so we should NOT
-    // reset the addresses in this case.
-    cb_->continueFilterChain(true);
-    return;
+  // If the line starts with UNKNOWN we know it's a proxy protocol line, so we can remove it from
+  // the socket and continue. According to spec "real connection's parameters" should be used, so
+  // we should NOT restore the addresses in this case.
+  if (line_parts[1] != "UNKNOWN") {
+    // If protocol not UNKNOWN, src and dst addresses have to be present.
+    if (line_parts.size() != 6) {
+      throw EnvoyException("failed to read proxy protocol");
+    }
+
+    Network::Address::IpVersion protocol_version;
+    Network::Address::InstanceConstSharedPtr remote_address;
+    Network::Address::InstanceConstSharedPtr local_address;
+
+    // TODO(gsagula): parseInternetAddressAndPort() could be modified to take two string_view
+    // arguments, so we can eliminate allocation here.
+    if (line_parts[1] == "TCP4") {
+      protocol_version = Network::Address::IpVersion::v4;
+      remote_address = Network::Utility::parseInternetAddressAndPort(
+          std::string{line_parts[2]} + ":" + std::string{line_parts[4]});
+      local_address = Network::Utility::parseInternetAddressAndPort(
+          std::string{line_parts[3]} + ":" + std::string{line_parts[5]});
+    } else if (line_parts[1] == "TCP6") {
+      protocol_version = Network::Address::IpVersion::v6;
+      remote_address = Network::Utility::parseInternetAddressAndPort(
+          "[" + std::string{line_parts[2]} + "]:" + std::string{line_parts[4]});
+      local_address = Network::Utility::parseInternetAddressAndPort(
+          "[" + std::string{line_parts[3]} + "]:" + std::string{line_parts[5]});
+    } else {
+      throw EnvoyException("failed to read proxy protocol");
+    }
+
+    // Error check the source and destination fields. Most errors are caught by the address
+    // parsing above, but a malformed IPv6 address may combine with a malformed port and parse as
+    // an IPv6 address when parsing for an IPv4 address. Remote address refers to the source
+    // address.
+    const auto remote_version = remote_address->ip()->version();
+    const auto local_version = local_address->ip()->version();
+    if (remote_version != protocol_version || local_version != protocol_version) {
+      throw EnvoyException("failed to read proxy protocol");
+    }
+    // Check that both addresses are valid unicast addresses, as required for TCP
+    if (!remote_address->ip()->isUnicastAddress() || !local_address->ip()->isUnicastAddress()) {
+      throw EnvoyException("failed to read proxy protocol");
+    }
+
+    socket.setLocalAddress(local_address);
+    socket.setRemoteAddress(remote_address);
   }
 
-  // If protocol not UNKNOWN, src and dst addresses have to be present.
-  if (line_parts.size() != 6) {
-    throw EnvoyException("failed to read proxy protocol");
-  }
-
-  Network::Address::IpVersion protocol_version;
-  Network::Address::InstanceConstSharedPtr remote_address;
-  Network::Address::InstanceConstSharedPtr local_address;
-
-  // TODO(gsagula): parseInternetAddressAndPort() could be modified to take two string_view
-  // arguments, so we can eliminate allocation here.
-  if (line_parts[1] == "TCP4") {
-    protocol_version = Network::Address::IpVersion::v4;
-    remote_address = Network::Utility::parseInternetAddressAndPort(
-        std::string{line_parts[2]} + ":" + std::string{line_parts[4]});
-    local_address = Network::Utility::parseInternetAddressAndPort(std::string{line_parts[3]} + ":" +
-                                                                  std::string{line_parts[5]});
-  } else if (line_parts[1] == "TCP6") {
-    protocol_version = Network::Address::IpVersion::v6;
-    remote_address = Network::Utility::parseInternetAddressAndPort(
-        "[" + std::string{line_parts[2]} + "]:" + std::string{line_parts[4]});
-    local_address = Network::Utility::parseInternetAddressAndPort(
-        "[" + std::string{line_parts[3]} + "]:" + std::string{line_parts[5]});
-  } else {
-    throw EnvoyException("failed to read proxy protocol");
-  }
-
-  // Error check the source and destination fields. Most errors are caught by the address
-  // parsing above, but a malformed IPv6 address may combine with a malformed port and parse as
-  // an IPv6 address when parsing for an IPv4 address. Remote address refers to the source
-  // address.
-  const auto remote_version = remote_address->ip()->version();
-  const auto local_version = local_address->ip()->version();
-  if (remote_version != protocol_version || local_version != protocol_version) {
-    throw EnvoyException("failed to read proxy protocol");
-  }
-  // Check that both addresses are valid unicast addresses, as required for TCP
-  if (!remote_address->ip()->isUnicastAddress() || !local_address->ip()->isUnicastAddress()) {
-    throw EnvoyException("failed to read proxy protocol");
-  }
-
-  socket.setLocalAddress(local_address);
-  socket.setRemoteAddress(remote_address);
+  // Release the file event so that we do not interfere with the connection read events.
+  file_event_.reset();
   cb_->continueFilterChain(true);
 }
 
