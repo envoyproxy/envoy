@@ -22,6 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -45,15 +46,6 @@ public:
                                                Network::Address::InstanceConstSharedPtr(),
                                                Network::Test::createRawBufferSocket());
     conn_->addConnectionCallbacks(connection_callbacks_);
-
-    EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](ListenerFilterManager& filter_manager) -> bool {
-          filter_manager.addAcceptFilter(
-              std::make_unique<Envoy::Filter::Listener::ProxyProtocol::Instance>(
-                  std::make_shared<Envoy::Filter::Listener::ProxyProtocol::Config>(
-                      listenerScope())));
-          return true;
-        }));
   }
 
   // Listener
@@ -66,23 +58,26 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
 
-  void connect() {
-    conn_->connect();
-    read_filter_.reset(new NiceMock<MockReadFilter>());
-    EXPECT_CALL(factory_, createNetworkFilterChain(_))
-        .WillOnce(Invoke([&](Connection& connection) -> bool {
-          server_connection_ = &connection;
-          connection.addConnectionCallbacks(server_callbacks_);
-          connection.addReadFilter(read_filter_);
+  void connect(bool read = true) {
+    EXPECT_CALL(factory_, createListenerFilterChain(_))
+        .WillOnce(Invoke([&](ListenerFilterManager& filter_manager) -> bool {
+          filter_manager.addAcceptFilter(
+              std::make_unique<Envoy::Filter::Listener::ProxyProtocol::Instance>(
+                  std::make_shared<Envoy::Filter::Listener::ProxyProtocol::Config>(
+                      listenerScope())));
           return true;
         }));
-    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-
-  void connectNoRead() {
     conn_->connect();
+    if (read) {
+      read_filter_.reset(new NiceMock<MockReadFilter>());
+      EXPECT_CALL(factory_, createNetworkFilterChain(_))
+          .WillOnce(Invoke([&](Connection& connection) -> bool {
+            server_connection_ = &connection;
+            connection.addConnectionCallbacks(server_callbacks_);
+            connection.addReadFilter(read_filter_);
+            return true;
+          }));
+    }
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -91,6 +86,19 @@ public:
   void write(const std::string& s) {
     Buffer::OwnedImpl buf(s);
     conn_->write(buf);
+  }
+
+  void expectData(std::string expected) {
+    EXPECT_CALL(*read_filter_, onNewConnection());
+    EXPECT_CALL(*read_filter_, onData(_))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
+          EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
+          buffer.drain(expected.length());
+          dispatcher_.exit();
+          return Network::FilterStatus::Continue;
+        }));
+
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
   void disconnect() {
@@ -133,17 +141,9 @@ TEST_P(ProxyProtocolTest, Basic) {
   connect();
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
 
-  EXPECT_CALL(*read_filter_, onNewConnection());
-  EXPECT_CALL(*read_filter_, onData(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
+  expectData("more data");
 
-        EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
-        buffer.drain(9);
-        return Network::FilterStatus::Continue;
-      }));
-
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
 
   disconnect();
 }
@@ -152,17 +152,9 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   connect();
   write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
 
-  EXPECT_CALL(*read_filter_, onNewConnection());
-  EXPECT_CALL(*read_filter_, onData(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
+  expectData("more data");
 
-        EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
-        buffer.drain(9);
-        return Network::FilterStatus::Continue;
-      }));
-
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
 
   disconnect();
 }
@@ -173,9 +165,13 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   write(" 254.254.2");
   write("54.254 1.2");
   write(".3.4 65535");
-  write(" 1234\r\n");
+  write(" 1234\r\n...");
 
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  // If there is no data after the PROXY line, the read filter does not receive even the
+  // onNewConnection() callback. We need this in order to run the dispatcher in blocking
+  // mode to make sure that proxy protocol processing is completed before we start testing
+  // the results. Since we must have data we might as well check that we get it.
+  expectData("...");
 
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
 
@@ -192,9 +188,9 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   write("54.254 1.2");
   write(".3.4 65535");
-  write(" 1234\r\n");
+  write(" 1234\r\n...");
 
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  expectData("...");
 
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
 
@@ -202,7 +198,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
-  connectNoRead();
+  connect(false);
 
   write("BOGUS\r");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
@@ -212,74 +208,74 @@ TEST_P(ProxyProtocolTest, MalformedProxyLine) {
 }
 
 TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
-  connectNoRead();
+  connect(false);
   write("012345678901234567890123456789012345678901234567890123456789"
         "012345678901234567890123456789012345678901234567890123456789");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, NotEnoughFields) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, UnsupportedProto) {
-  connectNoRead();
+  connect(false);
   write("PROXY UDP6 1:2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP4 230.0.0.1 10.1.1.3 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, InvalidDstAddress) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP4 10.1.1.2 0.0.0.0 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, BadPort) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, NegativePort) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 -1 1234\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, PortOutOfRange) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 1234\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, BadAddress) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP6 1::2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP4 [1:2:3::4] 1.2.3.4 1234 5678\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP4 1.2.3.4 [1:2:3: 1234 4]:5678\r\nmore data");
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, Truncated) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP4 1.2.3.4 5.6.7.8 1234 5678");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
@@ -291,7 +287,7 @@ TEST_P(ProxyProtocolTest, Truncated) {
 }
 
 TEST_P(ProxyProtocolTest, Closed) {
-  connectNoRead();
+  connect(false);
   write("PROXY TCP4 1.2.3");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
@@ -303,6 +299,9 @@ TEST_P(ProxyProtocolTest, Closed) {
 }
 
 TEST_P(ProxyProtocolTest, ClosedEmpty) {
+  // We may or may not get these, depending on the operating system timing.
+  EXPECT_CALL(factory_, createListenerFilterChain(_)).Times(AtLeast(0));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_)).Times(AtLeast(0));
   conn_->connect();
   conn_->close(ConnectionCloseType::NoFlush);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
@@ -365,6 +364,19 @@ public:
     conn_->write(buf);
   }
 
+  void expectData(std::string expected) {
+    EXPECT_CALL(*read_filter_, onNewConnection());
+    EXPECT_CALL(*read_filter_, onData(_))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
+          EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
+          buffer.drain(expected.length());
+          dispatcher_.exit();
+          return Network::FilterStatus::Continue;
+        }));
+
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
+
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
     conn_->close(ConnectionCloseType::NoFlush);
@@ -396,17 +408,11 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
   connect();
   write("PROXY TCP4 1.2.3.4 254.254.254.254 65535 1234\r\nmore data");
 
-  EXPECT_CALL(*read_filter_, onNewConnection());
-  EXPECT_CALL(*read_filter_, onData(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress()->asString(), "1.2.3.4:65535");
-        EXPECT_EQ(server_connection_->localAddress()->asString(), "254.254.254.254:1234");
+  expectData("more data");
 
-        EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
-        buffer.drain(9);
-        return Network::FilterStatus::Continue;
-      }));
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(server_connection_->remoteAddress()->asString(), "1.2.3.4:65535");
+  EXPECT_EQ(server_connection_->localAddress()->asString(), "254.254.254.254:1234");
+
   disconnect();
 }
 
@@ -414,18 +420,11 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   connect();
   write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
 
-  EXPECT_CALL(*read_filter_, onNewConnection());
-  EXPECT_CALL(*read_filter_, onData(_))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
-        EXPECT_EQ(server_connection_->remoteAddress()->asString(), "[1:2:3::4]:65535");
-        EXPECT_EQ(server_connection_->localAddress()->asString(), "[5:6::7:8]:1234");
+  expectData("more data");
 
-        EXPECT_EQ(TestUtility::bufferToString(buffer), "more data");
-        buffer.drain(9);
-        return Network::FilterStatus::Continue;
-      }));
+  EXPECT_EQ(server_connection_->remoteAddress()->asString(), "[1:2:3::4]:65535");
+  EXPECT_EQ(server_connection_->localAddress()->asString(), "[5:6::7:8]:1234");
 
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   disconnect();
 }
 
