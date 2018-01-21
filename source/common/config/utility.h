@@ -230,7 +230,7 @@ public:
    */
   static std::string resourceName(const ProtobufWkt::Any& resource);
 
-  /*
+  /**
    * Create TagProducer instance. Check all tag names for conflicts to avoid
    * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.

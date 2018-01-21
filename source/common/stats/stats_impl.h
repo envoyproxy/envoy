@@ -50,7 +50,7 @@ public:
   TagProducerImpl(const envoy::api::v2::StatsConfig& config);
   TagProducerImpl() {}
 
-  /*
+  /**
    * Take a metric name and a vector then add proper tags into the vector and
    * return an extracted metric name.
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
