@@ -140,7 +140,8 @@ TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : Ta
           tag_specifier.tag_name(), tag_specifier.regex()));
 
     } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
-      default_tags_.emplace_back(Stats::Tag{tag_specifier.tag_name(), tag_specifier.fixed_value()});
+      default_tags_.emplace_back(
+          Stats::Tag{.name_ = tag_specifier.tag_name(), .value_ = tag_specifier.fixed_value()});
     }
   }
 }
