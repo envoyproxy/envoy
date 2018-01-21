@@ -11,6 +11,11 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
+
+namespace Router {
+class RouteEntry;
+} // namespace Router
+
 namespace RequestInfo {
 
 enum ResponseFlag {
@@ -158,6 +163,12 @@ public:
    * inferred from proxy proto, x-forwarded-for, etc.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
+
+  /**
+   * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
+   * will be nullptr if no route was selected.
+   */
+  virtual const Router::RouteEntry* routeEntry() const PURE;
 };
 
 } // namespace RequestInfo
