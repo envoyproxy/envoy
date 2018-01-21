@@ -10,7 +10,7 @@ routing PRs, questions, etc. to the right place.
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * APIs, xDS, gRPC, configuration, and Bazel/build.
+  * APIs, xDS, gRPC, configuration, Bazel/build, base server (startup, etc.), Python, and Bash.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
@@ -26,8 +26,8 @@ routing PRs, questions, etc. to the right place.
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (stephan@turbinelabs.io)
-  * Load balancing, upstream clusters and cluster manager, logging, and complex HTTP routing
-    (metadata, etc.).
+  * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
+    (metadata, etc.), and OSX build.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
 
@@ -42,7 +42,7 @@ This section lists a few people that are not maintainers but typically help out 
 matter expert reviews. Feel free to loop them in as needed.
 
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-  * TLS, boringssl, and core networking (listeners, connections, etc.).
+  * TLS, BoringSSL, and core networking (listeners, connections, etc.).
 * Shriram Rajagopalan ([rshriram](https://github.com/rshriram)) (shriram@us.ibm.com)
   * Istio, APIs, HTTP routing, and WebSocket.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (zlizan@google.com)
