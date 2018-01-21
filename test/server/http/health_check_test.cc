@@ -55,7 +55,7 @@ public:
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl request_headers_no_hc_;
 
-  class MockHealthCheckCluster : public NiceMock<Upstream::MockCluster> {
+  class MockHealthCheckCluster : public NiceMock<Upstream::MockThreadLocalCluster> {
   public:
     MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy) {
       info()->stats().membership_total_.set(membership_total);
@@ -126,12 +126,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
     MockHealthCheckCluster cluster_www1(100, 50);
     MockHealthCheckCluster cluster_www2(1000, 800);
-    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
-        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
-        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
     EXPECT_CALL(context_, clusterManager()).Times(1);
-    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
+    EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
         .Times(1);
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -142,12 +140,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
     MockHealthCheckCluster cluster_www1(100, 49);
     MockHealthCheckCluster cluster_www2(1000, 800);
-    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
-        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
-        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
     EXPECT_CALL(context_, clusterManager()).Times(1);
-    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
+    EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
         .Times(1);
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -158,12 +154,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 800);
-    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
-        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
-        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
     EXPECT_CALL(context_, clusterManager()).Times(1);
-    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
+    EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
         .Times(1);
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -177,12 +171,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 0);
-    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
-        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
-        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
     EXPECT_CALL(context_, clusterManager()).Times(1);
-    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
+    EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
         .Times(1);
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

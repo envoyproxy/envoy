@@ -33,4 +33,5 @@ final version.
 * Added support for route matching based on URL query string parameters.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
 * Added `/runtime` admin endpoint to read the current runtime values.
-* Extended the health check filter to support computation of the health check resopnse based on the percent of healthy servers is upstream clusters.
+* Extended the health check filter to support computation of the health check response
+  based on the percent of healthy servers is upstream clusters.
