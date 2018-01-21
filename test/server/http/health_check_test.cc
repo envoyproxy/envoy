@@ -55,28 +55,12 @@ public:
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl request_headers_no_hc_;
 
-  class MockHealthCheckCluster : public Upstream::MockCluster {
+  class MockHealthCheckCluster : public NiceMock<Upstream::MockCluster> {
   public:
-    MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy)
-        : info_(new ClusterInfo(membership_total, membership_healthy)) {}
-
-    Upstream::ClusterInfoConstSharedPtr info() const override { return info_; }
-
-    class ClusterInfo : public Upstream::MockClusterInfo {
-    public:
-      ClusterInfo(uint64_t membership_total, uint64_t membership_healthy)
-          : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {
-        stats_.membership_total_.set(membership_total);
-        stats_.membership_healthy_.set(membership_healthy);
-      }
-
-      Upstream::ClusterStats& stats() const override { return stats_; }
-
-    private:
-      mutable Upstream::ClusterStats stats_;
-    };
-
-    Upstream::ClusterInfoConstSharedPtr info_;
+    MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy) {
+      info()->stats().membership_total_.set(membership_total);
+      info()->stats().membership_healthy_.set(membership_healthy);
+    }
   };
 };
 
@@ -114,8 +98,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
-  // Test health non-pass-through health checks without upstream cluster
-  // minimum health specified.
+  // Test non-pass-through health checks without upstream cluster minimum health specified.
   prepareFilter(false);
   {
     Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
@@ -134,8 +117,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
               filter_->decodeHeaders(request_headers_, true));
   }
 
-  // Test health non-pass-through health checks with upstream cluster
-  // minimum health specified.
+  // Test non-pass-through health checks with upstream cluster minimum health specified.
   prepareFilter(false, ClusterMinHealthyPercentagesSharedPtr(
                            new ClusterMinHealthyPercentages{{"www1", 50.0}, {"www2", 75.0}}));
   {
@@ -176,6 +158,25 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 800);
+    Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
+        {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
+        {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_.cluster_manager_, clusters()).WillOnce(Return(cluster_info_map));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+        .Times(1);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+  // Test the cases where an upstream cluster is empty, or has no healthy servers, but
+  // the minimum required percent healthy is zero. The hhealth check should return a 200.
+  prepareFilter(false, ClusterMinHealthyPercentagesSharedPtr(
+                           new ClusterMinHealthyPercentages{{"www1", 0.0}, {"www2", 0.0}}));
+  {
+    Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
+    MockHealthCheckCluster cluster_www1(0, 0);
+    MockHealthCheckCluster cluster_www2(1000, 0);
     Upstream::ClusterManager::ClusterInfoMap cluster_info_map{
         {"www1", std::reference_wrapper<const Upstream::Cluster>(cluster_www1)},
         {"www2", std::reference_wrapper<const Upstream::Cluster>(cluster_www2)}};

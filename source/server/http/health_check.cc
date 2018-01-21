@@ -185,7 +185,7 @@ void HealthCheckFilter::onComplete() {
             break;
           }
         }
-        if (100.0 * stats.membership_healthy_.value() < membership_total * min_healthy_percentage) {
+        if (stats.membership_healthy_.value() < membership_total * min_healthy_percentage / 100.0) {
           final_status = Http::Code::ServiceUnavailable;
           break;
         }
