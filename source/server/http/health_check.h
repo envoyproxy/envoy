@@ -111,8 +111,8 @@ private:
   bool handling_{};
   bool health_check_request_{};
   bool pass_through_mode_{};
-  HealthCheckCacheManagerSharedPtr cache_manager_{};
+  HealthCheckCacheManagerSharedPtr cache_manager_;
   const std::string endpoint_;
-  ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages_{};
+  ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages_;
 };
 } // namespace Envoy
