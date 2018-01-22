@@ -109,8 +109,8 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
 TEST_F(SslContextImplTest, TestExpiredCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "{{ test_tmpdir }}/unittestcert_expired.pem",
-      "private_key_file": "{{ test_tmpdir }}/unittestkey_expired.pem"
+      "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_cert.pem",
+      "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_key.pem"
   }
   )EOF";
 

@@ -67,8 +67,8 @@ public:
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
-  void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractors) override {
-    tag_extractors_ = &tag_extractors;
+  void setTagProducer(TagProducerPtr&& tag_producer) override {
+    tag_producer_ = std::move(tag_producer);
   }
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
@@ -121,7 +121,7 @@ private:
   std::unordered_set<ScopeImpl*> scopes_;
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
-  const std::vector<TagExtractorPtr>* tag_extractors_{};
+  TagProducerPtr tag_producer_;
   std::atomic<bool> shutting_down_{};
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;

@@ -11,6 +11,7 @@ set -e
 # openssl genrsa -out san_multiple_dns_key.pem 1024
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
+# openssl genrsa -out expired_key.pem 1024
 
 # Generate ca_cert.pem.
 openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
@@ -49,6 +50,10 @@ openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey 
 
 # Generate selfsigned_cert.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
+
+# Generate expired_cert.pem (will fail on Mac OS 10.13+ because of negative days value).
+openssl req -new -key expired_key.pem -out expired_cert.csr -config selfsigned_cert.cfg -batch -sha256
+openssl x509 -req -days -365 -in expired_cert.csr -signkey expired_key.pem -out expired_cert.pem
 
 # Write session ticket key files
 openssl rand 80 > ticket_key_a

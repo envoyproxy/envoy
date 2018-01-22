@@ -11,6 +11,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -25,10 +27,10 @@ public:
                               Upstream::ResourcePriority priority);
   ~RetryStateImpl();
 
-  static uint32_t parseRetryOn(const std::string& config);
+  static uint32_t parseRetryOn(absl::string_view config);
 
   // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
-  static uint32_t parseRetryGrpcOn(const std::string& retry_grpc_on_header);
+  static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }

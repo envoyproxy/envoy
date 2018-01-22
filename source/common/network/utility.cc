@@ -303,14 +303,15 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #endif
 }
 
-void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>& list) {
-  std::vector<std::string> ranges = StringUtil::split(string.c_str(), ',');
-  for (const std::string& s : ranges) {
-    std::stringstream ss(s);
+void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>& list) {
+  const auto ranges = StringUtil::splitToken(string, ",");
+  for (auto s : ranges) {
+    const std::string s_string{s};
+    std::stringstream ss(s_string);
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (s.find("-") != std::string::npos) {
       char dash = 0;
       ss >> min;
       ss >> dash;
@@ -321,7 +322,7 @@ void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>
     }
 
     if (s.empty() || (min > 65535) || (max > 65535) || ss.fail() || !ss.eof()) {
-      throw EnvoyException(fmt::format("invalid port number or range '{}'", s));
+      throw EnvoyException(fmt::format("invalid port number or range '{}'", s_string));
     }
 
     list.emplace_back(PortRange(min, max));

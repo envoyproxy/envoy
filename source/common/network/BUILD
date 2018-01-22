@@ -171,7 +171,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_base"],
+    external_deps = [
+        "abseil_strings",
+        "envoy_base",
+    ],
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",

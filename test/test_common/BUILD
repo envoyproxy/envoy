@@ -69,12 +69,16 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["envoy_bootstrap"],
+    external_deps = [
+        "envoy_bootstrap",
+        "abseil_strings",
+    ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
         "//source/common/common:empty_string",
+        "//source/common/common:utility_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
