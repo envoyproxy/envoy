@@ -97,10 +97,10 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     onTrailers(std::move(headers));
     return;
   }
+  trailers_only_ = false;
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
-  trailers_only_ = false;
   decoded_frames_.clear();
   if (!decoder_.decode(data, decoded_frames_)) {
     streamError(Status::GrpcStatus::Internal);
