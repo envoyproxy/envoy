@@ -124,7 +124,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
     // because it might be actively written to while we sanityCheck it.
     std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
-                                       shmem_.stats_set_data_));
+                                        shmem_.stats_set_data_));
   }
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
