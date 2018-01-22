@@ -17,9 +17,9 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-class AsyncClientImplTest : public testing::Test {
+class EnvoyAsyncClientImplTest : public testing::Test {
 public:
-  AsyncClientImplTest()
+  EnvoyAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         grpc_client_(new AsyncClientImpl(cm_, "test_cluster")) {
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
@@ -33,7 +33,7 @@ public:
 
 // Validate that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
-TEST_F(AsyncClientImplTest, StreamHttpStartFail) {
+TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   ON_CALL(http_client_, start(_, _, false)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
@@ -43,7 +43,7 @@ TEST_F(AsyncClientImplTest, StreamHttpStartFail) {
 
 // Validate that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
-TEST_F(AsyncClientImplTest, RequestHttpStartFail) {
+TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   ON_CALL(http_client_, start(_, _, true)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, "", _));
@@ -67,7 +67,7 @@ TEST_F(AsyncClientImplTest, RequestHttpStartFail) {
 
 // Validate that a failure to sendHeaders() in the HTTP client returns
 // immediately with status INTERNAL.
-TEST_F(AsyncClientImplTest, StreamHttpSendHeadersFail) {
+TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
@@ -92,7 +92,7 @@ TEST_F(AsyncClientImplTest, StreamHttpSendHeadersFail) {
 
 // Validate that a failure to sendHeaders() in the HTTP client returns
 // immediately with status INTERNAL.
-TEST_F(AsyncClientImplTest, RequestHttpSendHeadersFail) {
+TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;

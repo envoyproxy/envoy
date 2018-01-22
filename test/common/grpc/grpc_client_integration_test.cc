@@ -235,7 +235,7 @@ public:
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::make_unique<Network::RawBufferSocket>());
-    EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef("fake_cluster"));
+    EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
     EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
     Upstream::MockHost::MockCreateConnectionData connection_data{client_connection_.release(),
@@ -250,9 +250,9 @@ public:
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         *cluster_info_ptr_, stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
         std::move(shadow_writer_ptr_));
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
+    EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    return std::make_unique<AsyncClientImpl>(cm_, "fake_cluster");
+    return std::make_unique<AsyncClientImpl>(cm_, fake_cluster_name_);
   }
 
   void expectInitialHeaders(FakeStream& fake_stream) {
@@ -279,7 +279,7 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "fake_cluster"));
+                setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, fake_cluster_name_));
     EXPECT_CALL(*request->child_span_,
                 setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
     EXPECT_CALL(*request->child_span_, injectContext(_));
@@ -339,6 +339,7 @@ public:
   Event::TimerPtr timeout_timer_;
 
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
+  const std::string fake_cluster_name_{"fake_cluster"};
   Upstream::MockClusterManager cm_;
   Upstream::MockClusterInfo* mock_cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
   Upstream::ClusterInfoConstSharedPtr cluster_info_ptr_{mock_cluster_info_};
@@ -505,7 +506,7 @@ TEST_P(GrpcClientIntegrationTest, MissingGrpcStatus) {
   EXPECT_CALL(*stream, onReceiveTrailingMetadata_(_)).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   stream->expectGrpcStatus(Status::GrpcStatus::Unknown);
-  const Http::TestHeaderMapImpl reply_trailers;
+  const Http::TestHeaderMapImpl reply_trailers{{"some", "other header"}};
   stream->fake_stream_->encodeTrailers(reply_trailers);
   dispatcher_helper_.runDispatcher();
 }
