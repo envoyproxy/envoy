@@ -89,8 +89,8 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(5, config_->memoryLevel());
   EXPECT_EQ(30, config_->minimumLength());
   EXPECT_EQ(28, config_->windowBits());
-  EXPECT_EQ(false, config_->disableOnEtag());
-  EXPECT_EQ(false, config_->disableOnLastModified());
+  EXPECT_EQ(false, config_->disableOnEtagHeader());
+  EXPECT_EQ(false, config_->disableOnLastModifiedHeader());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
@@ -266,7 +266,7 @@ TEST_F(GzipFilterTest, ContentTypeWithParameter) {
 
 // Last-Modified disable true.
 TEST_F(GzipFilterTest, LastModifiedDisableTrue) {
-  setUpTest(R"EOF({ "disable_on_last_modified": true })EOF");
+  setUpTest(R"EOF({ "disable_on_last_modified_header": true })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression({{":method", "get"},
                            {"content-length", "256"},
@@ -284,7 +284,7 @@ TEST_F(GzipFilterTest, LastModifiedDefault) {
 
 // Etag disable true.
 TEST_F(GzipFilterTest, EtagDisableTrue) {
-  setUpTest(R"EOF({ "disable_on_etag": true })EOF");
+  setUpTest(R"EOF({ "disable_on_etag_header": true })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
@@ -302,8 +302,12 @@ TEST_F(GzipFilterTest, EtagDefault) {
 TEST_F(GzipFilterTest, StrongEtag) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  doResponseNoCompression(
-      {{":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}});
+  TestHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}};
+  feedBuffer(256);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has("etag"));
+  EXPECT_EQ("gzip", headers.get_("content-encoding"));
 }
 
 // Transfer-Encoding chunked.

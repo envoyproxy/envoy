@@ -69,8 +69,8 @@ public:
         content_type:
           - text/html
           - application/json
-        disable_on_etag: true
-        disable_on_last_modified: true
+        disable_on_etag_header: true
+        disable_on_last_modified_header: true
     )EOF"};
 
   const std::string default_config{"name: envoy.gzip"};

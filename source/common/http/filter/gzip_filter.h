@@ -31,8 +31,8 @@ public:
   ZlibCompressionLevelEnum compressionLevel() const { return compression_level_; }
   ZlibCompressionStrategyEnum compressionStrategy() const { return compression_strategy_; }
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
-  bool disableOnEtag() const { return disable_on_etag_; }
-  bool disableOnLastModified() const { return disable_on_last_modified_; }
+  bool disableOnEtagHeader() const { return disable_on_etag_header_; }
+  bool disableOnLastModifiedHeader() const { return disable_on_last_modified_header_; }
   uint64_t memoryLevel() const { return memory_level_; }
   uint64_t minimumLength() const { return content_length_; }
   uint64_t windowBits() const { return window_bits_; }
@@ -58,8 +58,8 @@ private:
 
   std::unordered_set<std::string> content_type_values_;
 
-  bool disable_on_etag_;
-  bool disable_on_last_modified_;
+  bool disable_on_etag_header_;
+  bool disable_on_last_modified_header_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;

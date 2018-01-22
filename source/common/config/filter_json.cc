@@ -434,9 +434,9 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
                                      envoy::api::v2::filter::http::Gzip& proto_config) {
   json_config.validateSchema(Json::Schema::GZIP_HTTP_FILTER_SCHEMA);
 
-  proto_config.set_disable_on_etag(json_config.getBoolean("disable_on_etag", false));
-  proto_config.set_disable_on_last_modified(
-      json_config.getBoolean("disable_on_last_modified", false));
+  proto_config.set_disable_on_etag_header(json_config.getBoolean("disable_on_etag_header", false));
+  proto_config.set_disable_on_last_modified_header(
+      json_config.getBoolean("disable_on_last_modified_header", false));
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, content_length);
   JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);

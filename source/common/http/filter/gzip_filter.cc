@@ -43,8 +43,8 @@ GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzi
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
-      disable_on_etag_(gzip.disable_on_etag()),
-      disable_on_last_modified_(gzip.disable_on_last_modified()) {}
+      disable_on_etag_header_(gzip.disable_on_etag_header()),
+      disable_on_last_modified_header_(gzip.disable_on_last_modified_header()) {}
 
 ZlibCompressionLevelEnum
 GzipFilterConfig::compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level) {
@@ -188,27 +188,33 @@ bool GzipFilter::isCacheControlAllowed(HeaderMap& headers) const {
 bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
-    // TODO(gsagula): do this lookup without allocating a new string.
     std::string value{StringUtil::cropRight(content_type->value().c_str(), ";")};
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
   return true;
 }
 
+// TODO(gsagula): It seems that every proxy has a different opinion how handle Etag. Some
+// discussions around this topic have been going on for over a decade e.g.,
+// https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
+// This design attempts to stay more on the safe side by preserving weak etags and removing
+// the strong ones when disable_on_etag_header is false. Envoy does NOT rewrite Etags.
 bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* etag = headers.Etag();
-  if (config_->disableOnEtag()) {
+  if (config_->disableOnEtagHeader()) {
     return !etag;
   }
   if (etag) {
     absl::string_view value(etag->value().c_str());
-    return (value.length() > 2 && (value[0] == 'w' || value[0] == 'W') && value[1] == '/');
+    if (value.length() < 2 || !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+      headers.removeEtag();
+    }
   }
   return true;
 }
 
 bool GzipFilter::isLastModifiedAllowed(HeaderMap& headers) const {
-  return !(config_->disableOnLastModified() && headers.LastModified());
+  return !(config_->disableOnLastModifiedHeader() && headers.LastModified());
 }
 
 bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
