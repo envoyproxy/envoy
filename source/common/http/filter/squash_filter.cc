@@ -162,7 +162,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
   attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
   // Check if the timer expired inline.
-  if (is_squashing_ == false) {
+  if (!is_squashing_) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -170,18 +170,18 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 }
 
 FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
-  if (is_squashing_ == false) {
-    return FilterDataStatus::Continue;
-  } else {
+  if (is_squashing_) {
     return FilterDataStatus::StopIterationAndBuffer;
+  } else {
+    return FilterDataStatus::Continue;
   }
 }
 
 FilterTrailersStatus SquashFilter::decodeTrailers(HeaderMap&) {
-  if (is_squashing_ == false) {
-    return FilterTrailersStatus::Continue;
-  } else {
+  if (is_squashing_) {
     return FilterTrailersStatus::StopIteration;
+  } else {
+    return FilterTrailersStatus::Continue;
   }
 }
 
@@ -198,19 +198,20 @@ void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
               m->headers().Status()->value().c_str());
     doneSquashing();
   } else {
-    std::string debugAttachmentId;
+    std::string debug_attachment_id;
     try {
       Json::ObjectSharedPtr json_config = getJsonBody(std::move(m));
-      debugAttachmentId = json_config->getObject("metadata", true)->getString("name", EMPTY_STRING);
+      debug_attachment_id =
+          json_config->getObject("metadata", true)->getString("name", EMPTY_STRING);
     } catch (Json::Exception&) {
-      debugAttachmentId = EMPTY_STRING;
+      debug_attachment_id = EMPTY_STRING;
     }
 
-    if (debugAttachmentId.empty()) {
+    if (debug_attachment_id.empty()) {
       ENVOY_LOG(info, "Squash: failed to parse debug attachment object - check server settings.");
       doneSquashing();
     } else {
-      debug_attachment_path_ = POST_ATTACHMENT_PATH + debugAttachmentId;
+      debug_attachment_path_ = POST_ATTACHMENT_PATH + debug_attachment_id;
       pollForAttachment();
     }
   }
