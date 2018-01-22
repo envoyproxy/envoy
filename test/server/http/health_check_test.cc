@@ -103,16 +103,14 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
   {
     Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-        .Times(1);
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
   }
   {
     Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-        .Times(1);
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
   }
@@ -127,11 +125,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     MockHealthCheckCluster cluster_www1(100, 50);
     MockHealthCheckCluster cluster_www2(1000, 800);
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_, clusterManager());
     EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
     EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-        .Times(1);
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
   }
@@ -141,11 +138,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     MockHealthCheckCluster cluster_www1(100, 49);
     MockHealthCheckCluster cluster_www2(1000, 800);
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_, clusterManager());
     EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
     EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-        .Times(1);
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
   }
@@ -155,11 +151,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 800);
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_, clusterManager());
     EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
     EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-        .Times(1);
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
   }
@@ -172,11 +167,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 0);
     EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager()).Times(1);
+    EXPECT_CALL(context_, clusterManager());
     EXPECT_CALL(context_.cluster_manager_, get("www1")).WillRepeatedly(Return(&cluster_www1));
     EXPECT_CALL(context_.cluster_manager_, get("www2")).WillRepeatedly(Return(&cluster_www2));
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-        .Times(1);
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
   }
