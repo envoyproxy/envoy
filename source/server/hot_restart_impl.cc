@@ -120,7 +120,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
-    // We must hold the stat lock when attaching to an existing shared-memorh segment
+    // We must hold the stat lock when attaching to an existing shared-memory segment
     // because it might be actively written to while we sanityCheck it.
     std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
