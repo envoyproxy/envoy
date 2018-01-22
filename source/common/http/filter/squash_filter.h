@@ -78,14 +78,6 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  // Current state of the squash filter:
-  // NotSquashing - Let the the request pass-through.
-  // Squashing - Hold the request while we communicate with the squash server to attach a debugger.
-  enum class State {
-    NotSquashing,
-    Squashing,
-  };
-
   // AsyncClient callbacks for create attachment request
   void onCreateAttachmentSuccess(MessagePtr&&);
   void onCreateAttachmentFailure(AsyncClient::FailureReason);
@@ -105,20 +97,35 @@ private:
 
   const SquashFilterConfigSharedPtr config_;
 
-  State state_;
-  std::string debugAttachmentPath_;
-  Event::TimerPtr delay_timer_;
+  // Current state of the squash filter. If is_squashing_ is true, Hold the request while we
+  // communicate with the squash server to attach a debugger. If it is false, let the the request
+  // pass-through.
+  bool is_squashing_;
+  // The API path of the created debug attachment (used for polling its state).
+  std::string debug_attachment_path_;
+  // A timer for polling the state of a debug attachment until it reaches a final state.
+  Event::TimerPtr attachment_poll_period_timer_;
+  // A timeout timer - after this timer expires we abort polling the debug attachment, and continue
+  // filter iteration
   Event::TimerPtr attachment_timeout_timer_;
+  // The current inflight request to the squash server.
   AsyncClient::Request* in_flight_request_;
-  AsyncClientCallbackShim createAttachmentCallback_;
-  AsyncClientCallbackShim checkAttachmentCallback_;
+  // Shims to get AsyncClient callbacks to specific methods, per API method.
+  AsyncClientCallbackShim create_attachment_callback_;
+  AsyncClientCallbackShim check_attachment_callback_;
 
+  // ClusterManager to send requests to squash server
   Upstream::ClusterManager& cm_;
+  // Callbacks used to continue filter iteration.
   StreamDecoderFilterCallbacks* decoder_callbacks_;
 
+  // Create debug attachment URL path.
   const static std::string POST_ATTACHMENT_PATH;
+  // Authority header for squash server.
   const static std::string SERVER_AUTHORITY;
+  // The state of a debug attachment object when a debugger is successfully attached.
   const static std::string ATTACHED_STATE;
+  // The state of a debug attachment object when an error has occured.
   const static std::string ERROR_STATE;
 };
 

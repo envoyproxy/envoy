@@ -118,12 +118,13 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
 }
 
 SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
-    : config_(config), state_(State::NotSquashing), debugAttachmentPath_(), delay_timer_(nullptr),
-      attachment_timeout_timer_(nullptr), in_flight_request_(nullptr),
-      createAttachmentCallback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
-                                std::bind(&SquashFilter::onCreateAttachmentFailure, this, _1)),
-      checkAttachmentCallback_(std::bind(&SquashFilter::onGetAttachmentSuccess, this, _1),
-                               std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
+    : config_(config), is_squashing_(false), debug_attachment_path_(),
+      attachment_poll_period_timer_(nullptr), attachment_timeout_timer_(nullptr),
+      in_flight_request_(nullptr),
+      create_attachment_callback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
+                                  std::bind(&SquashFilter::onCreateAttachmentFailure, this, _1)),
+      check_attachment_callback_(std::bind(&SquashFilter::onGetAttachmentSuccess, this, _1),
+                                 std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
       cm_(cm), decoder_callbacks_(nullptr) {}
 
 SquashFilter::~SquashFilter() {}
@@ -146,14 +147,14 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
   request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Post);
   request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
 
-  state_ = State::Squashing;
+  is_squashing_ = true;
   in_flight_request_ =
       cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), createAttachmentCallback_, config_->requestTimeout());
+          .send(std::move(request), create_attachment_callback_, config_->requestTimeout());
 
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(info, "Squash: can't create request for squash server");
-    state_ = State::NotSquashing;
+    is_squashing_ = false;
     return FilterHeadersStatus::Continue;
   }
 
@@ -161,7 +162,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
   attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
   // Check if the timer expired inline.
-  if (state_ == State::NotSquashing) {
+  if (is_squashing_ == false) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -169,7 +170,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 }
 
 FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
-  if (state_ == State::NotSquashing) {
+  if (is_squashing_ == false) {
     return FilterDataStatus::Continue;
   } else {
     return FilterDataStatus::StopIterationAndBuffer;
@@ -177,7 +178,7 @@ FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
 }
 
 FilterTrailersStatus SquashFilter::decodeTrailers(HeaderMap&) {
-  if (state_ == State::NotSquashing) {
+  if (is_squashing_ == false) {
     return FilterTrailersStatus::Continue;
   } else {
     return FilterTrailersStatus::StopIteration;
@@ -209,7 +210,7 @@ void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
       ENVOY_LOG(info, "Squash: failed to parse debug attachment object - check server settings.");
       doneSquashing();
     } else {
-      debugAttachmentPath_ = POST_ATTACHMENT_PATH + debugAttachmentId;
+      debug_attachment_path_ = POST_ATTACHMENT_PATH + debugAttachmentId;
       pollForAttachment();
     }
   }
@@ -239,13 +240,11 @@ void SquashFilter::onGetAttachmentSuccess(MessagePtr&& m) {
     // No state yet.. leave it empty for the retry logic.
   }
 
-  bool attached = attachmentstate == ATTACHED_STATE;
-  bool error = attachmentstate == ERROR_STATE;
-  bool finalstate = attached || error;
-
-  if (finalstate) {
+  if (attachmentstate == ATTACHED_STATE || attachmentstate == ERROR_STATE) {
     doneSquashing();
   } else {
+    // Always schedule a retry. The attachment_timeout_timer_ will stop the retry loop when it
+    // expires.
     scheduleRetry();
   }
 }
@@ -256,22 +255,22 @@ void SquashFilter::onGetAttachmentFailure(AsyncClient::FailureReason) {
 }
 
 void SquashFilter::scheduleRetry() {
-  if (delay_timer_.get() == nullptr) {
-    delay_timer_ =
+  if (attachment_poll_period_timer_.get() == nullptr) {
+    attachment_poll_period_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
-  delay_timer_->enableTimer(config_->attachmentPollPeriod());
+  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod());
 }
 
 void SquashFilter::pollForAttachment() {
   MessagePtr request(new RequestMessageImpl());
   request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Get);
-  request->headers().insertPath().value().setReference(debugAttachmentPath_);
+  request->headers().insertPath().value().setReference(debug_attachment_path_);
   request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
 
   in_flight_request_ =
       cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), checkAttachmentCallback_, config_->requestTimeout());
+          .send(std::move(request), check_attachment_callback_, config_->requestTimeout());
   // No need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }
@@ -282,11 +281,11 @@ void SquashFilter::doneSquashing() {
 }
 
 void SquashFilter::cleanup() {
-  state_ = State::NotSquashing;
+  is_squashing_ = false;
 
-  if (delay_timer_) {
-    delay_timer_->disableTimer();
-    delay_timer_.reset();
+  if (attachment_poll_period_timer_) {
+    attachment_poll_period_timer_->disableTimer();
+    attachment_poll_period_timer_.reset();
   }
 
   if (attachment_timeout_timer_) {
@@ -299,7 +298,7 @@ void SquashFilter::cleanup() {
     in_flight_request_ = nullptr;
   }
 
-  debugAttachmentPath_ = EMPTY_STRING;
+  debug_attachment_path_ = EMPTY_STRING;
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(MessagePtr&& m) {
