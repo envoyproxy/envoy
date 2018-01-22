@@ -582,7 +582,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
-      regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
+      regex_(RegexUtil::parseRegex(route.match().regex().c_str())) {}
 
 void RegexRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
@@ -672,7 +672,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   }
 
   const std::string pattern = virtual_cluster.pattern();
-  pattern_ = std::regex{pattern, std::regex::optimize};
+  pattern_ = RegexUtil::parseRegex(pattern);
   name_ = virtual_cluster.name();
 }
 

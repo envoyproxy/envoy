@@ -476,6 +476,41 @@ TEST(RouteMatcherTest, TestRoutes) {
   }
 }
 
+TEST(RouteMatcherTest, TestRoutesWithInvalidRegex) {
+  std::string invalid_route = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: ["*"]
+    routes:
+      - match: { regex: "/(+invalid)" }
+        route: { cluster: "regex" }
+  )EOF";
+
+  std::string invalid_virtual_cluster = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "regex" }
+    virtual_clusters:
+      - pattern: "^/(+invalid)"
+        name: "invalid"
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  EXPECT_THROW_WITH_REGEX(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_route), runtime, cm, true),
+      EnvoyException, "Invalid regex '/\\(\\+invalid\\)':");
+
+  EXPECT_THROW_WITH_REGEX(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster), runtime, cm, true),
+      EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
+}
+
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   std::string json = R"EOF(
@@ -995,6 +1030,46 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   }
 }
 
+// Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
+TEST(RouteMatcherTest, InvalidHeaderMatchedRoutingConfig) {
+  std::string value_with_regex_chars = R"EOF(
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header
+              value: "(+not a regex)"
+        route: { cluster: "local_service" }
+  )EOF";
+
+  std::string invalid_regex = R"EOF(
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header
+              value: "(+invalid regex)"
+              regex: true
+        route: { cluster: "local_service" }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_NO_THROW(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(value_with_regex_chars), runtime, cm, true));
+
+  EXPECT_THROW_WITH_REGEX(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_regex), runtime, cm, true),
+      EnvoyException, "Invalid regex");
+}
+
 TEST(RouteMatcherTest, QueryParamMatchedRouting) {
   std::string json = R"EOF(
 {
@@ -1086,6 +1161,46 @@ TEST(RouteMatcherTest, QueryParamMatchedRouting) {
     EXPECT_EQ("local_service_with_multiple_query_parameters",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
+}
+
+// Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
+TEST(RouteMatcherTest, InvalidQueryParamMatchedRoutingConfig) {
+  std::string value_with_regex_chars = R"EOF(
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          query_parameters:
+            - name: test_param
+              value: "(+not a regex)"
+        route: { cluster: "local_service" }
+  )EOF";
+
+  std::string invalid_regex = R"EOF(
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          query_parameters:
+            - name: test_param
+              value: "(+invalid regex)"
+              regex: true
+        route: { cluster: "local_service" }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_NO_THROW(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(value_with_regex_chars), runtime, cm, true));
+
+  EXPECT_THROW_WITH_REGEX(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_regex), runtime, cm, true),
+      EnvoyException, "Invalid regex");
 }
 
 class RouterMatcherHashPolicyTest : public testing::Test {

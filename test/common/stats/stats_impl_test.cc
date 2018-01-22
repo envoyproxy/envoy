@@ -111,6 +111,11 @@ TEST(TagExtractorTest, EmptyName) {
                             EnvoyException, "tag_name cannot be empty");
 }
 
+TEST(TagExtractorTest, BadRegex) {
+  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("cluster_name", "+invalid"),
+                          EnvoyException, "Invalid regex '\\+invalid':");
+}
+
 class DefaultTagRegexTester {
 public:
   DefaultTagRegexTester() {
