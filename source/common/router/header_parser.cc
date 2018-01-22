@@ -1,79 +1,204 @@
 #include "common/router/header_parser.h"
 
+#include <ctype.h>
+
 #include <string>
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
-
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Router {
 
 namespace {
 
+enum class ParserState {
+  Literal,                   // processing literal data
+  VariableName,              // consuming a %VAR% name
+  ExpectArray,               // expect starting [ in %VAR([...])%
+  ExpectString,              // expect starting " in array of strings
+  String,                    // consuming an array element string
+  ExpectArrayDelimiterOrEnd, // expect array delimiter (,) or end of array (])
+  ExpectArgsEnd,             // expect closing ) in %VAR(...)%
+  ExpectVariableEnd          // expect closing % in %VAR(...)%
+};
+
+// Implements a state machine to parse custom headers. Each character of the custom header format
+// is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
+// The statement machine does minimal validation of the arguments (if any) and does not know the
+// names of valid variables. Interpretation of the variable name and arguments is delegated to
+// RequestInfoHeaderFormatter.
 HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header_value_option) {
   const std::string& format = header_value_option.header().value();
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
 
+  if (format.empty()) {
+    return HeaderFormatterPtr{new PlainHeaderFormatter(format, append)};
+  }
+
   std::vector<HeaderFormatterPtr> formatters;
 
-  const absl::string_view format_view(format);
   std::string buf;
-  buf.reserve(format_view.size());
+  buf.reserve(format.size());
 
-  size_t prev = 0;
+  size_t pos = 0;
+  ParserState state = ParserState::Literal;
   do {
-    bool flush_buf = false;
-    HeaderFormatterPtr formatter;
-    size_t pos = format_view.find("%", prev);
-    if (pos == absl::string_view::npos) {
-      // End of format.
-      absl::StrAppend(&buf, format_view.substr(prev));
-      prev = format_view.size();
-      flush_buf = true;
-    } else if (pos + 1 < format_view.size() && format_view[pos + 1] == '%') {
-      // Found "%%", copy the first % into the buffer and skip the second.
-      absl::StrAppend(&buf, format_view.substr(prev, pos + 1 - prev));
-      prev = pos + 2;
-      flush_buf = prev >= format_view.size();
-    } else {
-      // Found the start of a %variable%.
-      absl::StrAppend(&buf, format_view.substr(prev, pos - prev));
-      flush_buf = true;
+    const char ch = format[pos];
+    const bool has_next_ch = (pos + 1) < format.size();
 
-      size_t len = std::string::npos;
-      absl::string_view var_view = format_view.substr(pos);
-      formatter = RequestInfoHeaderFormatter::parse(var_view, append, len);
-      if (!formatter) {
-        if (len == std::string::npos) {
-          throw EnvoyException(fmt::format(
-              "Incorrect header configuration. Un-terminated variable expression in '{}'",
-              absl::StrCat(var_view)));
-        }
-
-        throw EnvoyException(
-            fmt::format("Incorrect header configuration. Variable '{}' is not supported",
-                        absl::StrCat(var_view.substr(0, len))));
+    switch (state) {
+    case ParserState::Literal:
+      // Searching for start of %VARIABLE% expression.
+      if (ch != '%') {
+        buf += ch;
+        break;
       }
 
-      ASSERT(len != std::string::npos);
-      prev = pos + len;
-      ASSERT(prev <= format_view.size());
-    }
+      if (!has_next_ch) {
+        throw EnvoyException(
+            fmt::format("Invalid header configuration. Un-escaped % at position {}", pos));
+      }
 
-    if (flush_buf && !buf.empty()) {
-      formatters.emplace_back(new PlainHeaderFormatter(buf, append));
-      buf.clear();
-    }
+      if (format[pos + 1] == '%') {
+        // Escaped %, append and skip next character.
+        buf += '%';
+        pos++;
+        break;
+      }
 
-    if (formatter) {
-      formatters.push_back(std::move(formatter));
-    }
-  } while (prev < format_view.size());
+      // Unescaped %: start of variable name. Create a formatter for preceding characters, if
+      // any.
+      state = ParserState::VariableName;
+      if (!buf.empty()) {
+        formatters.emplace_back(new PlainHeaderFormatter(buf, append));
+        buf.clear();
+      }
+      break;
 
-  ASSERT(buf.empty());
+    case ParserState::VariableName:
+      // Consume "VAR" from "%VAR%" or "%VAR(...)%"
+      if (ch == '%') {
+        // Found complete variable name, add formatter.
+        formatters.emplace_back(new RequestInfoHeaderFormatter(buf, append));
+        buf.clear();
+        state = ParserState::Literal;
+        break;
+      }
+
+      if (ch == '(') {
+        // Variable with arguments, search for start of arg array.
+        state = ParserState::ExpectArray;
+      }
+      buf += ch;
+      break;
+
+    case ParserState::ExpectArray:
+      // Skip over whitespace searching for the start of JSON array args.
+      if (ch == '[') {
+        // Search for first argument string
+        state = ParserState::ExpectString;
+      } else if (!isspace(ch)) {
+        throw EnvoyException(fmt::format(
+            "Invalid header configuration. Expecting JSON array of arguments after '{}', but "
+            "found '{}'",
+            buf, ch));
+      }
+      buf += ch;
+      break;
+
+    case ParserState::ExpectArrayDelimiterOrEnd:
+      // Skip over whitespace searching for a comma or close bracket.
+      if (ch == ',') {
+        state = ParserState::ExpectString;
+      } else if (ch == ']') {
+        state = ParserState::ExpectArgsEnd;
+      } else if (!isspace(ch)) {
+        throw EnvoyException(fmt::format(
+            "Invalid header configuration. Expecting ',', ']', or whitespace after '{}', but "
+            "found '{}'",
+            buf, ch));
+      }
+      buf += ch;
+      break;
+
+    case ParserState::ExpectString:
+      // Skip over whitespace looking for the starting quote of a JSON string.
+      if (ch == '"') {
+        state = ParserState::String;
+      } else if (!isspace(ch)) {
+        throw EnvoyException(fmt::format(
+            "Invalid header configuration. Expecting '\"' or whitespace after '{}', but found '{}'",
+            buf, ch));
+      }
+      buf += ch;
+      break;
+
+    case ParserState::String:
+      // Consume a JSON string (ignoring backslash-escaped chars).
+      if (ch == '\\') {
+        if (!has_next_ch) {
+          throw EnvoyException(fmt::format(
+              "Invalid header configuration. Un-terminated backslash in JSON string after '{}'",
+              buf));
+        }
+        buf += ch;
+        pos++;
+        buf += format[pos];
+        break;
+      }
+
+      if (ch == '"') {
+        state = ParserState::ExpectArrayDelimiterOrEnd;
+      }
+      buf += ch;
+      break;
+
+    case ParserState::ExpectArgsEnd:
+      // Search for the closing paren of a %VAR(...)% expression.
+      if (ch == ')') {
+        state = ParserState::ExpectVariableEnd;
+      } else if (!isspace(ch)) {
+        throw EnvoyException(fmt::format(
+            "Invalid header configuration. Expecting ')' or whitespace after '{}', but found '{}'",
+            buf, ch));
+      }
+      buf += ch;
+      break;
+
+    case ParserState::ExpectVariableEnd:
+      // Search for closing % of a %VAR(...)% expression
+      if (ch == '%') {
+        formatters.emplace_back(new RequestInfoHeaderFormatter(buf, append));
+        buf.clear();
+        state = ParserState::Literal;
+        break;
+      }
+
+      if (!isspace(ch)) {
+        throw EnvoyException(fmt::format(
+            "Invalid header configuration. Expecting '%' or whitespace after '{}', but found '{}'",
+            buf, ch));
+      }
+      buf += ch;
+      break;
+
+    default:
+      NOT_REACHED;
+    }
+  } while (++pos < format.size());
+
+  if (state != ParserState::Literal) {
+    // Parsing terminated mid-variable.
+    throw EnvoyException(
+        fmt::format("Invalid header configuration. Un-terminated variable expression '{}'", buf));
+  }
+
+  if (!buf.empty()) {
+    // Trailing constant data.
+    formatters.emplace_back(new PlainHeaderFormatter(buf, append));
+  }
+
   ASSERT(formatters.size() > 0);
 
   if (formatters.size() == 1) {

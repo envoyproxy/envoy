@@ -11,6 +11,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "api/base.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -38,20 +39,9 @@ public:
   void testFormatting(const Envoy::RequestInfo::MockRequestInfo& request_info,
                       const std::string& variable, const std::string& expected_output) {
     {
-      size_t len = 0;
-      auto f = RequestInfoHeaderFormatter::parse(variable, false, len);
-      const std::string formatted_string = f->format(request_info);
+      auto f = RequestInfoHeaderFormatter(variable, false);
+      const std::string formatted_string = f.format(request_info);
       EXPECT_EQ(expected_output, formatted_string);
-      EXPECT_EQ(variable.size(), len);
-    }
-
-    // Append additional information, which it to be ignored.
-    {
-      size_t len = 0;
-      auto f = RequestInfoHeaderFormatter::parse(variable + "%EXTRANEOUS%", false, len);
-      const std::string formatted_string = f->format(request_info);
-      EXPECT_EQ(expected_output, formatted_string);
-      EXPECT_EQ(variable.size(), len);
     }
   }
 
@@ -60,20 +50,18 @@ public:
     testFormatting(request_info, variable, expected_output);
   }
 
-  void testInvalidFormat(const std::string& variable, const size_t expected_len) {
-    size_t len = 0;
-    HeaderFormatterPtr fp = RequestInfoHeaderFormatter::parse(variable, false, len);
-    EXPECT_EQ(nullptr, fp);
-    EXPECT_EQ(expected_len, len);
+  void testInvalidFormat(const std::string& variable) {
+    EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter(variable, false), EnvoyException,
+                              fmt::format("field '{}' not supported as custom header", variable));
   }
 };
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
-  testFormatting("%CLIENT_IP%", "127.0.0.1");
+  testFormatting("CLIENT_IP", "127.0.0.1");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
-  testFormatting("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", "127.0.0.1");
+  testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -81,7 +69,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
 
-  testFormatting(request_info, "%PROTOCOL%", "HTTP/1.1");
+  testFormatting(request_info, "PROTOCOL", "HTTP/1.1");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
@@ -123,48 +111,45 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
 
   // Top-level value.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"key\"])%", "value");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "value");
 
   // Nested string value.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"str_key\"])%",
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"str_key\"])",
                  "str_value");
 
   // Boolean values.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key1\"])%",
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key1\"])",
                  "true");
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key2\"])%",
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"bool_key2\"])",
                  "false");
 
   // Number values.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key1\"])%",
-                 "1");
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key2\"])%",
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key1\"])", "1");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"num_key2\"])",
                  "3.14");
 
   // Deeply nested value.
   testFormatting(request_info,
-                 "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\", \"deep_key\"])%",
+                 "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\", \"deep_key\"])",
                  "deep_value");
 
   // Initial metadata lookup fails.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"wrong_namespace\", \"key\"])%", "");
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"not_found\"])%", "");
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"not_found\", \"key\"])%", "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"wrong_namespace\", \"key\"])", "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"not_found\"])", "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"not_found\", \"key\"])", "");
 
   // Nested metadata lookup fails.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"not_found\"])%",
-                 "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"not_found\"])", "");
 
   // Nested metadata lookup returns non-struct intermediate value.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"key\", \"invalid\"])%", "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\", \"invalid\"])", "");
 
   // Struct values are not rendered.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\"])%",
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"struct_key\"])",
                  "");
 
   // List values are not rendered.
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])%",
-                 "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
@@ -172,94 +157,69 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMis
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
-  testFormatting(request_info, "%UPSTREAM_METADATA([\"namespace\", \"key\"])%", "");
+  testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, UnknownVariable) {
-  const std::string variable = "%INVALID_VARIABLE%";
-  testInvalidFormat(variable, variable.size());
-}
-
-TEST_F(RequestInfoHeaderFormatterTest, UnterminatedVariableName) {
-  testInvalidFormat("%PROTOCOL", std::string::npos);
-}
-
-TEST_F(RequestInfoHeaderFormatterTest, UnterminatedUnknownVariableName) {
-  testInvalidFormat("%UNTERMINATED VAR", std::string::npos);
-}
-
-TEST_F(RequestInfoHeaderFormatterTest, VariableMissingLeadingPercent) {
-  testInvalidFormat("FOO", std::string::npos);
-}
-
-TEST_F(RequestInfoHeaderFormatterTest, VariableEmpty) {
-  testInvalidFormat("%", std::string::npos);
-  testInvalidFormat("%%", 2);
-}
+TEST_F(RequestInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
 
 TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
-  size_t len = 0;
-
   // Invalid JSON.
-  EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA(abcd)%", false, len), EnvoyException,
-      "Incorrect header configuration. Expected format "
-      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA(abcd)%, because JSON supplied is not valid.");
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
+                            EnvoyException,
+                            "Incorrect header configuration. Expected format "
+                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                            "UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
+                            "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA%", false, len),
-                            EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
                             "Incorrect header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA()%", false, len),
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA()", false),
                             EnvoyException,
                             "Incorrect header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA()");
+                            "UPSTREAM_METADATA(), because JSON supplied is not valid. "
+                            "Error(offset 0, line 1): The document is empty.\n");
 
   // One parameter.
-  EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA([\"ns\"])%", false, len),
-      EnvoyException,
-      "Incorrect header configuration. Expected format "
-      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA([\"ns\"])");
-
-  // Missing close paren.
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA(%", false, len),
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
                             EnvoyException,
                             "Incorrect header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA(%, because JSON supplied is not valid.");
+                            "UPSTREAM_METADATA([\"ns\"])");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA([a,b,c,d]%", false, len),
-      EnvoyException,
-      "Incorrect header configuration. Expected format "
-      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA([a,b,c,d]%, because JSON supplied is not valid.");
+  // Missing close paren.
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
+                            "Incorrect header configuration. Expected format "
+                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                            "UPSTREAM_METADATA(");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA([\"a\",\"b\"]%", false, len),
-      EnvoyException,
-      "Incorrect header configuration. Expected format "
-      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA([\"a\",\"b\"]%, because JSON supplied is not valid.");
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
+                            EnvoyException,
+                            "Incorrect header configuration. Expected format "
+                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                            "UPSTREAM_METADATA([a,b,c,d]");
+
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
+                            EnvoyException,
+                            "Incorrect header configuration. Expected format "
+                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                            "UPSTREAM_METADATA([\"a\",\"b\"]");
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA([\"a\", 1])%", false, len),
-      EnvoyException,
+      RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false), EnvoyException,
       "Incorrect header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA([\"a\", 1])%, because JSON supplied is not valid.");
+      "UPSTREAM_METADATA([\"a\", 1]), because JSON field from line 1 accessed with type 'String' "
+      "does not match actual type 'Integer'.");
 
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA([\"a\", \"\\unothex\"])%", false, len),
+      RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false),
       EnvoyException,
       "Incorrect header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -268,17 +228,11 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
-      RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA({\"a\":1})%", false, len),
-      EnvoyException,
+      RequestInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false), EnvoyException,
       "Incorrect header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA({\"a\":1})%, because JSON supplied is not valid.");
-
-  // Missing terminal %.
-  len = 0;
-  auto fp = RequestInfoHeaderFormatter::parse("%UPSTREAM_METADATA([\"a\",\"b\"])", false, len);
-  EXPECT_EQ(nullptr, fp);
-  EXPECT_EQ(std::string::npos, len);
+      "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
+      "does not match actual type 'Object'.");
 }
 
 TEST(HeaderParserTest, UnterminatedVariable) {
@@ -295,11 +249,69 @@ TEST(HeaderParserTest, UnterminatedVariable) {
     ]
   }
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(Envoy::Router::HeaderParser::configure(
-                                parseRouteFromJson(json).route().request_headers_to_add()),
-                            EnvoyException,
-                            "Incorrect header configuration. Un-terminated variable expression in "
-                            "'%CLIENT_IP'");
+  EXPECT_THROW_WITH_MESSAGE(
+      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add()),
+      EnvoyException,
+      "Invalid header configuration. Un-terminated variable expression "
+      "'CLIENT_IP'");
+}
+
+TEST(HeaderParserTest, UnterminatedVariableWithArgs) {
+  std::vector<std::pair<std::string, std::string>> test_cases({
+      {"%VAR(no array)%", "Invalid header configuration. Expecting JSON array of arguments after "
+                          "'VAR(', but found 'n'"},
+      {"%VAR( no array)%", "Invalid header configuration. Expecting JSON array of arguments after "
+                           "'VAR( ', but found 'n'"},
+      {"%VAR([)",
+       "Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ')'"},
+      {"%VAR([ )",
+       "Invalid header configuration. Expecting '\"' or whitespace after 'VAR([ ', but found ')'"},
+      {"%VAR([\"x\")%", "Invalid header configuration. Expecting ',', ']', or whitespace after "
+                        "'VAR([\"x\"', but found ')'"},
+      {"%VAR([\"x\" )%", "Invalid header configuration. Expecting ',', ']', or whitespace after "
+                         "'VAR([\"x\" ', but found ')'"},
+      {"%VAR([\"x\\",
+       "Invalid header configuration. Un-terminated backslash in JSON string after 'VAR([\"x'"},
+      {"%VAR([\"x\"]!", "Invalid header configuration. Expecting ')' or whitespace after "
+                        "'VAR([\"x\"]', but found '!'"},
+      {"%VAR([\"x\"] !", "Invalid header configuration. Expecting ')' or whitespace after "
+                         "'VAR([\"x\"] ', but found '!'"},
+      {"%VAR([\"x\"])!", "Invalid header configuration. Expecting '%' or whitespace after "
+                         "'VAR([\"x\"])', but found '!'"},
+      {"%VAR([\"x\"]) !", "Invalid header configuration. Expecting '%' or whitespace after "
+                          "'VAR([\"x\"]) ', but found '!'"},
+  });
+
+  for (const auto& test_case : test_cases) {
+    const std::string& var = test_case.first;
+    const std::string& expected_message = test_case.second;
+
+    Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption> to_add;
+    envoy::api::v2::HeaderValueOption* header = to_add.Add();
+    header->mutable_header()->set_key("x-header");
+    header->mutable_header()->set_value(var);
+
+    EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException, expected_message);
+  }
+}
+
+TEST(HeaderParserTest, BarePercent) {
+  const std::string json = R"EOF(
+  {
+    "prefix": "/new_endpoint",
+    "prefix_rewrite": "/api/new_endpoint",
+    "cluster": "www2",
+    "request_headers_to_add": [
+       {
+         "key": "x-header",
+         "value": "%"
+       }
+    ]
+  }
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(
+      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add()),
+      EnvoyException, "Invalid header configuration. Un-escaped % at position 0");
 }
 
 TEST(HeaderParserTest, UnknownVariable) {
@@ -316,11 +328,9 @@ TEST(HeaderParserTest, UnknownVariable) {
     ]
   }
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(Envoy::Router::HeaderParser::configure(
-                                parseRouteFromJson(json).route().request_headers_to_add()),
-                            EnvoyException,
-                            "Incorrect header configuration. Variable '%INVALID%' is not "
-                            "supported");
+  EXPECT_THROW_WITH_MESSAGE(
+      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add()),
+      EnvoyException, "field 'INVALID' not supported as custom header");
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {
@@ -337,8 +347,8 @@ TEST(HeaderParserTest, EvaluateHeaders) {
     ]
   }
   )EOF";
-  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
-      parseRouteFromJson(json).route().request_headers_to_add());
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   req_header_parser->evaluateHeaders(headerMap, request_info);
@@ -359,8 +369,8 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
     ]
   }
   )EOF";
-  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
-      parseRouteFromJson(json).route().request_headers_to_add());
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
@@ -386,8 +396,8 @@ TEST(HeaderParserTest, EvaluateStaticHeaders) {
     ]
   }
   )EOF";
-  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
-      parseRouteFromJson(json).route().request_headers_to_add());
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   req_header_parser->evaluateHeaders(headerMap, request_info);
@@ -427,8 +437,8 @@ route:
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
   )EOF";
 
-  HeaderParserPtr req_header_parser = Envoy::Router::HeaderParser::configure(
-      parseRouteFromV2Yaml(yaml).route().request_headers_to_add());
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV2Yaml(yaml).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
@@ -544,8 +554,8 @@ route:
 )EOF";
 
   const auto route = parseRouteFromV2Yaml(yaml).route();
-  HeaderParserPtr resp_header_parser = Envoy::Router::HeaderParser::configure(
-      route.response_headers_to_add(), route.response_headers_to_remove());
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   resp_header_parser->evaluateHeaders(headerMap, request_info);

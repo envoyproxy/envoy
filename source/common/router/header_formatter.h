@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -35,31 +36,13 @@ typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
  */
 class RequestInfoHeaderFormatter : public HeaderFormatter {
 public:
-  /*
-   * Constructs a RequestInfoHeaderFormatter. The view should contain the complete variable
-   * definition, include leading and trailing % symbols. It may include further content. If
-   * successful, a HeaderFormatterPtr is returned and the len reference is updated with the length
-   * of the variable definition, including the delimiters. Otherwise a nullptr is returned and len
-   * may be the length of the variable definition (provided the trailing % was found or std::npos).
-   *
-   * @param var an absl::string_view containing at least the variable definition.
-   * @param append controls whether the header data should be appended or not.
-   * @param len a size_t& updated to contain the length of the variable definition (or std::npos
-   *            if the definition is un-terminated).
-   * @return a HeaderFormatterPtr on success or nullptr on failure
-   */
-  static HeaderFormatterPtr parse(absl::string_view var, bool append, size_t& len);
+  RequestInfoHeaderFormatter(const std::string& field_name, bool append);
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override;
   bool append() const override { return append_; }
 
 private:
-  RequestInfoHeaderFormatter(
-      std::function<std::string(const Envoy::RequestInfo::RequestInfo&)> field_extractor,
-      bool append)
-      : field_extractor_(field_extractor), append_(append){};
-
   std::function<std::string(const Envoy::RequestInfo::RequestInfo&)> field_extractor_;
   const bool append_;
 };
