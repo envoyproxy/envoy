@@ -54,6 +54,8 @@ public:
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
+  Optional<std::string> responseBody() const override { return Optional<std::string>(); }
+  Optional<std::string> responseBodyFilename() const override { return Optional<std::string>(); }
 };
 
 class SslRedirectRoute : public Route {
@@ -334,6 +336,8 @@ public:
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return direct_response_code_.value(); }
+  Optional<std::string> responseBody() const override { return direct_response_body_; }
+  Optional<std::string> responseBodyFilename() const override { return direct_response_file_; }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -492,6 +496,8 @@ private:
 
   const DecoratorConstPtr decorator_;
   const Optional<Http::Code> direct_response_code_;
+  const Optional<std::string> direct_response_body_;
+  const Optional<std::string> direct_response_file_;
 };
 
 /**

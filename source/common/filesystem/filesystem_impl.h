@@ -4,6 +4,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstdlib>
 #include <mutex>
 #include <string>
 
@@ -40,6 +41,13 @@ bool fileExists(const std::string& path);
  * @return bool whether a directory exists on disk and can be opened for read.
  */
 bool directoryExists(const std::string& path);
+
+/**
+ * @return ssize_t the size in bytes of the specified file, or -1 if the file size
+ *                 cannot be determined for any reason, including without limitation
+ *                 the non-existence of the file.
+ */
+ssize_t fileSize(const std::string& path);
 
 /**
  * @return full file content as a string.

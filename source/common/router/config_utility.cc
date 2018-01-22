@@ -98,6 +98,33 @@ Optional<Http::Code> ConfigUtility::parseDirectResponseCode(const envoy::api::v2
   return Optional<Http::Code>();
 }
 
+Optional<std::string> ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& route) {
+  if (route.has_direct_response() && route.direct_response().has_body()) {
+    const auto& body = route.direct_response().body();
+    std::string inline_bytes = body.inline_bytes();
+    if (!inline_bytes.empty()) {
+      return inline_bytes;
+    }
+    std::string inline_string = body.inline_string();
+    if (!inline_string.empty()) {
+      return inline_string;
+    }
+  }
+  return Optional<std::string>();
+}
+
+Optional<std::string>
+ConfigUtility::parseDirectResponseFilename(const envoy::api::v2::Route& route) {
+  if (route.has_direct_response() && route.direct_response().has_body()) {
+    const auto& body = route.direct_response().body();
+    std::string filename = body.filename();
+    if (!filename.empty()) {
+      return filename;
+    }
+  }
+  return Optional<std::string>();
+}
+
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     const envoy::api::v2::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {

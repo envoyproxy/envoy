@@ -2217,7 +2217,20 @@ virtual_hosts:
     domains: [direct.example.com]
     routes:
     - match: { prefix: /gone }
-      direct_response: { status: 410 }
+      direct_response:
+        status: 410
+        body: { inline_bytes: "RXhhbXBsZSB0ZXh0IDE=" }
+    - match: { prefix: /error }
+      direct_response:
+        status: 500
+        body: { inline_string: "Example text 2" }
+    - match: { prefix: /no_body }
+      direct_response:
+        status: 200
+    - match: { prefix: /static }
+      direct_response:
+        status: 200
+        body: { filename: /etc/envoy/message }
     - match: { prefix: / }
       route: { cluster: www2 }
   )EOF";
@@ -2267,6 +2280,29 @@ virtual_hosts:
       Http::TestHeaderMapImpl headers =
           genRedirectHeaders("direct.example.com", "/gone", true, false);
       EXPECT_EQ(Http::Code::Gone, config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_EQ("Example text 1",
+                config.route(headers, 0)->directResponseEntry()->responseBody().value());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("direct.example.com", "/error", true, false);
+      EXPECT_EQ(Http::Code::InternalServerError,
+                config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_EQ("Example text 2",
+                config.route(headers, 0)->directResponseEntry()->responseBody().value());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("direct.example.com", "/no_body", true, false);
+      EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_FALSE(config.route(headers, 0)->directResponseEntry()->responseBody().valid());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("direct.example.com", "/static", true, false);
+      EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_EQ("/etc/envoy/message",
+                config.route(headers, 0)->directResponseEntry()->responseBodyFilename().value());
     }
     {
       Http::TestHeaderMapImpl headers =

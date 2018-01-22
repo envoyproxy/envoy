@@ -35,6 +35,8 @@ public:
   // DirectResponseEntry
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
+  MOCK_CONST_METHOD0(responseBody, Optional<std::string>());
+  MOCK_CONST_METHOD0(responseBodyFilename, Optional<std::string>());
 };
 
 class TestCorsPolicy : public CorsPolicy {

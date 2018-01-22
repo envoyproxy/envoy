@@ -17,6 +17,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -219,8 +220,23 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
       return Http::FilterHeadersStatus::StopIteration;
     }
     config_.stats_.rq_direct_response_.inc();
-    sendLocalReply(route_->directResponseEntry()->responseCode(), "", false);
-    // TODO(brian-pane) support sending a response body and response_headers_to_add.
+    std::string body;
+    Optional<std::string> inline_body = route_->directResponseEntry()->responseBody();
+    if (inline_body.valid()) {
+      body = inline_body.value();
+    }
+    Optional<std::string> path = route_->directResponseEntry()->responseBodyFilename();
+    if (path.valid()) {
+      const ssize_t kMaxFileSize = 4096;
+      ssize_t file_size = Filesystem::fileSize(path.value());
+      if (file_size < 0 || file_size > kMaxFileSize) {
+        sendLocalReply(Http::Code::InternalServerError, "", false);
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+      body = Filesystem::fileReadToEnd(path.value());
+    }
+    sendLocalReply(route_->directResponseEntry()->responseCode(), body, false);
+    // TODO(brian-pane) support sending response_headers_to_add.
     return Http::FilterHeadersStatus::StopIteration;
   }
 
