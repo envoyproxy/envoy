@@ -1,9 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <map>
 #include <memory>
-#include <sstream>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -36,7 +34,7 @@ typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
  */
 class RequestInfoHeaderFormatter : public HeaderFormatter {
 public:
-  RequestInfoHeaderFormatter(const std::string& field_name, bool append);
+  RequestInfoHeaderFormatter(absl::string_view field_name, bool append);
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override;
@@ -76,11 +74,11 @@ public:
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override {
-    std::ostringstream buf;
+    std::string buf;
     for (const auto& formatter : formatters_) {
-      buf << formatter->format(request_info);
+      buf += formatter->format(request_info);
     }
-    return buf.str();
+    return buf;
   };
   bool append() const override { return append_; }
 

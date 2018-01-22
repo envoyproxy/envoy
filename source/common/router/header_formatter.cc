@@ -11,6 +11,7 @@
 #include "common/json/json_loader.h"
 #include "common/request_info/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -18,7 +19,7 @@ namespace Router {
 
 namespace {
 
-std::string formatUpstreamMetadataParseException(const std::string& params,
+std::string formatUpstreamMetadataParseException(absl::string_view params,
                                                  const EnvoyException* cause = nullptr) {
   std::string reason;
   if (cause != nullptr) {
@@ -28,7 +29,7 @@ std::string formatUpstreamMetadataParseException(const std::string& params,
   return fmt::format("Incorrect header configuration. Expected format "
                      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                      "UPSTREAM_METADATA{}{}",
-                     params, reason);
+                     absl::StrCat(params), reason);
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
@@ -36,15 +37,19 @@ std::string formatUpstreamMetadataParseException(const std::string& params,
 //   (["a", "b", "c"])
 // There must be at least 2 array elements (a metadata namespace and at least 1 key).
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
-parseUpstreamMetadataField(const std::string& params_str) {
+parseUpstreamMetadataField(absl::string_view params_str) {
+  params_str = StringUtil::trim(params_str);
   if (params_str.empty() || params_str.front() != '(' || params_str.back() != ')') {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
   }
 
+  absl::string_view json = params_str;
+  json.remove_prefix(1);
+  json.remove_suffix(1);
+
   std::vector<std::string> params;
   try {
-    Json::ObjectSharedPtr parsed_params =
-        Json::Factory::loadFromString(StringUtil::subspan(params_str, 1, params_str.size() - 1));
+    Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(absl::StrCat(json));
 
     for (const auto& param : parsed_params->asObjectArray()) {
       params.emplace_back(param->asString());
@@ -113,7 +118,7 @@ parseUpstreamMetadataField(const std::string& params_str) {
 
 } // namespace
 
-RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_name, bool append)
+RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_name, bool append)
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
@@ -125,11 +130,12 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(const std::string& field_
       return RequestInfo::Utility::formatDownstreamAddressNoPort(
           *request_info.downstreamRemoteAddress());
     };
-  } else if (StringUtil::startsWith(field_name.c_str(), "UPSTREAM_METADATA")) {
+  } else if (field_name.find_first_of("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(sizeof("UPSTREAM_METADATA") - 1));
   } else {
-    throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
+    throw EnvoyException(
+        fmt::format("field '{}' not supported as custom header", absl::StrCat(field_name)));
   }
 }
 

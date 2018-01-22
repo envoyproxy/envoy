@@ -7,6 +7,9 @@
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -23,25 +26,24 @@ enum class ParserState {
   ExpectVariableEnd          // expect closing % in %VAR(...)%
 };
 
+std::string unescape(absl::string_view sv) { return absl::StrJoin(absl::StrSplit(sv, "%%"), "%"); }
+
 // Implements a state machine to parse custom headers. Each character of the custom header format
 // is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // RequestInfoHeaderFormatter.
 HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header_value_option) {
-  const std::string& format = header_value_option.header().value();
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
 
+  absl::string_view format(header_value_option.header().value());
   if (format.empty()) {
-    return HeaderFormatterPtr{new PlainHeaderFormatter(format, append)};
+    return HeaderFormatterPtr{new PlainHeaderFormatter("", append)};
   }
 
   std::vector<HeaderFormatterPtr> formatters;
 
-  std::string buf;
-  buf.reserve(format.size());
-
-  size_t pos = 0;
+  size_t pos = 0, start = 0;
   ParserState state = ParserState::Literal;
   do {
     const char ch = format[pos];
@@ -51,7 +53,6 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
     case ParserState::Literal:
       // Searching for start of %VARIABLE% expression.
       if (ch != '%') {
-        buf += ch;
         break;
       }
 
@@ -61,27 +62,28 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
       }
 
       if (format[pos + 1] == '%') {
-        // Escaped %, append and skip next character.
-        buf += '%';
+        // Escaped %, skip next character.
         pos++;
         break;
       }
 
-      // Unescaped %: start of variable name. Create a formatter for preceding characters, if
+      // Un-escaped %: start of variable name. Create a formatter for preceding characters, if
       // any.
       state = ParserState::VariableName;
-      if (!buf.empty()) {
-        formatters.emplace_back(new PlainHeaderFormatter(buf, append));
-        buf.clear();
+      if (pos > start) {
+        absl::string_view literal = format.substr(start, pos - start);
+        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
       }
+      start = pos + 1;
       break;
 
     case ParserState::VariableName:
       // Consume "VAR" from "%VAR%" or "%VAR(...)%"
       if (ch == '%') {
         // Found complete variable name, add formatter.
-        formatters.emplace_back(new RequestInfoHeaderFormatter(buf, append));
-        buf.clear();
+        formatters.emplace_back(
+            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+        start = pos + 1;
         state = ParserState::Literal;
         break;
       }
@@ -90,7 +92,6 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
         // Variable with arguments, search for start of arg array.
         state = ParserState::ExpectArray;
       }
-      buf += ch;
       break;
 
     case ParserState::ExpectArray:
@@ -102,9 +103,8 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
         throw EnvoyException(fmt::format(
             "Invalid header configuration. Expecting JSON array of arguments after '{}', but "
             "found '{}'",
-            buf, ch));
+            absl::StrCat(format.substr(start, pos - start)), ch));
       }
-      buf += ch;
       break;
 
     case ParserState::ExpectArrayDelimiterOrEnd:
@@ -117,9 +117,8 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
         throw EnvoyException(fmt::format(
             "Invalid header configuration. Expecting ',', ']', or whitespace after '{}', but "
             "found '{}'",
-            buf, ch));
+            absl::StrCat(format.substr(start, pos - start)), ch));
       }
-      buf += ch;
       break;
 
     case ParserState::ExpectString:
@@ -129,9 +128,8 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
       } else if (!isspace(ch)) {
         throw EnvoyException(fmt::format(
             "Invalid header configuration. Expecting '\"' or whitespace after '{}', but found '{}'",
-            buf, ch));
+            absl::StrCat(format.substr(start, pos - start)), ch));
       }
-      buf += ch;
       break;
 
     case ParserState::String:
@@ -140,18 +138,14 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
         if (!has_next_ch) {
           throw EnvoyException(fmt::format(
               "Invalid header configuration. Un-terminated backslash in JSON string after '{}'",
-              buf));
+              absl::StrCat(format.substr(start, pos - start))));
         }
-        buf += ch;
-        pos++;
-        buf += format[pos];
-        break;
-      }
 
-      if (ch == '"') {
+        // Skip escaped char.
+        pos++;
+      } else if (ch == '"') {
         state = ParserState::ExpectArrayDelimiterOrEnd;
       }
-      buf += ch;
       break;
 
     case ParserState::ExpectArgsEnd:
@@ -161,16 +155,16 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
       } else if (!isspace(ch)) {
         throw EnvoyException(fmt::format(
             "Invalid header configuration. Expecting ')' or whitespace after '{}', but found '{}'",
-            buf, ch));
+            absl::StrCat(format.substr(start, pos - start)), ch));
       }
-      buf += ch;
       break;
 
     case ParserState::ExpectVariableEnd:
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
-        formatters.emplace_back(new RequestInfoHeaderFormatter(buf, append));
-        buf.clear();
+        formatters.emplace_back(
+            new RequestInfoHeaderFormatter(format.substr(start, pos - start), append));
+        start = pos + 1;
         state = ParserState::Literal;
         break;
       }
@@ -178,9 +172,8 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
       if (!isspace(ch)) {
         throw EnvoyException(fmt::format(
             "Invalid header configuration. Expecting '%' or whitespace after '{}', but found '{}'",
-            buf, ch));
+            absl::StrCat(format.substr(start, pos - start)), ch));
       }
-      buf += ch;
       break;
 
     default:
@@ -191,12 +184,14 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
   if (state != ParserState::Literal) {
     // Parsing terminated mid-variable.
     throw EnvoyException(
-        fmt::format("Invalid header configuration. Un-terminated variable expression '{}'", buf));
+        fmt::format("Invalid header configuration. Un-terminated variable expression '{}'",
+                    absl::StrCat(format.substr(start, pos - start))));
   }
 
-  if (!buf.empty()) {
+  if (pos > start) {
     // Trailing constant data.
-    formatters.emplace_back(new PlainHeaderFormatter(buf, append));
+    absl::string_view literal = format.substr(start, pos - start);
+    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
   }
 
   ASSERT(formatters.size() > 0);
