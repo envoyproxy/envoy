@@ -10,7 +10,7 @@
 #include "api/discovery.pb.h"
 #include "api/eds.pb.h"
 #include "api/lds.pb.h"
-#include "api/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionFailure;
@@ -96,7 +96,7 @@ public:
     ads_stream_->sendGrpcMessage(discovery_response);
   }
 
-  envoy::api::v2::Cluster buildCluster(const std::string& name) {
+  envoy::api::v2::cluster::Cluster buildCluster(const std::string& name) {
     return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s

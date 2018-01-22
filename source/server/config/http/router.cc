@@ -9,7 +9,7 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
-#include "api/filter/http/router.pb.validate.h"
+#include "envoy/api/v2/filter/http/router.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

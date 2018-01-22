@@ -9,7 +9,7 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "api/filter/accesslog/accesslog.pb.h"
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
 
 namespace Envoy {
 namespace AccessLog {

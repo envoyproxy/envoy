@@ -15,7 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
 
-#include "api/filter/fault.pb.h"
+#include "envoy/api/v2/filter/fault.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

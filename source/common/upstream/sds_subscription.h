@@ -8,7 +8,7 @@
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
 
-#include "api/base.pb.h"
+#include "envoy/api/v2/base.pb.h"
 #include "api/eds.pb.h"
 
 namespace Envoy {

@@ -11,7 +11,7 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
 
-#include "api/filter/network/redis_proxy.pb.validate.h"
+#include "envoy/api/v2/filter/network/redis_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

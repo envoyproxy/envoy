@@ -7,7 +7,7 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/http/router.pb.h"
+#include "envoy/api/v2/filter/http/router.pb.h"
 
 namespace Envoy {
 namespace Server {

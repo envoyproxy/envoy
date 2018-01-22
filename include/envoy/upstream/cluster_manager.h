@@ -17,8 +17,8 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
-#include "api/bootstrap.pb.h"
-#include "api/cds.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/api/v2/cluster/cluster.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -39,7 +39,7 @@ public:
    *
    * @return true if the action results in an add/update of a cluster.
    */
-  virtual bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) PURE;
+  virtual bool addOrUpdatePrimaryCluster(const envoy::api::v2::cluster::Cluster& cluster) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
@@ -193,7 +193,7 @@ public:
   /**
    * Allocate a cluster manager from configuration proto.
    */
-  virtual ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
+  virtual ClusterManagerPtr clusterManagerFromProto(const envoy::bootstrap::v2::Bootstrap& bootstrap,
                                                     Stats::Store& stats, ThreadLocal::Instance& tls,
                                                     Runtime::Loader& runtime,
                                                     Runtime::RandomGenerator& random,
@@ -211,7 +211,7 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
+  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::cluster::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
                                             bool added_via_api) PURE;

@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Config {
 
 void BootstrapJson::translateClusterManagerBootstrap(const Json::Object& json_cluster_manager,
-                                                     envoy::api::v2::Bootstrap& bootstrap) {
+                                                     envoy::bootstrap::v2::Bootstrap& bootstrap) {
   json_cluster_manager.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
 
   Optional<envoy::api::v2::ConfigSource> eds_config;
@@ -52,7 +52,7 @@ void BootstrapJson::translateClusterManagerBootstrap(const Json::Object& json_cl
 }
 
 void BootstrapJson::translateBootstrap(const Json::Object& json_config,
-                                       envoy::api::v2::Bootstrap& bootstrap) {
+                                       envoy::bootstrap::v2::Bootstrap& bootstrap) {
   json_config.validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
 
   translateClusterManagerBootstrap(*json_config.getObject("cluster_manager"), bootstrap);

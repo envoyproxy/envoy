@@ -8,7 +8,7 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
 
-#include "api/base.pb.h"
+#include "envoy/api/v2/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {

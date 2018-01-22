@@ -6,7 +6,7 @@
 
 #include "common/config/well_known_names.h"
 
-#include "api/filter/http/lua.pb.h"
+#include "envoy/api/v2/filter/http/lua.pb.h"
 
 namespace Envoy {
 namespace Server {

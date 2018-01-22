@@ -15,7 +15,7 @@
 
 #include "source/common/ratelimit/ratelimit.pb.h"
 
-#include "api/bootstrap.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 
 namespace Envoy {
 namespace RateLimit {

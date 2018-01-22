@@ -41,7 +41,7 @@ namespace Upstream {
 namespace {
 
 const Network::Address::InstanceConstSharedPtr
-getSourceAddress(const envoy::api::v2::Cluster& cluster,
+getSourceAddress(const envoy::api::v2::cluster::Cluster& cluster,
                  const Network::Address::InstanceConstSharedPtr source_address) {
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
@@ -91,7 +91,7 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
-ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
+ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::cluster::Cluster& config,
                                  const Network::Address::InstanceConstSharedPtr source_address,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
@@ -167,7 +167,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
     new std::vector<std::vector<HostSharedPtr>>()};
 
-ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
                                          Stats::Store& stats, ThreadLocal::Instance& tls,
                                          Network::DnsResolverSharedPtr dns_resolver,
                                          Ssl::ContextManager& ssl_context_manager,
@@ -247,7 +247,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
-ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
+ClusterImplBase::ClusterImplBase(const envoy::api::v2::cluster::Cluster& cluster,
                                  const Network::Address::InstanceConstSharedPtr source_address,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
@@ -306,7 +306,7 @@ bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
 }
 
-uint64_t ClusterInfoImpl::parseFeatures(const envoy::api::v2::Cluster& config) {
+uint64_t ClusterInfoImpl::parseFeatures(const envoy::api::v2::cluster::Cluster& config) {
   uint64_t features = 0;
   if (config.has_http2_protocol_options()) {
     features |= Features::HTTP2;
@@ -414,7 +414,7 @@ void ClusterImplBase::reloadHealthyHosts() {
   }
 }
 
-ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
+ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::cluster::Cluster& config,
                                                     Runtime::Loader& runtime,
                                                     const std::string& cluster_name) {
   managers_[enumToInt(ResourcePriority::Default)] =
@@ -424,7 +424,7 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluste
 }
 
 ResourceManagerImplPtr
-ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
+ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::cluster::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
                                         const envoy::api::v2::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
@@ -464,7 +464,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
-StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
+StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::cluster::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
@@ -582,7 +582,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedP
   }
 }
 
-StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster,
+StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster,
                                            Runtime::Loader& runtime, Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolverSharedPtr dns_resolver,

@@ -8,7 +8,7 @@
 #include "common/config/filter_json.h"
 #include "common/filter/tcp_proxy.h"
 
-#include "api/filter/network/tcp_proxy.pb.validate.h"
+#include "envoy/api/v2/filter/network/tcp_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

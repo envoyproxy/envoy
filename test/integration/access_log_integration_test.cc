@@ -21,7 +21,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::bootstrap::v2::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");

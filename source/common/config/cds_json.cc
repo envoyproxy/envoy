@@ -79,7 +79,7 @@ void CdsJson::translateCircuitBreakers(const Json::Object& json_circuit_breakers
 
 void CdsJson::translateOutlierDetection(
     const Json::Object& json_outlier_detection,
-    envoy::api::v2::Cluster::OutlierDetection& outlier_detection) {
+    envoy::api::v2::cluster::OutlierDetection& outlier_detection) {
   JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, interval);
   JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, base_ejection_time);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, consecutive_5xx);
@@ -96,7 +96,7 @@ void CdsJson::translateOutlierDetection(
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,
                                const Optional<envoy::api::v2::ConfigSource>& eds_config,
-                               envoy::api::v2::Cluster& cluster) {
+                               envoy::api::v2::cluster::Cluster& cluster) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
   const std::string name = json_cluster.getString("name");

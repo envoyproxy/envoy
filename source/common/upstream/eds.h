@@ -5,7 +5,7 @@
 
 #include "common/upstream/upstream_impl.h"
 
-#include "api/base.pb.h"
+#include "envoy/api/v2/base.pb.h"
 #include "api/eds.pb.h"
 
 namespace Envoy {
@@ -17,7 +17,7 @@ namespace Upstream {
 class EdsClusterImpl : public BaseDynamicClusterImpl,
                        Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+  EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, Runtime::Loader& runtime,
                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                  const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,

@@ -53,7 +53,7 @@ public:
    */
   static void
   translateOutlierDetection(const Json::Object& json_outlier_detection,
-                            envoy::api::v2::Cluster::OutlierDetection& outlier_detection);
+                            envoy::api::v2::cluster::OutlierDetection& outlier_detection);
 
   /**
    * Translate a v1 JSON Cluster to v2 envoy::api::v2::Cluster.
@@ -63,7 +63,7 @@ public:
    */
   static void translateCluster(const Json::Object& json_cluster,
                                const Optional<envoy::api::v2::ConfigSource>& eds_config,
-                               envoy::api::v2::Cluster& cluster);
+                               envoy::api::v2::cluster::Cluster& cluster);
 };
 
 } // namespace Config

@@ -35,7 +35,7 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
-#include "api/bootstrap.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "api/bootstrap.pb.validate.h"
 
 namespace Envoy {
@@ -157,7 +157,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-void InstanceUtil::loadBootstrapConfig(envoy::api::v2::Bootstrap& bootstrap,
+void InstanceUtil::loadBootstrapConfig(envoy::bootstrap::v2::Bootstrap& bootstrap,
                                        const std::string& config_path, bool v2_only) {
   bool v2_config_loaded = false;
   try {
@@ -185,7 +185,7 @@ void InstanceImpl::initialize(Options& options,
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::bootstrap::v2::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require

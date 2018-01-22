@@ -8,7 +8,7 @@
 #include "envoy/stats/stats.h"
 
 #include "absl/strings/string_view.h"
-#include "api/address.pb.h"
+#include "envoy/api/v2/address.pb.h"
 
 namespace Envoy {
 namespace Network {

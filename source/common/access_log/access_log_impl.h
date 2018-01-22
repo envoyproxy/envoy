@@ -11,7 +11,7 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/accesslog/accesslog.pb.h"
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
 
 namespace Envoy {
 namespace AccessLog {

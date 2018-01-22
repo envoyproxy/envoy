@@ -14,7 +14,7 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
-#include "api/stats.pb.h"
+#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -164,7 +164,7 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
+Stats::TagProducerPtr Utility::createTagProducer(const envoy::bootstrap::v2::Bootstrap& bootstrap) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 

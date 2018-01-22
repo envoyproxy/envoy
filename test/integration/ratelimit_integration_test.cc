@@ -26,7 +26,7 @@ public:
   void initialize() override {
     config_helper_.addFilter(
         "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
-    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::bootstrap::v2::Bootstrap& bootstrap) {
       bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);

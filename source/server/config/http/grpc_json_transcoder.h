@@ -8,7 +8,7 @@
 
 #include "server/config/network/http_connection_manager.h"
 
-#include "api/filter/http/transcoder.pb.h"
+#include "envoy/api/v2/filter/http/transcoder.pb.h"
 
 namespace Envoy {
 namespace Server {

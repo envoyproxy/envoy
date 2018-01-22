@@ -9,7 +9,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
-#include "api/address.pb.h"
+#include "envoy/api/v2/address.pb.h"
 
 namespace Envoy {
 namespace Network {

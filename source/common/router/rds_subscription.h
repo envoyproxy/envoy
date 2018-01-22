@@ -8,7 +8,7 @@
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
 
-#include "api/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {

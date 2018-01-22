@@ -8,7 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
-#include "api/address.pb.h"
+#include "envoy/api/v2/address.pb.h"
 
 namespace Envoy {
 namespace Network {

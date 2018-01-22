@@ -16,7 +16,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "api/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Router {

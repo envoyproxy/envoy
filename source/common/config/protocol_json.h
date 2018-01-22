@@ -2,7 +2,7 @@
 
 #include "envoy/json/json_object.h"
 
-#include "api/protocol.pb.h"
+#include "envoy/api/v2/protocol.pb.h"
 
 namespace Envoy {
 namespace Config {

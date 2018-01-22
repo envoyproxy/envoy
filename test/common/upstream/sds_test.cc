@@ -20,7 +20,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "api/base.pb.h"
+#include "envoy/api/v2/base.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -108,7 +108,7 @@ protected:
 
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  envoy::api::v2::Cluster sds_cluster_;
+  envoy::api::v2::cluster::Cluster sds_cluster_;
   NiceMock<MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   std::shared_ptr<EdsClusterImpl> cluster_;

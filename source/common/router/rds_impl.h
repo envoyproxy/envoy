@@ -18,8 +18,8 @@
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
 
-#include "api/filter/network/http_connection_manager.pb.h"
-#include "api/rds.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Router {

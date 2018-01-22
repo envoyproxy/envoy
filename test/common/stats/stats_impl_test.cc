@@ -8,7 +8,7 @@
 
 #include "test/test_common/utility.h"
 
-#include "api/stats.pb.h"
+#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

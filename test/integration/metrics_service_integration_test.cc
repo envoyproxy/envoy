@@ -23,7 +23,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::bootstrap::v2::Bootstrap& bootstrap) {
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       metrics_service_cluster->set_name("metrics_service");

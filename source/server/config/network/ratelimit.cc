@@ -10,7 +10,7 @@
 #include "common/filter/ratelimit.h"
 #include "common/protobuf/utility.h"
 
-#include "api/filter/network/rate_limit.pb.validate.h"
+#include "envoy/api/v2/filter/network/rate_limit.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

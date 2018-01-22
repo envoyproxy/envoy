@@ -11,7 +11,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "api/filter/network/rate_limit.pb.h"
+#include "envoy/api/v2/filter/network/rate_limit.pb.h"
 
 namespace Envoy {
 namespace RateLimit {

@@ -15,7 +15,7 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
-#include "api/cds.pb.h"
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -45,7 +45,7 @@ private:
 class DetectorImplFactory {
 public:
   static DetectorSharedPtr createForCluster(Cluster& cluster,
-                                            const envoy::api::v2::Cluster& cluster_config,
+                                            const envoy::api::v2::cluster::Cluster& cluster_config,
                                             Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                             EventLoggerSharedPtr event_logger);
 };
@@ -171,7 +171,7 @@ struct DetectionStats {
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& config);
+  DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config);
 
   uint64_t intervalMs() { return interval_ms_; }
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
@@ -207,7 +207,7 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::api::v2::Cluster::OutlierDetection& config,
+  create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, MonotonicTimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
@@ -223,7 +223,7 @@ public:
   double successRateEjectionThreshold() const override { return success_rate_ejection_threshold_; }
 
 private:
-  DetectorImpl(const Cluster& cluster, const envoy::api::v2::Cluster::OutlierDetection& config,
+  DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger);
 

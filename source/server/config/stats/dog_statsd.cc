@@ -8,7 +8,7 @@
 #include "common/network/resolver_impl.h"
 #include "common/stats/statsd.h"
 
-#include "api/stats.pb.h"
+#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "api/stats.pb.validate.h"
 
 namespace Envoy {

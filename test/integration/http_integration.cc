@@ -876,7 +876,7 @@ void HttpIntegrationTest::testConnect() {
 }
 
 void HttpIntegrationTest::testEquivalent(const std::string& request) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::bootstrap::v2::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
     auto static_resources = bootstrap.mutable_static_resources();
     auto* old_listener = static_resources->mutable_listeners(0);

@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["cluster_manager.h"],
     external_deps = [
         "envoy_bootstrap",
-        "envoy_cds",
+        "envoy_cluster",
     ],
     deps = [
         ":load_balancer_interface",
@@ -64,7 +64,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_balancer_type_interface",
     hdrs = ["load_balancer_type.h"],
-    external_deps = ["envoy_cds"],
+    external_deps = ["envoy_cluster"],
     deps = [
         "//source/common/protobuf",
     ],

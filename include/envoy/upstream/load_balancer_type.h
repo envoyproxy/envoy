@@ -6,7 +6,7 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "api/cds.pb.h"
+#include "envoy/api/v2/cluster/cluster.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -32,7 +32,7 @@ public:
    * @return LbSubsetFallbackPolicy the fallback policy used when
    * route metadata does not match any subset.
    */
-  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+  virtual envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
   fallbackPolicy() const PURE;
 
   /**

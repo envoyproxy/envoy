@@ -40,7 +40,7 @@ envoy_cc_library(
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
     external_deps = [
-        "envoy_sds",
+        "envoy_cert",
         "ssl",
     ],
     deps = [

@@ -8,7 +8,7 @@
 #include "common/config/filter_json.h"
 #include "common/mongo/proxy.h"
 
-#include "api/filter/network/mongo_proxy.pb.validate.h"
+#include "envoy/api/v2/filter/network/mongo_proxy.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {

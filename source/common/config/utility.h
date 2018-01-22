@@ -16,13 +16,13 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
-#include "api/base.pb.h"
-#include "api/bootstrap.pb.h"
-#include "api/cds.pb.h"
-#include "api/eds.pb.h"
-#include "api/filter/network/http_connection_manager.pb.h"
-#include "api/lds.pb.h"
-#include "api/rds.pb.h"
+#include "envoy/api/v2/base.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/service/discovery/v2/cds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v2/lds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -236,7 +236,7 @@ public:
    * @param bootstrap bootstrap proto.
    * @throws EnvoyException when the conflict of tag names is found.
    */
-  static Stats::TagProducerPtr createTagProducer(const envoy::api::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr createTagProducer(const envoy::bootstrap::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

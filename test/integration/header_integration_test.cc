@@ -6,7 +6,7 @@
 #include "test/test_common/network_utility.h"
 
 #include "api/eds.pb.h"
-#include "api/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -100,7 +100,7 @@ public:
   }
 
   void prepareEDS() {
-    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::bootstrap::v2::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 

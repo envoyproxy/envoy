@@ -13,7 +13,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "api/filter/network/redis_proxy.pb.h"
+#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Redis {

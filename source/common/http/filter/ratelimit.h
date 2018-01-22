@@ -14,7 +14,7 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 
-#include "api/filter/http/rate_limit.pb.h"
+#include "envoy/api/v2/filter/http/rate_limit.pb.h"
 
 namespace Envoy {
 namespace Http {

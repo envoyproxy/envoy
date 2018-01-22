@@ -8,7 +8,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "api/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 
@@ -318,7 +318,7 @@ void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
 }
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
-  addConfigModifier([function, this](envoy::api::v2::Bootstrap&) -> void {
+  addConfigModifier([function, this](envoy::bootstrap::v2::Bootstrap&) -> void {
     envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);

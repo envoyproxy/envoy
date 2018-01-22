@@ -7,7 +7,7 @@
 
 #include "common/json/json_loader.h"
 
-#include "api/sds.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -30,10 +30,10 @@ public:
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
 protected:
-  ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config);
+  ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config);
 
 private:
-  static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
+  static unsigned tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
                                       unsigned default_version);
 
   static const std::string DEFAULT_CIPHER_SUITES;
@@ -54,7 +54,7 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  explicit ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config);
+  explicit ClientContextConfigImpl(const envoy::api::v2::auth::UpstreamTlsContext& config);
   explicit ClientContextConfigImpl(const Json::Object& config);
 
   // Ssl::ClientContextConfig
@@ -66,7 +66,7 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  explicit ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config);
+  explicit ServerContextConfigImpl(const envoy::api::v2::auth::DownstreamTlsContext& config);
   explicit ServerContextConfigImpl(const Json::Object& config);
 
   // Ssl::ServerContextConfig

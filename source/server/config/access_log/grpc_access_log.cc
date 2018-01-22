@@ -9,7 +9,7 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/accesslog/accesslog.pb.validate.h"
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

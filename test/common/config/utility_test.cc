@@ -85,7 +85,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
 }
 
 TEST(UtilityTest, createTagProducer) {
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::bootstrap::v2::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap);
   ASSERT(producer != nullptr);
   std::vector<Stats::Tag> tags;
@@ -132,7 +132,7 @@ TEST(UtilityTest, ObjNameLength) {
         R"EOF({ "name": ")EOF" + name +
         R"EOF(", "type": "static", "lb_type": "random", "connect_timeout_ms" : 1})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::api::v2::Cluster cluster;
+    envoy::api::v2::cluster::Cluster cluster;
     envoy::api::v2::ConfigSource eds_config;
     EXPECT_THROW_WITH_MESSAGE(
         Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
@@ -157,7 +157,7 @@ TEST(UtilityTest, UnixClusterDns) {
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
       R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
-  envoy::api::v2::Cluster cluster;
+  envoy::api::v2::cluster::Cluster cluster;
   envoy::api::v2::ConfigSource eds_config;
   EXPECT_THROW_WITH_MESSAGE(
       Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
@@ -172,7 +172,7 @@ TEST(UtilityTest, UnixClusterStatic) {
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
       R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
-  envoy::api::v2::Cluster cluster;
+  envoy::api::v2::cluster::Cluster cluster;
   envoy::api::v2::ConfigSource eds_config;
   Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());

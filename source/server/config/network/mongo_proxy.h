@@ -6,7 +6,7 @@
 
 #include "common/config/well_known_names.h"
 
-#include "api/filter/network/mongo_proxy.pb.h"
+#include "envoy/api/v2/filter/network/mongo_proxy.pb.h"
 
 namespace Envoy {
 namespace Server {

@@ -6,7 +6,7 @@
 #include "common/grpc/json_transcoder_filter.h"
 #include "common/json/config_schemas.h"
 
-#include "api/filter/http/transcoder.pb.validate.h"
+#include "envoy/api/v2/filter/http/transcoder.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

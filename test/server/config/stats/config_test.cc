@@ -14,7 +14,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-#include "api/bootstrap.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

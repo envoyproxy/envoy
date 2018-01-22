@@ -22,7 +22,7 @@ public:
                                   Event::Dispatcher& primary_dispatcher,
                                   const LocalInfo::LocalInfo& local_info);
 
-  ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
+  ClusterManagerPtr clusterManagerFromProto(const envoy::bootstrap::v2::Bootstrap& bootstrap,
                                             Stats::Store& stats, ThreadLocal::Instance& tls,
                                             Runtime::Loader& runtime,
                                             Runtime::RandomGenerator& random,
@@ -41,7 +41,7 @@ public:
  */
 class ValidationClusterManager : public ClusterManagerImpl {
 public:
-  ValidationClusterManager(const envoy::api::v2::Bootstrap& bootstrap,
+  ValidationClusterManager(const envoy::bootstrap::v2::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,

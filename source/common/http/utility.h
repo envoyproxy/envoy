@@ -9,7 +9,7 @@
 
 #include "common/json/json_loader.h"
 
-#include "api/protocol.pb.h"
+#include "envoy/api/v2/protocol.pb.h"
 
 namespace Envoy {
 namespace Http {

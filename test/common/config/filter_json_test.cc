@@ -1,7 +1,7 @@
 #include "common/config/filter_json.h"
 #include "common/json/json_loader.h"
 
-#include "api/filter/http/router.pb.h"
+#include "envoy/api/v2/filter/http/router.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

@@ -33,7 +33,7 @@
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
-#include "api/base.pb.h"
+#include "envoy/api/v2/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -279,7 +279,7 @@ private:
 class ClusterInfoImpl : public ClusterInfo,
                         public Server::Configuration::TransportSocketFactoryContext {
 public:
-  ClusterInfoImpl(const envoy::api::v2::Cluster& config,
+  ClusterInfoImpl(const envoy::api::v2::cluster::Cluster& config,
                   const Network::Address::InstanceConstSharedPtr source_address,
                   Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
@@ -321,9 +321,9 @@ public:
 
 private:
   struct ResourceManagers {
-    ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+    ResourceManagers(const envoy::api::v2::cluster::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name);
-    ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+    ResourceManagerImplPtr load(const envoy::api::v2::cluster::Cluster& config, Runtime::Loader& runtime,
                                 const std::string& cluster_name,
                                 const envoy::api::v2::RoutingPriority& priority);
 
@@ -332,7 +332,7 @@ private:
     Managers managers_;
   };
 
-  static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
+  static uint64_t parseFeatures(const envoy::api::v2::cluster::Cluster& config);
 
   Runtime::Loader& runtime_;
   const std::string name_;
@@ -364,7 +364,7 @@ private:
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+  static ClusterSharedPtr create(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
                                  Stats::Store& stats, ThreadLocal::Instance& tls,
                                  Network::DnsResolverSharedPtr dns_resolver,
                                  Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
@@ -397,7 +397,7 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(const envoy::api::v2::Cluster& cluster,
+  ClusterImplBase(const envoy::api::v2::cluster::Cluster& cluster,
                   const Network::Address::InstanceConstSharedPtr source_address,
                   Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
@@ -445,7 +445,7 @@ private:
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+  StaticClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                     ClusterManager& cm, bool added_via_api);
 
@@ -478,7 +478,7 @@ protected:
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+  StrictDnsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                        Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, bool added_via_api);

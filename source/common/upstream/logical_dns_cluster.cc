@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Upstream {
 
-LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
+LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::cluster::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager,
                                      Network::DnsResolverSharedPtr dns_resolver,

@@ -5,7 +5,7 @@
 #include "common/config/filter_json.h"
 #include "common/http/filter/fault_filter.h"
 
-#include "api/filter/http/fault.pb.validate.h"
+#include "envoy/api/v2/filter/http/fault.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

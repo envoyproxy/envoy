@@ -12,7 +12,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "api/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {

@@ -12,8 +12,8 @@
 
 #include "common/router/config_impl.h"
 
-#include "api/filter/http/fault.pb.h"
-#include "api/rds.pb.h"
+#include "envoy/api/v2/filter/http/fault.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Http {

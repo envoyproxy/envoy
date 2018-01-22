@@ -6,7 +6,7 @@
 
 #include "common/config/well_known_names.h"
 
-#include "api/filter/http/buffer.pb.h"
+#include "envoy/api/v2/filter/http/buffer.pb.h"
 
 namespace Envoy {
 namespace Server {

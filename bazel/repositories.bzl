@@ -133,33 +133,74 @@ def _envoy_api_deps():
     api_bind_targets = [
         "address",
         "base",
-        "bootstrap",
-        "discovery",
-        "cds",
-        "discovery",
-        "eds",
         "grpc_service",
         "health_check",
-        "lds",
-        "metrics",
         "protocol",
-        "rds",
-        "sds",
-        "stats",
-        "trace",
     ]
     for t in api_bind_targets:
         native.bind(
             name = "envoy_" + t,
-            actual = "@envoy_api//api:" + t + "_cc",
+            actual = "@envoy_api//envoy/api/v2:" + t + "_cc",
         )
+    native.bind(
+        name = "envoy_bootstrap",
+        actual = "@envoy_api//envoy/bootstrap/v2:bootstrap_cc",
+    )
+    native.bind(
+        name = "envoy_metrics",
+        actual = "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+    )
+    native.bind(
+        name = "envoy_stats",
+        actual = "@envoy_api//envoy/api/v2/monitoring:stats_cc",
+    )
+    native.bind(
+        name = "envoy_trace",
+        actual = "@envoy_api//envoy/api/v2/monitoring:trace_cc",
+    )
+    native.bind(
+        name = "envoy_cluster",
+        actual = "@envoy_api//envoy/api/v2/cluster:cluster_cc",
+    )
+    native.bind(
+        name = "envoy_route",
+        actual = "@envoy_api//envoy/api/v2/route:route_cc",
+    )
+    native.bind(
+        name = "envoy_listener",
+        actual = "@envoy_api//envoy/api/v2/listener:listener_cc",
+    )
+    native.bind(
+        name = "envoy_cert",
+        actual = "@envoy_api//envoy/api/v2/auth:cert_cc",
+    )
+
+    discovery_bind_targets = [
+        "cds",
+        "eds",
+        "lds",
+        "rds",
+        "sds",
+    ]
+    for t in discovery_bind_targets:
+        native.bind(
+            name = "envoy_" + t,
+            actual = "@envoy_api//envoy/service/discovery/v2:" + t + "_cc",
+        )
+    native.bind(
+        name = "envoy_discovery",
+        actual = "@envoy_api//envoy/service/discovery/v2:common_cc",
+    )
+
+
+
     filter_bind_targets = [
         "fault",
     ]
     for t in filter_bind_targets:
         native.bind(
             name = "envoy_filter_" + t,
-            actual = "@envoy_api//api/filter:" + t + "_cc",
+            actual = "@envoy_api//envoy/api/v2/filter:" + t + "_cc",
         )
     http_filter_bind_targets = [
         "buffer",
@@ -174,7 +215,7 @@ def _envoy_api_deps():
     for t in http_filter_bind_targets:
         native.bind(
             name = "envoy_filter_http_" + t,
-            actual = "@envoy_api//api/filter/http:" + t + "_cc",
+            actual = "@envoy_api//envoy/api/v2/filter/http:" + t + "_cc",
         )
     network_filter_bind_targets = [
         "http_connection_manager",
@@ -187,11 +228,11 @@ def _envoy_api_deps():
     for t in network_filter_bind_targets:
         native.bind(
             name = "envoy_filter_network_" + t,
-            actual = "@envoy_api//api/filter/network:" + t + "_cc",
+            actual = "@envoy_api//envoy/api/v2/filter/network:" + t + "_cc",
         )
     native.bind(
         name = "envoy_filter_accesslog",
-        actual = "@envoy_api//api/filter/accesslog:accesslog_cc",
+        actual = "@envoy_api//envoy/api/v2/filter/accesslog:accesslog_cc",
     )
     native.bind(
         name = "http_api_protos",

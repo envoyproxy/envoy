@@ -137,7 +137,7 @@ envoy_cc_library(
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
-        "envoy_sds",
+        "envoy_cert",
     ],
     deps = [
         "//include/envoy/network:transport_socket_interface",

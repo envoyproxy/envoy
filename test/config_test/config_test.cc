@@ -33,7 +33,7 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    envoy::api::v2::Bootstrap bootstrap;
+    envoy::bootstrap::v2::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_.configPath(),
                                               options_.v2ConfigOnly());
     Server::Configuration::InitialImpl initial_config(bootstrap);

@@ -13,7 +13,7 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/base.pb.h"
+#include "envoy/api/v2/base.pb.h"
 
 namespace Envoy {
 namespace Config {

@@ -23,7 +23,7 @@
 #include "common/http/utility.h"
 #include "common/request_info/request_info_impl.h"
 
-#include "api/filter/http/router.pb.h"
+#include "envoy/api/v2/filter/http/router.pb.h"
 
 namespace Envoy {
 namespace Router {

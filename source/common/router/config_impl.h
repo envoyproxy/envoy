@@ -20,7 +20,7 @@
 #include "common/router/header_parser.h"
 #include "common/router/router_ratelimit.h"
 
-#include "api/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Router {
