@@ -77,13 +77,15 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
-  callbacks_.onReceiveInitialMetadata(std::move(headers));
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
+  const auto grpc_status = Common::getGrpcStatus(*headers);
+  const std::string grpc_message = Common::getGrpcMessage(*headers);
+  callbacks_.onReceiveInitialMetadata(std::move(headers));
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
-    if (end_stream && Common::getGrpcStatus(*headers).valid()) {
-      onTrailers(std::move(headers));
+    if (end_stream && grpc_status.valid()) {
+      trailerResponse(grpc_status, grpc_message);
       return;
     }
     // Technically this should be
@@ -94,10 +96,9 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     return;
   }
   if (end_stream) {
-    onTrailers(std::move(headers));
+    trailerResponse(grpc_status, grpc_message);
     return;
   }
-  trailers_only_ = false;
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
@@ -130,16 +131,19 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
-  if (!trailers_only_) {
-    callbacks_.onReceiveTrailingMetadata(std::move(trailers));
-  }
-  const Optional<Status::GrpcStatus> grpc_status = Common::getGrpcStatus(*trailers);
+  const auto grpc_status = Common::getGrpcStatus(*trailers);
+  const std::string grpc_message = Common::getGrpcMessage(*trailers);
+  callbacks_.onReceiveTrailingMetadata(std::move(trailers));
+  trailerResponse(grpc_status, grpc_message);
+}
+
+void AsyncStreamImpl::trailerResponse(Optional<Status::GrpcStatus> grpc_status,
+                                      const std::string& grpc_message) {
   if (!grpc_status.valid()) {
     streamError(Status::GrpcStatus::Unknown);
     return;
   }
   if (grpc_status.value() != Status::GrpcStatus::Ok) {
-    const std::string grpc_message = Common::getGrpcMessage(*trailers);
     streamError(grpc_status.value(), grpc_message);
     return;
   }

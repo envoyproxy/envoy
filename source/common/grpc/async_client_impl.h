@@ -67,6 +67,7 @@ private:
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();
+  void trailerResponse(Optional<Status::GrpcStatus> grpc_status, const std::string& grpc_message);
 
   Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
@@ -74,7 +75,6 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
   const Optional<std::chrono::milliseconds>& timeout_;
-  bool trailers_only_{true};
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;
