@@ -58,7 +58,10 @@ envoy_cc_test(
     external_deps = [
         "abseil_strings",
     ],
-    deps = ["//source/common/common:utility_lib"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(

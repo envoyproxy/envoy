@@ -20,7 +20,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-#include "api/bootstrap.pb.h"
+#include "api/stats.pb.h"
 
 namespace Envoy {
 namespace Stats {
@@ -44,6 +44,28 @@ public:
 private:
   const std::string name_;
   const std::regex regex_;
+};
+
+class TagProducerImpl : public TagProducer {
+public:
+  TagProducerImpl(const envoy::api::v2::StatsConfig& config);
+  TagProducerImpl() {}
+
+  /**
+   * Take a metric name and a vector then add proper tags into the vector and
+   * return an extracted metric name.
+   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
+   * @param tags std::vector a set of Stats::Tag.
+   */
+  std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
+
+private:
+  void reserveResources(const envoy::api::v2::StatsConfig& config);
+  void addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
+                            std::unordered_set<std::string>& names);
+
+  std::vector<TagExtractorPtr> tag_extractors_;
+  std::vector<Tag> default_tags_;
 };
 
 /**

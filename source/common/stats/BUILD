@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["stats_impl.h"],
     external_deps = [
         "abseil_strings",
-        "envoy_bootstrap",
+        "envoy_stats",
     ],
     deps = [
         "//include/envoy/common:time_interface",

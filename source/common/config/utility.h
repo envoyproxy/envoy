@@ -17,6 +17,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "api/base.pb.h"
+#include "api/bootstrap.pb.h"
 #include "api/cds.pb.h"
 #include "api/eds.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
@@ -230,13 +231,12 @@ public:
   static std::string resourceName(const ProtobufWkt::Any& resource);
 
   /**
-   * Creates the set of stats tag extractors requested by the config and transfers ownership to the
-   * caller.
+   * Create TagProducer instance. Check all tag names for conflicts to avoid
+   * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
-   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
+   * @throws EnvoyException when the conflict of tag names is found.
    */
-  static std::vector<Stats::TagExtractorPtr>
-  createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr createTagProducer(const envoy::api::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

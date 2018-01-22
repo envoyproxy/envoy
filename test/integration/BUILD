@@ -317,6 +317,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stats_integration_test",
+    srcs = ["stats_integration_test.cc"],
+    external_deps = [
+        "envoy_bootstrap",
+        "envoy_stats",
+    ],
+    deps = [
+        ":integration_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
     external_deps = ["envoy_eds"],

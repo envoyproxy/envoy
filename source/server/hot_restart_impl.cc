@@ -117,9 +117,15 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), stats_set_options_(sharedMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
-      stats_set_(stats_set_options_, options.restartEpoch() == 0, shmem_.stats_set_data_),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
+  {
+    // We must hold the stat lock when attaching to an existing shared-memory segment
+    // because it might be actively written to while we sanityCheck it.
+    std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+    stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
+                                        shmem_.stats_set_data_));
+  }
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
@@ -141,7 +147,7 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
   }
-  auto value_created = stats_set_.insert(key);
+  auto value_created = stats_set_->insert(key);
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
     return nullptr;
@@ -162,7 +168,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   if (--data.ref_count_ > 0) {
     return;
   }
-  bool key_removed = stats_set_.remove(data.key());
+  bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
   UNREFERENCED_PARAMETER(key_removed);
   memset(&data, 0, Stats::RawStatData::size());
@@ -474,7 +480,7 @@ void HotRestartImpl::terminateParent() {
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() {
-  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), stats_set_);
+  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), *stats_set_);
 }
 
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
