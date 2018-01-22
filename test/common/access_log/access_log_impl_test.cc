@@ -90,6 +90,8 @@ public:
     return downstream_remote_address_;
   }
 
+  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+
   SystemTime start_time_;
   Optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
   Optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};
@@ -102,6 +104,7 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Router::RouteEntry* route_entry_{};
 };
 
 class AccessLogImplTest : public testing::Test {

@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Ssl {
 
+static const std::string INLINE_STRING = "<inline>";
+
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
   // Ssl::ContextConfig
@@ -19,9 +21,18 @@ public:
   const std::string& altAlpnProtocols() const override { return alt_alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
-  const std::string& caCertFile() const override { return ca_cert_file_; }
-  const std::string& certChainFile() const override { return cert_chain_file_; }
-  const std::string& privateKeyFile() const override { return private_key_file_; }
+  const std::string& caCert() const override { return ca_cert_; }
+  const std::string& caCertPath() const override {
+    return (ca_cert_path_.empty() && !ca_cert_.empty()) ? INLINE_STRING : ca_cert_path_;
+  }
+  const std::string& certChain() const override { return cert_chain_; }
+  const std::string& certChainPath() const override {
+    return (cert_chain_path_.empty() && !cert_chain_.empty()) ? INLINE_STRING : cert_chain_path_;
+  }
+  const std::string& privateKey() const override { return private_key_; }
+  const std::string& privateKeyPath() const override {
+    return (private_key_path_.empty() && !private_key_.empty()) ? INLINE_STRING : private_key_path_;
+  }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
   };
@@ -31,6 +42,10 @@ public:
 
 protected:
   ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config);
+
+  static const std::string readDataSource(const envoy::api::v2::DataSource& source,
+                                          bool allow_empty);
+  static const std::string getDataSourcePath(const envoy::api::v2::DataSource& source);
 
 private:
   static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
@@ -43,9 +58,12 @@ private:
   const std::string alt_alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
-  const std::string ca_cert_file_;
-  const std::string cert_chain_file_;
-  const std::string private_key_file_;
+  const std::string ca_cert_;
+  const std::string ca_cert_path_;
+  const std::string cert_chain_;
+  const std::string cert_chain_path_;
+  const std::string private_key_;
+  const std::string private_key_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::string verify_certificate_hash_;
   const unsigned min_protocol_version_;

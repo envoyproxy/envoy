@@ -147,7 +147,7 @@ struct ClusterManagerStats {
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-                     Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+                     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& primary_dispatcher);
@@ -184,6 +184,7 @@ public:
   }
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
+  Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
@@ -302,6 +303,7 @@ private:
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
+  Grpc::AsyncClientManagerPtr async_client_manager_;
 };
 
 } // namespace Upstream

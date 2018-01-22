@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -269,6 +270,22 @@ public:
    * Finds the next prime number larger than x.
    */
   static uint32_t findPrimeLargerThan(uint32_t x);
+};
+
+/**
+ * Utilities for constructing regular expressions.
+ */
+class RegexUtil {
+public:
+  /*
+   * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
+   * @param regex std::string containing the regular expression to parse.
+   * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
+   * @return std::regex constructed from regex and flags
+   * @throw EnvoyException if the regex string is invalid.
+   */
+  static std::regex parseRegex(const std::string& regex,
+                               std::regex::flag_type flags = std::regex::optimize);
 };
 
 } // namespace Envoy

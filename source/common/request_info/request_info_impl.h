@@ -74,6 +74,8 @@ struct RequestInfoImpl : public RequestInfo {
     return downstream_remote_address_;
   }
 
+  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+
   Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -88,6 +90,7 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Router::RouteEntry* route_entry_{};
 };
 
 } // namespace RequestInfo

@@ -20,15 +20,6 @@ LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::Node& node,
   establishNewStream();
 }
 
-LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::Node& node,
-                                     ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     const std::string& remote_cluster_name,
-                                     Event::Dispatcher& dispatcher)
-    : LoadStatsReporter(
-          node, cluster_manager, scope,
-          std::make_unique<Grpc::AsyncClientImpl>(cluster_manager, remote_cluster_name),
-          dispatcher) {}
-
 void LoadStatsReporter::setRetryTimer() {
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }

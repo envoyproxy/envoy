@@ -8,8 +8,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_split.h"
+#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -255,6 +258,16 @@ uint32_t Primes::findPrimeLargerThan(uint32_t x) {
     x += 2;
   }
   return x;
+}
+
+std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type flags) {
+  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
+  // may allow us to remove this in favor of direct validation of regular expressions.
+  try {
+    return std::regex(regex, flags);
+  } catch (const std::regex_error& e) {
+    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
+  }
 }
 
 } // namespace Envoy

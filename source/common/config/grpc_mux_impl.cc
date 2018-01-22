@@ -15,14 +15,6 @@ GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr 
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
 }
 
-GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node,
-                         Upstream::ClusterManager& cluster_manager,
-                         const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-                         const Protobuf::MethodDescriptor& service_method)
-    : GrpcMuxImpl(node,
-                  std::make_unique<Grpc::AsyncClientImpl>(cluster_manager, remote_cluster_name),
-                  dispatcher, service_method) {}
-
 GrpcMuxImpl::~GrpcMuxImpl() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {

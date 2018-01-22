@@ -190,8 +190,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  tag_extractors_ = Config::Utility::createTagExtractors(bootstrap);
-  stats_store_.setTagExtractors(tag_extractors_);
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap));
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});

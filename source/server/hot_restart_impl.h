@@ -210,7 +210,7 @@ private:
   Options& options_;
   SharedMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
-  RawStatDataSet stats_set_;
+  std::unique_ptr<RawStatDataSet> stats_set_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;
