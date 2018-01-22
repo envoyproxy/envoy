@@ -1042,5 +1042,133 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
                             "chains is currently not supported");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
+  const std::string yaml = R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIC3jCCAkegAwIBAgIJAJvUixVO/5pTMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE4MDExNTIyNDAyN1oXDTI4MDExMzIyNDAyN1ow\ngYMxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1T\nYW4gRnJhbmNpc2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2lu\nZWVyaW5nMR0wGwYDVQQDDBRUZXN0IEludGVybWVkaWF0ZSBDQTCBnzANBgkqhkiG\n9w0BAQEFAAOBjQAwgYkCgYEAxd1kOhV+/2n+rJWKvrtkyyqkWgBXXhH15G9cusaR\nzJtwxsvtPRYZ9nTc+A6GDFgZ0TS1sq/WJXfs3guMpFObXU+tSlezxHVRpWPTXKff\nhblqtZMPKW5q5LmOHxKi8GUxwDnEeAiZmzstGCYkRKn+GmLYe26vFGBw4MvM89Vm\necMCAwEAAaNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYw\nHQYDVR0OBBYEFIuDOLnI5iZPpH230VFAuWeNYuWdMB8GA1UdIwQYMBaAFDt4pFFP\nFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAGO77sBFzn63pM2Oy4XS\n+FEcFj/lB4vBh4r8jtzdf5EMaKUeXY9i57MTryPTJZRFXW6BuQ/B3hiOW2fwkCdL\neHd0MwGv95cn1PCWZh1IidVrtrDeu0oLxhRk5mcflaaLBuGADUD3Y1ms2sl90Ean\n6C+0EHH2O6Emesx9IhPZRx4H\n-----END CERTIFICATE-----" }
+              private_key: { inline_string: "-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQCxhu9J/53yAeuCx+o62qsaSdxFDvoC/ypBxuPv4UDDGaXoT3XB\n2u749XnwYGmnXbY0Wdxi0khfevDtfRGzMI0JdQM8J90JfEnXUIclt9P0P44GOeDJ\nwwRoG+cYW+7XX4xr2fpSmqbvRcqU3K63v8F0sAUrJptpntAgjQGSnXcjMwIDAQAB\nAoGAJk4kQcZLEVYCuDRkwRA/zStUwP3rSkw+lPTSaAcljzNwjgDfOtX/rG5jQk+7\nXGanEwK0wAn5nciMReIvuIdoVt7zEtFygZ7D3yKh+Ywu0AYC8TaiszAaL0efMnAW\nMtpgyrAoMB4bFON3oyNVZM161+cdrU0PrEDqh+GHl8abpokCQQDfn2jE3WmS/a36\n2Dt/e3yjNE/4xDshAcHkNmF+jpcB66bls5ZU5Yv07RUVExQ30fw3v+ADMxmNYg2f\nqpAF2getAkEAyzr9GwgdKeruErwlLhMOG327zTcZlHZXU5Q378/S3bKi3c/voGCb\nexKjxRBZTzSw5hfrOzbCEpMLcwZaoBiyXwJBAJAH2XAq98vQDpXpXfEPNUjc8cFV\niowI2LxHdmYQKxz2jemW0PXfX1Siuxh20GffnOa/c+Y7rHKOvB2hut+5/YUCQQCF\nnBx2vxjdTBSEwKj455IoxLrJKeZpUnwK+LDluo35Ls4gYeo6WAkgGpsMnbj5d7yt\nKSB/Z3qj14R5dL3z7wilAkEAp78JPrvWP5zc3YOmmr9s8IQ3almspwnlh1mdcgoX\n4rHe3U4jRZwE6fw8W9G4QsFRlez1Re6g8T7yoFXiZETGqQ==\n-----END RSA PRIVATE KEY-----" }
+          validation_context:
+              trusted_ca: { inline_string: "-----BEGIN CERTIFICATE-----\nMIICzTCCAjagAwIBAgIJAOrzsOodDleaMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE3MDcwOTAxMzkzMloXDTI3MDcwNzAxMzkzMlow\ndjELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\nbiBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\nZXJpbmcxEDAOBgNVBAMTB1Rlc3QgQ0EwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJ\nAoGBAJuJh8N5TheTHLKOxsLSAfiIu9VDeKPsV98KRJJaYCMoaof3j9wBs65HzIat\nAunuV4DVZZ2c/x7/v741oWadYd3yqL7XSzQaeBvhXi+wv3g17FYrdxaowG7cfmsh\ngCp7/9TRW0bRGL6Qp6od/u62L8dprdHXxnck/+sZMupam9YrAgMBAAGjYzBhMA8G\nA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBQ7eKRRTxaE\nkxxIKHoMrSuWQcp9eTAfBgNVHSMEGDAWgBQ7eKRRTxaEkxxIKHoMrSuWQcp9eTAN\nBgkqhkiG9w0BAQsFAAOBgQCN00/2k9k8HNeJ8eYuFH10jnc+td7+OaYWpRSEKCS7\nux3KAu0UFt90mojEMClt4Y6uP4oXTWbRzMzAgQHldHU8Gkj8tYnv7mToX7Bh/xdc\n19epzjCmo/4Q6+16GZZvltiFjkkHSZEVI5ggljy1QdMIPRegsKKmX9mjZSCSSXD6\nSA==\n-----END CERTIFICATE-----" }
+  )EOF";
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateKeyFilename) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIC3jCCAkegAwIBAgIJAJvUixVO/5pTMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE4MDExNTIyNDAyN1oXDTI4MDExMzIyNDAyN1ow\ngYMxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1T\nYW4gRnJhbmNpc2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2lu\nZWVyaW5nMR0wGwYDVQQDDBRUZXN0IEludGVybWVkaWF0ZSBDQTCBnzANBgkqhkiG\n9w0BAQEFAAOBjQAwgYkCgYEAxd1kOhV+/2n+rJWKvrtkyyqkWgBXXhH15G9cusaR\nzJtwxsvtPRYZ9nTc+A6GDFgZ0TS1sq/WJXfs3guMpFObXU+tSlezxHVRpWPTXKff\nhblqtZMPKW5q5LmOHxKi8GUxwDnEeAiZmzstGCYkRKn+GmLYe26vFGBw4MvM89Vm\necMCAwEAAaNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYw\nHQYDVR0OBBYEFIuDOLnI5iZPpH230VFAuWeNYuWdMB8GA1UdIwQYMBaAFDt4pFFP\nFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAGO77sBFzn63pM2Oy4XS\n+FEcFj/lB4vBh4r8jtzdf5EMaKUeXY9i57MTryPTJZRFXW6BuQ/B3hiOW2fwkCdL\neHd0MwGv95cn1PCWZh1IidVrtrDeu0oLxhRk5mcflaaLBuGADUD3Y1ms2sl90Ean\n6C+0EHH2O6Emesx9IhPZRx4H\n-----END CERTIFICATE-----" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true), EnvoyException,
+      TestEnvironment::substitute("Failed to load incomplete certificate from {{ test_rundir }}"
+                                  "/test/common/ssl/test_data/san_dns_chain3.pem, ",
+                                  Network::Address::IpVersion::v4));
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateChain) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "invalid" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load certificate chain from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediateCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\ninvalid" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load certificate chain from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+              private_key: { inline_string: "invalid" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load private key from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+          validation_context:
+              trusted_ca: { inline_string: "invalid" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load trusted CA certificates from <inline>");
+}
+
 } // namespace Server
 } // namespace Envoy

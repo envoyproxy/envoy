@@ -4,10 +4,12 @@ set -e
 
 # Uncomment the following lines if you want to regenerate the private keys.
 # openssl genrsa -out ca_key.pem 1024
+# openssl genrsa -out intermediate_ca_key.pem 1024
 # openssl genrsa -out fake_ca_key.pem 1024
 # openssl genrsa -out no_san_key.pem 1024
 # openssl genrsa -out san_dns_key.pem 1024
 # openssl genrsa -out san_dns_key2.pem 1024
+# openssl genrsa -out san_dns_key3.pem 1024
 # openssl genrsa -out san_multiple_dns_key.pem 1024
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
@@ -16,6 +18,10 @@ set -e
 # Generate ca_cert.pem.
 openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
 openssl x509 -req -days 3650 -in ca_cert.csr -signkey ca_key.pem -out ca_cert.pem -extensions v3_ca -extfile ca_cert.cfg
+
+# Generate intermediate_ca_cert.pem.
+openssl req -new -key intermediate_ca_key.pem -out intermediate_ca_cert.csr -config intermediate_ca_cert.cfg -batch -sha256
+openssl x509 -req -days 3650 -in intermediate_ca_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out intermediate_ca_cert.pem -extensions v3_ca -extfile intermediate_ca_cert.cfg
 
 # Generate fake_ca_cert.pem.
 openssl req -new -key fake_ca_key.pem -out fake_ca_cert.csr -config fake_ca_cert.cfg -batch -sha256
@@ -32,9 +38,16 @@ openssl x509 -req -days 730 -in no_san_cert.csr -sha256 -CA ca_cert.pem -CAkey c
 openssl req -new -key san_dns_key.pem -out san_dns_cert.csr -config san_dns_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_dns_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_dns_cert.pem -extensions v3_ca -extfile san_dns_cert.cfg
 
-# Generate san_dns_cert2.pem.
+# Generate san_dns_cert2.pem (duplicate of san_dns_cert.pem, but with a different private key).
 openssl req -new -key san_dns_key2.pem -out san_dns_cert2.csr -config san_dns_cert.cfg -batch -sha256
 openssl x509 -req -days 730 -in san_dns_cert2.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out san_dns_cert2.pem -extensions v3_ca -extfile san_dns_cert.cfg
+
+# Generate san_dns_cert3.pem (signed by intermediate_ca_cert.pem).
+openssl req -new -key san_dns_key3.pem -out san_dns_cert3.csr -config san_dns_cert.cfg -batch -sha256
+openssl x509 -req -days 730 -in san_dns_cert3.csr -sha256 -CA intermediate_ca_cert.pem -CAkey intermediate_ca_key.pem -CAcreateserial -out san_dns_cert3.pem -extensions v3_ca -extfile san_dns_cert.cfg
+
+# Concatenate san_dns_cert3.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
+cat san_dns_cert3.pem intermediate_ca_cert.pem > san_dns_chain3.pem
 
 # Generate san_multiple_dns_cert.pem.
 openssl req -new -key san_multiple_dns_key.pem -out san_multiple_dns_cert.csr -config san_multiple_dns_cert.cfg -batch -sha256

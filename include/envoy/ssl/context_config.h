@@ -39,19 +39,37 @@ public:
   virtual const std::string& ecdhCurves() const PURE;
 
   /**
-   * @return The CA certificate file to use for peer validation.
+   * @return The CA certificate to use for peer validation.
    */
-  virtual const std::string& caCertFile() const PURE;
+  virtual const std::string& caCert() const PURE;
 
   /**
-   * @return The certificate chain file used to identify the local side.
+   * @return Path of the CA certificate to use for peer validation or "<inline>"
+   * if the CA certificate was inlined.
    */
-  virtual const std::string& certChainFile() const PURE;
+  virtual const std::string& caCertPath() const PURE;
 
   /**
-   * @return The private key chain file used to identify the local side.
+   * @return The certificate chain used to identify the local side.
    */
-  virtual const std::string& privateKeyFile() const PURE;
+  virtual const std::string& certChain() const PURE;
+
+  /**
+   * @return Path of the certificate chain used to identify the local side or "<inline>"
+   * if the certificate chain was inlined.
+   */
+  virtual const std::string& certChainPath() const PURE;
+
+  /**
+   * @return The private key used to identify the local side.
+   */
+  virtual const std::string& privateKey() const PURE;
+
+  /**
+   * @return Path of the private key used to identify the local side or "<inline>"
+   * if the private key was inlined.
+   */
+  virtual const std::string& privateKeyPath() const PURE;
 
   /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""
