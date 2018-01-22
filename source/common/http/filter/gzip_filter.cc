@@ -194,8 +194,8 @@ bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
   return true;
 }
 
-// TODO(gsagula): It seems that every proxy has a different opinion how handle Etag. Some
-// discussions around this topic have been going on for over a decade e.g.,
+// TODO(gsagula): It seems that every proxy has a different opinion how to handle Etag. Some
+// discussions around this topic have been going on for over a decade, e.g.,
 // https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
 // This design attempts to stay more on the safe side by preserving weak etags and removing
 // the strong ones when disable_on_etag_header is false. Envoy does NOT rewrite Etags.
