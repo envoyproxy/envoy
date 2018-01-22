@@ -97,7 +97,6 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   }
   if (end_stream) {
     trailerResponse(grpc_status, grpc_message);
-    return;
   }
 }
 
@@ -126,7 +125,6 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
     Http::HeaderMapPtr empty_trailers = std::make_unique<Http::HeaderMapImpl>();
     callbacks_.onReceiveTrailingMetadata(std::move(empty_trailers));
     streamError(Status::GrpcStatus::Unknown);
-    return;
   }
 }
 
