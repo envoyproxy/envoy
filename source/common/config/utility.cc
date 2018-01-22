@@ -14,6 +14,7 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
+#include "api/stats.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -163,35 +164,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-std::vector<Stats::TagExtractorPtr>
-Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
-  std::vector<Stats::TagExtractorPtr> tag_extractors;
-
-  // Ensure no tag names are repeated.
-  std::unordered_set<std::string> names;
-  auto add_tag = [&names, &tag_extractors](const std::string& name, const std::string& regex) {
-    if (!names.emplace(name).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
-    }
-
-    tag_extractors.emplace_back(Stats::TagExtractorImpl::createTagExtractor(name, regex));
-  };
-
-  // Add defaults.
-  if (!bootstrap.stats_config().has_use_all_default_tags() ||
-      bootstrap.stats_config().use_all_default_tags().value()) {
-    for (const std::pair<std::string, std::string>& default_tag :
-         TagNames::get().name_regex_pairs_) {
-      add_tag(default_tag.first, default_tag.second);
-    }
-  }
-
-  // Add custom tags.
-  for (const envoy::api::v2::TagSpecifier& tag_specifier : bootstrap.stats_config().stats_tags()) {
-    add_tag(tag_specifier.tag_name(), tag_specifier.regex());
-  }
-
-  return tag_extractors;
+Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {

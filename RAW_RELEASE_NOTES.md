@@ -34,6 +34,8 @@ final version.
   cluster must be statically defined and be of non-EDS type.
 * Added support for route matching based on URL query string parameters.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
+* Added support for :ref:`fixed stats tag values
+  <envoy_api_field_TagSpecifier.fixed_value>` which will be added to all metrics.
 * Added `/runtime` admin endpoint to read the current runtime values.
 * Added `gateway-error` retry-on policy.
 * Added support for building envoy with exported symbols
