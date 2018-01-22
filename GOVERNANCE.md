@@ -35,14 +35,23 @@
 * Monitor email aliases.
 * Monitor Slack (delayed response is perfectly acceptable).
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
+  The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
+  an issue/question to the right person.
+* Make sure that ongoing PRs are moving forward at the right pace or closing them.
 * Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
   that although this should be a rare occurrence, if a serious vulnerability is found, the process
   may take up to several full days of work to implement. This reality should be taken into account
   when discussing time commitment obligations with employers.
 * In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
   business days per week).
-* Note that currently the above is performed by all maintainers in a best-effort/haphazard way. In
-  the future we may decide to move to an "on-call" rotation.
+* We currently maintain an "on-call" rotation within the maintainers. Each on-call is 1 week.
+  Although all maintainers are welcome to perform all of the above tasks, it is the on-call
+  maintainer's responsibility to triage incoming issues/questions and marshal ongoing work
+  forward. To reiterate, it is *not* the responsibility of the on-call maintainer to answer all
+  questions and do all reviews, but it is their responsibility to make sure that everything is
+  being actively covered by someone.
+* The on-call rotation is currently tracked in a [spreadsheet](https://docs.google.com/spreadsheets/d/11RIjkGZIe_lQQMeJbxRc-YTGuGG7yPU15Gx8uu-k2No/edit#gid=0).
+  In the future we will move to a service such as PagerDuty once CNCF sets it up for us.
 
 ## When does a maintainer lose maintainer status
 
