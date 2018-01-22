@@ -43,7 +43,7 @@ HealthCheckFilterConfig::createFilter(const envoy::api::v2::filter::http::Health
                                                     std::chrono::milliseconds(cache_time_ms)));
   }
 
-  ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages;
+  ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;
   if (!pass_through_mode && !proto_config.cluster_min_healthy_percentages().empty()) {
     auto cluster_to_percentage = std::make_unique<ClusterMinHealthyPercentages>();
     for (const auto& item : proto_config.cluster_min_healthy_percentages()) {
@@ -191,7 +191,9 @@ void HealthCheckFilter::onComplete() {
           }
         }
         // In the general case, consider the service unhealthy if fewer than the
-        // specified percentage of the servers inthe cluster are healthy.
+        // specified percentage of the servers in the cluster are healthy.
+        // TODO(brian-pane) switch to purely integer-based math here, because the
+        //                  int-to-float conversions and floating point division are slow.
         if (stats.membership_healthy_.value() < membership_total * min_healthy_percentage / 100.0) {
           final_status = Http::Code::ServiceUnavailable;
           break;

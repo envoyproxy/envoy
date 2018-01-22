@@ -38,9 +38,9 @@ public:
     prepareFilter(pass_through);
   }
 
-  void
-  prepareFilter(bool pass_through,
-                ClusterMinHealthyPercentagesSharedPtr cluster_min_healthy_percentages = nullptr) {
+  void prepareFilter(
+      bool pass_through,
+      ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages = nullptr) {
     filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, "/healthcheck",
                                         cluster_min_healthy_percentages));
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -118,7 +118,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
   }
 
   // Test non-pass-through health checks with upstream cluster minimum health specified.
-  prepareFilter(false, ClusterMinHealthyPercentagesSharedPtr(
+  prepareFilter(false, ClusterMinHealthyPercentagesConstSharedPtr(
                            new ClusterMinHealthyPercentages{{"www1", 50.0}, {"www2", 75.0}}));
   {
     // This should pass, because each upstream cluster has at least the
@@ -164,8 +164,8 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
               filter_->decodeHeaders(request_headers_, true));
   }
   // Test the cases where an upstream cluster is empty, or has no healthy servers, but
-  // the minimum required percent healthy is zero. The hhealth check should return a 200.
-  prepareFilter(false, ClusterMinHealthyPercentagesSharedPtr(
+  // the minimum required percent healthy is zero. The health check should return a 200.
+  prepareFilter(false, ClusterMinHealthyPercentagesConstSharedPtr(
                            new ClusterMinHealthyPercentages{{"www1", 0.0}, {"www2", 0.0}}));
   {
     Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
