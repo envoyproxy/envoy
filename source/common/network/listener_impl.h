@@ -24,7 +24,7 @@ protected:
 
   Address::InstanceConstSharedPtr local_address_;
   ListenerCallbacks& cb_;
-  bool hand_off_restored_destinations_;
+  const bool hand_off_restored_destinations_;
 
 private:
   static void errorCallback(evconnlistener* listener, void* context);
