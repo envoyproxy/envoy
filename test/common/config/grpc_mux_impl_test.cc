@@ -80,7 +80,6 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   auto bar_zz_sub = grpc_mux_->subscribe("bar", {"zz"}, callbacks_);
   expectSendMessage("bar", {"z"}, "");
   expectSendMessage("bar", {}, "");
-  expectSendMessage("bar", {}, "");
   expectSendMessage("foo", {}, "");
 }
 
@@ -106,7 +105,6 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   timer_cb_();
 
   expectSendMessage("baz", {}, "");
-  expectSendMessage("bar", {}, "");
   expectSendMessage("foo", {}, "");
 }
 
@@ -190,8 +188,6 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
     expectSendMessage(type_url, {}, "1");
     grpc_mux_->onReceiveMessage(std::move(response));
   }
-
-  expectSendMessage(type_url, {}, "1");
 }
 
 // Validate behavior when watches specify resources (potentially overlapping).
