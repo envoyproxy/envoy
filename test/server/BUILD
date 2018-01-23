@@ -123,6 +123,7 @@ envoy_cc_test(
     data = ["//test/common/ssl/test_data:certs"],
     deps = [
         ":utility_lib",
+        "//source/common/config:metadata_lib",
         "//source/server:listener_manager_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/server:server_mocks",

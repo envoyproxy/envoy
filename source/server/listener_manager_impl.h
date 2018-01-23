@@ -231,6 +231,7 @@ public:
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
   Admin& admin() override { return parent_.server_.admin(); }
+  const envoy::api::v2::Metadata& listenerMetadata() const override { return metadata_; };
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -259,6 +260,7 @@ private:
   std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
+  const envoy::api::v2::Metadata metadata_;
 };
 
 } // namespace Server
