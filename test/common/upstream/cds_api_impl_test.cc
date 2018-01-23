@@ -39,6 +39,8 @@ public:
     }
     )EOF";
 
+    envoy::service::discovery::v2::CdsDummy dummy;
+
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
