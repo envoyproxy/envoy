@@ -30,6 +30,7 @@ using testing::_;
 
 namespace Envoy {
 namespace Http {
+namespace {
 
 class AsyncClientImplTest : public testing::Test {
 public:
@@ -862,5 +863,6 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
+} // namespace
 } // namespace Http
 } // namespace Envoy
