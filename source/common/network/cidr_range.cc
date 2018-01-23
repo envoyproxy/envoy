@@ -188,8 +188,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 
     absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address());
     // The maximum number stored in absl::uint128 has every bit set to 1.
-    absl::uint128 max_int = absl::MakeUint128(std::numeric_limits<uint64_t>::max(),
-                                              std::numeric_limits<uint64_t>::max());
+    absl::uint128 max_int = absl::Uint128Max();
     // Shifting the value to the left set all bits between 128-length and 128 to zero.
     max_int <<= (128 - length);
     ip6 &= max_int;
