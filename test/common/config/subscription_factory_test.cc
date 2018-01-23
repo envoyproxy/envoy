@@ -114,6 +114,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST);
   api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("eds_cluster", cluster);
@@ -137,10 +138,11 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 
-TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
+// Confirm error when no refresh delay is set (not checked by schema).
+TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   envoy::api::v2::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
-  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::REST);
   api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
@@ -148,18 +150,35 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "refresh_delay is required for REST API configuration sources");
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
+  envoy::api::v2::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
+  api_config_source->add_cluster_names("eds_cluster");
+  envoy::api::v2::GrpcService expected_grpc_service;
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("eds_cluster");
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("eds_cluster", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+  EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(ProtoEq(expected_grpc_service), _))
+      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+        auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        }));
+        return async_client_factory;
+      }));
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
-  NiceMock<Http::MockAsyncClientStream> stream;
-  EXPECT_CALL(cm_.async_client_, start(_, _, false)).WillOnce(Return(&stream));
-  Http::TestHeaderMapImpl headers{
-      {":method", "POST"},
-      {":path", "/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints"},
-      {":authority", "eds_cluster"},
-      {"content-type", "application/grpc"},
-      {"te", "trailers"}};
-  EXPECT_CALL(stream, sendHeaders(HeaderMapEqualRef(&headers), _));
-  EXPECT_CALL(cm_.async_client_.dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
 }
 

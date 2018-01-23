@@ -2,13 +2,17 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <iterator>
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_split.h"
+#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -230,6 +234,40 @@ std::string StringUtil::toUpper(absl::string_view s) {
   upper_s.reserve(s.size());
   std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+bool Primes::isPrime(uint32_t x) {
+  if (x < 4) {
+    return true; // eliminates special-casing 2.
+  } else if ((x & 1) == 0) {
+    return false; // eliminates even numbers >2.
+  }
+
+  uint32_t limit = sqrt(x);
+  for (uint32_t factor = 3; factor <= limit; factor += 2) {
+    if ((x % factor) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint32_t Primes::findPrimeLargerThan(uint32_t x) {
+  x += (x % 2) + 1;
+  while (!isPrime(x)) {
+    x += 2;
+  }
+  return x;
+}
+
+std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type flags) {
+  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
+  // may allow us to remove this in favor of direct validation of regular expressions.
+  try {
+    return std::regex(regex, flags);
+  } catch (const std::regex_error& e) {
+    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
+  }
 }
 
 } // namespace Envoy

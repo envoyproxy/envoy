@@ -8,6 +8,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
@@ -127,6 +128,11 @@ public:
    * @return GrpcMux& ADS API provider referencee.
    */
   virtual Config::GrpcMux& adsMux() PURE;
+
+  /**
+   * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
+   */
+  virtual Grpc::AsyncClientManager& grpcAsyncClientManager() PURE;
 
   /**
    * Return the current version info string for dynamic clusters, if CDS is setup.

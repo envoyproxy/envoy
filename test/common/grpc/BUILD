@@ -27,6 +27,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "async_client_manager_impl_test",
+    srcs = ["async_client_manager_impl_test.cc"],
+    deps = [
+        "//source/common/grpc:async_client_manager_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
     deps = [

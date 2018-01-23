@@ -19,6 +19,8 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
+#include "api/base.pb.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -393,6 +395,12 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  /**
+   * @return const envoy::api::v2::Metadata& return the metadata provided in the config for this
+   * route.
+   */
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
 };
 
 /**

@@ -119,22 +119,34 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-TEST(RateLimitGrpcFactoryTest, NoCluster) {
-  envoy::api::v2::RateLimitServiceConfig config;
-  config.set_cluster_name("foo");
-  Upstream::MockClusterManager cm;
-
-  EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
-  EXPECT_THROW(GrpcFactoryImpl(config, cm), EnvoyException);
-}
-
 TEST(RateLimitGrpcFactoryTest, Create) {
   envoy::api::v2::RateLimitServiceConfig config;
-  config.set_cluster_name("foo");
-  Upstream::MockClusterManager cm;
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("foo");
+  Grpc::MockAsyncClientManager async_client_manager;
+  Stats::MockStore scope;
+  EXPECT_CALL(async_client_manager,
+              factoryForGrpcService(ProtoEq(config.grpc_service()), Ref(scope)))
+      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  GrpcFactoryImpl factory(config, async_client_manager, scope);
+  factory.create(Optional<std::chrono::milliseconds>());
+}
 
-  EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));
-  GrpcFactoryImpl factory(config, cm);
+// TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
+TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
+  envoy::api::v2::RateLimitServiceConfig config;
+  config.set_cluster_name("foo");
+  Grpc::MockAsyncClientManager async_client_manager;
+  Stats::MockStore scope;
+  envoy::api::v2::GrpcService expected_grpc_service;
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  EXPECT_CALL(async_client_manager,
+              factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope)))
+      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  GrpcFactoryImpl factory(config, async_client_manager, scope);
   factory.create(Optional<std::chrono::milliseconds>());
 }
 
