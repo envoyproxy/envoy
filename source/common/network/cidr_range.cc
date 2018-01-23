@@ -189,8 +189,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     // The maximum number stored in absl::uint128 has every bit set to 1.
     absl::uint128 max_int = absl::MakeUint128(std::numeric_limits<uint64_t>::max(),
                                               std::numeric_limits<uint64_t>::max());
-    // When shifting the value to ththe left, all bits between 128-length and
-    // 128 are set to zero.
+    // Shifting the value to the left set all bits between 128-length and 128 to zero.
     max_int <<= (128 - length);
     ip6 &= max_int;
 
