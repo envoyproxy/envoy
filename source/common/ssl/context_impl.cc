@@ -170,10 +170,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     for (const X509_INFO* item : list.get()) {
       if (item->crl) {
         X509_STORE_add_crl(cs, item->crl);
-
-        // We need to hold an additional reference to the CRL, or our stack's
-        // destructor will free it.
-        X509_CRL_up_ref(item->crl);
       }
     }
 
