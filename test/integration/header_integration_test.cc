@@ -105,7 +105,7 @@ public:
       ASSERT(static_resources->clusters_size() == 1);
 
       static_resources->mutable_clusters(0)->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(
+          TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(
               R"EOF(
                   name: cluster_0
                   type: EDS
@@ -122,7 +122,7 @@ public:
       // host must come before the eds-cluster's host to keep the upstreams and ports in the same
       // order.
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(fmt::format(
               R"EOF(
                       name: unused-cluster
                       type: STATIC
@@ -135,7 +135,7 @@ public:
               Network::Test::getLoopbackAddressString(version_))));
 
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(fmt::format(
               R"EOF(
                       name: eds-cluster
                       type: STATIC

@@ -19,7 +19,7 @@ namespace Configuration {
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
   const auto& sink_config =
-      MessageUtil::downcastAndValidate<const envoy::api::v2::MetricsServiceConfig&>(config);
+      MessageUtil::downcastAndValidate<const envoy::service::metrics::v2::MetricsServiceConfig&>(config);
   const auto& grpc_service = sink_config.grpc_service();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
@@ -34,8 +34,8 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::api::v2::MetricsServiceConfig>(
-      std::make_unique<envoy::api::v2::MetricsServiceConfig>());
+  return std::unique_ptr<envoy::service::metrics::v2::MetricsServiceConfig>(
+      std::make_unique<envoy::service::metrics::v2::MetricsServiceConfig>());
 }
 
 std::string MetricsServiceSinkFactory::name() {

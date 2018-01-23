@@ -114,7 +114,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 }
 
 const std::string testUtilV2(const envoy::api::v2::listener::Listener& server_proto,
-                             const envoy::api::v2::UpstreamTlsContext& client_ctx_proto,
+                             const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
                              const std::string& client_session, bool expect_success,
                              const std::string& expected_protocol_version,
                              const std::string& expected_server_cert_digest,
@@ -1073,7 +1073,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   envoy::api::v2::auth::TlsParameters* server_params =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
   envoy::api::v2::auth::TlsParameters* client_params =
       client_ctx.mutable_common_tls_context()->mutable_tls_params();
 
@@ -1167,7 +1167,7 @@ TEST_P(SslSocketTest, SniCertificate) {
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Connection to server1.example.com succeeds, client receives san_dns_cert.pem (exact match).
   // ssl.handshake logged by both: client & server.
@@ -1259,7 +1259,7 @@ TEST_P(SslSocketTest, SniSessionResumption) {
   filter_chain3->mutable_tls_context()->mutable_session_ticket_keys()->add_keys()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Connection to www.example.com succeeds, new session established.
   client_ctx.set_sni("www.example.com");
@@ -1325,7 +1325,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
   filter_chain2->mutable_tls_context()->mutable_session_ticket_keys()->add_keys()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
   filter_chain2->mutable_tls_context()->mutable_require_client_certificate()->set_value(true);
-  envoy::api::v2::CertificateValidationContext* validation_ctx2 =
+  envoy::api::v2::auth::CertificateValidationContext* validation_ctx2 =
       filter_chain2->mutable_tls_context()
           ->mutable_common_tls_context()
           ->mutable_validation_context();
@@ -1333,7 +1333,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
   validation_ctx2->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Connection to www.example.com succeeds.
   // ssl.handshake logged by both: client & server.
@@ -1395,11 +1395,11 @@ TEST_P(SslSocketTest, SniALPN) {
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test ALPN.
   server_ctx1->add_alpn_protocols("srv1");
@@ -1445,11 +1445,11 @@ TEST_P(SslSocketTest, SniCipherSuites) {
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test cipher suites.
   server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
@@ -1508,11 +1508,11 @@ TEST_P(SslSocketTest, SniEcdhCurves) {
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test ECDH curves.
   server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
@@ -1571,11 +1571,11 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test protocol versions.
   server_ctx1->mutable_tls_params()->set_tls_minimum_protocol_version(

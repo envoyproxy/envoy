@@ -98,7 +98,7 @@ public:
   }
 
   envoy::api::v2::cluster::Cluster buildCluster(const std::string& name) {
-    return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+    return TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: EDS
@@ -189,7 +189,7 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   // Send initial configuration, validate we can process a request.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(
@@ -218,7 +218,7 @@ TEST_P(AdsIntegrationTest, Basic) {
   makeSingleRequest();
 
   // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(
+  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("cluster_1"), buildCluster("cluster_2")}, "2");
   sendDiscoveryResponse<envoy::service::discovery::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
@@ -271,12 +271,12 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().ClusterLoadAssignment,
+  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().ClusterLoadAssignment,
                                                  {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));

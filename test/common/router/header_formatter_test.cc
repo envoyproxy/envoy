@@ -20,15 +20,15 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Router {
 
-static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) {
-  envoy::api::v2::Route route;
+static envoy::api::v2::route::Route parseRouteFromJson(const std::string& json_string) {
+  envoy::api::v2::route::Route route;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRoute(*json_object_ptr, route);
   return route;
 }
 
-static envoy::api::v2::Route parseRouteFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::Route route;
+static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::route::Route route;
   MessageUtil::loadFromYaml(yaml, route);
   return route;
 }

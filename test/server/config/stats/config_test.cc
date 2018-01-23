@@ -87,7 +87,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, DogStatsdConfigLoopbackTest,
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = Config::StatsSinkNames::get().DOG_STATSD;
 
-  envoy::api::v2::DogStatsdSink sink_config;
+  envoy::api::v2::monitoring::DogStatsdSink sink_config;
   envoy::api::v2::Address& address = *sink_config.mutable_address();
   envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
@@ -111,7 +111,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 // Negative test for protoc-gen-validate constraints for dog_statsd.
 TEST(DogStatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
-  EXPECT_THROW(DogStatsdSinkFactory().createStatsSink(envoy::api::v2::DogStatsdSink(), server),
+  EXPECT_THROW(DogStatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::DogStatsdSink(), server),
                ProtoValidationException);
 }
 

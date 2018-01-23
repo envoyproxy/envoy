@@ -295,7 +295,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   envoy::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  envoy::api::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
+  envoy::api::v2::monitoring::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");

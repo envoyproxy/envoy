@@ -42,7 +42,7 @@ GrpcMetricsStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
     : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
 
 void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
-    envoy::api::v2::StreamMetricsMessage& message) {
+    envoy::service::metrics::v2::StreamMetricsMessage& message) {
   if (thread_local_stream_ == nullptr) {
     thread_local_stream_ = std::make_shared<ThreadLocalStream>(*this);
   }

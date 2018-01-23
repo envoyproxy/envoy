@@ -32,7 +32,7 @@ GrpcAccessLogStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
     : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
 
 void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
-    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
+    envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
     const std::string& log_name) {
   auto stream_it = stream_map_.find(log_name);
   if (stream_it == stream_map_.end()) {
@@ -60,7 +60,7 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
 }
 
 HttpGrpcAccessLog::HttpGrpcAccessLog(
-    FilterPtr&& filter, const envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig& config,
+    FilterPtr&& filter, const envoy::service::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
     : filter_(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {}
@@ -150,7 +150,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message;
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message;
   auto* log_entry = message.mutable_http_logs()->add_log_entry();
 
   // Common log properties.

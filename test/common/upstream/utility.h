@@ -61,7 +61,7 @@ inline envoy::api::v2::cluster::Cluster defaultStaticCluster(const std::string& 
   return parseClusterFromJson(defaultStaticClusterJson(name));
 }
 
-inline envoy::api::v2::Cluster
+inline envoy::api::v2::cluster::Cluster
 parseSdsClusterFromJson(const std::string& json_string,
                         const envoy::api::v2::ConfigSource eds_config) {
   envoy::api::v2::cluster::Cluster cluster;

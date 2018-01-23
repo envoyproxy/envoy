@@ -57,7 +57,10 @@ envoy_cc_library(
     name = "grpc_access_log_lib",
     srcs = ["grpc_access_log_impl.cc"],
     hdrs = ["grpc_access_log_impl.h"],
-    external_deps = ["envoy_filter_accesslog"],
+    external_deps = [
+        "envoy_accesslog",
+        "envoy_filter_accesslog",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/grpc:async_client_interface",
