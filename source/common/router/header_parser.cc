@@ -7,8 +7,8 @@
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Router {
@@ -26,7 +26,7 @@ enum class ParserState {
   ExpectVariableEnd          // expect closing % in %VAR(...)%
 };
 
-std::string unescape(absl::string_view sv) { return absl::StrJoin(absl::StrSplit(sv, "%%"), "%"); }
+std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%%", "%"}}); }
 
 // Implements a state machine to parse custom headers. Each character of the custom header format
 // is either literal text (with % escaped as %%) or part of a %VAR% or %VAR(["args"])% expression.
