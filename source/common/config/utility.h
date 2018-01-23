@@ -51,7 +51,7 @@ public:
    */
   template <class ResourceType>
   static Protobuf::RepeatedPtrField<ResourceType>
-  getTypedResources(const envoy::api::v2::DiscoveryResponse& response) {
+  getTypedResources(const envoy::service::discovery::v2::DiscoveryResponse& response) {
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();

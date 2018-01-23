@@ -9,7 +9,7 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/cds_subscription.h"
 
-#include "api/cds.pb.validate.h"
+#include "envoy/api/v2/cluster/cluster.pb.validate.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -30,10 +30,10 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
   subscription_ =
-      Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
+      Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::cluster::Cluster>(
           cds_config, local_info.node(), dispatcher, cm, random, *scope_,
           [this, &cds_config, &eds_config, &cm, &dispatcher, &random,
-           &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
+           &local_info]() -> Config::Subscription<envoy::api::v2::cluster::Cluster>* {
             return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
                                        eds_config, cm, dispatcher, random, local_info);
           },

@@ -54,7 +54,10 @@ envoy_cc_library(
     name = "cds_json_lib",
     srcs = ["cds_json.cc"],
     hdrs = ["cds_json.h"],
-    external_deps = ["envoy_cluster"],
+    external_deps = [
+        "envoy_cluster",
+        "envoy_circuit_breaker",
+    ],
     deps = [
         ":address_json_lib",
         ":json_utility_lib",

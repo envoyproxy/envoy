@@ -11,7 +11,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -46,7 +46,7 @@ public:
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
-    envoy::api::v2::DiscoveryRequest expected_request;
+    envoy::service::discovery::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     for (const auto& cluster : cluster_names) {
       expected_request.add_resource_names(cluster);
@@ -74,8 +74,8 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);

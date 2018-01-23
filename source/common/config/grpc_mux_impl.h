@@ -19,7 +19,7 @@ namespace Config {
  * ADS API implementation that fetches via gRPC.
  */
 class GrpcMuxImpl : public GrpcMux,
-                    Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
+                    Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::DiscoveryResponse>,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
@@ -35,7 +35,7 @@ public:
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void onReceiveMessage(std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -75,7 +75,7 @@ private:
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
-    envoy::api::v2::DiscoveryRequest request_;
+    envoy::service::discovery::v2::DiscoveryRequest request_;
     // Paused via pause()?
     bool paused_{};
     // Was a DiscoveryRequest elided during a pause?

@@ -90,7 +90,7 @@ public:
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                           Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
   }
@@ -100,7 +100,7 @@ public:
     // validation mock.
     return nullptr;
   }
-  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType) override {
+  DrainManagerPtr createDrainManager(envoy::api::v2::listener::Listener::DrainType) override {
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }

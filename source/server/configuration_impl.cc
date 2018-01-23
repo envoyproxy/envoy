@@ -19,7 +19,6 @@
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "api/lds.pb.h"
 #include "envoy/api/v2/monitoring/trace.pb.h"
 #include "fmt/format.h"
 
@@ -81,7 +80,7 @@ void MainImpl::initialize(const envoy::bootstrap::v2::Bootstrap& bootstrap, Inst
   initializeStatsSinks(bootstrap, server);
 }
 
-void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server) {
+void MainImpl::initializeTracers(const envoy::api::v2::monitoring::Tracing& configuration, Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
   if (!configuration.has_http()) {
@@ -110,7 +109,7 @@ void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, I
 void MainImpl::initializeStatsSinks(const envoy::bootstrap::v2::Bootstrap& bootstrap, Instance& server) {
   ENVOY_LOG(info, "loading stats sink configuration");
 
-  for (const envoy::api::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
+  for (const envoy::api::v2::monitoring::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
     ProtobufTypes::MessagePtr message =

@@ -18,7 +18,7 @@ namespace Router {
  * Service.
  */
 class RdsSubscription : public Http::RestApiFetcher,
-                        public Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>,
+                        public Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
   RdsSubscription(Envoy::Config::SubscriptionStats stats,
@@ -29,7 +29,7 @@ public:
 private:
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
-             Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>& callbacks)
+             Envoy::Config::SubscriptionCallbacks<envoy::api::v2::route::RouteConfiguration>& callbacks)
       override {
     // We can only handle a single cluster route configuration, it's a design error to ever use this
     // type of Subscription with more than a single cluster.
@@ -57,7 +57,7 @@ private:
   std::string route_config_name_;
   std::string version_info_;
   const LocalInfo::LocalInfo& local_info_;
-  Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>* callbacks_ = nullptr;
+  Envoy::Config::SubscriptionCallbacks<envoy::api::v2::route::RouteConfiguration>* callbacks_ = nullptr;
   Envoy::Config::SubscriptionStats stats_;
 };
 

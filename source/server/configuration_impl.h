@@ -136,7 +136,7 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server);
+  void initializeTracers(const envoy::api::v2::monitoring::Tracing& configuration, Instance& server);
 
   void initializeStatsSinks(const envoy::bootstrap::v2::Bootstrap& bootstrap, Instance& server);
 

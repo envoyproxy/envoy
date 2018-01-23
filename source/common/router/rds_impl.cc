@@ -13,7 +13,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
 
-#include "api/rds.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -36,7 +36,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
 }
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
-    const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
+    const envoy::api::v2::route::RouteConfiguration& config, Runtime::Loader& runtime,
     Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
@@ -60,10 +60,10 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::RouteConfiguration>(
+      envoy::api::v2::route::RouteConfiguration>(
       rds.config_source(), local_info.node(), dispatcher, cm, random, *scope_,
       [this, &rds, &dispatcher, &random,
-       &local_info]() -> Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>* {
+       &local_info]() -> Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>* {
         return new RdsSubscription(Envoy::Config::Utility::generateStats(*scope_), rds, cm_,
                                    dispatcher, random, local_info);
       },

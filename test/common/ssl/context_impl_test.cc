@@ -179,7 +179,7 @@ public:
 
   static void loadConfigV2(envoy::api::v2::DownstreamTlsContext& cfg) {
     // Must add a certificate for the config to be considered valid.
-    envoy::api::v2::TlsCertificate* server_cert =
+    envoy::api::v2::auth::TlsCertificate* server_cert =
         cfg.mutable_common_tls_context()->add_tls_certificates();
     server_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));

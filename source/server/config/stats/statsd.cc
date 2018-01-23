@@ -19,9 +19,9 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
                                                   Server::Instance& server) {
 
   const auto& statsd_sink =
-      MessageUtil::downcastAndValidate<const envoy::api::v2::StatsdSink&>(config);
+      MessageUtil::downcastAndValidate<const envoy::api::v2::monitoring::StatsdSink&>(config);
   switch (statsd_sink.statsd_specifier_case()) {
-  case envoy::api::v2::StatsdSink::kAddress: {
+  case envoy::api::v2::monitoring::StatsdSink::kAddress: {
     Network::Address::InstanceConstSharedPtr address =
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
@@ -29,7 +29,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address), false));
     break;
   }
-  case envoy::api::v2::StatsdSink::kTcpClusterName:
+  case envoy::api::v2::monitoring::StatsdSink::kTcpClusterName:
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
     return Stats::SinkPtr(new Stats::Statsd::TcpStatsdSink(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
@@ -42,7 +42,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
 }
 
 ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::api::v2::StatsdSink>(new envoy::api::v2::StatsdSink());
+  return std::unique_ptr<envoy::api::v2::monitoring::StatsdSink>(new envoy::api::v2::monitoring::StatsdSink());
 }
 
 std::string StatsdSinkFactory::name() { return Config::StatsSinkNames::get().STATSD; }

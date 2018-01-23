@@ -39,15 +39,15 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
 
-envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
-  envoy::api::v2::RouteConfiguration route_config;
+envoy::api::v2::route::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
+  envoy::api::v2::route::RouteConfiguration route_config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
   return route_config;
 }
 
-envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::RouteConfiguration route_config;
+envoy::api::v2::route::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::route::RouteConfiguration route_config;
   MessageUtil::loadFromYaml(yaml, route_config);
   return route_config;
 }
@@ -689,7 +689,7 @@ request_headers_to_add:
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
 
-  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+  envoy::api::v2::route::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
   ConfigImpl config(route_config, runtime, cm, true);
 
@@ -1230,7 +1230,7 @@ public:
     route_config_ = parseRouteConfigurationFromJson(json);
   }
 
-  envoy::api::v2::RouteAction_HashPolicy* firstRouteHashPolicy() {
+  envoy::api::v2::route::RouteAction_HashPolicy* firstRouteHashPolicy() {
     auto hash_policies = route_config_.mutable_virtual_hosts(0)
                              ->mutable_routes(0)
                              ->mutable_route()
@@ -1251,7 +1251,7 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  envoy::api::v2::RouteConfiguration route_config_;
+  envoy::api::v2::route::RouteConfiguration route_config_;
   HashPolicy::AddCookieCallback add_cookie_nop_;
 
 private:
@@ -1489,7 +1489,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
   NiceMock<Upstream::MockClusterManager> cm;
   {
     auto hash_policy = firstRouteHashPolicy();
-    EXPECT_EQ(envoy::api::v2::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+    EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
     EXPECT_THROW(config(), EnvoyException);
   }
@@ -1498,7 +1498,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
     route->add_hash_policy()->mutable_header()->set_header_name("foo_header");
     route->add_hash_policy()->mutable_connection_properties()->set_source_ip(true);
     auto hash_policy = route->add_hash_policy();
-    EXPECT_EQ(envoy::api::v2::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+    EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
     EXPECT_THROW(config(), EnvoyException);
   }
@@ -3364,7 +3364,7 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
 }
 
 TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
-  auto route_config = envoy::api::v2::RouteConfiguration();
+  auto route_config = envoy::api::v2::route::RouteConfiguration();
   auto* vhost = route_config.add_virtual_hosts();
   vhost->set_name("vhost");
   vhost->add_domains("www.lyft.com");
@@ -3476,14 +3476,14 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
 }
 
 TEST(ConfigUtility, ParseResponseCode) {
-  const std::vector<std::pair<envoy::api::v2::RedirectAction::RedirectResponseCode, Http::Code>>
-      test_set = {std::make_pair(envoy::api::v2::RedirectAction::MOVED_PERMANENTLY,
+  const std::vector<std::pair<envoy::api::v2::route::RedirectAction::RedirectResponseCode, Http::Code>>
+      test_set = {std::make_pair(envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY,
                                  Http::Code::MovedPermanently),
-                  std::make_pair(envoy::api::v2::RedirectAction::FOUND, Http::Code::Found),
-                  std::make_pair(envoy::api::v2::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
-                  std::make_pair(envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT,
+                  std::make_pair(envoy::api::v2::route::RedirectAction::FOUND, Http::Code::Found),
+                  std::make_pair(envoy::api::v2::route::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
+                  std::make_pair(envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT,
                                  Http::Code::TemporaryRedirect),
-                  std::make_pair(envoy::api::v2::RedirectAction::PERMANENT_REDIRECT,
+                  std::make_pair(envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT,
                                  Http::Code::PermanentRedirect)};
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));

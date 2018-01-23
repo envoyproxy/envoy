@@ -66,8 +66,8 @@ public:
   // Add an additional route to the configuration.
   void addRoute(
       const std::string& host, const std::string& route, const std::string& cluster,
-      bool validate_clusters, envoy::api::v2::RouteAction::ClusterNotFoundResponseCode code,
-      envoy::api::v2::VirtualHost::TlsRequirementType type = envoy::api::v2::VirtualHost::NONE);
+      bool validate_clusters, envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
+      envoy::api::v2::route::VirtualHost::TlsRequirementType type = envoy::api::v2::route::VirtualHost::NONE);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -98,7 +98,7 @@ private:
   storeHttpConnectionManager(const envoy::api::v2::filter::network::HttpConnectionManager& hcm);
 
   // Snags the first filter from the first filter chain from the first listener.
-  envoy::api::v2::Filter* getFilterFromListener();
+  envoy::api::v2::listener::Filter* getFilterFromListener();
 
   // The bootstrap proto Envoy will start up with.
   envoy::bootstrap::v2::Bootstrap bootstrap_;

@@ -11,7 +11,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 
-#include "api/cds.pb.h"
+#include "envoy/api/v2/cluster/cluster.pb.h"
 
 namespace Envoy {
 namespace Upstream {

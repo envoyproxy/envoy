@@ -7,7 +7,7 @@
 #include "common/common/logger.h"
 #include "common/grpc/async_client_impl.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/load_stats/v2/lrs.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -29,7 +29,7 @@ struct LoadReporterStats {
   ALL_LOAD_REPORTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class LoadStatsReporter : Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::LoadStatsResponse>,
+class LoadStatsReporter : Grpc::TypedAsyncStreamCallbacks<envoy::service::load_stats::v2::LoadStatsResponse>,
                           Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const envoy::api::v2::Node& node, ClusterManager& cluster_manager,
@@ -39,7 +39,7 @@ public:
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessage(std::unique_ptr<envoy::api::v2::LoadStatsResponse>&& message) override;
+  void onReceiveMessage(std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -60,8 +60,8 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
-  envoy::api::v2::LoadStatsRequest request_;
-  std::unique_ptr<envoy::api::v2::LoadStatsResponse> message_;
+  envoy::service::load_stats::v2::LoadStatsRequest request_;
+  std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse> message_;
   std::vector<std::string> clusters_;
 };
 

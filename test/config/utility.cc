@@ -207,8 +207,8 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
 
 void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
                             const std::string& cluster, bool validate_clusters,
-                            envoy::api::v2::RouteAction::ClusterNotFoundResponseCode code,
-                            envoy::api::v2::VirtualHost::TlsRequirementType type) {
+                            envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
+                            envoy::api::v2::route::VirtualHost::TlsRequirementType type) {
   RELEASE_ASSERT(!finalized_);
   envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -277,7 +277,7 @@ void ConfigHelper::addSslConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 }
 
-envoy::api::v2::Filter* ConfigHelper::getFilterFromListener() {
+envoy::api::v2::listener::Filter* ConfigHelper::getFilterFromListener() {
   RELEASE_ASSERT(!finalized_);
   if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
     return nullptr;

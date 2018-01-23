@@ -450,7 +450,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::cluster::Cluster& 
   const auto& thresholds = config.circuit_breakers().thresholds();
   const auto it =
       std::find_if(thresholds.cbegin(), thresholds.cend(),
-                   [priority](const envoy::api::v2::CircuitBreakers::Thresholds& threshold) {
+                   [priority](const envoy::api::v2::cluster::CircuitBreakers::Thresholds& threshold) {
                      return threshold.priority() == priority;
                    });
   if (it != thresholds.cend()) {

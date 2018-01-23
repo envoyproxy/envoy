@@ -149,7 +149,7 @@ envoy_cc_library(
     name = "load_stats_reporter_lib",
     srcs = ["load_stats_reporter.cc"],
     hdrs = ["load_stats_reporter.h"],
-    external_deps = ["envoy_eds"],
+    external_deps = ["envoy_load_stats"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/stats:stats_macros",

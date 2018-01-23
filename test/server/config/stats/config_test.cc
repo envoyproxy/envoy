@@ -30,7 +30,7 @@ namespace Configuration {
 TEST(StatsConfigTest, ValidTcpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
-  envoy::api::v2::StatsdSink sink_config;
+  envoy::api::v2::monitoring::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
@@ -52,7 +52,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
-  envoy::api::v2::StatsdSink sink_config;
+  envoy::api::v2::monitoring::StatsdSink sink_config;
   envoy::api::v2::Address& address = *sink_config.mutable_address();
   envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
@@ -76,7 +76,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 // Negative test for protoc-gen-validate constraints for statsd.
 TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
-  EXPECT_THROW(StatsdSinkFactory().createStatsSink(envoy::api::v2::StatsdSink(), server),
+  EXPECT_THROW(StatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::StatsdSink(), server),
                ProtoValidationException);
 }
 

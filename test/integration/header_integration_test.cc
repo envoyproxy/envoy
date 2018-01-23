@@ -5,7 +5,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
@@ -229,10 +229,10 @@ public:
         eds_stream_ = eds_connection_->waitForNewStream(*dispatcher_);
         eds_stream_->startGrpcStream();
 
-        envoy::api::v2::DiscoveryRequest discovery_request;
+        envoy::service::discovery::v2::DiscoveryRequest discovery_request;
         eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
 
-        envoy::api::v2::DiscoveryResponse discovery_response;
+        envoy::service::discovery::v2::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 

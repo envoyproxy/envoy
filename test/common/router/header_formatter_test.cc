@@ -407,7 +407,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   )EOF";
 
   // Disable append mode.
-  envoy::api::v2::RouteAction route_action = parseRouteFromJson(json).route();
+  envoy::api::v2::route::RouteAction route_action = parseRouteFromJson(json).route();
   route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
 

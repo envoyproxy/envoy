@@ -7,8 +7,8 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/discovery.pb.h"
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/common.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -41,7 +41,7 @@ public:
   void expectSendMessage(const std::string& type_url,
                          const std::vector<std::string>& resource_names,
                          const std::string& version) {
-    envoy::api::v2::DiscoveryRequest expected_request;
+    envoy::service::discovery::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     for (const auto& resource : resource_names) {
       expected_request.add_resource_names(resource);
@@ -139,15 +139,15 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_type_url("bar");
     grpc_mux_->onReceiveMessage(std::move(response));
   }
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_type_url("foo");
     response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
@@ -171,8 +171,8 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("1");
     envoy::service::discovery::v2::ClusterLoadAssignment load_assignment;
@@ -208,8 +208,8 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("1");
     envoy::service::discovery::v2::ClusterLoadAssignment load_assignment;
@@ -232,8 +232,8 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   }
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("2");
     envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_x;

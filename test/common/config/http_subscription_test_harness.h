@@ -13,7 +13,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -102,7 +102,7 @@ public:
     }
     response_json.pop_back();
     response_json += "]}";
-    envoy::api::v2::DiscoveryResponse response_pb;
+    envoy::service::discovery::v2::DiscoveryResponse response_pb;
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};

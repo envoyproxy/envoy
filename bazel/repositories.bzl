@@ -151,6 +151,10 @@ def _envoy_api_deps():
         actual = "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     )
     native.bind(
+        name = "envoy_load_stats",
+        actual = "@envoy_api//envoy/service/load_stats/v2:lrs_cc",
+    )
+    native.bind(
         name = "envoy_ratelimit",
         actual = "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     )
@@ -165,6 +169,10 @@ def _envoy_api_deps():
     native.bind(
         name = "envoy_cluster",
         actual = "@envoy_api//envoy/api/v2/cluster:cluster_cc",
+    )
+    native.bind(
+        name = "envoy_circuit_breaker",
+        actual = "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
     )
     native.bind(
         name = "envoy_route",

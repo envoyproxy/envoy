@@ -149,13 +149,13 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
 
 std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::listener::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::route::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::cluster::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
     return MessageUtil::anyConvert<envoy::service::discovery::v2::ClusterLoadAssignment>(resource).cluster_name();

@@ -134,12 +134,12 @@ TagProducerImpl::TagProducerImpl(const envoy::api::v2::monitoring::StatsConfig& 
     }
 
     // If no tag value is found, fallback to default regex to keep backward compatibility.
-    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
-        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
+    if (tag_specifier.tag_value_case() == envoy::api::v2::monitoring::TagSpecifier::TAG_VALUE_NOT_SET ||
+        tag_specifier.tag_value_case() == envoy::api::v2::monitoring::TagSpecifier::kRegex) {
       tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
           tag_specifier.tag_name(), tag_specifier.regex()));
 
-    } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
+    } else if (tag_specifier.tag_value_case() == envoy::api::v2::monitoring::TagSpecifier::kFixedValue) {
       default_tags_.emplace_back(
           Stats::Tag{.name_ = tag_specifier.tag_name(), .value_ = tag_specifier.fixed_value()});
     }

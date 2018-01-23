@@ -11,7 +11,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

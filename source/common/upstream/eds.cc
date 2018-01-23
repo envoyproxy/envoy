@@ -12,7 +12,7 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/sds_subscription.h"
 
-#include "api/eds.pb.validate.h"
+#include "envoy/service/discovery/v2/eds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {

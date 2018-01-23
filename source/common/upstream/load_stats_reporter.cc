@@ -100,7 +100,7 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) 
 }
 
 void LoadStatsReporter::onReceiveMessage(
-    std::unique_ptr<envoy::api::v2::LoadStatsResponse>&& message) {
+    std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   stats_.requests_.inc();
   message_ = std::move(message);

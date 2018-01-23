@@ -19,7 +19,7 @@ namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
 ProdListenerComponentFactory::createFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -67,11 +67,11 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
 }
 
 DrainManagerPtr
-ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::DrainType drain_type) {
+ProdListenerComponentFactory::createDrainManager(envoy::api::v2::listener::Listener::DrainType drain_type) {
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
+ListenerImpl::ListenerImpl(const envoy::api::v2::listener::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
     : parent_(parent),
@@ -207,7 +207,7 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
+bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::listener::Listener& config,
                                               bool modifiable) {
   std::string name;
   if (!config.name().empty()) {

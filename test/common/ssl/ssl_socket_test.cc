@@ -113,7 +113,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   }
 }
 
-const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
+const std::string testUtilV2(const envoy::api::v2::listener::Listener& server_proto,
                              const envoy::api::v2::UpstreamTlsContext& client_ctx_proto,
                              const std::string& client_session, bool expect_success,
                              const std::string& expected_protocol_version,
@@ -1062,19 +1062,19 @@ TEST_P(SslSocketTest, SslError) {
 }
 
 TEST_P(SslSocketTest, ProtocolVersions) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::TlsCertificate* server_cert =
+  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
-  envoy::api::v2::TlsParameters* server_params =
+  envoy::api::v2::auth::TlsParameters* server_params =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
 
   envoy::api::v2::UpstreamTlsContext client_ctx;
-  envoy::api::v2::TlsParameters* client_params =
+  envoy::api::v2::auth::TlsParameters* client_params =
       client_ctx.mutable_common_tls_context()->mutable_tls_params();
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
@@ -1082,74 +1082,74 @@ TEST_P(SslSocketTest, ProtocolVersions) {
 
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client_ctx, "", true, "TLSv1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using TLSv1.1 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using TLSv1.2 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using TLSv1.3 (client) and defaults (server) fails.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
              GetParam());
 
   // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.3", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.0 (server) succeeds.
   // ssl.handshake logged by both: client & server.
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client_ctx, "", true, "TLSv1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.1 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.2 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.3 (server) succeeds.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
              GetParam());
 
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.3", "", "", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, SniCertificate) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1157,10 +1157,10 @@ TEST_P(SslSocketTest, SniCertificate) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com, *.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("*.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1195,8 +1195,8 @@ TEST_P(SslSocketTest, SniCertificate) {
              GetParam());
 
   // no_san_cert.pem: * (no SNI restrictions)
-  envoy::api::v2::FilterChain* filter_chain3 = listener.add_filter_chains();
-  envoy::api::v2::TlsCertificate* server_cert3 =
+  envoy::api::v2::listener::FilterChain* filter_chain3 = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert3 =
       filter_chain3->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert3->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
@@ -1219,13 +1219,13 @@ TEST_P(SslSocketTest, SniCertificate) {
 }
 
 TEST_P(SslSocketTest, SniSessionResumption) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com, *
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
   filter_chain1->mutable_filter_chain_match()->add_sni_domains(""); // Catch-all, no SNI.
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1235,10 +1235,10 @@ TEST_P(SslSocketTest, SniSessionResumption) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
 
   // san_multiple_dns_cert.pem: server2.example.com, *.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("*.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1248,9 +1248,9 @@ TEST_P(SslSocketTest, SniSessionResumption) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
 
   // san_multiple_dns_cert.pem: protected.example.com (same certificate as #2, but different SNI)
-  envoy::api::v2::FilterChain* filter_chain3 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain3 = listener.add_filter_chains();
   filter_chain3->mutable_filter_chain_match()->add_sni_domains("protected.example.com");
-  envoy::api::v2::TlsCertificate* server_cert3 =
+  envoy::api::v2::auth::TlsCertificate* server_cert3 =
       filter_chain3->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert3->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1298,12 +1298,12 @@ TEST_P(SslSocketTest, SniSessionResumption) {
 }
 
 TEST_P(SslSocketTest, SniClientCertificate) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_multiple_dns_cert.pem: *.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("*.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1314,9 +1314,9 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 
   // san_multiple_dns_cert.pem: protected.example.com
   // (same certificate as #1, but requires Client Certificate)
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("protected.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1349,7 +1349,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 
   // Connection to protected.example.com with a valid client certificate fails, beacuse its SAN
   // is not whitelisted.
-  envoy::api::v2::TlsCertificate* client_cert =
+  envoy::api::v2::auth::TlsCertificate* client_cert =
       client_ctx.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
@@ -1373,12 +1373,12 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 }
 
 TEST_P(SslSocketTest, SniALPN) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1386,9 +1386,9 @@ TEST_P(SslSocketTest, SniALPN) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1423,12 +1423,12 @@ TEST_P(SslSocketTest, SniALPN) {
 }
 
 TEST_P(SslSocketTest, SniCipherSuites) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1436,9 +1436,9 @@ TEST_P(SslSocketTest, SniCipherSuites) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1486,12 +1486,12 @@ TEST_P(SslSocketTest, SniCipherSuites) {
 }
 
 TEST_P(SslSocketTest, SniEcdhCurves) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1499,9 +1499,9 @@ TEST_P(SslSocketTest, SniEcdhCurves) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1549,12 +1549,12 @@ TEST_P(SslSocketTest, SniEcdhCurves) {
 }
 
 TEST_P(SslSocketTest, SniProtocolVersions) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1562,9 +1562,9 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1579,22 +1579,22 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
 
   // Test protocol versions.
   server_ctx1->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_2);
+      envoy::api::v2::auth::TlsParameters::TLSv1_2);
   server_ctx1->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_3);
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
 
   server_ctx2->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_0);
+      envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_ctx2->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_2);
+      envoy::api::v2::auth::TlsParameters::TLSv1_2);
 
   // Connection to server1.example.com using TLSv1.3 succeeds.
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_3);
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_3);
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.3",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
              "ssl.handshake", 2, GetParam());
@@ -1607,9 +1607,9 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
   // Connection to server1.example.com using TLSv1.0 fails.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_0);
+      envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_0);
+      envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
              GetParam());
 

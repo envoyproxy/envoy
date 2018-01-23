@@ -59,7 +59,7 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
 
 void CdsJson::translateThresholds(const Json::Object& json_thresholds,
                                   const envoy::api::v2::RoutingPriority& priority,
-                                  envoy::api::v2::CircuitBreakers::Thresholds& thresholds) {
+                                  envoy::api::v2::cluster::CircuitBreakers::Thresholds& thresholds) {
   thresholds.set_priority(priority);
   JSON_UTIL_SET_INTEGER(json_thresholds, thresholds, max_connections);
   JSON_UTIL_SET_INTEGER(json_thresholds, thresholds, max_pending_requests);
@@ -68,7 +68,7 @@ void CdsJson::translateThresholds(const Json::Object& json_thresholds,
 }
 
 void CdsJson::translateCircuitBreakers(const Json::Object& json_circuit_breakers,
-                                       envoy::api::v2::CircuitBreakers& circuit_breakers) {
+                                       envoy::api::v2::cluster::CircuitBreakers& circuit_breakers) {
   translateThresholds(*json_circuit_breakers.getObject("default", true),
                       envoy::api::v2::RoutingPriority::DEFAULT,
                       *circuit_breakers.mutable_thresholds()->Add());

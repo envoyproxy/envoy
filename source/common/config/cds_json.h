@@ -5,6 +5,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "envoy/api/v2/cluster/cluster.pb.h"
+#include "envoy/api/v2/cluster/circuit_breaker.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -36,15 +37,15 @@ public:
    */
   static void translateThresholds(const Json::Object& json_thresholds,
                                   const envoy::api::v2::RoutingPriority& priority,
-                                  envoy::api::v2::CircuitBreakers::Thresholds& thresholds);
+                                  envoy::api::v2::cluster::CircuitBreakers::Thresholds& thresholds);
 
   /**
-   * Translate a v1 JSON circuit breakers object to v2 envoy::api::v2::CircuitBreakers.
+   * Translate a v1 JSON circuit breakers object to v2 envoy::api::v2::cluster::CircuitBreakers.
    * @param json_circuit_breakers source v1 JSON circuit breakers object.
-   * @param circuit_breakers destination v2 envoy::api::v2::CircuitBreakers.
+   * @param circuit_breakers destination v2 envoy::api::v2::cluster::CircuitBreakers.
    */
   static void translateCircuitBreakers(const Json::Object& json_circuit_breakers,
-                                       envoy::api::v2::CircuitBreakers& circuit_breakers);
+                                       envoy::api::v2::cluster::CircuitBreakers& circuit_breakers);
 
   /**
    * Translate a v1 JSON outlier detection object to v2 envoy::api::v2::OutlierDetection.

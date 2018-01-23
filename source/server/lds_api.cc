@@ -10,7 +10,7 @@
 
 #include "server/lds_subscription.h"
 
-#include "api/lds.pb.validate.h"
+#include "envoy/api/v2/listener/listener.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,10 +21,10 @@ LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::Cluster
                Stats::Scope& scope, ListenerManager& lm)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
   subscription_ =
-      Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
+      Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::listener::Listener>(
           lds_config, local_info.node(), dispatcher, cm, random, *scope_,
           [this, &lds_config, &cm, &dispatcher, &random,
-           &local_info]() -> Config::Subscription<envoy::api::v2::Listener>* {
+           &local_info]() -> Config::Subscription<envoy::api::v2::listener::Listener>* {
             return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
                                        dispatcher, random, local_info);
           },

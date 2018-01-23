@@ -45,7 +45,7 @@ public:
  */
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
-  StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
+  StaticRouteConfigProviderImpl(const envoy::api::v2::route::RouteConfiguration& config,
                                 Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   // Router::RouteConfigProvider
@@ -82,7 +82,7 @@ class RouteConfigProviderManagerImpl;
 class RdsRouteConfigProviderImpl
     : public RdsRouteConfigProvider,
       public Init::Target,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
+      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::route::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigProviderImpl();
@@ -128,7 +128,7 @@ private:
 
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
+  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
   std::string cluster_name_;
   const std::string route_config_name_;
@@ -139,7 +139,7 @@ private:
   std::function<void()> initialize_callback_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
-  envoy::api::v2::RouteConfiguration route_config_proto_;
+  envoy::api::v2::route::RouteConfiguration route_config_proto_;
 
   friend class RouteConfigProviderManagerImpl;
 };

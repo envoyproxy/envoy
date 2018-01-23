@@ -15,7 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "api/cds.pb.h"
+#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

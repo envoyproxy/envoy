@@ -9,7 +9,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -67,7 +67,7 @@ public:
     }
     file_json.pop_back();
     file_json += "]}";
-    envoy::api::v2::DiscoveryResponse response_pb;
+    envoy::service::discovery::v2::DiscoveryResponse response_pb;
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(

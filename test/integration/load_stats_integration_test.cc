@@ -3,7 +3,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 
-#include "api/eds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -70,7 +70,7 @@ public:
     }
 
     // Write to file the DiscoveryResponse and trigger inotify watch.
-    envoy::api::v2::DiscoveryResponse eds_response;
+    envoy::service::discovery::v2::DiscoveryResponse eds_response;
     eds_response.set_version_info(std::to_string(eds_version_++));
     eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     eds_response.add_resources()->PackFrom(cluster_load_assignment);
