@@ -124,6 +124,51 @@ public:
 };
 
 /**
+ * This function is used to wrap the creation of a listener filter chain for new sockets as they are
+ * created. Filter factories create the lambda at configuration initialization time, and then they
+ * are used at runtime.
+ * @param filter_manager supplies the filter manager for the listener to install filters to.
+ * Typically the function will install a single filter, but it's technically possibly to install
+ * more than one if desired.
+ */
+typedef std::function<void(Network::ListenerFilterManager& filter_manager)> ListenerFilterFactoryCb;
+
+/**
+ * Implemented by each listener filter and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
+ */
+class NamedListenerFilterConfigFactory {
+public:
+  virtual ~NamedListenerFilterConfigFactory() {}
+
+  /**
+   * Create a particular listener filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
+   * of general error or a Json::Exception if the json configuration is erroneous. The returned
+   * callback should always be initialized.
+   * @param config supplies the general protobuf configuration for the filter
+   * @param context supplies the filter's context.
+   * @return ListenerFilterFactoryCb the factory creation function.
+   */
+  virtual ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                               FactoryContext& context) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
+   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
+   *         is deprecated.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of a listener filter
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+};
+
+/**
  * This function is used to wrap the creation of a network filter chain for new connections as
  * they come in. Filter factories create the lambda at configuration initialization time, and then
  * they are used at runtime.

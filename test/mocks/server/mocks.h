@@ -146,9 +146,13 @@ public:
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
 
-  MOCK_METHOD2(createFilterFactoryList,
+  MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Configuration::NetworkFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                   Configuration::FactoryContext& context));
+  MOCK_METHOD2(createListenerFilterFactoryList,
+               std::vector<Configuration::ListenerFilterFactoryCb>(
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>&,
                    Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
                Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,

@@ -6,38 +6,11 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/ssl/context.h"
 
 namespace Envoy {
 namespace Network {
-
-/**
- * Listener configurations options.
- */
-struct ListenerOptions {
-  // Specifies if the listener should actually bind to the port. A listener that doesn't bind can
-  // only receive connections redirected from other listeners that set use_origin_dst_ to true.
-  bool bind_to_port_;
-  // Whether to use the PROXY Protocol V1
-  // (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-  bool use_proxy_proto_;
-  // If a connection was redirected to this port using iptables, allow the listener to hand it off
-  // to the listener associated to the original port.
-  bool use_original_dst_;
-  // Soft limit on size of the listener's new connection read and write buffers.
-  uint32_t per_connection_buffer_limit_bytes_;
-
-  /**
-   * Factory for ListenerOptions with bind_to_port_ set.
-   * @return ListenerOptions object initialized with bind_to_port_ set.
-   */
-  static ListenerOptions listenerOptionsWithBindToPort() {
-    return {.bind_to_port_ = true,
-            .use_proxy_proto_ = false,
-            .use_original_dst_ = false,
-            .per_connection_buffer_limit_bytes_ = 0};
-  }
-};
 
 /**
  * A configuration for an individual listener.
@@ -64,12 +37,6 @@ public:
   virtual Ssl::ServerContext* defaultSslContext() PURE;
 
   /**
-   * @return bool whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   */
-  virtual bool useProxyProto() PURE;
-
-  /**
    * @return bool specifies whether the listener should actually listen on the port.
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
@@ -77,10 +44,12 @@ public:
   virtual bool bindToPort() PURE;
 
   /**
-   * @return bool if a connection was redirected to this listener address using iptables,
-   *         allow the listener to hand it off to the listener associated to the original address
+   * @return bool if a connection should be handed off to another Listener after the original
+   *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
+   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
+   *         removed from the v2 API.
    */
-  virtual bool useOriginalDst() PURE;
+  virtual bool handOffRestoredDestinationConnections() const PURE;
 
   /**
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write
@@ -96,7 +65,7 @@ public:
   /**
    * @return uint64_t the tag the listener should use for connection handler tracking.
    */
-  virtual uint64_t listenerTag() PURE;
+  virtual uint64_t listenerTag() const PURE;
 
   /**
    * @return const std::string& the listener's name.
@@ -110,6 +79,16 @@ public:
 class ListenerCallbacks {
 public:
   virtual ~ListenerCallbacks() {}
+
+  /**
+   * Called when a new connection is accepted.
+   * @param socket supplies the socket that is moved into the callee.
+   * @param redirected is true when the socket was first accepted by another listener
+   * and is redirected to a new listener. The recipient should not redirect
+   * the socket any further.
+   */
+  virtual void onAccept(ConnectionSocketPtr&& socket,
+                        bool hand_off_restored_destination_connections = true) PURE;
 
   /**
    * Called when a new connection is accepted.

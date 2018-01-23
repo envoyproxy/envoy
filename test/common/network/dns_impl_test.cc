@@ -198,6 +198,14 @@ private:
 
 class TestDnsServer : public ListenerCallbacks {
 public:
+  TestDnsServer(Event::DispatcherImpl& dispatcher) : dispatcher_(dispatcher) {}
+
+  void onAccept(ConnectionSocketPtr&& socket, bool) override {
+    Network::ConnectionPtr new_connection =
+        dispatcher_.createServerConnection(std::move(socket), nullptr);
+    onNewConnection(std::move(new_connection));
+  }
+
   void onNewConnection(ConnectionPtr&& new_connection) override {
     TestDnsServerQuery* query =
         new TestDnsServerQuery(std::move(new_connection), hosts_A_, hosts_AAAA_);
@@ -213,6 +221,8 @@ public:
   }
 
 private:
+  Event::DispatcherImpl& dispatcher_;
+
   HostMap hosts_A_;
   HostMap hosts_AAAA_;
   // All queries are tracked so we can do resource reclamation when the test is
@@ -276,14 +286,10 @@ public:
     resolver_ = dispatcher_.createDnsResolver({});
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
-    server_.reset(new TestDnsServer());
+    server_.reset(new TestDnsServer(dispatcher_));
     socket_.reset(
         new Network::TcpListenSocket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true));
-    listener_ = dispatcher_.createListener(connection_handler_, *socket_, *server_, stats_store_,
-                                           {.bind_to_port_ = true,
-                                            .use_proxy_proto_ = false,
-                                            .use_original_dst_ = false,
-                                            .per_connection_buffer_limit_bytes_ = 0});
+    listener_ = dispatcher_.createListener(*socket_, *server_, true, false);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));
