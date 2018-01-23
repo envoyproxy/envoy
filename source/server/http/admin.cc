@@ -4,9 +4,13 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -502,6 +506,75 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerRuntime(const std::string& url, Http::HeaderMap& response_headers,
+                                     Buffer::Instance& response) {
+  Http::Code rc = Http::Code::OK;
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const auto& entries = server_.runtime().snapshot().getAll();
+  const auto pairs = sortedRuntime(entries);
+
+  if (params.size() == 0) {
+    for (const auto& entry : pairs) {
+      response.add(fmt::format("{}: {}\n", entry.first, entry.second.string_value_));
+    }
+  } else {
+    if (params.begin()->first == "format" && params.begin()->second == "json") {
+      response_headers.insertContentType().value().setReference(
+          Http::Headers::get().ContentTypeValues.Json);
+      response.add(runtimeAsJson(pairs));
+      response.add("\n");
+    } else {
+      response.add("usage: /runtime?format=json\n");
+      rc = Http::Code::BadRequest;
+    }
+  }
+
+  return rc;
+}
+
+const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::sortedRuntime(
+    const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries) {
+  std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> pairs(entries.begin(),
+                                                                      entries.end());
+
+  std::sort(pairs.begin(), pairs.end(),
+            [](const std::pair<std::string, const Runtime::Snapshot::Entry>& a,
+               const std::pair<std::string, const Runtime::Snapshot::Entry>& b) -> bool {
+              return a.first < b.first;
+            });
+
+  return pairs;
+}
+
+std::string AdminImpl::runtimeAsJson(
+    const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Value entries_array(rapidjson::kArrayType);
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  for (const auto& entry : entries) {
+    Value entry_obj;
+    entry_obj.SetObject();
+
+    entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
+
+    Value entry_value;
+    if (entry.second.uint_value_.valid()) {
+      entry_value.SetUint64(entry.second.uint_value_.value());
+    } else {
+      entry_value.SetString(entry.second.string_value_.c_str(), allocator);
+    }
+    entry_obj.AddMember("value", entry_value, allocator);
+
+    entries_array.PushBack(entry_obj, allocator);
+  }
+  document.AddMember("runtime", entries_array, allocator);
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  return strbuf.GetString();
+}
+
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
@@ -567,7 +640,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
-           false}},
+           false},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
       listener_stats_(
           Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
 

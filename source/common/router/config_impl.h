@@ -47,19 +47,19 @@ class RouteEntryImplBase;
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
 
 /**
- * Redirect entry that does an SSL redirect.
+ * Direct response entry that does an SSL redirect.
  */
-class SslRedirector : public RedirectEntry {
+class SslRedirector : public DirectResponseEntry {
 public:
-  // Router::RedirectEntry
+  // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-  Http::Code redirectResponseCode() const override { return Http::Code::MovedPermanently; }
+  Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
 };
 
 class SslRedirectRoute : public Route {
 public:
   // Router::Route
-  const RedirectEntry* redirectEntry() const override { return &SSL_REDIRECTOR; }
+  const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
 
@@ -286,7 +286,7 @@ private:
  */
 class RouteEntryImplBase : public RouteEntry,
                            public Matchable,
-                           public RedirectEntry,
+                           public DirectResponseEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
@@ -294,6 +294,7 @@ public:
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
+  bool isDirectResponse() const { return direct_response_code_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
@@ -328,13 +329,14 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
+  const envoy::api::v2::Metadata& metadata() const override { return metadata_; }
 
-  // Router::RedirectEntry
+  // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-  Http::Code redirectResponseCode() const override { return redirect_response_code_; }
+  Http::Code responseCode() const override { return direct_response_code_.value(); }
 
   // Router::Route
-  const RedirectEntry* redirectEntry() const override;
+  const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
 
@@ -400,9 +402,10 @@ private:
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
+    const envoy::api::v2::Metadata& metadata() const override { return parent_->metadata(); }
 
     // Router::Route
-    const RedirectEntry* redirectEntry() const override { return nullptr; }
+    const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return nullptr; }
 
@@ -482,12 +485,13 @@ private:
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
+  envoy::api::v2::Metadata metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
-  const Http::Code redirect_response_code_;
+  const Optional<Http::Code> direct_response_code_;
 };
 
 /**

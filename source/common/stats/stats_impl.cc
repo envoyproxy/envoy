@@ -62,7 +62,7 @@ std::string Utility::sanitizeStatsName(const std::string& name) {
 }
 
 TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex)
-    : name_(name), regex_(regex) {}
+    : name_(name), regex_(RegexUtil::parseRegex(regex)) {}
 
 TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
                                                      const std::string& regex) {
@@ -122,23 +122,79 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   return data;
 }
 
+TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : TagProducerImpl() {
+  // To check name conflict.
+  std::unordered_set<std::string> names;
+  reserveResources(config);
+  addDefaultExtractors(config, names);
+
+  for (const auto& tag_specifier : config.stats_tags()) {
+    if (!names.emplace(tag_specifier.tag_name()).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", tag_specifier.tag_name()));
+    }
+
+    // If no tag value is found, fallback to default regex to keep backward compatibility.
+    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
+        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
+      tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
+          tag_specifier.tag_name(), tag_specifier.regex()));
+
+    } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
+      default_tags_.emplace_back(
+          Stats::Tag{.name_ = tag_specifier.tag_name(), .value_ = tag_specifier.fixed_value()});
+    }
+  }
+}
+
+std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
+  tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
+
+  std::string tag_extracted_name = name;
+  for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
+    tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
+  }
+  return tag_extracted_name;
+}
+
+// Roughly estimate the size of the vectors.
+void TagProducerImpl::reserveResources(const envoy::api::v2::StatsConfig& config) {
+  default_tags_.reserve(config.stats_tags().size());
+
+  if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
+    tag_extractors_.reserve(Config::TagNames::get().name_regex_pairs_.size() +
+                            config.stats_tags().size());
+  } else {
+    tag_extractors_.reserve(config.stats_tags().size());
+  }
+}
+
+void TagProducerImpl::addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
+                                           std::unordered_set<std::string>& names) {
+  if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
+    for (const auto& extractor : Config::TagNames::get().name_regex_pairs_) {
+      names.emplace(extractor.first);
+      tag_extractors_.emplace_back(
+          Stats::TagExtractorImpl::createTagExtractor(extractor.first, extractor.second));
+    }
+  }
+}
+
 void HeapRawStatDataAllocator::free(RawStatData& data) {
   // This allocator does not ever have concurrent access to the raw data.
   ASSERT(data.ref_count_ == 1);
   ::free(&data);
 }
 
-void RawStatData::initialize(const std::string& name) {
+void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  ASSERT(name.size() <= maxNameLength());
-  ASSERT(std::string::npos == name.find(':'));
+  ASSERT(key.size() <= maxNameLength());
+  ASSERT(absl::string_view::npos == key.find(':'));
   ref_count_ = 1;
-  StringUtil::strlcpy(name_, name.substr(0, maxNameLength()).c_str(), nameSize());
-}
 
-bool RawStatData::matches(const std::string& name) {
-  // In case a stat got truncated, match on the truncated name.
-  return 0 == strcmp(name.substr(0, maxNameLength()).c_str(), name_);
+  // key is not necessarily nul-terminated, but we want to make sure name_ is.
+  size_t xfer_size = std::min(nameSize() - 1, key.size());
+  memcpy(name_, key.data(), xfer_size);
+  name_[xfer_size] = '\0';
 }
 
 } // namespace Stats

@@ -138,8 +138,10 @@ def _envoy_api_deps():
         "cds",
         "discovery",
         "eds",
+        "grpc_service",
         "health_check",
         "lds",
+        "metrics",
         "protocol",
         "rds",
         "sds",
@@ -419,4 +421,9 @@ def _com_github_grpc_grpc():
     native.bind(
       name = "grpc",
       actual = "@com_github_grpc_grpc//:grpc++"
+    )
+
+    native.bind(
+      name = "grpc_health_proto",
+      actual = "@envoy//bazel:grpc_health_proto",
     )

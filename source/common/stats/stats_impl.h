@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -15,9 +16,11 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
+#include "common/common/hash.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/bootstrap.pb.h"
+#include "absl/strings/string_view.h"
+#include "api/stats.pb.h"
 
 namespace Envoy {
 namespace Stats {
@@ -41,6 +44,28 @@ public:
 private:
   const std::string name_;
   const std::regex regex_;
+};
+
+class TagProducerImpl : public TagProducer {
+public:
+  TagProducerImpl(const envoy::api::v2::StatsConfig& config);
+  TagProducerImpl() {}
+
+  /**
+   * Take a metric name and a vector then add proper tags into the vector and
+   * return an extracted metric name.
+   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
+   * @param tags std::vector a set of Stats::Tag.
+   */
+  std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
+
+private:
+  void reserveResources(const envoy::api::v2::StatsConfig& config);
+  void addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
+                            std::unordered_set<std::string>& names);
+
+  std::vector<TagExtractorPtr> tag_extractors_;
+  std::vector<Tag> default_tags_;
 };
 
 /**
@@ -111,15 +136,21 @@ struct RawStatData {
 
   /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment.
+   * and padding for alignment. This is required by SharedMemoryHashSet.
    */
   static size_t size();
 
   /**
-   * Initializes this object to have the specified name,
-   * a refcount of 1, and all other values zero.
+   * Initializes this object to have the specified key,
+   * a refcount of 1, and all other values zero. This is required by
+   * SharedMemoryHashSet.
    */
-  void initialize(const std::string& name);
+  void initialize(absl::string_view key);
+
+  /**
+   * Returns a hash of the key. This is required by SharedMemoryHashSet.
+   */
+  static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
 
   /**
    * Returns true if object is in use.
@@ -127,9 +158,11 @@ struct RawStatData {
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns true if this matches name, truncated to maxNameLength().
+   * Returns the name as a string_view. This is required by SharedMemoryHashSet.
    */
-  bool matches(const std::string& name);
+  absl::string_view key() const {
+    return absl::string_view(name_, strnlen(name_, maxNameLength()));
+  }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;

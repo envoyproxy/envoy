@@ -16,6 +16,7 @@
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
@@ -164,7 +165,7 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
 
 ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstrap,
                                        ClusterManagerFactory& factory, Stats::Store& stats,
-                                       ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+                                       ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
@@ -172,22 +173,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
-  const auto& ads_config = bootstrap.dynamic_resources().ads_config();
-  if (ads_config.cluster_names().empty()) {
-    ENVOY_LOG(debug, "No ADS clusters defined, ADS will not be initialized.");
-    ads_mux_.reset(new Config::NullGrpcMuxImpl());
-  } else {
-    if (ads_config.cluster_names().size() != 1) {
-      // TODO(htuch): Add support for multiple clusters, #1170.
-      throw EnvoyException(
-          "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
-    }
-    ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(), *this, ads_config.cluster_names()[0], primary_dispatcher,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
-  }
-
+  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -251,9 +237,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
           "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
     }
   }
-  if (!ads_config.cluster_names().empty()) {
-    Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(loaded_clusters, ads_config);
-  }
 
   Optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
@@ -271,6 +254,21 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
+
+  // Now setup ADS if needed, this might rely on a primary cluster and the
+  // thread local cluster manager.
+  if (bootstrap.dynamic_resources().has_ads_config()) {
+    ads_mux_.reset(new Config::GrpcMuxImpl(
+        bootstrap.node(),
+        Config::Utility::factoryForApiConfigSource(
+            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+            ->create(),
+        primary_dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+  } else {
+    ads_mux_.reset(new Config::NullGrpcMuxImpl());
+  }
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
@@ -295,13 +293,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    if (load_stats_config.cluster_names().size() != 1) {
-      // TODO(htuch): Add support for multiple clusters, #1170.
-      throw EnvoyException(
-          "envoy::api::v2::ApiConfigSource must have a singleton cluster name specified");
-    }
     load_stats_reporter_.reset(new LoadStatsReporter(
-        bootstrap.node(), *this, stats, load_stats_config.cluster_names()[0], primary_dispatcher));
+        bootstrap.node(), *this, stats,
+        Config::Utility::factoryForApiConfigSource(*async_client_manager_, load_stats_config, stats)
+            ->create(),
+        primary_dispatcher));
   }
 }
 

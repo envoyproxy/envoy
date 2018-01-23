@@ -5,8 +5,8 @@
     "ssl_context": {
       "alpn_protocols": "h2,http/1.1",
       "alt_alpn_protocols": "http/1.1",
-      "cert_chain_file": "/etc/envoy/cert.pem",
-      "private_key_file": "/etc/envoy/key.pem"
+      "cert_chain_file": "certs/servercert.pem",
+      "private_key_file": "certs/serverkey.pem"
     },
     {% endif -%}
     {% if proxy_proto -%}
@@ -128,8 +128,8 @@
                                                up with a better solution just limit the requests
                                                so we can cycle and get better spread. #}
       "ssl_context": {
-        "cert_chain_file": "/etc/envoy/envoy-double-proxy.pem",
-        "private_key_file": "/etc/envoy/envoy-double-proxy.key",
+        "cert_chain_file": "certs/clientcert.pem",
+        "private_key_file": "certs/clientkey.pem",
         "verify_subject_alt_name": ["front-proxy.yourcompany.net"]
       },
       "hosts": [{"url": "tcp://front-proxy.yourcompany.net:9400"}]
@@ -138,7 +138,7 @@
       "name": "lightstep_saas",
       "features": "http2",
       "ssl_context": {
-        "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
+        "ca_cert_file": "certs/cacert.pem",
         "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,

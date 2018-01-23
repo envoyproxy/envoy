@@ -1,6 +1,7 @@
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -26,7 +27,6 @@ dynamic_resources:
   cds_config: {ads: {}}
   ads_config:
     api_type: GRPC
-    cluster_names: [ads_cluster]
 static_resources:
   clusters:
     name: ads_cluster
@@ -46,10 +46,9 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
-  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), config) {}
+  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
     test_server_.reset();
@@ -120,7 +119,7 @@ public:
                 address: {}
                 port_value: {}
     )EOF",
-                    name, Network::Test::getLoopbackAddressString(GetParam()),
+                    name, Network::Test::getLoopbackAddressString(ipVersion()),
                     fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
@@ -143,7 +142,7 @@ public:
               config_source: {{ ads: {{}} }}
             http_filters: [{{ name: envoy.router }}]
     )EOF",
-                    name, Network::Test::getLoopbackAddressString(GetParam()), route_config));
+                    name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
   }
 
   envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
@@ -168,6 +167,11 @@ public:
   }
 
   void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::api::v2::Bootstrap& bootstrap) {
+      setGrpcService(
+          *bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services(),
+          "ads_cluster", fake_upstreams_.back()->localAddress());
+    });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
     ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
@@ -179,8 +183,7 @@ public:
   FakeStreamPtr ads_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {

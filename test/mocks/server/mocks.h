@@ -165,34 +165,12 @@ public:
   ~MockListenerManager();
 
   MOCK_METHOD2(addOrUpdateListener, bool(const envoy::api::v2::Listener& config, bool modifiable));
-  MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Listener>>());
+  MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(stopWorkers, void());
-};
-
-class MockListener : public Listener {
-public:
-  MockListener();
-  ~MockListener();
-
-  MOCK_METHOD0(filterChainFactory, Network::FilterChainFactory&());
-  MOCK_METHOD0(socket, Network::ListenSocket&());
-  MOCK_METHOD0(defaultSslContext, Ssl::ServerContext*());
-  MOCK_METHOD0(useProxyProto, bool());
-  MOCK_METHOD0(bindToPort, bool());
-  MOCK_METHOD0(useOriginalDst, bool());
-  MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
-  MOCK_METHOD0(listenerScope, Stats::Scope&());
-  MOCK_METHOD0(listenerTag, uint64_t());
-  MOCK_CONST_METHOD0(name, const std::string&());
-
-  testing::NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;
-  testing::NiceMock<Network::MockListenSocket> socket_;
-  Stats::IsolatedStoreImpl scope_;
-  std::string name_;
 };
 
 class MockWorkerFactory : public WorkerFactory {
@@ -224,12 +202,14 @@ public:
   }
 
   // Server::Worker
-  MOCK_METHOD2(addListener, void(Listener& listener, AddListenerCompletion completion));
+  MOCK_METHOD2(addListener,
+               void(Network::ListenerConfig& listener, AddListenerCompletion completion));
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD2(removeListener, void(Listener& listener, std::function<void()> completion));
+  MOCK_METHOD2(removeListener,
+               void(Network::ListenerConfig& listener, std::function<void()> completion));
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
   MOCK_METHOD0(stop, void());
-  MOCK_METHOD1(stopListener, void(Listener& listener));
+  MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
   MOCK_METHOD0(stopListeners, void());
 
   AddListenerCompletion add_listener_completion_;
