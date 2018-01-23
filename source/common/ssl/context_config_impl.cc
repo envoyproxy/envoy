@@ -90,9 +90,8 @@ const std::string ContextConfigImpl::getDataSourcePath(const envoy::api::v2::Dat
   return source.specifier_case() == envoy::api::v2::DataSource::kFilename ? source.filename() : "";
 }
 
-unsigned
-ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
-                                       unsigned default_version) {
+unsigned ContextConfigImpl::tlsVersionFromProto(
+    const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
   switch (version) {
   case envoy::api::v2::auth::TlsParameters::TLS_AUTO:
     return default_version;

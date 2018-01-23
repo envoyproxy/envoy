@@ -173,7 +173,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::bootstrap::v2::Bootstrap& bootstrap) {
       setGrpcService(
           *bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services(),
           "ads_cluster", fake_upstreams_.back()->localAddress());
