@@ -29,15 +29,18 @@ public:
   class TestListener : public Network::ListenerConfig, public LinkedObject<TestListener> {
   public:
     TestListener(ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
-                 bool hand_off_restored_destinations, const std::string& name)
+                 bool hand_off_restored_destination_connections, const std::string& name)
         : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
-          hand_off_restored_destinations_(hand_off_restored_destinations), name_(name) {}
+          hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
+          name_(name) {}
 
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocket& socket() override { return socket_; }
     Ssl::ServerContext* defaultSslContext() override { return nullptr; }
     bool bindToPort() override { return bind_to_port_; }
-    bool handOffRestoredDestinations() const override { return hand_off_restored_destinations_; }
+    bool handOffRestoredDestinationConnections() const override {
+      return hand_off_restored_destination_connections_;
+    }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
@@ -47,16 +50,17 @@ public:
     Network::MockListenSocket socket_;
     uint64_t tag_;
     bool bind_to_port_;
-    bool hand_off_restored_destinations_;
+    const bool hand_off_restored_destination_connections_;
     const std::string name_;
   };
 
   typedef std::unique_ptr<TestListener> TestListenerPtr;
 
-  TestListener* addListener(uint64_t tag, bool bind_to_port, bool hand_off_restored_destinations,
+  TestListener* addListener(uint64_t tag, bool bind_to_port,
+                            bool hand_off_restored_destination_connections,
                             const std::string& name) {
     TestListener* listener =
-        new TestListener(*this, tag, bind_to_port, hand_off_restored_destinations, name);
+        new TestListener(*this, tag, bind_to_port, hand_off_restored_destination_connections, name);
     listener->moveIntoListBack(TestListenerPtr{listener}, listeners_);
     return listener;
   }

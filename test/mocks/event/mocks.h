@@ -53,9 +53,9 @@ public:
 
   Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                       bool bind_to_port,
-                                      bool hand_off_restored_destinations) override {
+                                      bool hand_off_restored_destination_connections) override {
     return Network::ListenerPtr{
-        createListener_(socket, cb, bind_to_port, hand_off_restored_destinations)};
+        createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
   TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
@@ -87,7 +87,8 @@ public:
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
   MOCK_METHOD4(createListener_,
                Network::Listener*(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                  bool bind_to_port, bool hand_off_restored_destinations));
+                                  bool bind_to_port,
+                                  bool hand_off_restored_destination_connections));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletablePtr& to_delete));
   MOCK_METHOD0(exit, void());

@@ -60,10 +60,11 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerConfig& config)
-    : ActiveListener(parent,
-                     parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
-                                                       config.handOffRestoredDestinations()),
-                     config) {}
+    : ActiveListener(
+          parent,
+          parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
+                                            config.handOffRestoredDestinationConnections()),
+          config) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
@@ -143,7 +144,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     // Check if the socket may need to be redirected to another listener.
     ActiveListener* new_listener = nullptr;
 
-    if (hand_off_restored_destinations_ && socket_->localAddressRestored()) {
+    if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
       // Find a listener associated with the original destination address.
       new_listener = listener_.parent_.findActiveListenerByAddress(*socket_->localAddress());
     }
@@ -165,11 +166,11 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   }
 }
 
-void ConnectionHandlerImpl::ActiveListener::onAccept(Network::ConnectionSocketPtr&& socket,
-                                                     bool hand_off_restored_destinations) {
+void ConnectionHandlerImpl::ActiveListener::onAccept(
+    Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections) {
   Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
-  auto active_socket =
-      std::make_unique<ActiveSocket>(*this, std::move(socket), hand_off_restored_destinations);
+  auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket),
+                                                      hand_off_restored_destination_connections);
 
   // Create and run the filters
   config_.filterChainFactory().createListenerFilterChain(*active_socket);

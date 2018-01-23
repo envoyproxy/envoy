@@ -17,14 +17,14 @@ namespace Network {
 class ListenerImpl : public Listener {
 public:
   ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket, ListenerCallbacks& cb,
-               bool bind_to_port, bool hand_off_restored_destinations);
+               bool bind_to_port, bool hand_off_restored_destination_connections);
 
 protected:
   virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
 
   Address::InstanceConstSharedPtr local_address_;
   ListenerCallbacks& cb_;
-  const bool hand_off_restored_destinations_;
+  const bool hand_off_restored_destination_connections_;
 
 private:
   static void errorCallback(evconnlistener* listener, void* context);

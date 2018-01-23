@@ -77,7 +77,7 @@ private:
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket,
-                  bool hand_off_restored_destinations) override;
+                  bool hand_off_restored_destination_connections) override;
     void onNewConnection(Network::ConnectionPtr&& new_connection) override;
 
     /**
@@ -135,9 +135,9 @@ private:
                         LinkedObject<ActiveSocket>,
                         public Event::DeferredDeletable {
     ActiveSocket(ActiveListener& listener, Network::ConnectionSocketPtr&& socket,
-                 bool hand_off_restored_destinations)
+                 bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
-          hand_off_restored_destinations_(hand_off_restored_destinations),
+          hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           iter_(accept_filters_.end()) {}
     ~ActiveSocket() { accept_filters_.clear(); }
 
@@ -153,7 +153,7 @@ private:
 
     ActiveListener& listener_;
     Network::ConnectionSocketPtr socket_;
-    const bool hand_off_restored_destinations_;
+    const bool hand_off_restored_destination_connections_;
     std::list<Network::ListenerFilterPtr> accept_filters_;
     std::list<Network::ListenerFilterPtr>::iterator iter_;
   };

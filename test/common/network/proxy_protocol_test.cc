@@ -53,7 +53,7 @@ public:
   Network::ListenSocket& socket() override { return socket_; }
   Ssl::ServerContext* defaultSslContext() override { return nullptr; }
   bool bindToPort() override { return true; }
-  bool handOffRestoredDestinations() const override { return false; }
+  bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -340,7 +340,7 @@ public:
   Network::ListenSocket& socket() override { return socket_; }
   Ssl::ServerContext* defaultSslContext() override { return nullptr; }
   bool bindToPort() override { return true; }
-  bool handOffRestoredDestinations() const override { return false; }
+  bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }

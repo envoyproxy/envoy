@@ -49,7 +49,7 @@ public:
    *         configuration is set, false otherwise. Note that this flag is deprecated and will be
    *         removed from the v2 API.
    */
-  virtual bool handOffRestoredDestinations() const PURE;
+  virtual bool handOffRestoredDestinationConnections() const PURE;
 
   /**
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write
@@ -88,7 +88,7 @@ public:
    * the socket any further.
    */
   virtual void onAccept(ConnectionSocketPtr&& socket,
-                        bool hand_off_restored_destinations = true) PURE;
+                        bool hand_off_restored_destination_connections = true) PURE;
 
   /**
    * Called when a new connection is accepted.
