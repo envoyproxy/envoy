@@ -24,7 +24,7 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubscriptionImpl;
+typedef HttpSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment> HttpEdsSubscriptionImpl;
 
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -109,7 +109,7 @@ public:
     message->body().reset(new Buffer::OwnedImpl(response_json));
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
+                    Config::Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(
                         response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
@@ -143,7 +143,7 @@ public:
   Runtime::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
-  Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
 };
 

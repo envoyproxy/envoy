@@ -30,17 +30,17 @@ namespace Config {
 
 TEST(UtilityTest, GetTypedResources) {
   envoy::api::v2::DiscoveryResponse response;
-  EXPECT_EQ(0, Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(response).size());
+  EXPECT_EQ(0, Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(response).size());
 
-  envoy::api::v2::ClusterLoadAssignment load_assignment_0;
+  envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_0;
   load_assignment_0.set_cluster_name("0");
   response.add_resources()->PackFrom(load_assignment_0);
-  envoy::api::v2::ClusterLoadAssignment load_assignment_1;
+  envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_1;
   load_assignment_1.set_cluster_name("1");
   response.add_resources()->PackFrom(load_assignment_1);
 
   auto typed_resources =
-      Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(response);
+      Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(response);
   EXPECT_EQ(2, typed_resources.size());
   EXPECT_EQ("0", typed_resources[0].cluster_name());
   EXPECT_EQ("1", typed_resources[1].cluster_name());

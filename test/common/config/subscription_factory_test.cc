@@ -25,14 +25,14 @@ namespace Config {
 class SubscriptionFactoryTest : public ::testing::Test {
 public:
   SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {
-    legacy_subscription_.reset(new MockSubscription<envoy::api::v2::ClusterLoadAssignment>());
+    legacy_subscription_.reset(new MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>());
   }
 
-  std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
+  std::unique_ptr<Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config) {
-    return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
+    return SubscriptionFactory::subscriptionFromConfigSource<envoy::service::discovery::v2::ClusterLoadAssignment>(
         config, node_, dispatcher_, cm_, random_, stats_store_,
-        [this]() -> Subscription<envoy::api::v2::ClusterLoadAssignment>* {
+        [this]() -> Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
           return legacy_subscription_.release();
         },
         "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
@@ -43,8 +43,8 @@ public:
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
-  MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  std::unique_ptr<MockSubscription<envoy::api::v2::ClusterLoadAssignment>> legacy_subscription_;
+  MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> callbacks_;
+  std::unique_ptr<MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>> legacy_subscription_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
 };

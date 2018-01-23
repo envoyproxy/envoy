@@ -32,10 +32,10 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, 
   Config::Utility::checkLocalInfo("eds", local_info);
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::ClusterLoadAssignment>(
+      envoy::service::discovery::v2::ClusterLoadAssignment>(
       eds_config, local_info.node(), dispatcher, cm, random, info_->statsScope(),
       [this, &eds_config, &cm, &dispatcher,
-       &random]() -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
+       &random]() -> Config::Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
         return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
       },
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",

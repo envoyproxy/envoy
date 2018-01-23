@@ -236,8 +236,8 @@ public:
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-        envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+        envoy::service::discovery::v2::ClusterLoadAssignment cluster_load_assignment =
+            TestUtility::parseYaml<envoy::service::discovery::v2::ClusterLoadAssignment>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:

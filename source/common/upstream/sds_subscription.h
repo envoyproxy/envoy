@@ -19,7 +19,7 @@ namespace Upstream {
  * Service.
  */
 class SdsSubscription : public Http::RestApiFetcher,
-                        public Config::Subscription<envoy::api::v2::ClusterLoadAssignment>,
+                        public Config::Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
   SdsSubscription(ClusterStats& stats, const envoy::api::v2::ConfigSource& eds_config,
@@ -33,7 +33,7 @@ private:
   // Config::Subscription
   void
   start(const std::vector<std::string>& resources,
-        Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>& callbacks) override {
+        Config::SubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>& callbacks) override {
     // We can only handle a single cluster here, it's a design error to ever use this type of
     // Subscription with more than a single cluster.
     ASSERT(resources.size() == 1);
@@ -57,7 +57,7 @@ private:
 
   std::string cluster_name_;
   std::string version_info_;
-  Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>* callbacks_ = nullptr;
+  Config::SubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>* callbacks_ = nullptr;
   ClusterStats& stats_;
 };
 

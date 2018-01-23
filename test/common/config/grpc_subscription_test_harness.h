@@ -24,7 +24,7 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubscriptionImpl;
+typedef GrpcSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment> GrpcEdsSubscriptionImpl;
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -80,11 +80,11 @@ public:
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
+        envoy::service::discovery::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         response->add_resources()->PackFrom(*load_assignment);
       }
@@ -121,7 +121,7 @@ public:
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
-  Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> callbacks_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
   std::string last_response_nonce_;

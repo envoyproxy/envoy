@@ -20,7 +20,7 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
+typedef FilesystemSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment>
     FilesystemEdsSubscriptionImpl;
 
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
@@ -71,7 +71,7 @@ public:
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
+                    Config::Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(
                         response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
@@ -93,7 +93,7 @@ public:
   const std::string path_;
   std::string version_;
   Event::DispatcherImpl dispatcher_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>> callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };

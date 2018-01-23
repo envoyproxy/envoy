@@ -175,7 +175,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
         new envoy::api::v2::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("1");
-    envoy::api::v2::ClusterLoadAssignment load_assignment;
+    envoy::service::discovery::v2::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
@@ -183,7 +183,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
               EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment;
+              envoy::service::discovery::v2::ClusterLoadAssignment expected_assignment;
               resources[0].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
@@ -212,7 +212,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
         new envoy::api::v2::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("1");
-    envoy::api::v2::ClusterLoadAssignment load_assignment;
+    envoy::service::discovery::v2::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1"))
@@ -223,7 +223,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
               EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment;
+              envoy::service::discovery::v2::ClusterLoadAssignment expected_assignment;
               resources[0].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
@@ -236,13 +236,13 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
         new envoy::api::v2::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("2");
-    envoy::api::v2::ClusterLoadAssignment load_assignment_x;
+    envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_x;
     load_assignment_x.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment_x);
-    envoy::api::v2::ClusterLoadAssignment load_assignment_y;
+    envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_y;
     load_assignment_y.set_cluster_name("y");
     response->add_resources()->PackFrom(load_assignment_y);
-    envoy::api::v2::ClusterLoadAssignment load_assignment_z;
+    envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_z;
     load_assignment_z.set_cluster_name("z");
     response->add_resources()->PackFrom(load_assignment_z);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
@@ -250,7 +250,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             [&load_assignment_y, &load_assignment_z](
                 const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
               EXPECT_EQ(2, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment;
+              envoy::service::discovery::v2::ClusterLoadAssignment expected_assignment;
               resources[0].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
               resources[1].UnpackTo(&expected_assignment);
@@ -261,7 +261,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             [&load_assignment_x, &load_assignment_y](
                 const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
               EXPECT_EQ(2, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment;
+              envoy::service::discovery::v2::ClusterLoadAssignment expected_assignment;
               resources[0].UnpackTo(&expected_assignment);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_x));
               resources[1].UnpackTo(&expected_assignment);

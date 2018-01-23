@@ -32,7 +32,7 @@ public:
                                    const std::vector<uint32_t>& p1_winter_upstreams,
                                    const std::vector<uint32_t>& p1_dragon_upstreams) {
     uint32_t num_endpoints = 0;
-    envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+    envoy::service::discovery::v2::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
 
     auto* winter = cluster_load_assignment.add_endpoints();
