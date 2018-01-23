@@ -41,13 +41,20 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
-      ca_cert_file_(config.validation_context().trusted_ca().filename()),
-      cert_chain_file_(config.tls_certificates().empty()
+      ca_cert_(readDataSource(config.validation_context().trusted_ca(), true)),
+      ca_cert_path_(getDataSourcePath(config.validation_context().trusted_ca())),
+      cert_chain_(config.tls_certificates().empty()
+                      ? ""
+                      : readDataSource(config.tls_certificates()[0].certificate_chain(), true)),
+      cert_chain_path_(config.tls_certificates().empty()
                            ? ""
-                           : config.tls_certificates()[0].certificate_chain().filename()),
-      private_key_file_(config.tls_certificates().empty()
+                           : getDataSourcePath(config.tls_certificates()[0].certificate_chain())),
+      private_key_(config.tls_certificates().empty()
+                       ? ""
+                       : readDataSource(config.tls_certificates()[0].private_key(), true)),
+      private_key_path_(config.tls_certificates().empty()
                             ? ""
-                            : config.tls_certificates()[0].private_key().filename()),
+                            : getDataSourcePath(config.tls_certificates()[0].private_key())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
@@ -61,8 +68,31 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
 }
 
-unsigned ContextConfigImpl::tlsVersionFromProto(
-    const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
+const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::DataSource& source,
+                                                    bool allow_empty) {
+  switch (source.specifier_case()) {
+  case envoy::api::v2::DataSource::kFilename:
+    return Filesystem::fileReadToEnd(source.filename());
+  case envoy::api::v2::DataSource::kInlineBytes:
+    return source.inline_bytes();
+  case envoy::api::v2::DataSource::kInlineString:
+    return source.inline_string();
+  default:
+    if (!allow_empty) {
+      throw EnvoyException(
+          fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
+    }
+    return "";
+  }
+}
+
+const std::string ContextConfigImpl::getDataSourcePath(const envoy::api::v2::DataSource& source) {
+  return source.specifier_case() == envoy::api::v2::DataSource::kFilename ? source.filename() : "";
+}
+
+unsigned
+ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
+                                       unsigned default_version) {
   switch (version) {
   case envoy::api::v2::auth::TlsParameters::TLS_AUTO:
     return default_version;
@@ -106,23 +136,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         switch (config.session_ticket_keys_type_case()) {
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
           for (const auto& datasource : config.session_ticket_keys().keys()) {
-            switch (datasource.specifier_case()) {
-            case envoy::api::v2::DataSource::kFilename: {
-              validateAndAppendKey(ret, Filesystem::fileReadToEnd(datasource.filename()));
-              break;
-            }
-            case envoy::api::v2::DataSource::kInlineBytes: {
-              validateAndAppendKey(ret, datasource.inline_bytes());
-              break;
-            }
-            case envoy::api::v2::DataSource::kInlineString: {
-              validateAndAppendKey(ret, datasource.inline_string());
-              break;
-            }
-            default:
-              throw EnvoyException(fmt::format("Unexpected DataSource::specifier_case(): {}",
-                                               datasource.specifier_case()));
-            }
+            validateAndAppendKey(ret, readDataSource(datasource, false));
           }
           break;
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:
@@ -140,12 +154,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   // TODO(PiotrSikora): Support multiple TLS certificates.
   // TODO(mattklein123): All of the ASSERTs in this file need to be converted to exceptions with
   //                     proper error handling.
-  // TODO(htuch): Support inline cert material delivery.
   ASSERT(config.common_tls_context().tls_certificates().size() == 1);
-  ASSERT(config.common_tls_context().tls_certificates()[0].certificate_chain().specifier_case() ==
-         envoy::api::v2::DataSource::kFilename);
-  ASSERT(config.common_tls_context().tls_certificates()[0].private_key().specifier_case() ==
-         envoy::api::v2::DataSource::kFilename);
 }
 
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)

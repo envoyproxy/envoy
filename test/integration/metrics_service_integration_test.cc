@@ -12,6 +12,8 @@ namespace Envoy {
 namespace Stats {
 namespace Metrics {
 
+// TODO(htuch): Convert to Grpc::GrpcClientIntegrationParamTest. Needs some fixes for Google gRPC
+// client first.
 class MetricsServiceIntegrationTest : public HttpIntegrationTest,
                                       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
@@ -35,7 +37,6 @@ public:
       envoy::service::metrics::v2::MetricsServiceConfig config;
       config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("metrics_service");
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
-
     });
 
     HttpIntegrationTest::initialize();

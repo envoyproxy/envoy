@@ -67,22 +67,7 @@ private:
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();
-
-  void closeLocal() {
-    local_closed_ |= true;
-    if (complete()) {
-      cleanup();
-    }
-  }
-
-  void closeRemote() {
-    remote_closed_ |= true;
-    if (complete()) {
-      cleanup();
-    }
-  }
-
-  bool complete() const { return local_closed_ && remote_closed_; }
+  void trailerResponse(Optional<Status::GrpcStatus> grpc_status, const std::string& grpc_message);
 
   Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
@@ -90,8 +75,6 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
   const Optional<std::chrono::milliseconds>& timeout_;
-  bool local_closed_{};
-  bool remote_closed_{};
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;

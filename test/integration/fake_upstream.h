@@ -65,6 +65,10 @@ public:
   }
   template <class T> void decodeGrpcFrame(T& message) {
     EXPECT_GE(decoded_grpc_frames_.size(), 1);
+    if (decoded_grpc_frames_[0].length_ == 0) {
+      decoded_grpc_frames_.erase(decoded_grpc_frames_.begin());
+      return;
+    }
     Buffer::ZeroCopyInputStreamImpl stream(std::move(decoded_grpc_frames_[0].data_));
     EXPECT_TRUE(decoded_grpc_frames_[0].flags_ == Grpc::GRPC_FH_DEFAULT);
     EXPECT_TRUE(message.ParseFromZeroCopyStream(&stream));
