@@ -1,8 +1,11 @@
 # What are the identities, certificates and keys
-There are 9 identities:
+There are 10 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
   private key.
+- **Intermediate CA**: Intermediate Certificate Authority, signed by the **CA**.
+  It has the certificate *intermediate_ca_cert.pem". *intermediate_ca_key.pem*
+  is its private key.
 - **Fake CA**: Fake Certificate Authority used to validate verification logic.
   It has the self-signed certificate *fake_ca_cert.pem"*. *fake_ca_key.pem" is
   its private key.
@@ -14,7 +17,9 @@ There are 9 identities:
 - **SAN With DNS**: It has the certificate *san_dns_cert.pem*, which is signed
   by the **CA** using the config *san_dns_cert.cfg*. The certificate has SAN
   field of DNS type. *san_dns_key.pem* is its private key. A second certificate
-  and key, using the same config, is *san_dns_cert2*.
+  and key, using the same config, is *san_dns_cert2*. A third certificate and key,
+  using the same config, but signed by the **Intermediate CA** is *san_dns_cert3*,
+  its certificate chain is *san_dns_chain3.pem*.
 - **SAN With Multiple DNS**: Same as *SAN With DNS* except there are multiple
   SANs (including wildcard domain). It has certificate *san_multiple_dns_cert.pem*,
   *san_multiple_dns_key.pem* is its private key.

@@ -17,6 +17,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "api/base.pb.h"
+#include "api/bootstrap.pb.h"
 #include "api/cds.pb.h"
 #include "api/eds.pb.h"
 #include "api/filter/network/http_connection_manager.pb.h"
@@ -230,13 +231,12 @@ public:
   static std::string resourceName(const ProtobufWkt::Any& resource);
 
   /**
-   * Creates the set of stats tag extractors requested by the config and transfers ownership to the
-   * caller.
+   * Create TagProducer instance. Check all tag names for conflicts to avoid
+   * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
-   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
+   * @throws EnvoyException when the conflict of tag names is found.
    */
-  static std::vector<Stats::TagExtractorPtr>
-  createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr createTagProducer(const envoy::api::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.
@@ -245,6 +245,17 @@ public:
    * @param name supplies the name to check for length limits.
    */
   static void checkObjNameLength(const std::string& error_prefix, const std::string& name);
+
+  /**
+   * Obtain gRPC async client factory from a envoy::api::v2::ApiConfigSource.
+   * @param async_client_manager gRPC async client manager.
+   * @param api_config_source envoy::api::v2::ApiConfigSource. Must have config type GRPC.
+   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
+   */
+  static Grpc::AsyncClientFactoryPtr
+  factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                            const envoy::api::v2::ApiConfigSource& api_config_source,
+                            Stats::Scope& scope);
 };
 
 } // namespace Config

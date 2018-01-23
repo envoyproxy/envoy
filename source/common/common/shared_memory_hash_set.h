@@ -5,7 +5,6 @@
 #include <utility>
 
 #include "common/common/assert.h"
-#include "common/common/hash.h"
 #include "common/common/logger.h"
 
 #include "absl/strings/string_view.h"
@@ -41,6 +40,7 @@ struct SharedMemoryHashSetOptions {
  *    absl::string_view Value::key()
  *    void Value::initialize(absl::string_view key)
  *    static size_t Value::size()
+ *    static uint64_t Value::hash()
  *
  * This set may also be suitable for persisting a hash-table to long
  * term storage, but not across machine architectures, as it doesn't
@@ -96,14 +96,9 @@ public:
    */
   const SharedMemoryHashSetOptions& options() const { return control_->options; }
 
-  /** Examines the data structures to see if they are sane. Tries hard not to crash or hang. */
-  bool sanityCheck() {
-    bool ret = true;
-    if (control_->size > control_->options.capacity) {
-      ENVOY_LOG(error, "SharedMemoryHashSet size={} > capacity={}", control_->size,
-                control_->options.capacity);
-      return false;
-    }
+  /** Examines the data structures to see if they are sane, assert-failing on any trouble. */
+  void sanityCheck() {
+    RELEASE_ASSERT(control_->size <= control_->options.capacity);
 
     // As a sanity check, make sure there are control_->size values
     // reachable from the slots, each of which has a valid char_offset
@@ -111,35 +106,33 @@ public:
     for (uint32_t slot = 0; slot < control_->options.num_slots; ++slot) {
       uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
-        if (cell_index >= control_->options.capacity) {
-          ENVOY_LOG(error, "SharedMemoryHashSet cell index too high={}, capacity={}", cell_index,
-                    control_->options.capacity);
-          ret = false;
+        RELEASE_ASSERT(cell_index < control_->options.capacity);
+        Cell& cell = getCell(cell_index);
+        absl::string_view key = cell.value.key();
+        RELEASE_ASSERT(computeSlot(key) == slot);
+        next = cell.next_cell;
+        ++num_values;
+        // Avoid infinite loops if there is a next_cell cycle within
+        // a slot. Note that the num_values message will be emitted
+        // outside the loop.
+        if (num_values > control_->size) {
           break;
-        } else {
-          Cell& cell = getCell(cell_index);
-          absl::string_view key = cell.value.key();
-          if (computeSlot(key) != slot) {
-            ENVOY_LOG(error, "SharedMemoryHashSet hash mismatch for key={}", std::string(key));
-            ret = false;
-          }
-          next = cell.next_cell;
-          ++num_values;
-          // Avoid infinite loops if there is a next_cell cycle within
-          // a slot. Note that the num_values message will be emitted
-          // outside the loop.
-          if (num_values > control_->size) {
-            break;
-          }
         }
       }
     }
-    if (num_values != control_->size) {
-      ENVOY_LOG(error, "SharedMemoryHashSet has wrong number of live cells: {}, expected {}",
-                num_values, control_->size);
-      ret = false;
+    RELEASE_ASSERT(num_values == control_->size);
+
+    uint32_t num_free_entries = 0;
+    uint32_t expected_free_entries = control_->options.capacity - control_->size;
+    for (uint32_t cell_index = control_->free_cell_index; cell_index != Sentinal;
+         cell_index = getCell(cell_index).next_cell) {
+      ++num_free_entries;
+      if (num_free_entries > expected_free_entries) {
+        // Don't infinite-loop with a corruption; break when we see there's a problem.
+        break;
+      }
     }
-    return ret;
+    RELEASE_ASSERT(num_free_entries == expected_free_entries);
   }
 
   /**
@@ -203,15 +196,20 @@ public:
     const uint32_t slot = computeSlot(key);
     uint32_t* next = nullptr;
     for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinal; cptr = next) {
-      Cell& cell = getCell(*cptr);
-      next = &cell.next_cell;
+      const uint32_t cell_index = *cptr;
+      Cell& cell = getCell(cell_index);
       if (cell.value.key() == key) {
-        control_->free_cell_index = *cptr;
+        // Splice current cell out of slot-chain.
+        *cptr = cell.next_cell;
+
+        // Splice current cell into free-list.
+        cell.next_cell = control_->free_cell_index;
+        control_->free_cell_index = cell_index;
+
         --control_->size;
-        *cptr = *next; // Splices current cell out of slot-chain.
-        *next = control_->free_cell_index;
         return true;
       }
+      next = &cell.next_cell;
     }
     return false;
   }
@@ -249,7 +247,7 @@ private:
    * @param memory
    */
   void initialize(const SharedMemoryHashSetOptions& options) {
-    control_->hash_signature = HashUtil::xxHash64(signatureStringToHash());
+    control_->hash_signature = Value::hash(signatureStringToHash());
     control_->num_bytes = numBytes(options);
     control_->options = options;
     control_->size = 0;
@@ -261,10 +259,12 @@ private:
     }
 
     // Initialize the free-cell list.
-    for (uint32_t cell_index = 0; cell_index < options.capacity; ++cell_index) {
+    const uint32_t last_cell = options.capacity - 1;
+    for (uint32_t cell_index = 0; cell_index < last_cell; ++cell_index) {
       Cell& cell = getCell(cell_index);
       cell.next_cell = cell_index + 1;
     }
+    getCell(last_cell).next_cell = Sentinal;
   }
 
   /**
@@ -278,15 +278,16 @@ private:
                 control_->num_bytes);
       return false;
     }
-    if (HashUtil::xxHash64(signatureStringToHash()) != control_->hash_signature) {
+    if (Value::hash(signatureStringToHash()) != control_->hash_signature) {
       ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
       return false;
     }
-    return sanityCheck();
+    sanityCheck();
+    return true;
   }
 
   uint32_t computeSlot(absl::string_view key) {
-    return HashUtil::xxHash64(key) % control_->options.num_slots;
+    return Value::hash(key) % control_->options.num_slots;
   }
 
   /**

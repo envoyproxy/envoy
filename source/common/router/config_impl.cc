@@ -246,6 +246,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  if (route.has_metadata()) {
+    metadata_ = route.metadata();
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
@@ -578,7 +582,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
-      regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
+      regex_(RegexUtil::parseRegex(route.match().regex().c_str())) {}
 
 void RegexRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
@@ -668,7 +672,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   }
 
   const std::string pattern = virtual_cluster.pattern();
-  pattern_ = std::regex{pattern, std::regex::optimize};
+  pattern_ = RegexUtil::parseRegex(pattern);
   name_ = virtual_cluster.name();
 }
 

@@ -14,13 +14,14 @@ envoy_cc_library(
     hdrs = ["stats_impl.h"],
     external_deps = [
         "abseil_strings",
-        "envoy_bootstrap",
+        "envoy_stats",
     ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",

@@ -138,6 +138,7 @@ def _envoy_api_deps():
         "cds",
         "discovery",
         "eds",
+        "grpc_service",
         "health_check",
         "lds",
         "metrics",

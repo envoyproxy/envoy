@@ -3,7 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "common/common/utility.h"
+
+#include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -286,6 +290,22 @@ TEST(Primes, findPrimeLargerThan) {
   EXPECT_EQ(67, Primes::findPrimeLargerThan(62));
   EXPECT_EQ(107, Primes::findPrimeLargerThan(103));
   EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));
+}
+
+TEST(RegexUtil, parseRegex) {
+  EXPECT_THROW_WITH_REGEX(RegexUtil::parseRegex("(+invalid)"), EnvoyException,
+                          "Invalid regex '\\(\\+invalid\\)': .+");
+
+  {
+    std::regex regex = RegexUtil::parseRegex("x*");
+    EXPECT_NE(0, regex.flags() & std::regex::optimize);
+  }
+
+  {
+    std::regex regex = RegexUtil::parseRegex("x*", std::regex::icase);
+    EXPECT_NE(0, regex.flags() & std::regex::icase);
+    EXPECT_EQ(0, regex.flags() & std::regex::optimize);
+  }
 }
 
 } // namespace Envoy

@@ -54,14 +54,33 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
 
   int verify_mode = SSL_VERIFY_NONE;
 
-  if (!config.caCertFile().empty()) {
-    ca_cert_ = loadCert(config.caCertFile());
-    ca_file_path_ = config.caCertFile();
-    // set CA certificate
-    int rc = SSL_CTX_load_verify_locations(ctx_.get(), config.caCertFile().c_str(), nullptr);
-    if (0 == rc) {
+  if (!config.caCert().empty()) {
+    ca_file_path_ = config.caCertPath();
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
+    RELEASE_ASSERT(bio != nullptr);
+    // Based on BoringSSL's X509_load_cert_crl_file().
+    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+    if (list == nullptr) {
       throw EnvoyException(
-          fmt::format("Failed to load verify locations file {}", config.caCertFile()));
+          fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
+    }
+    for (const X509_INFO* item : list.get()) {
+      if (item->x509) {
+        X509_STORE_add_cert(SSL_CTX_get_cert_store(ctx_.get()), item->x509);
+        if (ca_cert_ == nullptr) {
+          X509_up_ref(item->x509);
+          ca_cert_.reset(item->x509);
+        }
+      }
+      if (item->crl) {
+        X509_STORE_add_crl(SSL_CTX_get_cert_store(ctx_.get()), item->crl);
+      }
+    }
+    if (ca_cert_ == nullptr) {
+      throw EnvoyException(
+          fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
     }
     verify_mode = SSL_VERIFY_PEER;
   }
@@ -84,19 +103,52 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
-  if (!config.certChainFile().empty()) {
-    cert_chain_ = loadCert(config.certChainFile());
-    cert_chain_file_path_ = config.certChainFile();
-    int rc = SSL_CTX_use_certificate_chain_file(ctx_.get(), config.certChainFile().c_str());
-    if (0 == rc) {
+  if (config.certChain().empty() != config.privateKey().empty()) {
+    throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",
+                                     config.certChainPath(), config.privateKeyPath()));
+  }
+
+  if (!config.certChain().empty()) {
+    // Load certificate chain.
+    cert_chain_file_path_ = config.certChainPath();
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.certChain().data()), config.certChain().size()));
+    RELEASE_ASSERT(bio != nullptr);
+    cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
+    if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ctx_.get(), cert_chain_.get())) {
       throw EnvoyException(
-          fmt::format("Failed to load certificate chain file {}", config.certChainFile()));
+          fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
+    }
+    // Read rest of the certificate chain.
+    while (true) {
+      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      if (cert == nullptr) {
+        break;
+      }
+      if (!SSL_CTX_add_extra_chain_cert(ctx_.get(), cert.get())) {
+        throw EnvoyException(
+            fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
+      }
+      // SSL_CTX_add_extra_chain_cert() takes ownership.
+      cert.release();
+    }
+    // Check for EOF.
+    uint32_t err = ERR_peek_last_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+      ERR_clear_error();
+    } else {
+      throw EnvoyException(
+          fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
     }
 
-    rc = SSL_CTX_use_PrivateKey_file(ctx_.get(), config.privateKeyFile().c_str(), SSL_FILETYPE_PEM);
-    if (0 == rc) {
+    // Load private key.
+    bio.reset(
+        BIO_new_mem_buf(const_cast<char*>(config.privateKey().data()), config.privateKey().size()));
+    RELEASE_ASSERT(bio != nullptr);
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+    if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx_.get(), pkey.get())) {
       throw EnvoyException(
-          fmt::format("Failed to load private key file {}", config.privateKeyFile()));
+          fmt::format("Failed to load private key from {}", config.privateKeyPath()));
     }
   }
 
@@ -375,10 +427,41 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
         return dynamic_cast<ServerContextImpl*>(context_impl)->processClientHello(client_hello);
       });
 
-  if (!config.caCertFile().empty()) {
-    bssl::UniquePtr<STACK_OF(X509_NAME)> list(SSL_load_client_CA_file(config.caCertFile().c_str()));
-    if (nullptr == list) {
-      throw EnvoyException(fmt::format("Failed to load client CA file {}", config.caCertFile()));
+  if (!config.caCert().empty()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
+    RELEASE_ASSERT(bio != nullptr);
+    // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
+    bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
+        [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+    RELEASE_ASSERT(list != nullptr);
+    for (;;) {
+      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      if (cert == nullptr) {
+        break;
+      }
+      X509_NAME* name = X509_get_subject_name(cert.get());
+      if (name == nullptr) {
+        throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
+                                         config.caCertPath()));
+      }
+      // Check for duplicates.
+      if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+        continue;
+      }
+      bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+      if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+        throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
+                                         config.caCertPath()));
+      }
+    }
+    // Check for EOF.
+    uint32_t err = ERR_peek_last_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+      ERR_clear_error();
+    } else {
+      throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
+                                       config.caCertPath()));
     }
     SSL_CTX_set_client_CA_list(ctx_.get(), list.release());
 
