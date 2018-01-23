@@ -273,5 +273,56 @@ TEST(PortRangeListTest, Normal) {
   }
 }
 
+TEST(AbslUint128, ConvertDataStructure) {
+  {
+    Address::Ipv6Instance address("::1");
+    uint64_t high = 0x100000000000000;
+    EXPECT_EQ(absl::MakeUint128(high, 0), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::MakeUint128(high, 0),
+              Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+    EXPECT_EQ(absl::uint128(1), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+
+    std::array<uint8_t, 16> expected_result{0};
+    expected_result[15] = 1;
+    EXPECT_EQ(expected_result, Utility::getArrayRepresentation(address.ip()->ipv6()->address()));
+  }
+  {
+    Address::Ipv6Instance address("1::");
+    uint64_t high = 0x001000000000000;
+    EXPECT_EQ(absl::uint128(256), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::uint128(256),
+              Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+    EXPECT_EQ(absl::MakeUint128(high, 0), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+    std::array<uint8_t, 16> expected_result{0};
+    expected_result[1] = 1;
+    EXPECT_EQ(expected_result, Utility::getArrayRepresentation(address.ip()->ipv6()->address()));
+  }
+  {
+    Address::Ipv6Instance address("2001:abcd:ef01:2345:6789:abcd:ef01:234");
+    uint64_t low = 0x452301EFCDAB0120;
+    uint64_t high = 0x340201EFCDAB8967;
+    std::array<uint8_t, 16> expected_result{0x34, 0x02, 0x01, 0xEF, 0xCD, 0xAB, 0x89, 0x67,
+                                            0x45, 0x23, 0x01, 0xEF, 0xCD, 0xAB, 0x01, 0x20};
+    EXPECT_EQ(absl::MakeUint128(high, low), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::MakeUint128(high, low),
+              Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+    EXPECT_EQ(expected_result,
+              Utility::getArrayRepresentation(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+  }
+  {
+    Address::Ipv6Instance address("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+    absl::uint128 max_int = absl::MakeUint128(std::numeric_limits<uint64_t>::max(),
+                                              std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(max_int, address.ip()->ipv6()->address());
+    EXPECT_EQ(max_int, Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+
+    std::array<uint8_t, 16> expected_result;
+    for (size_t i = 0; i < expected_result.size(); i++) {
+      expected_result[i] = 0xFF;
+    }
+    EXPECT_EQ(expected_result, Utility::getArrayRepresentation(address.ip()->ipv6()->address()));
+  }
+}
+
 } // namespace Network
 } // namespace Envoy

@@ -221,8 +221,8 @@ bool Utility::isInternalAddress(const Address::Instance& address) {
   // Local IPv6 address prefix defined in RFC4193. Local addresses have prefix FC00::/7.
   // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the
   // future.
-  const auto address6 = address.ip()->ipv6()->address();
-  const uint8_t* address6_bytes = reinterpret_cast<const uint8_t*>(address6.data());
+  const uint8_t* address6_bytes = reinterpret_cast<const uint8_t*>(
+      Utility::getArrayRepresentation(address.ip()->ipv6()->address()).data());
   if (address6_bytes[0] == 0xfd ||
       memcmp(address6_bytes, &in6addr_loopback, sizeof(in6addr_loopback)) == 0) {
     return true;
@@ -240,7 +240,7 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     // Compare to the canonical v4 loopback address: 127.0.0.1.
     return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
   } else if (address.ip()->version() == Address::IpVersion::v6) {
-    std::array<uint8_t, 16> addr = address.ip()->ipv6()->address();
+    std::array<uint8_t, 16> addr = Utility::getArrayRepresentation(address.ip()->ipv6()->address());
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
   NOT_IMPLEMENTED;
@@ -340,6 +340,31 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
     }
   }
   return false;
+}
+
+absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) { return flipOrder(address); }
+
+absl::uint128 Utility::Ip6htonl(const absl::uint128& address) { return flipOrder(address); }
+
+std::array<uint8_t, 16> Utility::getArrayRepresentation(const absl::uint128& address) {
+  std::array<uint8_t, 16> result;
+  absl::uint128 data = address;
+  for (size_t i = 0; i < result.size(); i++) {
+    result[i] = static_cast<uint8_t>(data & 0x000000000000000000000000000000FF);
+    data >>= 8;
+  }
+  return result;
+}
+
+absl::uint128 Utility::flipOrder(const absl::uint128& input) {
+  absl::uint128 result{0};
+  absl::uint128 data = input;
+  for (int i = 0; i < 16; i++) {
+    result <<= 8;
+    result |= (data & 0x000000000000000000000000000000FF);
+    data >>= 8;
+  }
+  return result;
 }
 
 } // namespace Network

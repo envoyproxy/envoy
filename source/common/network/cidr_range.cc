@@ -90,24 +90,9 @@ bool CidrRange::isInRange(const Instance& address) const {
     }
     break;
   case IpVersion::v6:
-    int length = length_;
-    // Loop through address bytes and compare. Address is in network byte order.
-    for (int i = 0; i < 16; i++) {
-      if (length < 8) {
-        // Compare relevant bits.
-        return (address.ip()->ipv6()->address()[i] >> (8 - length) ==
-                address_->ip()->ipv6()->address()[i] >> (8 - length));
-      } else {
-        if (address.ip()->ipv6()->address()[i] == address_->ip()->ipv6()->address()[i]) {
-          if (length == 8) {
-            return true;
-          } else {
-            length -= 8;
-          }
-        } else {
-          break;
-        }
-      }
+    if (Utility::Ip6ntohl(address_->ip()->ipv6()->address()) >> (128 - length_) ==
+        Utility::Ip6ntohl(address.ip()->ipv6()->address()) >> (128 - length_)) {
+      return true;
     }
     break;
   }
@@ -200,21 +185,17 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     sockaddr_in6 sa6;
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(0);
-    std::array<uint8_t, 16> ip6 = address->ip()->ipv6()->address();
-    for (int i = 0; i < 16; ++i) {
-      if (length == 0) {
-        // We've retained all the bits we need, the remaining are all zero.
-        sa6.sin6_addr.s6_addr[i] = 0;
-      } else if (length < 8) {
-        // We're retaining only the high-order length bits of this byte.
-        sa6.sin6_addr.s6_addr[i] = ip6[i] & (0xff << (8 - length));
-        length = 0;
-      } else {
-        // We're keeping all of these bits.
-        sa6.sin6_addr.s6_addr[i] = ip6[i];
-        length -= 8;
-      }
-    }
+    absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address());
+    // The maximum number stored in absl::uint128 has every bit set to 1.
+    absl::uint128 max_int = absl::MakeUint128(std::numeric_limits<uint64_t>::max(),
+                                              std::numeric_limits<uint64_t>::max());
+    // When shifting the value to ththe left, all bits between 128-length and
+    // 128 are set to zero.
+    max_int <<= (128 - length);
+    ip6 &= max_int;
+
+    std::array<uint8_t, 16> ip6_array = Utility::getArrayRepresentation(Utility::Ip6htonl(ip6));
+    memcpy(&sa6.sin6_addr.s6_addr, &ip6_array, 16);
     return std::make_shared<Ipv6Instance>(sa6);
   }
   }
