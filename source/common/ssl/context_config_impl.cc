@@ -34,59 +34,6 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
 
 const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
 
-static std::vector<bssl::UniquePtr<X509_CRL>>
-loadCRL(const envoy::api::v2::CertificateValidationContext& vctx) {
-  std::vector<bssl::UniquePtr<X509_CRL>> crls;
-
-  if (!vctx.has_crl()) {
-    return crls;
-  }
-
-  // We want to load multiple CRLs from the same file, so we need to use
-  // OpenSSL's STACK abstraction. We read from the input file or inline data,
-  // and load into the stack of X509_INFOs.
-  bssl::UniquePtr<STACK_OF(X509_INFO)> xis(nullptr);
-
-  auto crl_conf = vctx.crl();
-  if (crl_conf.filename().length()) {
-    std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(crl_conf.filename().c_str(), "r"), &fclose);
-
-    if (!fp.get()) {
-      throw EnvoyException(
-          fmt::format("Failed to open CRL file '{}'", crl_conf.filename().c_str()));
-    }
-
-    xis.reset(PEM_X509_INFO_read(fp.get(), nullptr, nullptr, nullptr));
-  } else {
-    std::unique_ptr<BIO, decltype(&BIO_free_all)> bio(
-        BIO_new_mem_buf(crl_conf.inline_().c_str(), crl_conf.inline_().length()), BIO_free_all);
-
-    if (!bio.get()) {
-      throw EnvoyException(fmt::format("Failed to load inline CRL"));
-    }
-
-    xis.reset(PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-  }
-
-  if (!xis) {
-    throw EnvoyException(fmt::format("Failed to parse CRL"));
-  }
-
-  // Iterate through every item in the stack, adding all found CRLs to our
-  // return array.
-  for (const auto& xi : xis.get()) {
-    if (xi->crl != nullptr) {
-      crls.emplace_back(xi->crl);
-
-      // We need to hold an additional reference to the CRL, or our stack's
-      // destructor will free it.
-      X509_CRL_up_ref(xi->crl);
-    }
-  }
-
-  return crls;
-}
-
 ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config)
     : alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       alt_alpn_protocols_(config.deprecated_v1().alt_alpn_protocols()),
@@ -108,7 +55,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
       private_key_path_(config.tls_certificates().empty()
                             ? ""
                             : getDataSourcePath(config.tls_certificates()[0].private_key())),
-      certificate_revocation_lists_(loadCRL(config.validation_context())),
+      certificate_revocation_list_(readDataSource(config.validation_context().crl(), true)),
+      certificate_revocation_list_path_(getDataSourcePath(config.validation_context().crl())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()

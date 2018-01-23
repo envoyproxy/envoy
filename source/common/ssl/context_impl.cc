@@ -152,11 +152,29 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     }
   }
 
-  if (config.certificateRevocationLists().size() > 0) {
-    X509_STORE* cs = SSL_CTX_get_cert_store(ctx_.get());
+  if (!config.certificateRevocationList().empty()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.certificateRevocationList().data()),
+                        config.certificateRevocationList().size()));
+    RELEASE_ASSERT(bio != nullptr);
 
-    for (const bssl::UniquePtr<X509_CRL>& crl : config.certificateRevocationLists()) {
-      X509_STORE_add_crl(cs, crl.get());
+    // Based on BoringSSL's X509_load_cert_crl_file().
+    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+    if (list == nullptr) {
+      throw EnvoyException(
+          fmt::format("Failed to load CRL from {}", config.certificateRevocationListPath()));
+    }
+
+    X509_STORE* cs = SSL_CTX_get_cert_store(ctx_.get());
+    for (const X509_INFO* item : list.get()) {
+      if (item->crl) {
+        X509_STORE_add_crl(cs, item->crl);
+
+        // We need to hold an additional reference to the CRL, or our stack's
+        // destructor will free it.
+        X509_CRL_up_ref(item->crl);
+      }
     }
 
     X509_STORE_set_flags(cs, X509_V_FLAG_CRL_CHECK);

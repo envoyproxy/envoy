@@ -21,7 +21,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
-    external_deps = ["ssl"],
 )
 
 envoy_cc_library(

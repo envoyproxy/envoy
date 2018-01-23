@@ -6,8 +6,6 @@
 
 #include "envoy/common/pure.h"
 
-#include "openssl/ssl.h"
-
 namespace Envoy {
 namespace Ssl {
 
@@ -76,7 +74,13 @@ public:
   /**
    * @return The CRL to check if a cert is revoked.
    */
-  virtual const std::vector<bssl::UniquePtr<X509_CRL>>& certificateRevocationLists() const PURE;
+  virtual const std::string& certificateRevocationList() const PURE;
+
+  /**
+   * @return Path of the certificate revocation list, or "<inline>" if the CRL
+   * was inlined.
+   */
+  virtual const std::string& certificateRevocationListPath() const PURE;
 
   /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""
