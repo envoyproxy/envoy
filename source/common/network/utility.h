@@ -201,13 +201,6 @@ public:
    */
   static absl::uint128 Ip6htonl(const absl::uint128& address);
 
-  /**
-   * Coverts IPv6 absl::uint128 in network byte order into std::array<uint8_t, 16>.
-   * @param address supplies the IPv6 array in network byte order.
-   * @return the address in std::array<uint_8, 16> format.
-   */
-  static std::array<uint8_t, 16> getArrayRepresentation(const absl::uint128& address);
-
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
 
@@ -217,6 +210,14 @@ private:
    * output. Etc..
    */
   static absl::uint128 flipOrder(const absl::uint128& input);
+
+  /**
+   * Determines if the machine's byte order is little-endian or big-endian.
+   * For more information on the logic, refer to
+   * http://vijayinterviewquestions.blogspot.com/2007/07/what-little-endian-and-big-endian-how.html
+   * @return true if the machine uses little-endian. False if the machine uses big-endian.
+   */
+  static bool isLittleEndian();
 };
 
 } // namespace Network

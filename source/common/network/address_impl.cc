@@ -185,10 +185,7 @@ int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(ty
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
-  for (int i = 15; i >= 0; i--) {
-    result <<= 8;
-    result |= address_.sin6_addr.s6_addr[i];
-  }
+  memcpy(&result, &address_.sin6_addr.s6_addr, 16);
   return result;
 }
 
