@@ -37,8 +37,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
             return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
                                        eds_config, cm, dispatcher, random, local_info);
           },
-          "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
+          "envoy.service.discovery.v2.ClusterDiscoveryService.FetchClusters",
+          "envoy.service.discovery.v2.ClusterDiscoveryService.StreamClusters");
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {

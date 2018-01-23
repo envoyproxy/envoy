@@ -50,7 +50,7 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
   if (thread_local_stream_->stream_ == nullptr) {
     thread_local_stream_->stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.api.v2.MetricsService.StreamMetrics"),
+                           "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
                        *thread_local_stream_);
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = shared_state_->local_info_.node();

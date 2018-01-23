@@ -265,7 +265,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::bootstrap::v2::Bootstrap& bo
             ->create(),
         primary_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   } else {
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }

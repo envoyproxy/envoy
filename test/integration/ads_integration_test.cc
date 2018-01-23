@@ -6,9 +6,10 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/common.pb.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/service/discovery/v2/eds.pb.h"
 #include "envoy/service/discovery/v2/cds.pb.h"
+#include "envoy/service/discovery/v2/common.pb.h"
 #include "envoy/service/discovery/v2/rds.pb.h"
 #include "envoy/service/discovery/v2/lds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"

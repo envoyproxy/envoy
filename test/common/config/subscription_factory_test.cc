@@ -35,8 +35,8 @@ public:
         [this]() -> Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
           return legacy_subscription_.release();
         },
-        "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+        "envoy.service.discovery.v2.EndpointDiscoveryService.FetchEndpoints",
+        "envoy.service.discovery.v2.EndpointDiscoveryService.StreamEndpoints");
   }
 
   envoy::api::v2::Node node_;

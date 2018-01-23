@@ -53,7 +53,7 @@ public:
     envoy::service::metrics::v2::StreamMetricsMessage request_msg;
     metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.api.v2.MetricsService/StreamMetrics",
+    EXPECT_STREQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
                  metrics_service_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc",
                  metrics_service_request_->headers().ContentType()->value().c_str());

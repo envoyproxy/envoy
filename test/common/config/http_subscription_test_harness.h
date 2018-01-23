@@ -30,7 +30,7 @@ class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   HttpSubscriptionTestHarness()
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
+            "envoy.service.discovery.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -97,7 +97,7 @@ public:
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
-                       "envoy.api.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
+                       "envoy.service.discovery.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
                        cluster + "\"},";
     }
     response_json.pop_back();

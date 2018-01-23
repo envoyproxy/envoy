@@ -36,6 +36,7 @@ envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
     external_deps = [
+        "envoy_ads",
         "envoy_discovery",
         "envoy_eds",
     ],

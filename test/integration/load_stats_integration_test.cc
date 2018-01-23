@@ -220,7 +220,7 @@ public:
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
       EXPECT_STREQ("POST", loadstats_stream_->headers().Method()->value().c_str());
-      EXPECT_STREQ("/envoy.api.v2.EndpointDiscoveryService/StreamLoadStats",
+      EXPECT_STREQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
                    loadstats_stream_->headers().Path()->value().c_str());
       EXPECT_STREQ("application/grpc", loadstats_stream_->headers().ContentType()->value().c_str());
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,

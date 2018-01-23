@@ -192,6 +192,7 @@ def _envoy_api_deps():
     )
 
     discovery_bind_targets = [
+        "ads",
         "cds",
         "eds",
         "lds",

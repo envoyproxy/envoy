@@ -9,6 +9,7 @@
 
 #include "envoy/service/discovery/v2/common.pb.h"
 #include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,7 +36,7 @@ public:
     grpc_mux_.reset(new GrpcMuxImpl(
         envoy::api::v2::Node(), std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   }
 
   void expectSendMessage(const std::string& type_url,

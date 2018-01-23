@@ -108,6 +108,9 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    external_deps = [
+      "envoy_lds",
+    ],
     deps = [
         "//source/common/config:utility_lib",
         "//source/server:lds_api_lib",

@@ -16,6 +16,7 @@ envoy_cc_test(
     srcs = ["ads_integration_test.cc"],
     data = ["//test/config/integration:server_ads.yaml"],
     external_deps = [
+        "envoy_ads",
         "envoy_cds",
         "envoy_discovery",
         "envoy_eds",

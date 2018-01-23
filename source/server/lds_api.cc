@@ -28,8 +28,8 @@ LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::Cluster
             return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
                                        dispatcher, random, local_info);
           },
-          "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
-          "envoy.api.v2.ListenerDiscoveryService.StreamListeners");
+          "envoy.service.discovery.v2.ListenerDiscoveryService.FetchListeners",
+          "envoy.service.discovery.v2.ListenerDiscoveryService.StreamListeners");
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.registerTarget(*this);
 }

@@ -38,8 +38,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, 
        &random]() -> Config::Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
         return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
       },
-      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+      "envoy.service.discovery.v2.EndpointDiscoveryService.FetchEndpoints",
+      "envoy.service.discovery.v2.EndpointDiscoveryService.StreamEndpoints");
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }

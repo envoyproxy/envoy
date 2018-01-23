@@ -62,7 +62,7 @@ public:
     std::string file_json = "{\"versionInfo\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       file_json += "{\"@type\":\"type.googleapis.com/"
-                   "envoy.api.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
+                   "envoy.service.discovery.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
                    cluster + "\"},";
     }
     file_json.pop_back();

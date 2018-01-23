@@ -30,7 +30,7 @@ class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   GrpcSubscriptionTestHarness()
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
+            "envoy.service.discovery.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {

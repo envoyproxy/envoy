@@ -67,8 +67,8 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
         return new RdsSubscription(Envoy::Config::Utility::generateStats(*scope_), rds, cm_,
                                    dispatcher, random, local_info);
       },
-      "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
+      "envoy.service.discovery.v2.RouteDiscoveryService.FetchRoutes",
+      "envoy.service.discovery.v2.RouteDiscoveryService.StreamRoutes");
 
   // In V2 we use a Subscription model where the fetch can happen via gRPC, REST, or
   // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),

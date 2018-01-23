@@ -9,6 +9,8 @@
 
 #include "gmock/gmock.h"
 
+#include "envoy/service/discovery/v2/lds.pb.h"
+
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;

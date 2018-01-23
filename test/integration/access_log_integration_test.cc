@@ -58,7 +58,7 @@ public:
     envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
     access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     EXPECT_STREQ("POST", access_log_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.api.v2.filter.accesslog.AccessLogService/StreamAccessLogs",
+    EXPECT_STREQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
                  access_log_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc", access_log_request_->headers().ContentType()->value().c_str());
 
