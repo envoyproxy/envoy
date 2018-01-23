@@ -1,10 +1,10 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "common/common/assert.h"
 #include "testing/base/public/benchmark.h"
 
 static const char TextToTrim[] = "\t  the quick brown fox jumps over the lazy dog\n\r\n";
@@ -65,10 +65,10 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
     absl::string_view::size_type pos = str.find(delim);
     if (pos == absl::string_view::npos) {
       *token = str.substr(0, str.size());
-      str.remove_prefix(str.size());  // clears str
+      str.remove_prefix(str.size()); // clears str
     } else {
       *token = str.substr(0, pos);
-      str.remove_prefix(pos + 1);  // move past token and delim
+      str.remove_prefix(pos + 1); // move past token and delim
     }
     if (stripWhitespace) {
       *token = Envoy::StringUtil::trim(*token);
@@ -82,10 +82,10 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
 
 // Experimental alternative implementation of StringUtil::findToken which doesn't create
 // a temp vector, but just iterates through the string_view, tokenizing, and matching against
-// the token we want.  It appears to be about 2.5x to 3x faster on this testcase.
+// the token we want. It appears to be about 2.5x to 3x faster on this testcase.
 static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::string_view token,
                                       bool stripWhitespace) {
-  for (absl::string_view tok; nextToken(str, delim, stripWhitespace, &tok); ) {
+  for (absl::string_view tok; nextToken(str, delim, stripWhitespace, &tok);) {
     if (tok == token) {
       return true;
     }
@@ -136,7 +136,7 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
   for (auto _ : state) {
     absl::string_view cache_control(CacheControl, CacheControlLength);
     absl::string_view max_age;
-    for (absl::string_view token; nextToken(cache_control, ',', true, &token); ) {
+    for (absl::string_view token; nextToken(cache_control, ',', true, &token);) {
       absl::string_view name;
       if (nextToken(token, '=', true, &name) && (name == "max-age")) {
         max_age = Envoy::StringUtil::trim(token);
