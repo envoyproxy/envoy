@@ -7,6 +7,7 @@
 
 #include "envoy/network/listen_socket.h"
 
+#include "common/common/assert.h"
 #include "common/ssl/context_impl.h"
 
 namespace Envoy {
@@ -62,6 +63,7 @@ public:
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
                        bool restored) override {
+    ASSERT(!restored || *local_address != *local_address_);
     local_address_ = local_address;
     local_address_restored_ = restored;
   }

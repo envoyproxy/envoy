@@ -153,7 +153,7 @@ private:
 
     ActiveListener& listener_;
     Network::ConnectionSocketPtr socket_;
-    bool hand_off_restored_destinations_;
+    const bool hand_off_restored_destinations_;
     std::list<Network::ListenerFilterPtr> accept_filters_;
     std::list<Network::ListenerFilterPtr>::iterator iter_;
   };

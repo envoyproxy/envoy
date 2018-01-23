@@ -481,7 +481,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
   if (source_address != nullptr) {
-    int rc = source_address->bind(fd());
+    const int rc = source_address->bind(fd());
     if (rc < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
                      strerror(errno));
@@ -497,7 +497,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  int rc = socket_->remoteAddress()->connect(fd());
+  const int rc = socket_->remoteAddress()->connect(fd());
   if (rc == 0) {
     // write will become ready.
     ASSERT(connecting_);

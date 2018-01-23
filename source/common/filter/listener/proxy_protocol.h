@@ -44,7 +44,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  */
 class Instance : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Instance(const ConfigSharedPtr& config) : search_index_(1), config_(config) {}
+  Instance(const ConfigSharedPtr& config) : config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
@@ -62,14 +62,14 @@ private:
    */
   bool readLine(int fd, std::string& s);
 
-  Network::ListenerFilterCallbacks* cb_;
+  Network::ListenerFilterCallbacks* cb_{};
   Event::FileEventPtr file_event_;
 
   // The offset in buf_ that has been fully read
   size_t buf_off_{};
 
   // The index in buf_ where the search for '\r\n' should continue from
-  size_t search_index_;
+  size_t search_index_{1};
 
   // Stores the portion of the first line that has been read so far.
   char buf_[MAX_PROXY_PROTO_LEN];
