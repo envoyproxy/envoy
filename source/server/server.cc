@@ -216,13 +216,11 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
-  admin_scope_ = stats_store_.createScope("listener.admin.");
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
                              initial_config.admin().profilePath(), options.adminAddressPath(),
-                             initial_config.admin().address(), *this, *admin_scope_));
-
-  handler_->addListener(*admin_, admin_->mutable_socket(), *admin_scope_, 0,
-                        Network::ListenerOptions::listenerOptionsWithBindToPort());
+                             initial_config.admin().address(), *this,
+                             stats_store_.createScope("listener.admin.")));
+  handler_->addListener(admin_->listener());
 
   loadServerFlags(initial_config.flagsPath());
 

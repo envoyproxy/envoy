@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -18,7 +19,7 @@ namespace Envoy {
 namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
-ProdListenerComponentFactory::createFilterFactoryList_(
+ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
@@ -44,6 +45,30 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       callback = factory.createFilterFactoryFromProto(*message, context);
     }
     ret.push_back(callback);
+  }
+  return ret;
+}
+
+std::vector<Configuration::ListenerFilterFactoryCb>
+ProdListenerComponentFactory::createListenerFilterFactoryList_(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+    Configuration::FactoryContext& context) {
+  std::vector<Configuration::ListenerFilterFactoryCb> ret;
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    const ProtobufTypes::String string_name = proto_config.name();
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+
+    // Now see if there is a factory that will accept the config.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            string_name);
+    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
 }
@@ -84,9 +109,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
-      use_proxy_proto_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)),
-      use_original_dst_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
+      hand_off_restored_destination_connections_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
@@ -95,6 +119,30 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
+
+  if (!config.listener_filters().empty()) {
+    listener_filter_factories_ =
+        parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+  }
+  // Add original dst listener filter if 'use_original_dst' flag is set.
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            Config::ListenerFilterNames::get().ORIGINAL_DST);
+    listener_filter_factories_.push_back(
+        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+  }
+  // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
+  // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
+  //                   is implemented, this needs to be run after the filter chain has been
+  //                   selected.
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            Config::ListenerFilterNames::get().PROXY_PROTOCOL);
+    listener_filter_factories_.push_back(
+        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+  }
 
   // Skip lookup and update of the SSL Context if there is only one filter chain
   // and it doesn't enforce any SNI restrictions.
@@ -110,7 +158,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
                                          filter_chain.filter_chain_match().sni_domains().end());
     if (!filters_hash.valid()) {
       filters_hash.value(RepeatedPtrUtil::hash(filter_chain.filters()));
-      filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+      filter_factories_ =
+          parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this);
     } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
       throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
                                        "is currently not supported",
@@ -149,8 +198,12 @@ ListenerImpl::~ListenerImpl() {
   filter_factories_.clear();
 }
 
-bool ListenerImpl::createFilterChain(Network::Connection& connection) {
+bool ListenerImpl::createNetworkFilterChain(Network::Connection& connection) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
+}
+
+bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
+  return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
 }
 
 bool ListenerImpl::drainClose() const {

@@ -263,7 +263,7 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr
       api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      allow_unexpected_disconnects_(false) {
+      allow_unexpected_disconnects_(false), listener_(*this) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
 }
@@ -278,7 +278,7 @@ void FakeUpstream::cleanUp() {
   }
 }
 
-bool FakeUpstream::createFilterChain(Network::Connection& connection) {
+bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection) {
   std::unique_lock<std::mutex> lock(lock_);
   connection.readDisable(true);
   new_connections_.emplace_back(
@@ -287,14 +287,10 @@ bool FakeUpstream::createFilterChain(Network::Connection& connection) {
   return true;
 }
 
+bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
+
 void FakeUpstream::threadRoutine() {
-  if (ssl_ctx_) {
-    handler_->addSslListener(*this, *ssl_ctx_, *socket_, stats_store_, 0,
-                             Network::ListenerOptions::listenerOptionsWithBindToPort());
-  } else {
-    handler_->addListener(*this, *socket_, stats_store_, 0,
-                          Network::ListenerOptions::listenerOptionsWithBindToPort());
-  }
+  handler_->addListener(listener_);
 
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);

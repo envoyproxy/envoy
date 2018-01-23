@@ -1,6 +1,9 @@
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
+#include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
@@ -54,7 +57,7 @@ public:
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
             [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
                                       Configuration::FactoryContext& context)
@@ -95,12 +98,20 @@ class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
-    ON_CALL(listener_factory_, createFilterFactoryList(_, _))
+    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                                  Configuration::FactoryContext& context)
                                   -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
+          return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters, context);
         }));
+    ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+                      Configuration::FactoryContext& context)
+                       -> std::vector<Configuration::ListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+                                                                                    context);
+            }));
   }
 };
 
@@ -1168,6 +1179,120 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
                             EnvoyException, "Failed to load trusted CA certificates from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "envoy.listener.original_dst"
+      config: {}
+  )EOF", // "
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(-1,
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+
+class OriginalDstTest : public Filter::Listener::OriginalDst {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
+    return Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
+  }
+};
+
+namespace Configuration {
+
+class OriginalDstTestConfigFactory : public NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                       FactoryContext&) override {
+    return [](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+
+  std::string name() override { return "test.listener.original_dst"; }
+};
+
+/**
+ * Static registration for the original dst filter. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<OriginalDstTestConfigFactory, NamedListenerFilterConfigFactory>
+    registered_;
+
+} // namespace Configuration
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "test.listener.original_dst"
+      config: {}
+  )EOF", // "
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(
+      -1, std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+  EXPECT_TRUE(socket.localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.localAddress()->asString());
 }
 
 } // namespace Server
