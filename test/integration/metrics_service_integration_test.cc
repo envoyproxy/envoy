@@ -1,10 +1,11 @@
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
 #include "test/integration/http_integration.h"
 
-#include "envoy/service/metrics/v2/metrics_service.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

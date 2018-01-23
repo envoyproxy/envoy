@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 
+#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/config/well_known_names.h"
@@ -8,7 +9,6 @@
 
 #include "test/test_common/utility.h"
 
-#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

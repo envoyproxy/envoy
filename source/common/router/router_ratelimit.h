@@ -127,7 +127,8 @@ private:
  */
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
-  RateLimitPolicyImpl(const Protobuf::RepeatedPtrField<envoy::api::v2::route::RateLimit>& rate_limits);
+  RateLimitPolicyImpl(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RateLimit>& rate_limits);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/init/init.h"
@@ -17,9 +19,6 @@
 
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
-
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -128,7 +127,8 @@ private:
 
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>> subscription_;
+  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>>
+      subscription_;
   ThreadLocal::SlotPtr tls_;
   std::string cluster_name_;
   const std::string route_config_name_;

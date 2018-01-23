@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
@@ -19,8 +20,6 @@
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/router_ratelimit.h"
-
-#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -193,8 +192,8 @@ private:
  */
 class HashPolicyImpl : public HashPolicy {
 public:
-  HashPolicyImpl(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& hash_policy);
+  HashPolicyImpl(const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                     hash_policy);
 
   // Router::HashPolicy
   Optional<uint64_t> generateHash(const std::string& downstream_addr,

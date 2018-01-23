@@ -1,14 +1,13 @@
 #pragma once
 
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/service/discovery/v2/lds.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/http/rest_api_fetcher.h"
 #include "common/json/json_validator.h"
-
-#include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/service/discovery/v2/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,8 +26,9 @@ public:
 
 private:
   // Config::Subscription
-  void start(const std::vector<std::string>& resources,
-             Config::SubscriptionCallbacks<envoy::api::v2::listener::Listener>& callbacks) override {
+  void
+  start(const std::vector<std::string>& resources,
+        Config::SubscriptionCallbacks<envoy::api::v2::listener::Listener>& callbacks) override {
     // LDS subscribes to all clusters.
     ASSERT(resources.empty());
     UNREFERENCED_PARAMETER(resources);

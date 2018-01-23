@@ -1,5 +1,6 @@
 #include <string>
 
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
@@ -14,7 +15,6 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -76,8 +76,9 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 // Negative test for protoc-gen-validate constraints for statsd.
 TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
-  EXPECT_THROW(StatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::StatsdSink(), server),
-               ProtoValidationException);
+  EXPECT_THROW(
+      StatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::StatsdSink(), server),
+      ProtoValidationException);
 }
 
 class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
@@ -111,8 +112,9 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 // Negative test for protoc-gen-validate constraints for dog_statsd.
 TEST(DogStatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
-  EXPECT_THROW(DogStatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::DogStatsdSink(), server),
-               ProtoValidationException);
+  EXPECT_THROW(
+      DogStatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::DogStatsdSink(), server),
+      ProtoValidationException);
 }
 
 } // namespace Configuration

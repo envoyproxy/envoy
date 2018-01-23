@@ -2,14 +2,13 @@
 
 #include <string>
 
+#include "envoy/api/v2/monitoring/stats.pb.h"
+#include "envoy/api/v2/monitoring/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
 #include "common/stats/statsd.h"
-
-#include "envoy/api/v2/monitoring/stats.pb.h"
-#include "envoy/api/v2/monitoring/stats.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -42,7 +41,8 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
 }
 
 ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::api::v2::monitoring::StatsdSink>(new envoy::api::v2::monitoring::StatsdSink());
+  return std::unique_ptr<envoy::api::v2::monitoring::StatsdSink>(
+      new envoy::api::v2::monitoring::StatsdSink());
 }
 
 std::string StatsdSinkFactory::name() { return Config::StatsSinkNames::get().STATSD; }

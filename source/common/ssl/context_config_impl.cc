@@ -61,9 +61,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
 }
 
-unsigned
-ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
-                                       unsigned default_version) {
+unsigned ContextConfigImpl::tlsVersionFromProto(
+    const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
   switch (version) {
   case envoy::api::v2::auth::TlsParameters::TLS_AUTO:
     return default_version;
@@ -82,7 +81,8 @@ ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters
   NOT_REACHED;
 }
 
-ClientContextConfigImpl::ClientContextConfigImpl(const envoy::api::v2::auth::UpstreamTlsContext& config)
+ClientContextConfigImpl::ClientContextConfigImpl(
+    const envoy::api::v2::auth::UpstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
   // TODO(PiotrSikora): Support multiple TLS certificates.
   ASSERT(config.common_tls_context().tls_certificates().size() <= 1);
@@ -95,7 +95,8 @@ ClientContextConfigImpl::ClientContextConfigImpl(const Json::Object& config)
         return upstream_tls_context;
       }()) {}
 
-ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::auth::DownstreamTlsContext& config)
+ServerContextConfigImpl::ServerContextConfigImpl(
+    const envoy::api::v2::auth::DownstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),

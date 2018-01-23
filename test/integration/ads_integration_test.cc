@@ -1,3 +1,11 @@
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
+#include "envoy/service/discovery/v2/cds.pb.h"
+#include "envoy/service/discovery/v2/common.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/service/discovery/v2/lds.pb.h"
+#include "envoy/service/discovery/v2/rds.pb.h"
+
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -6,13 +14,6 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/ads.pb.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
-#include "envoy/service/discovery/v2/cds.pb.h"
-#include "envoy/service/discovery/v2/common.pb.h"
-#include "envoy/service/discovery/v2/rds.pb.h"
-#include "envoy/service/discovery/v2/lds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionFailure;
@@ -107,10 +108,11 @@ public:
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {{}}
     )EOF",
-                                                                       name));
+                                                                                name));
   }
 
-  envoy::service::discovery::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name) {
+  envoy::service::discovery::v2::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name) {
     return TestUtility::parseYaml<envoy::service::discovery::v2::ClusterLoadAssignment>(
         fmt::format(R"EOF(
       cluster_name: {}
@@ -126,7 +128,8 @@ public:
                     fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
-  envoy::api::v2::listener::Listener buildListener(const std::string& name, const std::string& route_config) {
+  envoy::api::v2::listener::Listener buildListener(const std::string& name,
+                                                   const std::string& route_config) {
     return TestUtility::parseYaml<envoy::api::v2::listener::Listener>(
         fmt::format(R"EOF(
       name: {}
@@ -149,7 +152,7 @@ public:
   }
 
   envoy::api::v2::route::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                      const std::string& cluster) {
+                                                             const std::string& cluster) {
     return TestUtility::parseYaml<envoy::api::v2::route::RouteConfiguration>(fmt::format(R"EOF(
       name: {}
       virtual_hosts:
@@ -159,7 +162,8 @@ public:
         - match: {{ prefix: "/" }}
           route: {{ cluster: {} }}
     )EOF",
-                                                                                  name, cluster));
+                                                                                         name,
+                                                                                         cluster));
   }
 
   void makeSingleRequest() {
@@ -191,7 +195,7 @@ TEST_P(AdsIntegrationTest, Basic) {
   // Send initial configuration, validate we can process a request.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
   sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().Cluster,
-                                                 {buildCluster("cluster_0")}, "1");
+                                                          {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
@@ -238,10 +242,11 @@ TEST_P(AdsIntegrationTest, Basic) {
   makeSingleRequest();
 
   // Upgrade LDS/RDS, validate we can process a request.
-  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(Config::TypeUrl::get().Listener,
-                                                  {buildListener("listener_1", "route_config_1"),
-                                                   buildListener("listener_2", "route_config_2")},
-                                                  "2");
+  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(
+      Config::TypeUrl::get().Listener,
+      {buildListener("listener_1", "route_config_1"),
+       buildListener("listener_2", "route_config_2")},
+      "2");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
                                       {"route_config_2", "route_config_1", "route_config_0"}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
@@ -273,12 +278,12 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
   sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().Cluster,
-                                                 {buildCluster("cluster_0")}, "1");
+                                                          {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().ClusterLoadAssignment,
-                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
   EXPECT_TRUE(
@@ -297,9 +302,9 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
-  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(Config::TypeUrl::get().RouteConfiguration,
-                                                  {buildListener("route_config_0", "cluster_0")},
-                                                  "1");
+  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(
+      Config::TypeUrl::get().RouteConfiguration, {buildListener("route_config_0", "cluster_0")},
+      "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
   EXPECT_TRUE(

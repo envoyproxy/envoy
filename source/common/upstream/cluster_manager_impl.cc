@@ -337,7 +337,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::cluster::Cluster& cluster) {
+bool ClusterManagerImpl::addOrUpdatePrimaryCluster(
+    const envoy::api::v2::cluster::Cluster& cluster) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration.
   const std::string cluster_name = cluster.name();
@@ -402,7 +403,8 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
   return true;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::api::v2::cluster::Cluster& cluster, bool added_via_api) {
+void ClusterManagerImpl::loadCluster(const envoy::api::v2::cluster::Cluster& cluster,
+                                     bool added_via_api) {
   ClusterSharedPtr new_cluster =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
@@ -779,8 +781,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
-    const envoy::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const envoy::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, primary_dispatcher_)};

@@ -4,11 +4,10 @@
 #include <set>
 #include <vector>
 
+#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
-
-#include "envoy/api/v2/cluster/cluster.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -213,7 +212,8 @@ public:
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
-  envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallbackPolicy() const override {
+  envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+  fallbackPolicy() const override {
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }

@@ -1,8 +1,9 @@
+#include "envoy/api/v2/monitoring/stats.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
+
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

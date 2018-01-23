@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
@@ -15,8 +16,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-
-#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -102,8 +101,8 @@ public:
    * @param code supplies the RedirectResponseCode enum.
    * @return Returns the Http::Code version of the RedirectResponseCode.
    */
-  static Http::Code
-  parseRedirectResponseCode(const envoy::api::v2::route::RedirectAction::RedirectResponseCode& code);
+  static Http::Code parseRedirectResponseCode(
+      const envoy::api::v2::route::RedirectAction::RedirectResponseCode& code);
 
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.

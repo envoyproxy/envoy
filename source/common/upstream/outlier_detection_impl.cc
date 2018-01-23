@@ -21,8 +21,8 @@ namespace Upstream {
 namespace Outlier {
 
 DetectorSharedPtr DetectorImplFactory::createForCluster(
-    Cluster& cluster, const envoy::api::v2::cluster::Cluster& cluster_config, Event::Dispatcher& dispatcher,
-    Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
+    Cluster& cluster, const envoy::api::v2::cluster::Cluster& cluster_config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
                                 ProdMonotonicTimeSource::instance_, event_logger);

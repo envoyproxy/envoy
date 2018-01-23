@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/json/json_object.h"
-
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/json/json_object.h"
 
 namespace Envoy {
 namespace Config {
@@ -23,8 +22,9 @@ public:
    * @param json_tls_context source v1 JSON TLS context object.
    * @param upstream_tls_context destination v2 envoy::api::v2::cluster::Cluster.
    */
-  static void translateUpstreamTlsContext(const Json::Object& json_tls_context,
-                                          envoy::api::v2::auth::UpstreamTlsContext& upstream_tls_context);
+  static void
+  translateUpstreamTlsContext(const Json::Object& json_tls_context,
+                              envoy::api::v2::auth::UpstreamTlsContext& upstream_tls_context);
   /**
    * Translate a v1 JSON TLS context to v2 envoy::api::v2::auth::CommonTlsContext.
    * @param json_tls_context source v1 JSON TLS context object.

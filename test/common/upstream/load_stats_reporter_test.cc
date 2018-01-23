@@ -1,3 +1,5 @@
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/stats/stats_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 
@@ -6,7 +8,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -43,7 +44,8 @@ public:
         node_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
   }
 
-  void expectSendMessage(const std::vector<envoy::service::load_stats::v2::ClusterStats>& expected_cluster_stats) {
+  void expectSendMessage(
+      const std::vector<envoy::service::load_stats::v2::ClusterStats>& expected_cluster_stats) {
     envoy::service::load_stats::v2::LoadStatsRequest expected_request;
     expected_request.mutable_node()->MergeFrom(node_);
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),

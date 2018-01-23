@@ -110,7 +110,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::cluster::Cluster& config,
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, source_address)),
-      lb_ring_hash_config_(envoy::api::v2::cluster::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
+      lb_ring_hash_config_(
+          envoy::api::v2::cluster::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()) {
@@ -167,15 +168,14 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::cluster::Cluster& config,
 const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
     new std::vector<std::vector<HostSharedPtr>>()};
 
-ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
-                                         Stats::Store& stats, ThreadLocal::Instance& tls,
-                                         Network::DnsResolverSharedPtr dns_resolver,
-                                         Ssl::ContextManager& ssl_context_manager,
-                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher,
-                                         const LocalInfo::LocalInfo& local_info,
-                                         Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                         bool added_via_api) {
+ClusterSharedPtr
+ClusterImplBase::create(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
+                        Stats::Store& stats, ThreadLocal::Instance& tls,
+                        Network::DnsResolverSharedPtr dns_resolver,
+                        Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                        Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                        const LocalInfo::LocalInfo& local_info,
+                        Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -448,11 +448,11 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::cluster::Cluster& 
       fmt::format("circuit_breakers.{}.{}.", cluster_name, priority_name);
 
   const auto& thresholds = config.circuit_breakers().thresholds();
-  const auto it =
-      std::find_if(thresholds.cbegin(), thresholds.cend(),
-                   [priority](const envoy::api::v2::cluster::CircuitBreakers::Thresholds& threshold) {
-                     return threshold.priority() == priority;
-                   });
+  const auto it = std::find_if(
+      thresholds.cbegin(), thresholds.cend(),
+      [priority](const envoy::api::v2::cluster::CircuitBreakers::Thresholds& threshold) {
+        return threshold.priority() == priority;
+      });
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
     max_pending_requests =

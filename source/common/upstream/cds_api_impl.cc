@@ -2,14 +2,14 @@
 
 #include <string>
 
+#include "envoy/api/v2/cluster/cluster.pb.validate.h"
+
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/cds_subscription.h"
-
-#include "envoy/api/v2/cluster/cluster.pb.validate.h"
 
 namespace Envoy {
 namespace Upstream {

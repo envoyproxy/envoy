@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -32,8 +33,6 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
-
-#include "envoy/api/v2/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -297,7 +296,8 @@ public:
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::cluster::Cluster::DiscoveryType type() const override { return type_; }
-  const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& lbRingHashConfig() const override {
+  const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>&
+  lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
   bool maintenanceMode() const override;
@@ -323,8 +323,8 @@ private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::cluster::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name);
-    ResourceManagerImplPtr load(const envoy::api::v2::cluster::Cluster& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name,
+    ResourceManagerImplPtr load(const envoy::api::v2::cluster::Cluster& config,
+                                Runtime::Loader& runtime, const std::string& cluster_name,
                                 const envoy::api::v2::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
@@ -364,14 +364,13 @@ private:
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr create(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
-                                 Stats::Store& stats, ThreadLocal::Instance& tls,
-                                 Network::DnsResolverSharedPtr dns_resolver,
-                                 Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                 const LocalInfo::LocalInfo& local_info,
-                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                 bool added_via_api);
+  static ClusterSharedPtr
+  create(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
+         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         const LocalInfo::LocalInfo& local_info, Outlier::EventLoggerSharedPtr outlier_event_logger,
+         bool added_via_api);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }

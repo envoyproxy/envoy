@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include "envoy/api/v2/monitoring/trace.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -22,9 +24,6 @@
 #include "common/network/utility.h"
 
 #include "server/lds_api.h"
-
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/api/v2/monitoring/trace.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -136,7 +135,8 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const envoy::api::v2::monitoring::Tracing& configuration, Instance& server);
+  void initializeTracers(const envoy::api::v2::monitoring::Tracing& configuration,
+                         Instance& server);
 
   void initializeStatsSinks(const envoy::bootstrap::v2::Bootstrap& bootstrap, Instance& server);
 

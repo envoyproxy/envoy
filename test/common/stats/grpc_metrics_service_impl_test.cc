@@ -59,7 +59,8 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
   // Verify that sending an empty response message doesn't do anything bad.
-  callbacks1->onReceiveMessage(std::make_unique<envoy::service::metrics::v2::StreamMetricsResponse>());
+  callbacks1->onReceiveMessage(
+      std::make_unique<envoy::service::metrics::v2::StreamMetricsResponse>());
 }
 
 // Test that stream failure is handled correctly.

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/monitoring/trace.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
@@ -19,7 +20,6 @@
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "envoy/api/v2/monitoring/trace.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -80,7 +80,8 @@ void MainImpl::initialize(const envoy::bootstrap::v2::Bootstrap& bootstrap, Inst
   initializeStatsSinks(bootstrap, server);
 }
 
-void MainImpl::initializeTracers(const envoy::api::v2::monitoring::Tracing& configuration, Instance& server) {
+void MainImpl::initializeTracers(const envoy::api::v2::monitoring::Tracing& configuration,
+                                 Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
   if (!configuration.has_http()) {
@@ -106,7 +107,8 @@ void MainImpl::initializeTracers(const envoy::api::v2::monitoring::Tracing& conf
   http_tracer_ = factory.createHttpTracer(*driver_config, server, *cluster_manager_);
 }
 
-void MainImpl::initializeStatsSinks(const envoy::bootstrap::v2::Bootstrap& bootstrap, Instance& server) {
+void MainImpl::initializeStatsSinks(const envoy::bootstrap::v2::Bootstrap& bootstrap,
+                                    Instance& server) {
   ENVOY_LOG(info, "loading stats sink configuration");
 
   for (const envoy::api::v2::monitoring::StatsSink& sink_object : bootstrap.stats_sinks()) {

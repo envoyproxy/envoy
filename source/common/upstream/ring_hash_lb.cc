@@ -103,8 +103,9 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   }
 }
 
-RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config,
-                                 const std::vector<HostSharedPtr>& hosts) {
+RingHashLoadBalancer::Ring::Ring(
+    const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config,
+    const std::vector<HostSharedPtr>& hosts) {
   ENVOY_LOG(trace, "ring hash: building ring");
   if (hosts.empty()) {
     return;

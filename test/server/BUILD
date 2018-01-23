@@ -109,7 +109,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     external_deps = [
-      "envoy_lds",
+        "envoy_lds",
     ],
     deps = [
         "//source/common/config:utility_lib",

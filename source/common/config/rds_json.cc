@@ -36,7 +36,8 @@ void RdsJson::translateVirtualCluster(const Json::Object& json_virtual_cluster,
   virtual_cluster.set_method(method);
 }
 
-void RdsJson::translateCors(const Json::Object& json_cors, envoy::api::v2::route::CorsPolicy& cors) {
+void RdsJson::translateCors(const Json::Object& json_cors,
+                            envoy::api::v2::route::CorsPolicy& cors) {
   for (const std::string& origin : json_cors.getStringArray("allow_origin", true)) {
     cors.add_allow_origin(origin);
   }

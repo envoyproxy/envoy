@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
@@ -18,7 +19,6 @@
 
 #include "test/test_common/printers.h"
 
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

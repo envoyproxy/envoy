@@ -1,6 +1,7 @@
 #include "common/upstream/eds.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/service/discovery/v2/eds.pb.validate.h"
 
 #include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
@@ -12,14 +13,14 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/sds_subscription.h"
 
-#include "envoy/service/discovery/v2/eds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, Runtime::Loader& runtime,
-                               Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster,
+                               Runtime::Loader& runtime, Stats::Store& stats,
+                               Ssl::ContextManager& ssl_context_manager,
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)

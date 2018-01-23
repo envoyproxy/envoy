@@ -1,10 +1,17 @@
 #pragma once
 
+#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
+#include "envoy/service/discovery/v2/cds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/service/discovery/v2/lds.pb.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -15,14 +22,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
-
-#include "envoy/api/v2/base.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/service/discovery/v2/cds.pb.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-#include "envoy/service/discovery/v2/lds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 
 namespace Envoy {
 namespace Config {

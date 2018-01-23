@@ -32,8 +32,7 @@ GrpcAccessLogStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
     : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
 
 void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
-    envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-    const std::string& log_name) {
+    envoy::service::accesslog::v2::StreamAccessLogsMessage& message, const std::string& log_name) {
   auto stream_it = stream_map_.find(log_name);
   if (stream_it == stream_map_.end()) {
     stream_it = stream_map_.emplace(log_name, ThreadLocalStream(*this, log_name)).first;

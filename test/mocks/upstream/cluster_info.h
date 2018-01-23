@@ -73,7 +73,8 @@ public:
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
-  envoy::api::v2::cluster::Cluster::DiscoveryType type_{envoy::api::v2::cluster::Cluster::STRICT_DNS};
+  envoy::api::v2::cluster::Cluster::DiscoveryType type_{
+      envoy::api::v2::cluster::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig> lb_ring_hash_config_;
 };

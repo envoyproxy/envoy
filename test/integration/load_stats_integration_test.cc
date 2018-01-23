@@ -1,10 +1,11 @@
+#include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/service/load_stats/v2/lrs.pb.h"
+
 #include "common/config/resources.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
-#include "envoy/service/load_stats/v2/lrs.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -15,8 +16,8 @@ class LoadStatsIntegrationTest : public HttpIntegrationTest,
 public:
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  void addEndpoint(envoy::service::discovery::v2::LocalityLbEndpoints& locality_lb_endpoints, uint32_t index,
-                   uint32_t& num_endpoints) {
+  void addEndpoint(envoy::service::discovery::v2::LocalityLbEndpoints& locality_lb_endpoints,
+                   uint32_t index, uint32_t& num_endpoints) {
     auto* socket_address = locality_lb_endpoints.add_lb_endpoints()
                                ->mutable_endpoint()
                                ->mutable_address()
@@ -149,8 +150,9 @@ public:
     loadstats_stream_ = fake_loadstats_connection_->waitForNewStream(*dispatcher_);
   }
 
-  void mergeLoadStats(envoy::service::load_stats::v2::LoadStatsRequest& loadstats_request,
-                      const envoy::service::load_stats::v2::LoadStatsRequest& local_loadstats_request) {
+  void
+  mergeLoadStats(envoy::service::load_stats::v2::LoadStatsRequest& loadstats_request,
+                 const envoy::service::load_stats::v2::LoadStatsRequest& local_loadstats_request) {
     ASSERT(loadstats_request.cluster_stats_size() <= 1);
     ASSERT(local_loadstats_request.cluster_stats_size() <= 1);
 
@@ -195,9 +197,10 @@ public:
     }
   }
 
-  void waitForLoadStatsRequest(
-      const std::vector<envoy::service::load_stats::v2::UpstreamLocalityStats>& expected_locality_stats,
-      uint64_t dropped = 0) {
+  void
+  waitForLoadStatsRequest(const std::vector<envoy::service::load_stats::v2::UpstreamLocalityStats>&
+                              expected_locality_stats,
+                          uint64_t dropped = 0) {
     Protobuf::RepeatedPtrField<envoy::service::load_stats::v2::ClusterStats> expected_cluster_stats;
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
@@ -258,9 +261,9 @@ public:
     test_server_->waitForCounterGe("load_reporter.requests", ++load_requests_);
   }
 
-  envoy::service::load_stats::v2::UpstreamLocalityStats localityStats(const std::string& sub_zone, uint64_t success,
-                                                      uint64_t error, uint64_t active,
-                                                      uint32_t priority = 0) {
+  envoy::service::load_stats::v2::UpstreamLocalityStats
+  localityStats(const std::string& sub_zone, uint64_t success, uint64_t error, uint64_t active,
+                uint32_t priority = 0) {
     envoy::service::load_stats::v2::UpstreamLocalityStats locality_stats;
     auto* locality = locality_stats.mutable_locality();
     locality->set_region("some_region");

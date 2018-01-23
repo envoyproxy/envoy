@@ -1,16 +1,15 @@
 #include "server/config/access_log/grpc_access_log.h"
 
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/service/accesslog/v2/als.pb.validate.h"
 
 #include "common/access_log/grpc_access_log_impl.h"
 #include "common/common/macros.h"
 #include "common/config/well_known_names.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
-
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
-#include "envoy/service/accesslog/v2/als.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -38,8 +37,7 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{
-      new envoy::service::accesslog::v2::HttpGrpcAccessLogConfig()};
+  return ProtobufTypes::MessagePtr{new envoy::service::accesslog::v2::HttpGrpcAccessLogConfig()};
 }
 
 std::string HttpGrpcAccessLogFactory::name() const {

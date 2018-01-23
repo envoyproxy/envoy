@@ -1,3 +1,6 @@
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
@@ -5,8 +8,6 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -237,8 +238,9 @@ public:
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
         envoy::service::discovery::v2::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::service::discovery::v2::ClusterLoadAssignment>(fmt::format(
-                R"EOF(
+            TestUtility::parseYaml<envoy::service::discovery::v2::ClusterLoadAssignment>(
+                fmt::format(
+                    R"EOF(
                 cluster_name: cluster_0
                 endpoints:
                 - lb_endpoints:
@@ -252,8 +254,8 @@ public:
                         test.namespace:
                           key: metadata-value
               )EOF",
-                Network::Test::getLoopbackAddressString(GetParam()),
-                fake_upstreams_[0]->localAddress()->ip()->port()));
+                    Network::Test::getLoopbackAddressString(GetParam()),
+                    fake_upstreams_[0]->localAddress()->ip()->port()));
 
         discovery_response.add_resources()->PackFrom(cluster_load_assignment);
         eds_stream_->sendGrpcMessage(discovery_response);

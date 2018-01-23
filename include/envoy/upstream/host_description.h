@@ -3,12 +3,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
-
-#include "envoy/api/v2/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {

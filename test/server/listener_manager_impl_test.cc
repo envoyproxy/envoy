@@ -48,24 +48,24 @@ public:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(
-      bool need_init,
-      envoy::api::v2::listener::Listener::DrainType drain_type = envoy::api::v2::listener::Listener_DrainType_DEFAULT) {
+  ListenerHandle* expectListenerCreate(bool need_init,
+                                       envoy::api::v2::listener::Listener::DrainType drain_type =
+                                           envoy::api::v2::listener::Listener_DrainType_DEFAULT) {
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                                      Configuration::FactoryContext& context)
-                -> std::vector<Configuration::NetworkFilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
-              if (need_init) {
-                context.initManager().registerTarget(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
+        .WillOnce(Invoke([raw_listener, need_init](
+                             const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
+                             Configuration::FactoryContext& context)
+                             -> std::vector<Configuration::NetworkFilterFactoryCb> {
+          std::shared_ptr<ListenerHandle> notifier(raw_listener);
+          raw_listener->context_ = &context;
+          if (need_init) {
+            context.initManager().registerTarget(notifier->target_);
+          }
+          return {[notifier](Network::FilterManager&) -> void {}};
+        }));
 
     return raw_listener;
   }
@@ -96,11 +96,12 @@ public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                                 Configuration::FactoryContext& context)
-                                  -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
-        }));
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+                      Configuration::FactoryContext& context)
+                       -> std::vector<Configuration::NetworkFilterFactoryCb> {
+              return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
+            }));
   }
 };
 

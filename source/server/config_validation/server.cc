@@ -1,5 +1,8 @@
 #include "server/config_validation/server.h"
 
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.validate.h"
+
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
@@ -8,9 +11,6 @@
 #include "common/singleton/manager_impl.h"
 
 #include "server/configuration_impl.h"
-
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/json/json_object.h"
-
 #include "envoy/api/v2/filter/http/buffer.pb.h"
 #include "envoy/api/v2/filter/http/fault.pb.h"
 #include "envoy/api/v2/filter/http/health_check.pb.h"
@@ -15,6 +13,7 @@
 #include "envoy/api/v2/filter/network/rate_limit.pb.h"
 #include "envoy/api/v2/filter/network/redis_proxy.pb.h"
 #include "envoy/api/v2/filter/network/tcp_proxy.pb.h"
+#include "envoy/json/json_object.h"
 
 namespace Envoy {
 namespace Config {

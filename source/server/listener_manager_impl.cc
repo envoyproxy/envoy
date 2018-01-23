@@ -66,14 +66,14 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   }
 }
 
-DrainManagerPtr
-ProdListenerComponentFactory::createDrainManager(envoy::api::v2::listener::Listener::DrainType drain_type) {
+DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
+    envoy::api::v2::listener::Listener::DrainType drain_type) {
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-ListenerImpl::ListenerImpl(const envoy::api::v2::listener::Listener& config, ListenerManagerImpl& parent,
-                           const std::string& name, bool modifiable, bool workers_started,
-                           uint64_t hash)
+ListenerImpl::ListenerImpl(const envoy::api::v2::listener::Listener& config,
+                           ListenerManagerImpl& parent, const std::string& name, bool modifiable,
+                           bool workers_started, uint64_t hash)
     : parent_(parent),
       // TODO(htuch): Validate not pipe when doing v2.
       address_(

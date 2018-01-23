@@ -3,11 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/ssl/context_config.h"
 
 #include "common/json/json_loader.h"
-
-#include "envoy/api/v2/auth/cert.pb.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -33,8 +32,9 @@ protected:
   ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config);
 
 private:
-  static unsigned tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
-                                      unsigned default_version);
+  static unsigned
+  tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
+                      unsigned default_version);
 
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_ECDH_CURVES;

@@ -1,5 +1,6 @@
 #include "test/config/utility.h"
 
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
@@ -7,8 +8,6 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 

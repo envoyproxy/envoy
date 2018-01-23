@@ -1,4 +1,5 @@
 #include "envoy/common/exception.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/config/cds_json.h"
 #include "common/config/lds_json.h"
@@ -15,7 +16,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
 #include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -30,7 +30,9 @@ namespace Config {
 
 TEST(UtilityTest, GetTypedResources) {
   envoy::service::discovery::v2::DiscoveryResponse response;
-  EXPECT_EQ(0, Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(response).size());
+  EXPECT_EQ(
+      0, Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(response)
+             .size());
 
   envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_0;
   load_assignment_0.set_cluster_name("0");

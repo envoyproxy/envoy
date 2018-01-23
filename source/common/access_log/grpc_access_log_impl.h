@@ -3,14 +3,13 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/service/accesslog/v2/als.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
-
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
 
 namespace Envoy {
 namespace AccessLog {

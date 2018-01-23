@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -8,8 +9,6 @@
 #include "common/common/logger.h"
 
 #include "server/init_manager_impl.h"
-
-#include "envoy/api/v2/listener/listener.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,19 +26,20 @@ public:
   /**
    * Static worker for createFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                           Configuration::FactoryContext& context);
+  static std::vector<Configuration::NetworkFilterFactoryCb> createFilterFactoryList_(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      Configuration::FactoryContext& context);
 
   // Server::ListenSocketFactory
-  std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                          Configuration::FactoryContext& context) override {
+  std::vector<Configuration::NetworkFilterFactoryCb> createFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      Configuration::FactoryContext& context) override {
     return createFilterFactoryList_(filters, context);
   }
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
-  DrainManagerPtr createDrainManager(envoy::api::v2::listener::Listener::DrainType drain_type) override;
+  DrainManagerPtr
+  createDrainManager(envoy::api::v2::listener::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
@@ -83,7 +83,8 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::api::v2::listener::Listener& config, bool modifiable) override;
+  bool addOrUpdateListener(const envoy::api::v2::listener::Listener& config,
+                           bool modifiable) override;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;

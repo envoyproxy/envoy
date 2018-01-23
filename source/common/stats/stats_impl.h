@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
@@ -20,7 +21,6 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-#include "envoy/api/v2/monitoring/stats.pb.h"
 
 namespace Envoy {
 namespace Stats {

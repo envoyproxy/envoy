@@ -3,6 +3,8 @@
 #include <regex>
 #include <unordered_map>
 
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
@@ -14,7 +16,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"

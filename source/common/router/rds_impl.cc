@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/route/route.pb.validate.h"
+
 #include "common/common/assert.h"
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
@@ -13,7 +15,6 @@
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
 
-#include "envoy/api/v2/route/route.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {

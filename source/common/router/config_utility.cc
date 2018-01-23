@@ -89,7 +89,8 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   }
 }
 
-Optional<Http::Code> ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route) {
+Optional<Http::Code>
+ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());
   } else if (route.has_direct_response()) {

@@ -1,4 +1,5 @@
 #include "envoy/common/exception.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/config/subscription_factory.h"
 
@@ -11,7 +12,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -25,12 +25,14 @@ namespace Config {
 class SubscriptionFactoryTest : public ::testing::Test {
 public:
   SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {
-    legacy_subscription_.reset(new MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>());
+    legacy_subscription_.reset(
+        new MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>());
   }
 
   std::unique_ptr<Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config) {
-    return SubscriptionFactory::subscriptionFromConfigSource<envoy::service::discovery::v2::ClusterLoadAssignment>(
+    return SubscriptionFactory::subscriptionFromConfigSource<
+        envoy::service::discovery::v2::ClusterLoadAssignment>(
         config, node_, dispatcher_, cm_, random_, stats_store_,
         [this]() -> Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
           return legacy_subscription_.release();
@@ -44,7 +46,8 @@ public:
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
   MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> callbacks_;
-  std::unique_ptr<MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>> legacy_subscription_;
+  std::unique_ptr<MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>>
+      legacy_subscription_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
 };

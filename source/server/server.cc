@@ -7,6 +7,8 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/bootstrap/v2//bootstrap.pb.validate.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -34,9 +36,6 @@
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
-
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/bootstrap/v2//bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

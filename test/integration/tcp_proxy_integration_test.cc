@@ -1,5 +1,7 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
+
 #include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
@@ -8,7 +10,6 @@
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
 
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;

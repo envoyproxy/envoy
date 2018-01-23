@@ -2,6 +2,8 @@
 
 #include <unordered_set>
 
+#include "envoy/api/v2/monitoring/stats.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
@@ -14,7 +16,6 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
-#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -158,7 +159,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
     return MessageUtil::anyConvert<envoy::api::v2::cluster::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return MessageUtil::anyConvert<envoy::service::discovery::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return MessageUtil::anyConvert<envoy::service::discovery::v2::ClusterLoadAssignment>(resource)
+        .cluster_name();
   }
   throw EnvoyException(
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));

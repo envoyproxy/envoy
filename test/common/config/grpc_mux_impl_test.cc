@@ -1,3 +1,7 @@
+#include "envoy/service/discovery/v2/ads.pb.h"
+#include "envoy/service/discovery/v2/common.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
@@ -7,9 +11,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/common.pb.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

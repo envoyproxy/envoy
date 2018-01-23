@@ -3,12 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/address.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
 #include "common/protobuf/protobuf.h"
-
-#include "envoy/api/v2/address.pb.h"
 
 namespace Envoy {
 namespace Network {

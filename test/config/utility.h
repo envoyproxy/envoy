@@ -5,16 +5,15 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/codes.h"
-
-#include "common/network/address_impl.h"
-
 #include "envoy/api/v2/base.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/protocol.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/http/codes.h"
+
+#include "common/network/address_impl.h"
 
 namespace Envoy {
 
@@ -64,10 +63,11 @@ public:
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
   // Add an additional route to the configuration.
-  void addRoute(
-      const std::string& host, const std::string& route, const std::string& cluster,
-      bool validate_clusters, envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-      envoy::api::v2::route::VirtualHost::TlsRequirementType type = envoy::api::v2::route::VirtualHost::NONE);
+  void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
+                bool validate_clusters,
+                envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
+                envoy::api::v2::route::VirtualHost::TlsRequirementType type =
+                    envoy::api::v2::route::VirtualHost::NONE);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);

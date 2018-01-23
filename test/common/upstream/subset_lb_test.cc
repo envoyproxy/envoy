@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/common/optional.h"
 
 #include "common/config/metadata.h"
@@ -15,7 +16,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

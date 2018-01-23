@@ -1,11 +1,10 @@
 #pragma once
 
+#include "envoy/api/v2/cluster/circuit_breaker.pb.h"
+#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "envoy/api/v2/cluster/cluster.pb.h"
-#include "envoy/api/v2/cluster/circuit_breaker.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -17,9 +16,9 @@ public:
    * @param json_ring_hash_lb_config source v1 JSON ring hash config object.
    * @param ring_hash_lb_config destination v2 envoy::api::v2::cluster::Cluster::RingHashLbConfig.
    */
-  static void
-  translateRingHashLbConfig(const Json::Object& json_ring_hash_lb_config,
-                            envoy::api::v2::cluster::Cluster::RingHashLbConfig& ring_hash_lb_config);
+  static void translateRingHashLbConfig(
+      const Json::Object& json_ring_hash_lb_config,
+      envoy::api::v2::cluster::Cluster::RingHashLbConfig& ring_hash_lb_config);
 
   /**
    * Translate a v1 JSON health check object to v2 envoy::api::v2::HealthCheck.

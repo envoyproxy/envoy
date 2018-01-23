@@ -39,14 +39,16 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
 
-envoy::api::v2::route::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
+envoy::api::v2::route::RouteConfiguration
+parseRouteConfigurationFromJson(const std::string& json_string) {
   envoy::api::v2::route::RouteConfiguration route_config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
   return route_config;
 }
 
-envoy::api::v2::route::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+envoy::api::v2::route::RouteConfiguration
+parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::route::RouteConfiguration route_config;
   MessageUtil::loadFromYaml(yaml, route_config);
   return route_config;
@@ -3476,15 +3478,17 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
 }
 
 TEST(ConfigUtility, ParseResponseCode) {
-  const std::vector<std::pair<envoy::api::v2::route::RedirectAction::RedirectResponseCode, Http::Code>>
-      test_set = {std::make_pair(envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY,
-                                 Http::Code::MovedPermanently),
-                  std::make_pair(envoy::api::v2::route::RedirectAction::FOUND, Http::Code::Found),
-                  std::make_pair(envoy::api::v2::route::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
-                  std::make_pair(envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT,
-                                 Http::Code::TemporaryRedirect),
-                  std::make_pair(envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT,
-                                 Http::Code::PermanentRedirect)};
+  const std::vector<
+      std::pair<envoy::api::v2::route::RedirectAction::RedirectResponseCode, Http::Code>>
+      test_set = {
+          std::make_pair(envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY,
+                         Http::Code::MovedPermanently),
+          std::make_pair(envoy::api::v2::route::RedirectAction::FOUND, Http::Code::Found),
+          std::make_pair(envoy::api::v2::route::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
+          std::make_pair(envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT,
+                         Http::Code::TemporaryRedirect),
+          std::make_pair(envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT,
+                         Http::Code::PermanentRedirect)};
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
   }

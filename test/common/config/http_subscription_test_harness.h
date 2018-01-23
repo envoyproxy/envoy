@@ -1,4 +1,5 @@
 #include "envoy/http/async_client.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/common/utility.h"
 #include "common/config/http_subscription_impl.h"
@@ -13,7 +14,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,7 +24,8 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef HttpSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment> HttpEdsSubscriptionImpl;
+typedef HttpSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment>
+    HttpEdsSubscriptionImpl;
 
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -109,8 +110,8 @@ public:
     message->body().reset(new Buffer::OwnedImpl(response_json));
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(
-                        response_pb))))
+                    Config::Utility::getTypedResources<
+                        envoy::service::discovery::v2::ClusterLoadAssignment>(response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
@@ -143,7 +144,8 @@ public:
   Runtime::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
-  Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>
+      callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
 };
 

@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/json/json_object.h"
-
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/json/json_object.h"
 
 namespace Envoy {
 namespace Config {
@@ -49,13 +48,14 @@ public:
                                      envoy::api::v2::route::HeaderMatcher& header_matcher);
 
   /**
-   * Translate a v1 JSON query parameter matcher object to v2 envoy::api::v2::route::QueryParameterMatcher.
+   * Translate a v1 JSON query parameter matcher object to v2
+   * envoy::api::v2::route::QueryParameterMatcher.
    * @param json_query_parameter_matcher source v1 JSON query parameter matcher object.
    * @param query_parameter_matcher destination v2 envoy::api::v2::route::QueryParameterMatcher.
    */
-  static void
-  translateQueryParameterMatcher(const Json::Object& json_query_parameter_matcher,
-                                 envoy::api::v2::route::QueryParameterMatcher& query_parameter_matcher);
+  static void translateQueryParameterMatcher(
+      const Json::Object& json_query_parameter_matcher,
+      envoy::api::v2::route::QueryParameterMatcher& query_parameter_matcher);
 
   /**
    * Translate a v1 JSON route configuration object to v2 envoy::api::v2::route::RouteConfiguration.

@@ -1,3 +1,5 @@
+#include "envoy/service/discovery/v2/lds.pb.h"
+
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 
@@ -8,8 +10,6 @@
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-
-#include "envoy/service/discovery/v2/lds.pb.h"
 
 using testing::InSequence;
 using testing::Invoke;
@@ -57,11 +57,11 @@ public:
 
   void expectAdd(const std::string& listener_name, bool updated) {
     EXPECT_CALL(listener_manager_, addOrUpdateListener(_, true))
-        .WillOnce(
-            Invoke([listener_name, updated](const envoy::api::v2::listener::Listener& config, bool) -> bool {
-              EXPECT_EQ(listener_name, config.name());
-              return updated;
-            }));
+        .WillOnce(Invoke([listener_name, updated](const envoy::api::v2::listener::Listener& config,
+                                                  bool) -> bool {
+          EXPECT_EQ(listener_name, config.name());
+          return updated;
+        }));
   }
 
   void expectRequest() {

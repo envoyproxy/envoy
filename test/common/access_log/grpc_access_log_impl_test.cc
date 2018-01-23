@@ -20,8 +20,7 @@ namespace AccessLog {
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   typedef Grpc::MockAsyncStream MockAccessLogStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<
-      envoy::service::accesslog::v2::StreamAccessLogsResponse>
+  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
       AccessLogCallbacks;
 
   GrpcAccessLogStreamerImplTest() {
@@ -120,11 +119,11 @@ public:
     envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
     MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
     EXPECT_CALL(*streamer_, send(_, "hello_log"))
-        .WillOnce(Invoke([expected_request_msg](
-                             envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-                             const std::string&) {
-          EXPECT_EQ(message.DebugString(), expected_request_msg.DebugString());
-        }));
+        .WillOnce(Invoke(
+            [expected_request_msg](envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
+                                   const std::string&) {
+              EXPECT_EQ(message.DebugString(), expected_request_msg.DebugString());
+            }));
   }
 
   MockFilter* filter_{new NiceMock<MockFilter>()};

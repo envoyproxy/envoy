@@ -7,15 +7,14 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-
-#include "envoy/service/metrics/v2/metrics_service.pb.h"
-#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
 
 namespace Envoy {
 namespace Stats {
@@ -81,7 +80,8 @@ private:
     // Grpc::TypedAsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
-    void onReceiveMessage(std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {}
+    void onReceiveMessage(
+        std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {}
     void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 

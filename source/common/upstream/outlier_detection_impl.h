@@ -10,12 +10,11 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
-
-#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 
 namespace Envoy {
 namespace Upstream {

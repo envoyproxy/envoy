@@ -1,13 +1,14 @@
 #include <unordered_set>
 
+#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.validate.h"
+
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.validate.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

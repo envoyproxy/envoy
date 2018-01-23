@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
@@ -18,8 +19,6 @@
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
-
-#include "envoy/api/v2/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -372,7 +371,8 @@ public:
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& lbRingHashConfig() const PURE;
+  virtual const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>&
+  lbRingHashConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

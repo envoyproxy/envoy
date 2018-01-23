@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/event/dispatcher_impl.h"
@@ -9,7 +11,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "envoy/service/discovery/v2/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -71,8 +72,8 @@ public:
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(
-                        response_pb))))
+                    Config::Utility::getTypedResources<
+                        envoy::service::discovery::v2::ClusterLoadAssignment>(response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;
@@ -93,7 +94,8 @@ public:
   const std::string path_;
   std::string version_;
   Event::DispatcherImpl dispatcher_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>> callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>>
+      callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };
