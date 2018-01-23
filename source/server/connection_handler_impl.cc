@@ -61,7 +61,8 @@ void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& c
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerConfig& config)
     : ActiveListener(parent,
-                     parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort()),
+                     parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort(),
+                                                       config.handOffRestoredDestinations()),
                      config) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
@@ -123,8 +124,6 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
 
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   if (success) {
-    ActiveListener* new_listener = nullptr;
-
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
     } else {
@@ -142,14 +141,17 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     // Successfully ran all the accept filters.
 
     // Check if the socket may need to be redirected to another listener.
-    if (!redirected_ && socket_->localAddressRestored()) {
+    ActiveListener* new_listener = nullptr;
+
+    if (hand_off_restored_destinations_ && socket_->localAddressRestored()) {
       // Find a listener associated with the original destination address.
       new_listener = listener_.parent_.findActiveListenerByAddress(*socket_->localAddress());
     }
     if (new_listener != nullptr) {
-      // Hands off connections redirecrted by iptables to the listener associated with the
-      // original destination address. Pass 'redirected' as true to prevent further redirection.
-      new_listener->onAccept(std::move(socket_), true);
+      // Hands off connections redirected by iptables to the listener associated with the
+      // original destination address. Pass 'hand_off_restored_destionations' as false to
+      // prevent further redirection.
+      new_listener->onAccept(std::move(socket_), false);
     } else {
       // Create a new connection on this listener.
       listener_.newConnection(std::move(socket_));
@@ -164,9 +166,10 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
 }
 
 void ConnectionHandlerImpl::ActiveListener::onAccept(Network::ConnectionSocketPtr&& socket,
-                                                     bool redirected) {
+                                                     bool hand_off_restored_destinations) {
   Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
-  auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket), redirected);
+  auto active_socket =
+      std::make_unique<ActiveSocket>(*this, std::move(socket), hand_off_restored_destinations);
 
   // Create and run the filters
   config_.filterChainFactory().createListenerFilterChain(*active_socket);

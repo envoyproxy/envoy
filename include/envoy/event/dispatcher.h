@@ -91,11 +91,13 @@ public:
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param bind_to_port controls whether the listener binds to a transport port or not.
+   * @param hand_off_restored_destinations controls whether the listener searches for another
+   *        listener after restoring the destination address of a new connection.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::ListenSocket& socket,
-                                              Network::ListenerCallbacks& cb,
-                                              bool bind_to_port) PURE;
+                                              Network::ListenerCallbacks& cb, bool bind_to_port,
+                                              bool hand_off_restored_destinations) PURE;
 
   /**
    * Allocate a timer. @see Event::Timer for docs on how to use the timer.

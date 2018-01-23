@@ -36,12 +36,14 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
           ? Address::peerAddressFromFd(fd)
           : Address::addressFromSockAddr(*reinterpret_cast<const sockaddr_storage*>(remote_addr),
                                          remote_addr_len)));
-  listener->cb_.onAccept(std::move(socket));
+  listener->cb_.onAccept(std::move(socket), listener->hand_off_restored_destinations_);
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket,
-                           ListenerCallbacks& cb, bool bind_to_port)
-    : local_address_(nullptr), cb_(cb), listener_(nullptr) {
+                           ListenerCallbacks& cb, bool bind_to_port,
+                           bool hand_off_restored_destinations)
+    : local_address_(nullptr), cb_(cb),
+      hand_off_restored_destinations_(hand_off_restored_destinations), listener_(nullptr) {
   const auto ip = socket.localAddress()->ip();
 
   // Only use the listen socket's local address for new connections if it is not the all hosts

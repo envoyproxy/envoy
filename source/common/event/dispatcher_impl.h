@@ -45,7 +45,8 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      bool bind_to_port) override;
+                                      bool bind_to_port,
+                                      bool hand_off_restored_destinations) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;

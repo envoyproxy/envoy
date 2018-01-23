@@ -44,6 +44,14 @@ public:
   virtual bool bindToPort() PURE;
 
   /**
+   * @return bool if a connection should be handed off to another Listener after the original
+   *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
+   *         configuration is set, false otherwise. Note that this flag will be removed from the v2
+   *         API.
+   */
+  virtual bool handOffRestoredDestinations() const PURE;
+
+  /**
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write
    *         buffers.
    */
@@ -79,7 +87,8 @@ public:
    * and is redirected to a new listener. The recipient should not redirect
    * the socket any further.
    */
-  virtual void onAccept(ConnectionSocketPtr&& socket, bool redirected = false) PURE;
+  virtual void onAccept(ConnectionSocketPtr&& socket,
+                        bool hand_off_restored_destinations = true) PURE;
 
   /**
    * Called when a new connection is accepted.

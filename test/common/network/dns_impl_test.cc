@@ -289,7 +289,7 @@ public:
     server_.reset(new TestDnsServer(dispatcher_));
     socket_.reset(
         new Network::TcpListenSocket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true));
-    listener_ = dispatcher_.createListener(*socket_, *server_, true);
+    listener_ = dispatcher_.createListener(*socket_, *server_, true, false);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));

@@ -212,6 +212,7 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
+  bool handOffRestoredDestinations() const override { return hand_off_restored_destinations_; }
   Ssl::ServerContext* defaultSslContext() override {
     return tls_contexts_.empty() ? nullptr : tls_contexts_[0].get();
   }
@@ -257,6 +258,7 @@ private:
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   std::vector<Ssl::ServerContextPtr> tls_contexts_;
   const bool bind_to_port_;
+  const bool hand_off_restored_destinations_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;

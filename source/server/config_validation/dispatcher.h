@@ -20,7 +20,8 @@ public:
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   Network::ListenerPtr createListener(Network::ListenSocket&, Network::ListenerCallbacks&,
-                                      bool bind_to_port) override;
+                                      bool bind_to_port,
+                                      bool hand_off_restored_destinations) override;
 };
 
 } // namespace Event
