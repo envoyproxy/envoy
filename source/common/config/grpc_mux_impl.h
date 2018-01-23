@@ -6,6 +6,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/service/discovery/v2/common.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 

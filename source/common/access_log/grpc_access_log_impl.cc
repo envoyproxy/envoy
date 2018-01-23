@@ -42,7 +42,7 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
   if (stream_entry.stream_ == nullptr) {
     stream_entry.stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.api.v2.filter.accesslog.AccessLogService.StreamAccessLogs"),
+                           "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
                        stream_entry);
 
     auto* identifier = message.mutable_identifier();

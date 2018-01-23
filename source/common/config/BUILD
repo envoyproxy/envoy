@@ -126,7 +126,10 @@ envoy_cc_library(
     name = "grpc_mux_lib",
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
-    external_deps = ["envoy_discovery"],
+    external_deps = [
+        "envoy_ads",
+        "envoy_discovery",
+    ],
     deps = [
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
