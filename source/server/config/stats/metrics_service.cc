@@ -9,8 +9,8 @@
 #include "common/network/resolver_impl.h"
 #include "common/stats/grpc_metrics_service_impl.h"
 
-#include "api/metrics_service.pb.h"
-#include "api/metrics_service.pb.validate.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

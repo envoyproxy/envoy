@@ -151,6 +151,10 @@ def _envoy_api_deps():
         actual = "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     )
     native.bind(
+        name = "envoy_ratelimit",
+        actual = "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+    )
+    native.bind(
         name = "envoy_stats",
         actual = "@envoy_api//envoy/api/v2/monitoring:stats_cc",
     )

@@ -376,9 +376,9 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
   )EOF";
 
   envoy::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
-  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
+  envoy::api::v2::cluster::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->set_fallback_policy(envoy::api::v2::cluster::Cluster::LbSubsetConfig::ANY_ENDPOINT);
   subset_config->add_subset_selectors()->add_keys("x");
 
   create(bootstrap);
@@ -402,9 +402,9 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
   )EOF";
 
   envoy::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
-  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
+  envoy::api::v2::cluster::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->set_fallback_policy(envoy::api::v2::cluster::Cluster::LbSubsetConfig::ANY_ENDPOINT);
   subset_config->add_subset_selectors()->add_keys("x");
 
   EXPECT_THROW_WITH_MESSAGE(

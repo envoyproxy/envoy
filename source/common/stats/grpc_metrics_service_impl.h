@@ -14,8 +14,8 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "api/metrics_service.pb.h"
-#include "api/metrics_service.pb.validate.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
 
 namespace Envoy {
 namespace Stats {

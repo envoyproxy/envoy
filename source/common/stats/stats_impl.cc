@@ -122,7 +122,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   return data;
 }
 
-TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : TagProducerImpl() {
+TagProducerImpl::TagProducerImpl(const envoy::api::v2::monitoring::StatsConfig& config) : TagProducerImpl() {
   // To check name conflict.
   std::unordered_set<std::string> names;
   reserveResources(config);
@@ -157,7 +157,7 @@ std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Ta
 }
 
 // Roughly estimate the size of the vectors.
-void TagProducerImpl::reserveResources(const envoy::api::v2::StatsConfig& config) {
+void TagProducerImpl::reserveResources(const envoy::api::v2::monitoring::StatsConfig& config) {
   default_tags_.reserve(config.stats_tags().size());
 
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
@@ -168,7 +168,7 @@ void TagProducerImpl::reserveResources(const envoy::api::v2::StatsConfig& config
   }
 }
 
-void TagProducerImpl::addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
+void TagProducerImpl::addDefaultExtractors(const envoy::api::v2::monitoring::StatsConfig& config,
                                            std::unordered_set<std::string>& names) {
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& extractor : Config::TagNames::get().name_regex_pairs_) {

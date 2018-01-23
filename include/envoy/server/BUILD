@@ -133,7 +133,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listener_manager_interface",
     hdrs = ["listener_manager.h"],
-    external_deps = ["envoy_lds"],
+    external_deps = ["envoy_listener"],
     deps = [
         ":drain_manager_interface",
         ":filter_config_interface",

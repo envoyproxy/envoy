@@ -2,7 +2,7 @@
 
 #include "envoy/json/json_object.h"
 
-#include "api/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -10,12 +10,12 @@ namespace Config {
 class LdsJson {
 public:
   /**
-   * Translate a v1 JSON Listener to v2 envoy::api::v2::Listener.
+   * Translate a v1 JSON Listener to v2 envoy::api::v2::listener::Listener.
    * @param json_listener source v1 JSON Listener object.
-   * @param listener destination v2 envoy::api::v2::Listener.
+   * @param listener destination v2 envoy::api::v2::listener::Listener.
    */
   static void translateListener(const Json::Object& json_listener,
-                                envoy::api::v2::Listener& listener);
+                                envoy::api::v2::listener::Listener& listener);
 };
 
 } // namespace Config

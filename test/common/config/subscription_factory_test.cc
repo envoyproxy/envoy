@@ -229,7 +229,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::cluster::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
       "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'eds_cluster' "

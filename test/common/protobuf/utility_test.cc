@@ -7,7 +7,7 @@
 #include "test/test_common/utility.h"
 
 #include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "api/bootstrap.pb.validate.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.validate.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

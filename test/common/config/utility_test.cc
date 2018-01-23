@@ -213,7 +213,7 @@ TEST(UtilityTest, CheckApiConfigSourceSubscriptionBackingCluster) {
   // EDS Cluster backing EDS Cluster.
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::cluster::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,

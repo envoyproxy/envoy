@@ -90,7 +90,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   const auto& cluster_name = api_config_source.cluster_names()[0];
   const auto& it = clusters.find(cluster_name);
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
-      it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+      it->second.get().info()->type() == envoy::api::v2::cluster::Cluster::EDS) {
     throw EnvoyException(fmt::format(
         "envoy::api::v2::ConfigSource must have a statically "
         "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",

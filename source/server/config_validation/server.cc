@@ -10,7 +10,7 @@
 #include "server/configuration_impl.h"
 
 #include "envoy/bootstrap/v2/bootstrap.pb.h"
-#include "api/bootstrap.pb.validate.h"
+#include "envoy/bootstrap/v2/bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

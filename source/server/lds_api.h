@@ -8,7 +8,7 @@
 
 #include "common/common/logger.h"
 
-#include "api/lds.pb.h"
+#include "envoy/service/discovery/v2/lds.pb.h"
 
 namespace Envoy {
 namespace Server {

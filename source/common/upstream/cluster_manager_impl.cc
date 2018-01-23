@@ -200,14 +200,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::bootstrap::v2::Bootstrap& bo
   // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
-    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
+    if (cluster.type() != envoy::api::v2::cluster::Cluster::EDS) {
       loadCluster(cluster, false);
     }
   }
 
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+    if (cluster.type() == envoy::api::v2::cluster::Cluster::EDS) {
       loadCluster(cluster, false);
     }
   }

@@ -10,7 +10,7 @@
 
 #include "common/common/logger.h"
 
-#include "api/discovery.pb.h"
+#include "envoy/service/discovery/v2/common.pb.h"
 
 namespace Envoy {
 namespace Config {

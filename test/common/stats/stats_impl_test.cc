@@ -368,7 +368,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 }
 
 TEST(TagProducerTest, CheckConstructor) {
-  envoy::api::v2::StatsConfig stats_config;
+  envoy::api::v2::monitoring::StatsConfig stats_config;
 
   // Should pass there were no tag name conflict.
   auto& tag_specifier1 = *stats_config.mutable_stats_tags()->Add();

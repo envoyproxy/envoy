@@ -4,7 +4,7 @@
 #include "common/config/json_utility.h"
 #include "common/protobuf/utility.h"
 
-#include "api/sds.pb.validate.h"
+#include "envoy/api/v2/auth/cert.pb.validate.h"
 
 namespace Envoy {
 namespace Config {
