@@ -4,11 +4,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optional.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/utility.h"
 #include "common/config/rds_json.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -30,8 +32,8 @@ public:
     // exact string matching.
     HeaderData(const envoy::api::v2::HeaderMatcher& config)
         : name_(config.name()), value_(config.value()),
-          regex_pattern_(value_, std::regex::optimize),
-          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {}
+          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
+          regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
     HeaderData(const Json::Object& config)
         : HeaderData([&config] {
             envoy::api::v2::HeaderMatcher header_matcher;
@@ -41,8 +43,8 @@ public:
 
     const Http::LowerCaseString name_;
     const std::string value_;
-    const std::regex regex_pattern_;
     const bool is_regex_;
+    const std::regex regex_pattern_;
   };
 
   // A QueryParameterMatcher specifies one "name" or "name=value" element
@@ -52,8 +54,8 @@ public:
   public:
     QueryParameterMatcher(const envoy::api::v2::QueryParameterMatcher& config)
         : name_(config.name()), value_(config.value()),
-          regex_pattern_(value_, std::regex::optimize),
-          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {}
+          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
+          regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
 
     /**
      * Check if the query parameters for a request contain a match for this
@@ -66,8 +68,8 @@ public:
   private:
     const std::string name_;
     const std::string value_;
-    const std::regex regex_pattern_;
     const bool is_regex_;
+    const std::regex regex_pattern_;
   };
 
   /**
@@ -102,6 +104,15 @@ public:
    */
   static Http::Code
   parseRedirectResponseCode(const envoy::api::v2::RedirectAction::RedirectResponseCode& code);
+
+  /**
+   * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
+   * @param route supplies the Route configuration.
+   * @return Optional<Http::Code> the HTTP status from the route's direct_response if specified,
+   *         or the HTTP status code from the route's redirect if specified,
+   *         or an empty Option otherwise.
+   */
+  static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::Route& route);
 
   /**
    * Returns the HTTP Status Code enum parsed from proto.

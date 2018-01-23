@@ -56,7 +56,23 @@ public:
   virtual std::string extractTag(const std::string& name, std::vector<Tag>& tags) const PURE;
 };
 
-typedef std::unique_ptr<TagExtractor> TagExtractorPtr;
+typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
+
+class TagProducer {
+public:
+  virtual ~TagProducer() {}
+
+  /**
+   * Take a metric name and a vector then add proper tags into the vector and
+   * return an extracted metric name.
+   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
+   * @param tags std::vector a set of Stats::Tag.
+   */
+  virtual std::string produceTags(const std::string& metric_name,
+                                  std::vector<Tag>& tags) const PURE;
+};
+
+typedef std::unique_ptr<const TagProducer> TagProducerPtr;
 
 /**
  * General interface for all stats objects.
@@ -241,9 +257,9 @@ public:
   virtual void addSink(Sink& sink) PURE;
 
   /**
-   * Set the set of extractors to extract a portions of stats names as tags.
+   * Set the given tag producer to control tags.
    */
-  virtual void setTagExtractors(const std::vector<TagExtractorPtr>& tag_extractor) PURE;
+  virtual void setTagProducer(TagProducerPtr&& tag_producer) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

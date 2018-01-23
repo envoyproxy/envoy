@@ -27,14 +27,14 @@
 namespace Envoy {
 namespace Router {
 
-class MockRedirectEntry : public RedirectEntry {
+class MockDirectResponseEntry : public DirectResponseEntry {
 public:
-  MockRedirectEntry();
-  ~MockRedirectEntry();
+  MockDirectResponseEntry();
+  ~MockDirectResponseEntry();
 
-  // Router::Config
+  // DirectResponseEntry
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
-  MOCK_CONST_METHOD0(redirectResponseCode, Http::Code());
+  MOCK_CONST_METHOD0(responseCode, Http::Code());
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -212,6 +212,7 @@ public:
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -243,7 +244,7 @@ public:
   ~MockRoute();
 
   // Router::Route
-  MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
+  MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
   MOCK_CONST_METHOD0(decorator, const Decorator*());
 

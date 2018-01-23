@@ -72,7 +72,8 @@ void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& 
 
   if (bootstrap.has_rate_limit_service()) {
     ratelimit_client_factory_.reset(
-        new RateLimit::GrpcFactoryImpl(bootstrap.rate_limit_service(), *cluster_manager_));
+        new RateLimit::GrpcFactoryImpl(bootstrap.rate_limit_service(),
+                                       cluster_manager_->grpcAsyncClientManager(), server.stats()));
   } else {
     ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
   }

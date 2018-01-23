@@ -50,7 +50,7 @@ public:
   Buffer::OwnedImpl data_;
   TestHeaderMapImpl request_headers_;
   std::unique_ptr<Router::TestCorsPolicy> cors_policy_;
-  Router::MockRedirectEntry redirect_entry_;
+  Router::MockDirectResponseEntry direct_response_entry_;
 };
 
 TEST_F(CorsFilterTest, RequestWithoutOrigin) {
@@ -329,7 +329,8 @@ TEST_F(CorsFilterTest, EncodeWithNonMatchingOrigin) {
 }
 
 TEST_F(CorsFilterTest, RedirectRoute) {
-  ON_CALL(*decoder_callbacks_.route_, redirectEntry()).WillByDefault(Return(&redirect_entry_));
+  ON_CALL(*decoder_callbacks_.route_, directResponseEntry())
+      .WillByDefault(Return(&direct_response_entry_));
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));

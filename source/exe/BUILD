@@ -54,6 +54,7 @@ envoy_cc_library(
         "//source/server/config/network:ssl_socket_lib",
         "//source/server/config/network:tcp_proxy_lib",
         "//source/server/config/stats:dog_statsd_lib",
+        "//source/server/config/stats:metrics_service_lib",
         "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
     ],

@@ -6,6 +6,7 @@
 
 #include "common/request_info/request_info_impl.h"
 
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "fmt/format.h"
@@ -125,6 +126,11 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     EXPECT_FALSE(request_info.healthCheck());
     request_info.healthCheck(true);
     EXPECT_TRUE(request_info.healthCheck());
+
+    EXPECT_EQ(nullptr, request_info.routeEntry());
+    NiceMock<Router::MockRouteEntry> route_entry;
+    request_info.route_entry_ = &route_entry;
+    EXPECT_EQ(&route_entry, request_info.routeEntry());
   }
 
   {

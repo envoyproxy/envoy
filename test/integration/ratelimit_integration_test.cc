@@ -4,6 +4,7 @@
 
 #include "source/common/ratelimit/ratelimit.pb.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
@@ -12,9 +13,9 @@ namespace Envoy {
 namespace {
 
 class RatelimitIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+                                 public Grpc::GrpcClientIntegrationParamTest {
 public:
-  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void SetUp() override { initialize(); }
 
@@ -26,12 +27,13 @@ public:
   void initialize() override {
     config_helper_.addFilter(
         "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
-    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
-      bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
+    config_helper_.addConfigModifier([this](envoy::api::v2::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ratelimit_cluster->set_name("ratelimit");
       ratelimit_cluster->mutable_http2_protocol_options();
+      setGrpcService(*bootstrap.mutable_rate_limit_service()->mutable_grpc_service(), "ratelimit",
+                     fake_upstreams_.back()->localAddress());
     });
     config_helper_.addConfigModifier(
         [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
@@ -124,8 +126,8 @@ public:
   const uint64_t response_size_ = 512;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, RatelimitIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) {
   initiateClientConnection();
@@ -167,13 +169,23 @@ TEST_P(RatelimitIntegrationTest, Error) {
 TEST_P(RatelimitIntegrationTest, Timeout) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
+  switch (clientType()) {
+  case Grpc::ClientType::EnvoyGrpc:
+    test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
+    EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_504")->value());
+    break;
+  case Grpc::ClientType::GoogleGrpc:
+    test_server_->waitForCounterGe("grpc.ratelimit.streams_closed_4", 1);
+    EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_total")->value());
+    EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_closed_4")->value());
+    break;
+  default:
+    NOT_REACHED;
+  }
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();
-
-  EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_504")->value());
 }
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {

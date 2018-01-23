@@ -80,7 +80,7 @@ public:
   }
 
   void makeListenersAndExpectCall(const std::vector<std::string>& listener_names) {
-    std::vector<std::reference_wrapper<Listener>> refs;
+    std::vector<std::reference_wrapper<Network::ListenerConfig>> refs;
     listeners_.clear();
     for (const auto& name : listener_names) {
       listeners_.emplace_back();
@@ -104,7 +104,7 @@ public:
   Http::AsyncClient::Callbacks* callbacks_{};
 
 private:
-  std::list<NiceMock<MockListener>> listeners_;
+  std::list<NiceMock<Network::MockListenerConfig>> listeners_;
 };
 
 // Negative test for protoc-gen-validate constraints.

@@ -7,6 +7,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
+#include "absl/strings/string_view.h"
 #include "api/address.pb.h"
 
 namespace Envoy {
@@ -176,7 +177,7 @@ public:
    * @param str is the string containing the port numbers and ranges
    * @param list is the list to append the new data structures to
    */
-  static void parsePortRangeList(const std::string& string, std::list<PortRange>& list);
+  static void parsePortRangeList(absl::string_view string, std::list<PortRange>& list);
 
   /**
    * Checks whether a given port number appears in at least one of the port ranges in a list

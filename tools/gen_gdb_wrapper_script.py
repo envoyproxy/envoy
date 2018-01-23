@@ -18,7 +18,7 @@ env = ${b64env}
 for k, v in env.iteritems():
   os.environ[k] = v
 
-os.system("${gdb} --args ${test_args}")
+os.system("${gdb} --fullname --args ${test_args}")
 """)
 
 if __name__ == '__main__':

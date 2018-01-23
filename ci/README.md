@@ -43,6 +43,12 @@ e.g. to use the `envoyproxy/envoy-build-centos` image you can run:
 IMAGE_NAME=envoyproxy/envoy-build-centos ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
+In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
+
+```bash
+IMAGE_NAME=envoyproxy/envoy-build-centos http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
 can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
 generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:

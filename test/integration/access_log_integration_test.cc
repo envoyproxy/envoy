@@ -3,6 +3,7 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
@@ -11,9 +12,9 @@ namespace Envoy {
 namespace {
 
 class AccessLogIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+                                 public Grpc::GrpcClientIntegrationParamTest {
 public:
-  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -29,15 +30,15 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+        [this](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.http_grpc_access_log");
 
           envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
-              "accesslog");
+          setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
+                         fake_upstreams_.back()->localAddress());
           MessageUtil::jsonConvert(config, *access_log->mutable_config());
         });
 
@@ -84,8 +85,8 @@ public:
   FakeStreamPtr access_log_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AccessLogIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_CASE_P(IpVersionsCientType, AccessLogIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {

@@ -35,6 +35,7 @@ public:
   MOCK_METHOD1(healthCheck, void(bool is_hc));
   MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(routeEntry, const Router::RouteEntry*());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
