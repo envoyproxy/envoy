@@ -7,6 +7,7 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -17,10 +18,8 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -183,23 +182,12 @@ public:
   Tracing::MockSpan* child_span_{new Tracing::MockSpan()};
 };
 
-// Support paramaterizing over gRPC client type.
-enum class ClientType { EnvoyGrpc, GoogleGrpc };
-
-// Skip tests based on gRPC client type.
-#define SKIP_IF_GRPC_CLIENT(client_type)                                                           \
-  if (std::get<1>(GetParam()) == (client_type)) {                                                  \
-    return;                                                                                        \
-  }
-
-class GrpcClientIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
+class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        fake_upstream_(
-            new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, std::get<0>(GetParam()))) {
-    switch (std::get<1>(GetParam())) {
+        fake_upstream_(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, ipVersion())) {
+    switch (clientType()) {
     case ClientType::EnvoyGrpc:
       grpc_client_ = createAsyncClientImpl();
       break;
@@ -362,9 +350,7 @@ public:
 
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, GrpcClientIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Values(ClientType::EnvoyGrpc /*,
-                                                         ClientType::GoogleGrpc*/)));
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
