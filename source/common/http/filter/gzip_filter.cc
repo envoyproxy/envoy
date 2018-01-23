@@ -100,9 +100,9 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
 
 FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
-      isContentTypeAllowed(headers) && isCacheControlAllowed(headers) && isEtagAllowed(headers) &&
+      isContentTypeAllowed(headers) && isCacheControlAllowed(headers) &&
       isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
-      !headers.ContentEncoding()) {
+      !headers.ContentEncoding() && isEtagAllowed(headers)) {
 
     insertVaryHeader(headers);
     headers.removeContentLength();
@@ -204,12 +204,14 @@ bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
   if (config_->disableOnEtagHeader()) {
     return !etag;
   }
+
   if (etag) {
     absl::string_view value(etag->value().c_str());
-    if (value.length() < 2 || !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+    if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
       headers.removeEtag();
     }
   }
+
   return true;
 }
 
@@ -248,22 +250,21 @@ bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
 
 void GzipFilter::insertVaryHeader(HeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
-  if (vary) {
-    std::string header_values;
-    if (!StringUtil::findToken(vary->value().c_str(), ",",
-                               Http::Headers::get().VaryValues.AcceptEncoding, true)) {
-      header_values.assign(Http::Headers::get().VaryValues.AcceptEncoding);
-    }
 
-    for (const auto value : StringUtil::splitToken(vary->value().c_str(), ",", true)) {
-      const auto trimmed_value = StringUtil::trim(value);
-      if (trimmed_value != Http::Headers::get().VaryValues.Wildcard) {
-        header_values.empty() ? header_values.assign(trimmed_value.data(), trimmed_value.size())
-                              : header_values.append(", " + std::string{trimmed_value});
-      }
-    }
+  if (vary && !StringUtil::findToken(vary->value().c_str(), ",",
+                                     Http::Headers::get().VaryValues.AcceptEncoding, true)) {
+    std::string new_header;
 
-    headers.insertVary().value(header_values);
+    // separator's length: ", "
+    const uint64_t comma_separator_len{2};
+    new_header.reserve(strlen(vary->value().c_str()) +
+                       Http::Headers::get().VaryValues.AcceptEncoding.size() + comma_separator_len);
+
+    new_header.append(vary->value().c_str());
+    new_header.append(", ");
+    new_header.append(Http::Headers::get().VaryValues.AcceptEncoding);
+
+    headers.insertVary().value(new_header);
   } else {
     headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
   }

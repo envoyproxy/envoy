@@ -257,7 +257,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
 }
 
 /**
- * Verify Vary header values are preserved and wildcard is removed.
+ * Verify Vary header values are preserved.
  */
 TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   initializeFilter(default_config);
@@ -268,7 +268,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
                                           {"accept-encoding", "deflate, gzip"}};
 
   Http::TestHeaderMapImpl response_headers{
-      {":status", "200"}, {"content-type", "application/json"}, {"vary", "*, cookie"}};
+      {":status", "200"}, {"content-type", "application/json"}, {"vary", "cookie"}};
 
   sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
 
@@ -277,7 +277,7 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   ASSERT_STREQ("gzip", response_->headers().ContentEncoding()->value().c_str());
-  ASSERT_STREQ("accept-encoding, cookie", response_->headers().Vary()->value().c_str());
+  ASSERT_STREQ("cookie, accept-encoding", response_->headers().Vary()->value().c_str());
 }
 
 } // namespace Envoy

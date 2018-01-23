@@ -360,22 +360,24 @@ TEST_F(GzipFilterTest, NoVaryHeader) {
   EXPECT_EQ("accept-encoding", headers.get_("vary"));
 }
 
-// Filter should set Vary header value with `accept-encoding` and remove `*`.
-TEST_F(GzipFilterTest, VaryRemoveWildcard) {
+// Filter should set Vary header value with `accept-encoding` and preserve other values.
+TEST_F(GzipFilterTest, VaryOtherValues) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}, {"vary", "*, cookie"}};
+  TestHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {"vary", "user-agent, cookie"}};
   feedBuffer(256);
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
-  EXPECT_EQ("accept-encoding, cookie", headers.get_("vary"));
+  EXPECT_EQ("user-agent, cookie, accept-encoding", headers.get_("vary"));
 }
 
 // Vary header should have only one `accept-encoding`value.
 TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}, {"vary", "*"}};
+  TestHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {"vary", "accept-encoding"}};
   feedBuffer(256);
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
