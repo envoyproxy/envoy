@@ -59,7 +59,9 @@ private:
     ~GrpcMuxWatchImpl() override {
       if (inserted_) {
         parent_.api_state_[type_url_].watches_.erase(entry_);
-        parent_.sendDiscoveryRequest(type_url_);
+        if (!resources_.empty()) {
+          parent_.sendDiscoveryRequest(type_url_);
+        }
       }
     }
     std::vector<std::string> resources_;

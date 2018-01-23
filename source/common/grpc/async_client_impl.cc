@@ -77,32 +77,30 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
-  ASSERT(!remote_closed_);
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
+  const auto grpc_status = Common::getGrpcStatus(*headers);
+  const std::string grpc_message = Common::getGrpcMessage(*headers);
+  callbacks_.onReceiveInitialMetadata(std::move(headers));
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
-    if (end_stream && Common::getGrpcStatus(*headers).valid()) {
-      onTrailers(std::move(headers));
+    if (end_stream && grpc_status.valid()) {
+      trailerResponse(grpc_status, grpc_message);
       return;
     }
-    streamError(Common::httpToGrpcStatus(http_response_status));
+    // Technically this should be
+    // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
+    // as given by Common::httpToGrpcStatus(), but the Google gRPC client treats
+    // this as GrpcStatus::Canceled.
+    streamError(Status::GrpcStatus::Canceled);
     return;
   }
   if (end_stream) {
-    onTrailers(std::move(headers));
-    return;
+    trailerResponse(grpc_status, grpc_message);
   }
-  callbacks_.onReceiveInitialMetadata(std::move(headers));
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!remote_closed_);
-  if (end_stream) {
-    streamError(Status::GrpcStatus::Internal);
-    return;
-  }
-
   decoded_frames_.clear();
   if (!decoder_.decode(data, decoded_frames_)) {
     streamError(Status::GrpcStatus::Internal);
@@ -122,24 +120,33 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
     }
     callbacks_.onReceiveMessageUntyped(std::move(response));
   }
+
+  if (end_stream) {
+    Http::HeaderMapPtr empty_trailers = std::make_unique<Http::HeaderMapImpl>();
+    callbacks_.onReceiveTrailingMetadata(std::move(empty_trailers));
+    streamError(Status::GrpcStatus::Unknown);
+  }
 }
 
 void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
-  ASSERT(!remote_closed_);
+  const auto grpc_status = Common::getGrpcStatus(*trailers);
+  const std::string grpc_message = Common::getGrpcMessage(*trailers);
+  callbacks_.onReceiveTrailingMetadata(std::move(trailers));
+  trailerResponse(grpc_status, grpc_message);
+}
 
-  const Optional<Status::GrpcStatus> grpc_status = Common::getGrpcStatus(*trailers);
+void AsyncStreamImpl::trailerResponse(Optional<Status::GrpcStatus> grpc_status,
+                                      const std::string& grpc_message) {
   if (!grpc_status.valid()) {
-    streamError(Status::GrpcStatus::Internal);
+    streamError(Status::GrpcStatus::Unknown);
     return;
   }
   if (grpc_status.value() != Status::GrpcStatus::Ok) {
-    const std::string grpc_message = Common::getGrpcMessage(*trailers);
     streamError(grpc_status.value(), grpc_message);
     return;
   }
-  callbacks_.onReceiveTrailingMetadata(std::move(trailers));
   callbacks_.onRemoteClose(Status::GrpcStatus::Ok, EMPTY_STRING);
-  closeRemote();
+  cleanup();
 }
 
 void AsyncStreamImpl::onReset() {
@@ -153,24 +160,14 @@ void AsyncStreamImpl::onReset() {
 
 void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
   stream_->sendData(*Common::serializeBody(request), end_stream);
-  if (end_stream) {
-    closeLocal();
-  }
 }
 
 void AsyncStreamImpl::closeStream() {
   Buffer::OwnedImpl empty_buffer;
   stream_->sendData(empty_buffer, true);
-  closeLocal();
 }
 
-void AsyncStreamImpl::resetStream() {
-  // Both closeLocal() and closeRemote() might self-destruct the object. We don't use these below
-  // to avoid sequencing issues.
-  local_closed_ |= true;
-  remote_closed_ |= true;
-  cleanup();
-}
+void AsyncStreamImpl::resetStream() { cleanup(); }
 
 void AsyncStreamImpl::cleanup() {
   if (!http_reset_) {
