@@ -265,9 +265,9 @@ TEST_P(SslSocketTest, GetCertDigest) {
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::TlsCertificate* server_cert =
+  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
 
   // From test/common/ssl/test_data/san_dns_cert.pem.
@@ -352,8 +352,8 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
                          "SA==\n"
                          "-----END CERTIFICATE-----");
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
-  envoy::api::v2::TlsCertificate* client_cert =
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
       client_ctx.mutable_common_tls_context()->add_tls_certificates();
 
   // From test/common/ssl/test_data/san_uri_cert.pem.
