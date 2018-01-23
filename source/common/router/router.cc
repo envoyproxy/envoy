@@ -225,16 +225,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     if (inline_body.valid()) {
       body = inline_body.value();
     }
-    Optional<std::string> path = route_->directResponseEntry()->responseBodyFilename();
-    if (path.valid()) {
-      const ssize_t kMaxFileSize = 4096;
-      ssize_t file_size = Filesystem::fileSize(path.value());
-      if (file_size < 0 || file_size > kMaxFileSize) {
-        sendLocalReply(Http::Code::InternalServerError, "", false);
-        return Http::FilterHeadersStatus::StopIteration;
-      }
-      body = Filesystem::fileReadToEnd(path.value());
-    }
     sendLocalReply(route_->directResponseEntry()->responseCode(), body, false);
     // TODO(brian-pane) support sending response_headers_to_add.
     return Http::FilterHeadersStatus::StopIteration;

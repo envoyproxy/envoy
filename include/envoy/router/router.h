@@ -47,17 +47,10 @@ public:
 
   /**
    * Returns the response body to send with direct responses.
-   * @return Optional<std::string> the response body specified in the route configuration,
-   *         or an invalid Optional if no response body is specified.
+   * @return std::string& the response body specified in the route configuration,
+   *         or an empty string if no response body is specified.
    */
-  virtual Optional<std::string> responseBody() const PURE;
-
-  /**
-   * Returns the pathname of the file containing the response body to send with direct responses.
-   * @return Optional<std::string> the response body pathname specified in the route configuration,
-   *         or an invalid Optional if no response body pathname is specified.
-   */
-  virtual Optional<std::string> responseBodyFilename() const PURE;
+  virtual const std::string& responseBody() const PURE;
 };
 
 /**

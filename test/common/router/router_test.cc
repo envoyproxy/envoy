@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
@@ -1556,6 +1557,7 @@ TEST_F(RouterTest, RedirectFound) {
 TEST_F(RouterTest, DirectResponse) {
   NiceMock<MockDirectResponseEntry> direct_response;
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
@@ -1570,8 +1572,8 @@ TEST_F(RouterTest, DirectResponse) {
 TEST_F(RouterTest, DirectResponseWithBody) {
   NiceMock<MockDirectResponseEntry> direct_response;
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
-  EXPECT_CALL(direct_response, responseBody())
-      .WillRepeatedly(Return(Optional<std::string>("static response")));
+  const std::string response_body("static response");
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(response_body));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestHeaderMapImpl response_headers{
@@ -1583,61 +1585,6 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
-}
-
-TEST_F(RouterTest, DirectResponseWithBodyFromFile) {
-  {
-    auto pathname = TestEnvironment::writeStringToFileForTest("response_body",
-                                                              "content to deliver from a file");
-    NiceMock<MockDirectResponseEntry> direct_response;
-    EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
-    EXPECT_CALL(direct_response, responseBodyFilename())
-        .WillRepeatedly(Return(Optional<std::string>(pathname)));
-    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-    Http::TestHeaderMapImpl response_headers{
-        {":status", "200"}, {"content-length", "30"}, {"content-type", "text/plain"}};
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
-    EXPECT_CALL(callbacks_, encodeData(_, true));
-    Http::TestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    router_.decodeHeaders(headers, true);
-    EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-    EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
-    config_.stats_.rq_direct_response_.reset();
-  }
-  {
-    // Nonexistent file, should return a 500.
-    NiceMock<MockDirectResponseEntry> direct_response;
-    EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
-    EXPECT_CALL(direct_response, responseBodyFilename())
-        .WillRepeatedly(Return(Optional<std::string>("nonexistent file")));
-    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-    Http::TestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    router_.decodeHeaders(headers, true);
-    EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-    EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
-    config_.stats_.rq_direct_response_.reset();
-  }
-  {
-    // File too big, should return a 500.
-    auto pathname =
-        TestEnvironment::writeStringToFileForTest("response_body", std::string(4097, '*'));
-    NiceMock<MockDirectResponseEntry> direct_response;
-    EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
-    EXPECT_CALL(direct_response, responseBodyFilename())
-        .WillRepeatedly(Return(Optional<std::string>(pathname)));
-    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
-    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-    Http::TestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers);
-    router_.decodeHeaders(headers, true);
-    EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-    EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
-  }
 }
 
 TEST(RouterFilterUtilityTest, finalTimeout) {

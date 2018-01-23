@@ -117,20 +117,12 @@ public:
   /**
    * Returns the content of the response body to send with direct responses from a route.
    * @param route supplies the Route configuration.
-   * @return Optional<std::string> the response body in the route's direct_response if specified,
-   *         or the HTTP status code from the route's redirect if specified,
-   *         or an empty Option otherwise.
+   * @return Optional<std::string> the response body provided inline in the route's
+   *         direct_response if specified, or the contents of the file named in the
+   *         route's direct_response if specified, or an empty string otherwise.
+   * @throw EnvoyException if the route configuration contains an error.
    */
-  static Optional<std::string> parseDirectResponseBody(const envoy::api::v2::Route& route);
-
-  /**
-   * Returns the pathname of the file containing the response body to send with direct
-   * responses from a route.
-   * @param route supplies the Route configuration.
-   * @return Optional<std::string> the response body filename in the route's direct_response
-   *         if specified, or an empty Option otherwise.
-   */
-  static Optional<std::string> parseDirectResponseFilename(const envoy::api::v2::Route& route);
+  static std::string parseDirectResponseBody(const envoy::api::v2::Route& route);
 
   /**
    * Returns the HTTP Status Code enum parsed from proto.

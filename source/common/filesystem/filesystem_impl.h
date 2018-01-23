@@ -51,6 +51,7 @@ ssize_t fileSize(const std::string& path);
 
 /**
  * @return full file content as a string.
+ * @throw EnvoyException if the file cannot be read.
  * Be aware, this is not most highly performing file reading method.
  */
 std::string fileReadToEnd(const std::string& path);

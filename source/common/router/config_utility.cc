@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -98,31 +99,36 @@ Optional<Http::Code> ConfigUtility::parseDirectResponseCode(const envoy::api::v2
   return Optional<Http::Code>();
 }
 
-Optional<std::string> ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& route) {
-  if (route.has_direct_response() && route.direct_response().has_body()) {
-    const auto& body = route.direct_response().body();
-    std::string inline_bytes = body.inline_bytes();
-    if (!inline_bytes.empty()) {
-      return inline_bytes;
-    }
-    std::string inline_string = body.inline_string();
-    if (!inline_string.empty()) {
-      return inline_string;
-    }
+std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& route) {
+  if (!route.has_direct_response() || !route.direct_response().has_body()) {
+    return EMPTY_STRING;
   }
-  return Optional<std::string>();
-}
-
-Optional<std::string>
-ConfigUtility::parseDirectResponseFilename(const envoy::api::v2::Route& route) {
-  if (route.has_direct_response() && route.direct_response().has_body()) {
-    const auto& body = route.direct_response().body();
-    std::string filename = body.filename();
-    if (!filename.empty()) {
-      return filename;
+  const auto& body = route.direct_response().body();
+  std::string filename = body.filename();
+  if (!filename.empty()) {
+    static const ssize_t kMaxFileSize = 4096;
+    if (!Filesystem::fileExists(filename)) {
+      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
     }
+    ssize_t size = Filesystem::fileSize(filename);
+    if (size < 0) {
+      throw EnvoyException(fmt::format("cannot determine size of response body file {}", filename));
+    }
+    if (size > kMaxFileSize) {
+      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
+                                       filename, kMaxFileSize));
+    }
+    return Filesystem::fileReadToEnd(filename);
   }
-  return Optional<std::string>();
+  std::string inline_bytes = body.inline_bytes();
+  if (!inline_bytes.empty()) {
+    return inline_bytes;
+  }
+  std::string inline_string = body.inline_string();
+  if (!inline_string.empty()) {
+    return inline_string;
+  }
+  return EMPTY_STRING;
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
