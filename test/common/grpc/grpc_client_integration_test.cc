@@ -486,6 +486,11 @@ TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
 // Validate that an out-of-range gRPC status is handled as an INVALID_CODE gRPC
 // error.
 TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {
+  // TODO(htuch): there is an UBSAN issue with Google gRPC client library
+  // handling of out-of-range status codes, see
+  // https://circleci.com/gh/envoyproxy/envoy/20234?utm_campaign=vcs-integration-link&utm_medium=referral&utm_source=github-build-link
+  // Need to fix this issue upstream first.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
