@@ -13,6 +13,7 @@ build:asan --define tcmalloc=disabled
 build:asan --build_tag_filters=-no_asan
 build:asan --test_tag_filters=-no_asan
 build:asan --define signal_trace=disabled
+build:asan --copt -DADDRESS_SANITIZER=1
 
 # Clang 5.0 ASAN
 build:clang-asan --define ENVOY_CONFIG_ASAN=1
@@ -27,6 +28,7 @@ build:clang-asan --define tcmalloc=disabled
 build:clang-asan --build_tag_filters=-no_asan
 build:clang-asan --test_tag_filters=-no_asan
 build:clang-asan --define signal_trace=disabled
+build:clang-asan --copt -DADDRESS_SANITIZER=1
 build:clang-asan --test_env=ASAN_SYMBOLIZER_PATH
 
 # Clang 5.0 TSAN

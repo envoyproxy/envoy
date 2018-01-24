@@ -220,12 +220,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
       return Http::FilterHeadersStatus::StopIteration;
     }
     config_.stats_.rq_direct_response_.inc();
-    std::string body;
-    Optional<std::string> inline_body = route_->directResponseEntry()->responseBody();
-    if (inline_body.valid()) {
-      body = inline_body.value();
-    }
-    sendLocalReply(route_->directResponseEntry()->responseCode(), body, false);
+    sendLocalReply(route_->directResponseEntry()->responseCode(),
+                   route_->directResponseEntry()->responseBody(), false);
     // TODO(brian-pane) support sending response_headers_to_add.
     return Http::FilterHeadersStatus::StopIteration;
   }
