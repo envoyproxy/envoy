@@ -39,9 +39,9 @@ public:
 
 private:
   static ZlibCompressionLevelEnum
-  compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level);
+  compressionLevelEnum(GzipV2CompressionLevelEnum compression_level);
   static ZlibCompressionStrategyEnum
-  compressionStrategyEnum(const GzipV2CompressionStrategyEnum& compression_strategy);
+  compressionStrategyEnum(GzipV2CompressionStrategyEnum compression_strategy);
   static std::unordered_set<std::string>
   contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
@@ -97,8 +97,8 @@ public:
   }
 
 private:
+  bool hasCacheControlNoTransform(HeaderMap& headers) const;
   bool isAcceptEncodingAllowed(HeaderMap& headers) const;
-  bool isCacheControlAllowed(HeaderMap& headers) const;
   bool isContentTypeAllowed(HeaderMap& headers) const;
   bool isEtagAllowed(HeaderMap& headers) const;
   bool isLastModifiedAllowed(HeaderMap& headers) const;

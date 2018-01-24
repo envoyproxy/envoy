@@ -1,9 +1,8 @@
 #include "common/http/filter/gzip_filter.h"
 
-#include <regex>
-
 #include "common/common/macros.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
@@ -47,7 +46,7 @@ GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzi
       disable_on_last_modified_header_(gzip.disable_on_last_modified_header()) {}
 
 ZlibCompressionLevelEnum
-GzipFilterConfig::compressionLevelEnum(const GzipV2CompressionLevelEnum& compression_level) {
+GzipFilterConfig::compressionLevelEnum(GzipV2CompressionLevelEnum compression_level) {
   switch (compression_level) {
   case GzipV2CompressionLevelEnum::Gzip_CompressionLevel_Enum_BEST:
     return ZlibCompressionLevelEnum::Best;
@@ -56,10 +55,11 @@ GzipFilterConfig::compressionLevelEnum(const GzipV2CompressionLevelEnum& compres
   default:
     return ZlibCompressionLevelEnum::Standard;
   }
+  return ZlibCompressionLevelEnum::Standard;
 }
 
-ZlibCompressionStrategyEnum GzipFilterConfig::compressionStrategyEnum(
-    const GzipV2CompressionStrategyEnum& compression_strategy) {
+ZlibCompressionStrategyEnum
+GzipFilterConfig::compressionStrategyEnum(GzipV2CompressionStrategyEnum compression_strategy) {
   switch (compression_strategy) {
   case GzipV2CompressionStrategyEnum::Gzip_CompressionStrategy_RLE:
     return ZlibCompressionStrategyEnum::Rle;
@@ -70,6 +70,7 @@ ZlibCompressionStrategyEnum GzipFilterConfig::compressionStrategyEnum(
   default:
     return ZlibCompressionStrategyEnum::Standard;
   }
+  return ZlibCompressionStrategyEnum::Standard;
 }
 
 std::unordered_set<std::string>
@@ -100,7 +101,7 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
 
 FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
-      isContentTypeAllowed(headers) && isCacheControlAllowed(headers) &&
+      isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
       !headers.ContentEncoding() && isEtagAllowed(headers)) {
 
@@ -122,7 +123,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
     return Http::FilterDataStatus::Continue;
   }
 
-  const uint64_t n_data{data.length()};
+  const uint64_t n_data = data.length();
 
   if (n_data) {
     compressor_.compress(data, compressed_data_);
@@ -141,6 +142,16 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
+bool GzipFilter::hasCacheControlNoTransform(HeaderMap& headers) const {
+  const Http::HeaderEntry* cache_control = headers.CacheControl();
+  if (cache_control) {
+    return StringUtil::findToken(cache_control->value().c_str(), ",",
+                                 Http::Headers::get().CacheControlValues.NoTransform.c_str());
+  }
+  return false;
+}
+
+// https://tools.ietf.org/html/rfc7231#page-41
 bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
   // TODO(gsagula): Since gzip is the only available content-encoding in Envoy at the moment,
@@ -153,11 +164,9 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
     bool is_gzip{false};     // true if exists and not followed by `q=0`.
 
     for (const auto token :
-         StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",", true)) {
-      const auto values = StringUtil::splitToken(token, ";");
-      const auto value = StringUtil::trim(values.at(0));
-      const auto q_value =
-          values.size() > 1 ? StringUtil::trim(values.at(1)) : absl::string_view{nullptr, 0};
+         StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",", false)) {
+      const auto value = StringUtil::trim(StringUtil::cropRight(token, ";", false));
+      const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";", false));
 
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
         is_gzip = q_value.empty() ? true : (q_value != ZeroQvalueString);
@@ -170,18 +179,18 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
       }
     }
 
-    return ((is_gzip && is_identity) || is_wildcard);
+    // rfc7231#5.3.4: An "identity" token is used as a synonym for "no encoding" in order to
+    // communicate when no encoding is preferred.
+    if (!is_identity) {
+      return false;
+    }
+
+    // rfc7231#5.3.4: If the representation has no content-coding, then it is acceptable by
+    // default unless specifically excluded by the Accept-Encoding field stating either
+    // "identity;q=0" or "*;q=0" without a more specific entry for "identity".
+    return is_gzip || is_wildcard;
   }
 
-  return true;
-}
-
-bool GzipFilter::isCacheControlAllowed(HeaderMap& headers) const {
-  const Http::HeaderEntry* cache_control = headers.CacheControl();
-  if (cache_control) {
-    return !StringUtil::findToken(cache_control->value().c_str(), ",",
-                                  Http::Headers::get().CacheControlValues.NoTransform.c_str());
-  }
   return true;
 }
 
@@ -198,7 +207,7 @@ bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
 // discussions around this topic have been going on for over a decade, e.g.,
 // https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
 // This design attempts to stay more on the safe side by preserving weak etags and removing
-// the strong ones when disable_on_etag_header is false. Envoy does NOT rewrite Etags.
+// the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
 bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* etag = headers.Etag();
   if (config_->disableOnEtagHeader()) {
@@ -254,16 +263,8 @@ void GzipFilter::insertVaryHeader(HeaderMap& headers) {
   if (vary && !StringUtil::findToken(vary->value().c_str(), ",",
                                      Http::Headers::get().VaryValues.AcceptEncoding, true)) {
     std::string new_header;
-
-    // separator's length: ", "
-    const uint64_t comma_separator_len{2};
-    new_header.reserve(strlen(vary->value().c_str()) +
-                       Http::Headers::get().VaryValues.AcceptEncoding.size() + comma_separator_len);
-
-    new_header.append(vary->value().c_str());
-    new_header.append(", ");
-    new_header.append(Http::Headers::get().VaryValues.AcceptEncoding);
-
+    absl::StrAppend(&new_header, vary->value().c_str(), ", ",
+                    Http::Headers::get().VaryValues.AcceptEncoding);
     headers.insertVary().value(new_header);
   } else {
     headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);

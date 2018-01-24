@@ -215,6 +215,16 @@ TEST(StringUtil, StringViewCropRight) {
   EXPECT_EQ("abcd", StringUtil::cropRight("abcd", ";"));
 }
 
+TEST(StringUtil, StringViewCropLeft) {
+  EXPECT_EQ("world\t\f\v\n\r", StringUtil::cropLeft("hello; world\t\f\v\n\r", ";"));
+  EXPECT_EQ("hello world ", StringUtil::cropLeft(";hello world ", ";"));
+  EXPECT_EQ("alo", StringUtil::cropLeft("\t\f\v\n\rhello\t\f\v\n\ralo", "lo"));
+  EXPECT_EQ("2\t\f\v\n\r", StringUtil::cropLeft("\t\f\v\n\rhe 12\t\f\v\n\r", "1"));
+  EXPECT_EQ("lo\t\f\v\n\r", StringUtil::cropLeft("hello alo\t\f\v\n\r", " a", false));
+  EXPECT_EQ("abcd", StringUtil::cropLeft("abcd", ";"));
+  EXPECT_EQ("", StringUtil::cropLeft("abcd", "abcd"));
+}
+
 TEST(StringUtil, StringViewFindToken) {
   EXPECT_TRUE(StringUtil::findToken("hello; world", ";", "hello"));
   EXPECT_TRUE(StringUtil::findToken("abc; type=text", ";=", "text"));

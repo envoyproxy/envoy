@@ -120,6 +120,15 @@ absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_v
   return trim_whitespace ? rtrim(source) : source;
 }
 
+absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_view delimiter,
+                                       bool trim_whitespace) {
+  const absl::string_view::size_type pos = source.find(delimiter);
+  if (pos != absl::string_view::npos) {
+    source.remove_prefix(pos + delimiter.size());
+  }
+  return trim_whitespace ? ltrim(source) : source;
+}
+
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
                                                       absl::string_view delimiters,
                                                       bool keep_empty_string) {

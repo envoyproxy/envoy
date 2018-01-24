@@ -190,6 +190,18 @@ public:
                                      bool trim_whitespace = true);
 
   /**
+   * Crop characters from a string view starting at the first character of the matched
+   * delimiter string view until the begining of the source string view.
+   * @param source supplies the string view to be processed.
+   * @param delimiter supplies the string view that delimits the starting point for deletion.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = true.
+   * @return sub-string of the string view if any.
+   */
+  static absl::string_view cropLeft(absl::string_view source, absl::string_view delimiters,
+                                    bool trim_whitespace = true);
+
+  /**
    * Split a delimiter-separated string view.
    * @param source supplies the delimiter-separated string view.
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
