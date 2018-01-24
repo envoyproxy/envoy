@@ -9,6 +9,7 @@ namespace Envoy {
 namespace Network {
 
 class Connection;
+class ConnectionSocket;
 
 /**
  * Status codes returned by filters that can cause future filters to not get iterated to.
@@ -148,6 +149,67 @@ public:
 };
 
 /**
+ * Callbacks used by individual listener filter instances to communicate with the listener filter
+ * manager.
+ */
+class ListenerFilterCallbacks {
+public:
+  virtual ~ListenerFilterCallbacks() {}
+
+  /**
+   * @return ConnectionSocket the socket the filter is operating on.
+   */
+  virtual ConnectionSocket& socket() PURE;
+
+  /**
+   * @return the Dispatcher for issuing events.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * If a filter stopped filter iteration by returning FilterStatus::StopIteration,
+   * the filter should call continueFilterChain(true) when complete to continue the filter chain,
+   * or continueFilterChain(false) if the filter execution failed and the connection must be
+   * closed.
+   * @param success boolean telling whether the filter execution was successful or not.
+   */
+  virtual void continueFilterChain(bool success) PURE;
+};
+
+/**
+ * Listener Filter
+ */
+class ListenerFilter {
+public:
+  virtual ~ListenerFilter() {}
+
+  /**
+   * Called when a new connection is accepted, but before a Connection is created.
+   * Filter chain iteration can be stopped if needed.
+   * @param cb the callbacks the filter instance can use to communicate with the filter chain.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
+};
+
+typedef std::unique_ptr<ListenerFilter> ListenerFilterPtr;
+
+/**
+ * Interface for filter callbacks and adding listener filters to a manager.
+ */
+class ListenerFilterManager {
+public:
+  virtual ~ListenerFilterManager() {}
+
+  /**
+   * Add a filter to the listener. Filters are invoked in FIFO order (the filter added
+   * first is called first).
+   * @param filter supplies the filter being added.
+   */
+  virtual void addAcceptFilter(ListenerFilterPtr&& filter) PURE;
+};
+
+/**
  * Creates a chain of network filters for a new connection.
  */
 class FilterChainFactory {
@@ -155,12 +217,19 @@ public:
   virtual ~FilterChainFactory() {}
 
   /**
-   * Called to create the filter chain.
+   * Called to create the network filter chain.
    * @param connection supplies the connection to create the chain on.
    * @return true if filter chain was created successfully. Otherwise
    *   false, e.g. filter chain is empty.
    */
-  virtual bool createFilterChain(Connection& connection) PURE;
+  virtual bool createNetworkFilterChain(Connection& connection) PURE;
+
+  /**
+   * Called to create the listener filter chain.
+   * @param listener supplies the listener to create the chain on.
+   * @return true if filter chain was created successfully. Otherwise false.
+   */
+  virtual bool createListenerFilterChain(ListenerFilterManager& listener) PURE;
 };
 
 } // namespace Network

@@ -49,12 +49,21 @@ public:
       return main_config.clusterManager();
     }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
-    ON_CALL(component_factory_, createFilterFactoryList(_, _))
+    ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
                                   Server::Configuration::FactoryContext& context)
                                   -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
-          return Server::ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
+          return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
+                                                                                       context);
         }));
+    ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+                       Server::Configuration::FactoryContext& context)
+                       -> std::vector<Server::Configuration::ListenerFilterFactoryCb> {
+              return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
+                  filters, context);
+            }));
 
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);

@@ -40,7 +40,7 @@ public:
   /**
    * @return int the file descriptor associated with the connection.
    */
-  virtual int fd() PURE;
+  virtual int fd() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.

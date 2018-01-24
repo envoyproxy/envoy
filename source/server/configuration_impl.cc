@@ -36,6 +36,15 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
+bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
+                                          const std::vector<ListenerFilterFactoryCb>& factories) {
+  for (const ListenerFilterFactoryCb& factory : factories) {
+    factory(filter_manager);
+  }
+
+  return true;
+}
+
 void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
