@@ -33,6 +33,8 @@ public:
 
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
+  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
+                                                Ssl::Context* ssl_ctx) override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
@@ -42,14 +44,9 @@ public:
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
-  Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
-                                      Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Scope& scope,
-                                      const Network::ListenerOptions& listener_options) override;
-  Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
-                                         Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                         Network::ListenerCallbacks& cb, Stats::Scope& scope,
-                                         const Network::ListenerOptions& listener_options) override;
+  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                                      bool bind_to_port,
+                                      bool hand_off_restored_destination_connections) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;

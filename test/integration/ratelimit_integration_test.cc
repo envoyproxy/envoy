@@ -172,6 +172,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
     test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
+    test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_504", 1);
     EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_504")->value());
     break;

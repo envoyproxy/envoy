@@ -48,7 +48,8 @@ public:
                      Network::Address::IpVersion version)
       : FakeUpstream(port, type, version) {}
   ~AutonomousUpstream();
-  bool createFilterChain(Network::Connection& connection) override;
+  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
 
 private:
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
