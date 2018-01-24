@@ -68,12 +68,12 @@ private:
   const std::string ecdh_curves_;
   const std::string ca_cert_;
   const std::string ca_cert_path_;
+  const std::string certificate_revocation_list_;
+  const std::string certificate_revocation_list_path_;
   const std::string cert_chain_;
   const std::string cert_chain_path_;
   const std::string private_key_;
   const std::string private_key_path_;
-  const std::string certificate_revocation_list_;
-  const std::string certificate_revocation_list_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::string verify_certificate_hash_;
   const unsigned min_protocol_version_;

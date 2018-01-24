@@ -43,6 +43,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       ca_cert_(readDataSource(config.validation_context().trusted_ca(), true)),
       ca_cert_path_(getDataSourcePath(config.validation_context().trusted_ca())),
+      certificate_revocation_list_(readDataSource(config.validation_context().crl(), true)),
+      certificate_revocation_list_path_(getDataSourcePath(config.validation_context().crl())),
       cert_chain_(config.tls_certificates().empty()
                       ? ""
                       : readDataSource(config.tls_certificates()[0].certificate_chain(), true)),
@@ -55,8 +57,6 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
       private_key_path_(config.tls_certificates().empty()
                             ? ""
                             : getDataSourcePath(config.tls_certificates()[0].private_key())),
-      certificate_revocation_list_(readDataSource(config.validation_context().crl(), true)),
-      certificate_revocation_list_path_(getDataSourcePath(config.validation_context().crl())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()

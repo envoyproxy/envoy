@@ -166,14 +166,14 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load CRL from {}", config.certificateRevocationListPath()));
     }
 
-    X509_STORE* cs = SSL_CTX_get_cert_store(ctx_.get());
+    X509_STORE* store_ctx = SSL_CTX_get_cert_store(ctx_.get());
     for (const X509_INFO* item : list.get()) {
       if (item->crl) {
-        X509_STORE_add_crl(cs, item->crl);
+        X509_STORE_add_crl(store_ctx, item->crl);
       }
     }
 
-    X509_STORE_set_flags(cs, X509_V_FLAG_CRL_CHECK);
+    X509_STORE_set_flags(store_ctx, X509_V_FLAG_CRL_CHECK);
   }
 
   // use the server's cipher list preferences
