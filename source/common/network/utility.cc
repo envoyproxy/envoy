@@ -221,6 +221,7 @@ bool Utility::isInternalAddress(const Address::Instance& address) {
   // Local IPv6 address prefix defined in RFC4193. Local addresses have prefix FC00::/7.
   // Currently, the FD00::/8 prefix is locally assigned and FC00::/8 may be defined in the
   // future.
+  static_assert(sizeof(absl::uint128) == sizeof(in6addr_loopback), "sizeof(absl::uint128) != sizeof(in6addr_loopback)");
   const absl::uint128 address6 = address.ip()->ipv6()->address();
   const uint8_t* address6_bytes = reinterpret_cast<const uint8_t*>(&address6);
   if (address6_bytes[0] == 0xfd ||
@@ -240,6 +241,7 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     // Compare to the canonical v4 loopback address: 127.0.0.1.
     return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
   } else if (address.ip()->version() == Address::IpVersion::v6) {
+    static_assert(sizeof(absl::uint128) == sizeof(in6addr_loopback), "sizeof(absl::uint128) != sizeof(in6addr_loopback)");
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
@@ -344,13 +346,13 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 
 absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
   // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  ASSERT(isLittleEndian());
+  ASSERT(ABSL_IS_LITTLE_ENDIAN);
   return flipOrder(address);
 }
 
 absl::uint128 Utility::Ip6htonl(const absl::uint128& address) {
   // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  ASSERT(isLittleEndian());
+  ASSERT(ABSL_IS_LITTLE_ENDIAN);
   return flipOrder(address);
 }
 
@@ -363,15 +365,6 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
     data >>= 8;
   }
   return result;
-}
-
-bool Utility::isLittleEndian() {
-  int num = 1;
-  // The machine byte order is little-endian.
-  if (*reinterpret_cast<char*>(&num) == 1) {
-    return true;
-  }
-  return false;
 }
 
 } // namespace Network

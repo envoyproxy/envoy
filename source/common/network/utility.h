@@ -212,14 +212,6 @@ private:
    * @return the absl::uint128 of the input having the bytes flipped.
    */
   static absl::uint128 flipOrder(const absl::uint128& input);
-
-  /**
-   * Determines if the machine's byte order is little-endian or big-endian.
-   * For more information on the logic, refer to
-   * http://vijayinterviewquestions.blogspot.com/2007/07/what-little-endian-and-big-endian-how.html
-   * @return true if the machine uses little-endian. False if the machine uses big-endian.
-   */
-  static bool isLittleEndian();
 };
 
 } // namespace Network
