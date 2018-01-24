@@ -1,13 +1,11 @@
 #include "common/ssl/ssl_socket.h"
 
-#include <regex>
-
 #include "common/common/assert.h"
-#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
 
+#include "absl/strings/str_replace.h"
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
 
@@ -246,11 +244,13 @@ std::string SslSocket::peerCertificate() const {
   RELEASE_ASSERT(bio_buf->length != 0);
   std::string pem = std::string(bio_buf->data, bio_buf->length);
   // URL encoding shortcut
-  pem = std::regex_replace(pem, std::regex("\n"), "%0A");
-  pem = std::regex_replace(pem, std::regex("="), "%3D");
-  pem = std::regex_replace(pem, std::regex(" "), "%20");
-  pem = std::regex_replace(pem, std::regex("\\+"), "%2B");
-  pem = std::regex_replace(pem, std::regex("/"), "%2F");
+  std::vector<std::pair<const absl::string_view, std::string>> replacements;
+  replacements.push_back({"\n", "%0A"});
+  replacements.push_back({"=", "%3D"});
+  replacements.push_back({" ", "%20"});
+  replacements.push_back({"+", "%2B"});
+  replacements.push_back({"/", "%2F"});
+  absl::StrReplaceAll(replacements, &pem);
   return pem;
 }
 
