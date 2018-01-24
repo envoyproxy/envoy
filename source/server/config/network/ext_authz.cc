@@ -19,7 +19,7 @@ namespace Configuration {
 
 NetworkFilterFactoryCb
 ExtAuthzConfigFactory::createFilter(const envoy::api::v2::filter::network::ExtAuthz& proto_config,
-                                 FactoryContext& context) {
+                                    FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.grpc_service().has_envoy_grpc());
@@ -29,13 +29,12 @@ ExtAuthzConfigFactory::createFilter(const envoy::api::v2::filter::network::ExtAu
       new ExtAuthz::TcpFilter::Config(proto_config, context.scope(), context.runtime(), context.clusterManager()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 20);
 
-/* @saumoh: could we just create one client_factory and use it the lambda?
-  ExtAuthz::ClientFactoryPtr client_factory(
-      new ExtAuthz::GrpcFactoryImpl(ext_authz_config->cluster(), ext_authz_config->cm()));
-*/
+  return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config, timeout_ms](
+    Network::FilterManager& filter_manager) -> void {
 
-  return [ext_authz_config, timeout_ms](Network::FilterManager& filter_manager) -> void {
-    ExtAuthz::GrpcFactoryImpl client_factory(ext_authz_config->cluster(), ext_authz_config->cm());
+    ExtAuthz::GrpcFactoryImpl client_factory(grpc_service,
+                                             context.clusterManager().grpcAsyncClientManager(),
+                                             context.scope());
 
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
       new ExtAuthz::TcpFilter::Instance(ext_authz_config, client_factory.create(std::chrono::milliseconds(timeout_ms)))});
