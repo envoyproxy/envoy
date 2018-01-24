@@ -1,1 +1,0 @@
-R	191220171237Z	171220171254Z	D9CBF429EE201F1F	unknown	/C=US/ST=California/L=San Francisco/O=Lyft/OU=Lyft Engineering/CN=Revoked Certificate

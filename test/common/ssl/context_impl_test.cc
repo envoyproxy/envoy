@@ -290,7 +290,7 @@ TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
     "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
-    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/revoked_cert.crl"
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
   }
   )EOF";
 

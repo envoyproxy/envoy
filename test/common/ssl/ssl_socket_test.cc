@@ -1848,15 +1848,15 @@ TEST_P(SslSocketTest, RevokedCertificate) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/revoked_cert.crl"
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
   }
   )EOF";
 
   // This should fail, since the certificate has been revoked.
   std::string revoked_client_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/revoked_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/revoked_key.pem"
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
   }
   )EOF";
   testUtil(revoked_client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_error",
@@ -1865,8 +1865,8 @@ TEST_P(SslSocketTest, RevokedCertificate) {
   // This should succeed, since the cert isn't revoked.
   std::string successful_client_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
   }
   )EOF";
   testUtil(successful_client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.handshake", true,

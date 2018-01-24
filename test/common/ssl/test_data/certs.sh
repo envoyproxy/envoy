@@ -14,7 +14,6 @@ set -e
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
 # openssl genrsa -out expired_key.pem 1024
-# openssl genrsa -out revoked_key.pem 1024
 
 # Generate ca_cert.pem.
 openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
@@ -69,18 +68,14 @@ openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pe
 openssl req -new -key expired_key.pem -out expired_cert.csr -config selfsigned_cert.cfg -batch -sha256
 openssl x509 -req -days -365 -in expired_cert.csr -signkey expired_key.pem -out expired_cert.pem
 
-# Generate revoked_cert.pem
-openssl req -new -key revoked_key.pem -out revoked_cert.csr -config revoked_cert.cfg -batch -sha256
-openssl x509 -req -days 730 -in revoked_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out revoked_cert.pem -extensions v3_ca -extfile revoked_cert.cfg
-
 # Initialize information for CRL process
 mkdir crl
 touch crl/index.txt crl/index.txt.attr
 echo 00 > crl/crl_number
 
 # Revoke the certificate and generate a CRL
-openssl ca -revoke revoked_cert.pem -keyfile ca_key.pem -cert ca_cert.pem -config crl.cfg
-openssl ca -gencrl -keyfile ca_key.pem -cert ca_cert.pem -out revoked_cert.crl -config crl.cfg
+openssl ca -revoke san_dns_cert.pem -keyfile ca_key.pem -cert ca_cert.pem -config crl.cfg
+openssl ca -gencrl -keyfile ca_key.pem -cert ca_cert.pem -out ca_cert.crl -config crl.cfg
 
 # Write session ticket key files
 openssl rand 80 > ticket_key_a
