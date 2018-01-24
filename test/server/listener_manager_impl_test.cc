@@ -1193,7 +1193,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
                                                        Network::Address::IpVersion::v4);
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
-  EXPECT_NE(nullptr, context);
+  ASSERT_NE(nullptr, context);
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
