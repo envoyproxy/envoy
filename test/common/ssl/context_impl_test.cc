@@ -9,6 +9,7 @@
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -305,7 +306,8 @@ TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
   }
   )EOF";
 
-  EXPECT_THROW(loadConfigJson(json), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+                          "Failed to load CRL from .*/not_a_crl.crl$");
 }
 
 } // namespace Ssl
