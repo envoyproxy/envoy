@@ -18,11 +18,11 @@ namespace Envoy {
 namespace ExtAuthz {
 
 using ::envoy::api::v2::auth::AttributeContext;
-using ::envoy::api::v2::auth::AttributeContext_HTTPRequest;
+using ::envoy::api::v2::auth::AttributeContext_HttpRequest;
 using ::envoy::api::v2::auth::AttributeContext_Peer;
 using ::envoy::api::v2::auth::AttributeContext_Request;
 
-GrpcClientImpl::GrpcClientImpl(ExtAuthzAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const Optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.api.v2.auth.Authorization.Check")),
@@ -67,20 +67,14 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const std::string& cluster_name,
-                                 Upstream::ClusterManager& cm)
-    : cluster_name_(cluster_name), cm_(cm) {
-  if (!cm_.get(cluster_name_)) {
-    throw EnvoyException(fmt::format("unknown external authorization service cluster '{}'", cluster_name_));
-  }
+GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::GrpcService &grpc_service,
+                                 Grpc::AsyncClientManager& async_client_manager,
+                                 Stats::Scope& scope) {
+  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope);
 }
 
 ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& timeout) {
-  return ClientPtr{new GrpcClientImpl(
-      ExtAuthzAsyncClientPtr{
-          new Grpc::AsyncClientImpl<envoy::api::v2::auth::CheckRequest,
-                                    envoy::api::v2::auth::CheckResponse>(cm_, cluster_name_)},
-      timeout)};
+  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 
 std::unique_ptr<::envoy::api::v2::Address> ExtAuthzCheckRequestGenerator::getProtobufAddress(const Network::Address::InstanceConstSharedPtr& instance) {
@@ -182,7 +176,7 @@ std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttp
                                                                                         const Envoy::Http::HeaderMap &headers) {
 
 
-  AttributeContext_HTTPRequest *httpreq = new AttributeContext_HTTPRequest();
+  AttributeContext_HttpRequest *httpreq = new AttributeContext_HttpRequest();
   ASSERT(httpreq);
 
   // Set id

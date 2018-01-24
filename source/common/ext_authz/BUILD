@@ -12,10 +12,10 @@ envoy_cc_library(
     name = "ext_authz_lib",
     srcs = ["ext_authz_impl.cc"],
     hdrs = ["ext_authz_impl.h"],
-    external_deps = ["envoy_bootstrap"],
     deps = [
         "//include/envoy/ext_authz:ext_authz_interface",
         "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:connection_interface",

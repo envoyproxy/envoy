@@ -7,6 +7,7 @@
 
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
@@ -16,17 +17,11 @@
 
 #include "common/singleton/const_singleton.h"
 
-#include "api/bootstrap.pb.h"
-
 namespace Envoy {
 namespace ExtAuthz {
 
-typedef Grpc::AsyncClient<envoy::api::v2::auth::CheckRequest,
-                          envoy::api::v2::auth::CheckResponse>
-    ExtAuthzAsyncClient;
-typedef std::unique_ptr<ExtAuthzAsyncClient> ExtAuthzAsyncClientPtr;
-
-typedef Grpc::AsyncRequestCallbacks<envoy::api::v2::auth::CheckResponse> ExtAuthzAsyncCallbacks;
+typedef Grpc::TypedAsyncRequestCallbacks<envoy::api::v2::auth::CheckResponse>
+    ExtAuthzAsyncCallbacks;
 
 struct ConstantValues {
   const std::string TraceStatus = "ext_authz_status";
@@ -40,7 +35,7 @@ typedef ConstSingleton<ConstantValues> Constants;
 // This will require support for more than one outstanding request per client.
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
-  GrpcClientImpl(ExtAuthzAsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                  const Optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
@@ -58,7 +53,7 @@ public:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  ExtAuthzAsyncClientPtr async_client_;
+  Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncRequest* request_{};
   Optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
@@ -66,15 +61,15 @@ private:
 
 class GrpcFactoryImpl : public ClientFactory {
 public:
-  GrpcFactoryImpl(const std::string& cluster_name,
-                  Upstream::ClusterManager& cm);
+  GrpcFactoryImpl(const envoy::api::v2::GrpcService &grpc_service,
+                  Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
   // ExtAuthz::ClientFactory
   ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) override;
 
 private:
-  const std::string cluster_name_;
-  Upstream::ClusterManager& cm_;
+  Grpc::AsyncClientFactoryPtr async_client_factory_;
+  std::string cluster_name_;
 };
 
 class NullClientImpl : public Client {

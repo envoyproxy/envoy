@@ -32,12 +32,10 @@ public:
 class ExtAuthzGrpcClientTest : public testing::Test {
 public:
   ExtAuthzGrpcClientTest()
-      : async_client_(new Grpc::MockAsyncClient<envoy::api::v2::auth::CheckRequest,
-                                                envoy::api::v2::auth::CheckResponse>()),
-        client_(ExtAuthzAsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
+      : async_client_(new Grpc::MockAsyncClient()),
+        client_(Grpc::AsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
 
-  Grpc::MockAsyncClient<envoy::api::v2::auth::CheckRequest,
-                        envoy::api::v2::auth::CheckResponse>* async_client_;
+  Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
   GrpcClientImpl client_;
   MockRequestCallbacks request_callbacks_;
@@ -53,8 +51,8 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
         .WillOnce(Invoke([this](
                              const Protobuf::MethodDescriptor& service_method,
-                             const envoy::api::v2::auth::CheckRequest&,
-                             Grpc::AsyncRequestCallbacks<envoy::api::v2::auth::CheckResponse>&,
+                             const Protobuf::Message&,
+                             Grpc::AsyncRequestCallbacks&,
                              Tracing::Span&,
                              const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
           EXPECT_EQ("envoy.api.v2.auth.Authorization", service_method.service()->full_name());
@@ -123,18 +121,17 @@ TEST_F(ExtAuthzGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-TEST(ExtAuthzGrpcFactoryTest, NoCluster) {
-  Upstream::MockClusterManager cm;
-
-  EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
-  EXPECT_THROW(GrpcFactoryImpl("foo", cm), EnvoyException);
-}
-
 TEST(ExtAuthzGrpcFactoryTest, Create) {
-  Upstream::MockClusterManager cm;
-
-  EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));
-  GrpcFactoryImpl factory("foo", cm);
+  envoy::api::v2::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("foo");
+  Grpc::MockAsyncClientManager async_client_manager;
+  Stats::MockStore scope;
+  EXPECT_CALL(async_client_manager,
+              factoryForGrpcService(ProtoEq(config), Ref(scope)))
+      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  GrpcFactoryImpl factory(config, async_client_manager, scope);
   factory.create(Optional<std::chrono::milliseconds>());
 }
 
