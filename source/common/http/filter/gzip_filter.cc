@@ -55,7 +55,6 @@ GzipFilterConfig::compressionLevelEnum(GzipV2CompressionLevelEnum compression_le
   default:
     return ZlibCompressionLevelEnum::Standard;
   }
-  return ZlibCompressionLevelEnum::Standard;
 }
 
 ZlibCompressionStrategyEnum
@@ -70,11 +69,11 @@ GzipFilterConfig::compressionStrategyEnum(GzipV2CompressionStrategyEnum compress
   default:
     return ZlibCompressionStrategyEnum::Standard;
   }
-  return ZlibCompressionStrategyEnum::Standard;
 }
 
 std::unordered_set<std::string>
 GzipFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
+  // This is only called once by the constructor.
   return types.empty() ? defaultContentEncoding()
                        : std::unordered_set<std::string>(types.cbegin(), types.cend());
 }
