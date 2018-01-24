@@ -46,7 +46,7 @@ private:
   std::unique_ptr<grpc::GenericStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
-  Stats::ScopePtr scope_;
+  Stats::Scope& scope_;
   GoogleAsyncClientStats stats_;
 
   friend class GoogleAsyncRequestImpl;

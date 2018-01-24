@@ -12,8 +12,7 @@ namespace Grpc {
 
 GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, Stats::Scope& scope,
                                              const envoy::api::v2::GrpcService::GoogleGrpc& config)
-    : dispatcher_(dispatcher), stat_prefix_(config.stat_prefix()),
-      scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))) {
+    : dispatcher_(dispatcher), stat_prefix_(config.stat_prefix()), scope_(scope) {
   // TODO(htuch): add support for SSL, OAuth2, GCP, etc. credentials.
   std::shared_ptr<grpc::ChannelCredentials> creds = grpc::InsecureChannelCredentials();
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
@@ -23,9 +22,9 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, Stat
   std::shared_ptr<grpc::Channel> channel = CreateChannel(config.target_uri(), creds);
   stub_ = std::make_unique<grpc::GenericStub>(channel);
   // Initialize client stats.
-  stats_.streams_total_ = &scope_->counter("streams_total");
+  stats_.streams_total_ = &scope_.counter("streams_total");
   for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
-    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
+    stats_.streams_closed_[i] = &scope_.counter(fmt::format("streams_closed_{}", i));
   }
 }
 

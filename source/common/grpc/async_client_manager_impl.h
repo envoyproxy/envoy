@@ -28,7 +28,7 @@ public:
 
 private:
   ThreadLocal::Instance& tls_;
-  Stats::Scope& scope_;
+  Stats::ScopePtr scope_;
   const envoy::api::v2::GrpcService::GoogleGrpc config_;
 };
 

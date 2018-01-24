@@ -33,7 +33,8 @@ AsyncClientPtr AsyncClientFactoryImpl::create() {
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, Stats::Scope& scope,
     const envoy::api::v2::GrpcService::GoogleGrpc& config)
-    : tls_(tls), scope_(scope), config_(config) {
+    : tls_(tls), scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))),
+      config_(config) {
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(scope_);
@@ -44,7 +45,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
 
 AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 #ifdef ENVOY_GOOGLE_GRPC
-  return std::make_unique<GoogleAsyncClientImpl>(tls_.dispatcher(), scope_, config_);
+  return std::make_unique<GoogleAsyncClientImpl>(tls_.dispatcher(), *scope_, config_);
 #else
   return nullptr;
 #endif
