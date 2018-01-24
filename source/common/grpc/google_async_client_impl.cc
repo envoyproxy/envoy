@@ -113,6 +113,7 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
   if (grpc_status > Status::GrpcStatus::MaximumValid) {
     grpc_status = Status::GrpcStatus::Unknown;
   }
+  ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
   parent_.stats_.streams_closed_[grpc_status]->inc();
   callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
                                                          : std::make_unique<Http::HeaderMapImpl>());
@@ -121,6 +122,8 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
 
 void GoogleAsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
   write_pending_queue_.emplace(request, end_stream);
+  ENVOY_LOG(trace, "Queued message to write ({} bytes)",
+            write_pending_queue_.back().buf_.value().Length());
   writeQueued();
 }
 

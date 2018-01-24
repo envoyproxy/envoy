@@ -142,8 +142,12 @@ private:
     // https://github.com/tensorflow/tensorflow/blob/f9462e82ac3981d7a3b5bf392477a585fb6e6912/tensorflow/core/distributed_runtime/rpc/grpc_serialization_traits.h#L189
     // at the cost of some additional implementation complexity.
     PendingMessage(const Protobuf::Message& request, bool end_stream)
-        : slice_(grpc_slice_from_copied_string(request.SerializeAsString().c_str()),
-                 grpc::Slice::STEAL_REF),
+        : slice_(
+              [&request] {
+                const std::string buf = request.SerializeAsString();
+                return grpc_slice_from_copied_buffer(buf.c_str(), buf.size());
+              }(),
+              grpc::Slice::STEAL_REF),
           buf_(grpc::ByteBuffer(&slice_, 1)), end_stream_(end_stream) {}
     // End-of-stream with no additional message.
     PendingMessage() : end_stream_(true) {}
