@@ -218,6 +218,10 @@ void GoogleAsyncStreamImpl::handleOpCompletion(Operation op, bool ok) {
     // by TensorFlow
     // https://github.com/tensorflow/tensorflow/blob/f9462e82ac3981d7a3b5bf392477a585fb6e6912/tensorflow/core/distributed_runtime/rpc/grpc_serialization_traits.h#L210
     // at the cost of some additional implementation complexity.
+    // Also see
+    // https://github.com/grpc/grpc/blob/5e82dddc056bd488e0ba1ba0057247ab23e442d4/include/grpc%2B%2B/impl/codegen/proto_utils.h#L113
+    // which gives us what we want for zero copy, but relies on grpc::internal details; we can't get
+    // a grpc_byte_buffer from grpc::ByteBuffer to use this.
     grpc::string buf;
     buf.reserve(read_buf_.Length());
     for (const auto& slice : slices) {
