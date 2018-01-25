@@ -168,6 +168,9 @@ void GoogleAsyncStreamImpl::handleOpCompletion(Operation op, bool ok) {
       return;
     }
     // Remote server has closed, we can pick up some meaningful status.
+    // TODO(htuch): We're assuming here that a failed Write/WriteLast operation will result in
+    // stream termination, and pick up on the failed Read here. Confirm that this assumption is
+    // valid.
     if (op == Operation::Read) {
       finish_pending_ = true;
       rw_->Finish(&status_, tag(Operation::Finish));
@@ -245,7 +248,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(Operation op, bool ok) {
     break;
   }
   default:
-    RELEASE_ASSERT(0);
+    NOT_REACHED;
   }
 }
 
@@ -287,7 +290,7 @@ void GoogleAsyncStreamImpl::cleanup() {
   // doesn't require joining on stream shutdown.
   ENVOY_LOG(debug, "Joining completionThread");
   completion_thread_->join();
-  ENVOY_LOG_MISC(debug, "Joined completionThread");
+  ENVOY_LOG(debug, "Joined completionThread");
   rw_ = nullptr;
 
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
