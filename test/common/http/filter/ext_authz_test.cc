@@ -9,19 +9,18 @@
 #include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
 
+#include "test/mocks/ext_authz/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/ext_authz/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/http/ext_authz.pb.validate.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "api/filter/http/ext_authz.pb.validate.h"
 
 using testing::InSequence;
 using testing::Invoke;
@@ -86,8 +85,9 @@ TEST_F(HttpExtAuthzFilterTest, BadConfig) {
   envoy::api::v2::filter::http::ExtAuthz proto_config{};
   MessageUtil::loadFromJson(filter_config, proto_config);
 
-  EXPECT_THROW(MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::ExtAuthz&>(proto_config),
-               ProtoValidationException);
+  EXPECT_THROW(
+      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::ExtAuthz&>(proto_config),
+      ProtoValidationException);
 }
 
 TEST_F(HttpExtAuthzFilterTest, NoRoute) {
@@ -115,8 +115,7 @@ TEST_F(HttpExtAuthzFilterTest, OkResponse) {
   InSequence s;
 
   EXPECT_CALL(*check_req_generator_, createHttpCheck(_, _, _));
-  EXPECT_CALL(*client_, check(_, _,
-                              testing::A<Tracing::Span&>()))
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;
       })));
@@ -171,9 +170,9 @@ TEST_F(HttpExtAuthzFilterTest, DeniedResponse) {
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized));
   request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::Denied);
 
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.unauthz")
-                .value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.unauthz").value());
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
@@ -203,7 +202,6 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::Error);
 
-
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
@@ -221,7 +219,6 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::Error);
-
 
   EXPECT_EQ(
       1U,
