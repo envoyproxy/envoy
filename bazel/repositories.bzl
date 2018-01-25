@@ -221,8 +221,6 @@ def _envoy_api_deps():
         actual = "@envoy_api//envoy/service/discovery/v2:common_cc",
     )
 
-
-
     filter_bind_targets = [
         "fault",
     ]

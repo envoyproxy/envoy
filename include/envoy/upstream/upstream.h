@@ -294,8 +294,8 @@ public:
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.ClusterStats for the definition of upstream_rq_dropped. These are
- * latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
+ * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
 // clang-format off
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER)                                                     \
