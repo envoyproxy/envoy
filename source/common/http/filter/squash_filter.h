@@ -38,12 +38,18 @@ private:
   // Interpolates envrionment variables in a string, and returns the new interpolated string.
   static std::string replaceEnv(const std::string& attachment_template);
 
+  // The name of the squash server cluster.
   std::string cluster_name_;
+  // The attachment body sent to squash server on create attachment.
   std::string attachment_json_;
+  // The total amount of time for an attachment to reach a final state (attached or error).
   std::chrono::milliseconds attachment_timeout_;
+  // How frequently should we poll the attachment state with the squash server.
   std::chrono::milliseconds attachment_poll_period_;
+  // The timeout for individual requests to the squash server.
   std::chrono::milliseconds request_timeout_;
 
+  // Defines the pattern for interpolating envrionment variables in to the attachment.
   const static std::regex ENV_REGEX;
 };
 

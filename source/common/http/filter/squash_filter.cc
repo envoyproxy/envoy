@@ -137,7 +137,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  ENVOY_LOG(info, "Squash: Holding request and requesting debug attachment");
+  ENVOY_LOG(debug, "Squash: Holding request and requesting debug attachment");
 
   MessagePtr request(new RequestMessageImpl());
   request->headers().insertContentType().value().setReference(
@@ -153,7 +153,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
           .send(std::move(request), create_attachment_callback_, config_->requestTimeout());
 
   if (in_flight_request_ == nullptr) {
-    ENVOY_LOG(info, "Squash: can't create request for squash server");
+    ENVOY_LOG(debug, "Squash: can't create request for squash server");
     is_squashing_ = false;
     return FilterHeadersStatus::Continue;
   }
@@ -192,7 +192,7 @@ void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
 
   // Get the config object that was created
   if (Utility::getResponseStatus(m->headers()) != enumToInt(Code::Created)) {
-    ENVOY_LOG(info, "Squash: can't create attachment object. status {} - not squashing",
+    ENVOY_LOG(debug, "Squash: can't create attachment object. status {} - not squashing",
               m->headers().Status()->value().c_str());
     doneSquashing();
   } else {
@@ -206,7 +206,7 @@ void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
     }
 
     if (debug_attachment_id.empty()) {
-      ENVOY_LOG(info, "Squash: failed to parse debug attachment object - check server settings.");
+      ENVOY_LOG(debug, "Squash: failed to parse debug attachment object - check server settings.");
       doneSquashing();
     } else {
       debug_attachment_path_ = POST_ATTACHMENT_PATH + debug_attachment_id;
