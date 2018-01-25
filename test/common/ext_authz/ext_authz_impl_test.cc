@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <string>
 
+#include "common/ext_authz/ext_authz_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/ext_authz/ext_authz_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -49,16 +49,14 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     envoy::api::v2::auth::CheckRequest request;
     Http::HeaderMapImpl headers;
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
-        .WillOnce(Invoke([this](
-                             const Protobuf::MethodDescriptor& service_method,
-                             const Protobuf::Message&,
-                             Grpc::AsyncRequestCallbacks&,
-                             Tracing::Span&,
-                             const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
-          EXPECT_EQ("envoy.api.v2.auth.Authorization", service_method.service()->full_name());
-          EXPECT_EQ("Check", service_method.name());
-          return &async_request_;
-        }));
+        .WillOnce(
+            Invoke([this](const Protobuf::MethodDescriptor& service_method,
+                          const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+                          const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+              EXPECT_EQ("envoy.api.v2.auth.Authorization", service_method.service()->full_name());
+              EXPECT_EQ("Check", service_method.name());
+              return &async_request_;
+            }));
 
     client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -66,7 +64,7 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     EXPECT_EQ(nullptr, headers.RequestId());
 
     response.reset(new envoy::api::v2::auth::CheckResponse());
-    ::google::rpc::Status *status = new ::google::rpc::Status();
+    ::google::rpc::Status* status = new ::google::rpc::Status();
     status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
     response->set_allocated_status(status);
     EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_unauthorized"));
@@ -80,13 +78,12 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
-    client_.check(request_callbacks_, request,
-                  Tracing::NullSpan::instance());
+    client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
     client_.onCreateInitialMetadata(headers);
 
     response.reset(new envoy::api::v2::auth::CheckResponse());
-    ::google::rpc::Status *status = new ::google::rpc::Status();
+    ::google::rpc::Status* status = new ::google::rpc::Status();
     status->set_code(Grpc::Status::GrpcStatus::Ok);
     response->set_allocated_status(status);
     EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
@@ -94,14 +91,12 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     client_.onSuccess(std::move(response), span_);
   }
 
-
   {
     envoy::api::v2::auth::CheckRequest request;
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
-    client_.check(request_callbacks_, request,
-                  Tracing::NullSpan::instance());
+    client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
     response.reset(new envoy::api::v2::auth::CheckResponse());
     EXPECT_CALL(request_callbacks_, complete(CheckStatus::Error));
@@ -126,8 +121,7 @@ TEST(ExtAuthzGrpcFactoryTest, Create) {
   config.mutable_envoy_grpc()->set_cluster_name("foo");
   Grpc::MockAsyncClientManager async_client_manager;
   Stats::MockStore scope;
-  EXPECT_CALL(async_client_manager,
-              factoryForGrpcService(ProtoEq(config), Ref(scope)))
+  EXPECT_CALL(async_client_manager, factoryForGrpcService(ProtoEq(config), Ref(scope)))
       .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));

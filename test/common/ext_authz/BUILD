@@ -12,9 +12,9 @@ envoy_cc_test(
     name = "ext_authz_impl_test",
     srcs = ["ext_authz_impl_test.cc"],
     deps = [
+        "//source/common/ext_authz:ext_authz_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/ext_authz:ext_authz_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
