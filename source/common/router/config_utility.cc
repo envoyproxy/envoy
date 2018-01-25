@@ -100,7 +100,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route
   return Optional<Http::Code>();
 }
 
-std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& route) {
+std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::Route& route) {
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
   }
