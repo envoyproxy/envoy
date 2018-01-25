@@ -50,7 +50,7 @@ public:
     }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+        .WillByDefault(Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                                   Server::Configuration::FactoryContext& context)
                                   -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
           return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,

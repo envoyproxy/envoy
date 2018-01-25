@@ -59,7 +59,7 @@ public:
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
-            [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
+            [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
                                       Configuration::FactoryContext& context)
                 -> std::vector<Configuration::NetworkFilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);

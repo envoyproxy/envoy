@@ -153,7 +153,7 @@ public:
                    Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenerFilterFactoryList,
                std::vector<Configuration::ListenerFilterFactoryCb>(
-                   const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>&,
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
                Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
