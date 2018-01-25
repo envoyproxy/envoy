@@ -36,7 +36,8 @@ void GrpcClientImpl::cancel() {
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::check(RequestCallbacks& callbacks, const envoy::api::v2::auth::CheckRequest& request,
+void GrpcClientImpl::check(RequestCallbacks& callbacks,
+                           const envoy::api::v2::auth::CheckRequest& request,
                            Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -67,7 +68,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::GrpcService &grpc_service,
+GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::GrpcService& grpc_service,
                                  Grpc::AsyncClientManager& async_client_manager,
                                  Stats::Scope& scope) {
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope);
@@ -77,9 +78,11 @@ ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& tim
   return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 
-std::unique_ptr<::envoy::api::v2::Address> ExtAuthzCheckRequestGenerator::getProtobufAddress(const Network::Address::InstanceConstSharedPtr& instance) {
+std::unique_ptr<::envoy::api::v2::Address> ExtAuthzCheckRequestGenerator::getProtobufAddress(
+    const Network::Address::InstanceConstSharedPtr& instance) {
 
-  std::unique_ptr<::envoy::api::v2::Address> addr = std::unique_ptr<::envoy::api::v2::Address>{new ::envoy::api::v2::Address()};
+  std::unique_ptr<::envoy::api::v2::Address> addr =
+      std::unique_ptr<::envoy::api::v2::Address>{new ::envoy::api::v2::Address()};
   ASSERT(addr);
 
   if (instance->type() == Network::Address::Type::Ip) {
@@ -92,11 +95,12 @@ std::unique_ptr<::envoy::api::v2::Address> ExtAuthzCheckRequestGenerator::getPro
   return addr;
 }
 
-std::unique_ptr<AttributeContext_Peer> ExtAuthzCheckRequestGenerator::getConnectionPeer(const Network::Connection *connection,
-                                                                                        const std::string& service,
-                                                                                        const bool local) {
+std::unique_ptr<AttributeContext_Peer>
+ExtAuthzCheckRequestGenerator::getConnectionPeer(const Network::Connection* connection,
+                                                 const std::string& service, const bool local) {
 
-  std::unique_ptr<AttributeContext_Peer> peer = std::unique_ptr<AttributeContext_Peer>{new AttributeContext_Peer()};
+  std::unique_ptr<AttributeContext_Peer> peer =
+      std::unique_ptr<AttributeContext_Peer>{new AttributeContext_Peer()};
   ASSERT(peer);
 
   // Set the address
@@ -110,8 +114,7 @@ std::unique_ptr<AttributeContext_Peer> ExtAuthzCheckRequestGenerator::getConnect
   // Preferably the SAN from the peer's cert or
   // Subject from the peer's cert.
   std::string principal;
-  Ssl::Connection* ssl =
-      const_cast<Ssl::Connection*>(connection->ssl());
+  Ssl::Connection* ssl = const_cast<Ssl::Connection*>(connection->ssl());
   if (ssl != nullptr) {
     if (!local) {
       principal = ssl->uriSanPeerCertificate();
@@ -136,52 +139,54 @@ std::unique_ptr<AttributeContext_Peer> ExtAuthzCheckRequestGenerator::getConnect
   return peer;
 }
 
-std::unique_ptr<AttributeContext_Peer> ExtAuthzCheckRequestGenerator::getConnectionPeer(const Network::Connection& connection,
-                                                                                        const std::string& service,
-                                                                                        const bool local) {
+std::unique_ptr<AttributeContext_Peer>
+ExtAuthzCheckRequestGenerator::getConnectionPeer(const Network::Connection& connection,
+                                                 const std::string& service, const bool local) {
   return getConnectionPeer(&connection, service, local);
 }
 
-
 const std::string ExtAuthzCheckRequestGenerator::getProtocolStr(const Envoy::Http::Protocol& p) {
 
-  switch(p) {
-    case Envoy::Http::Protocol::Http10:
-      return std::string("Http1.0");
-    case Envoy::Http::Protocol::Http11:
-      return std::string("Http1.1");
-    case Envoy::Http::Protocol::Http2:
-      return std::string("Http2");
-    default:
-      break;
+  switch (p) {
+  case Envoy::Http::Protocol::Http10:
+    return std::string("Http1.0");
+  case Envoy::Http::Protocol::Http11:
+    return std::string("Http1.1");
+  case Envoy::Http::Protocol::Http2:
+    return std::string("Http2");
+  default:
+    break;
   }
   return std::string("unknown");
 }
 
-Envoy::Http::HeaderMap::Iterate ExtAuthzCheckRequestGenerator::fillHttpHeaders(const Envoy::Http::HeaderEntry &e,
-                                                                               void *ctx) {
-  ::google::protobuf::Map< ::std::string, ::std::string >* mhdrs = static_cast<::google::protobuf::Map< ::std::string, ::std::string >*>(ctx);
-  (*mhdrs)[std::string(e.key().c_str(), e.key().size())] = std::string(e.value().c_str(), e.value().size());
+Envoy::Http::HeaderMap::Iterate
+ExtAuthzCheckRequestGenerator::fillHttpHeaders(const Envoy::Http::HeaderEntry& e, void* ctx) {
+  ::google::protobuf::Map<::std::string, ::std::string>* mhdrs =
+      static_cast<::google::protobuf::Map<::std::string, ::std::string>*>(ctx);
+  (*mhdrs)[std::string(e.key().c_str(), e.key().size())] =
+      std::string(e.value().c_str(), e.value().size());
   return Envoy::Http::HeaderMap::Iterate::Continue;
 }
 
-std::string ExtAuthzCheckRequestGenerator::getHeaderStr(const Envoy::Http::HeaderEntry *entry) {
+std::string ExtAuthzCheckRequestGenerator::getHeaderStr(const Envoy::Http::HeaderEntry* entry) {
   if (entry) {
     return std::string(entry->value().c_str(), entry->value().size());
   }
   return "";
 }
 
-std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttpRequest(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                                                                        const Envoy::Http::HeaderMap &headers) {
+std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttpRequest(
+    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+    const Envoy::Http::HeaderMap& headers) {
 
-
-  AttributeContext_HttpRequest *httpreq = new AttributeContext_HttpRequest();
+  AttributeContext_HttpRequest* httpreq = new AttributeContext_HttpRequest();
   ASSERT(httpreq);
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
-  Envoy::Http::StreamDecoderFilterCallbacks *sdfc = const_cast<Envoy::Http::StreamDecoderFilterCallbacks *>(callbacks);
+  Envoy::Http::StreamDecoderFilterCallbacks* sdfc =
+      const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
   httpreq->set_id(std::to_string(sdfc->streamId()));
 
   // Set method
@@ -204,21 +209,23 @@ std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttp
   auto* mhdrs = httpreq->mutable_headers();
   headers.iterate(fillHttpHeaders, mhdrs);
 
-  std::unique_ptr<AttributeContext_Request> req = std::unique_ptr<AttributeContext_Request>{new AttributeContext_Request()};
+  std::unique_ptr<AttributeContext_Request> req =
+      std::unique_ptr<AttributeContext_Request>{new AttributeContext_Request()};
   ASSERT(req);
   req->set_allocated_http(httpreq);
 
   return req;
 }
 
-void ExtAuthzCheckRequestGenerator::createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                                    const Envoy::Http::HeaderMap &headers,
-                                                    envoy::api::v2::auth::CheckRequest& request) {
+void ExtAuthzCheckRequestGenerator::createHttpCheck(
+    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+    const Envoy::Http::HeaderMap& headers, envoy::api::v2::auth::CheckRequest& request) {
 
   AttributeContext* attrs = request.mutable_attributes();
   ASSERT(attrs);
 
-  Envoy::Http::StreamDecoderFilterCallbacks* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks *>(callbacks);
+  Envoy::Http::StreamDecoderFilterCallbacks* cb =
+      const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
 
   std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
   attrs->set_allocated_source(getConnectionPeer(cb->connection(), service, false).release());
@@ -232,11 +239,10 @@ void ExtAuthzCheckRequestGenerator::createTcpCheck(const Network::ReadFilterCall
   AttributeContext* attrs = request.mutable_attributes();
   ASSERT(attrs);
 
-  Network::ReadFilterCallbacks* cb = const_cast<Network::ReadFilterCallbacks *>(callbacks);
+  Network::ReadFilterCallbacks* cb = const_cast<Network::ReadFilterCallbacks*>(callbacks);
   attrs->set_allocated_source(getConnectionPeer(cb->connection(), "", false).release());
   attrs->set_allocated_destination(getConnectionPeer(cb->connection(), "", true).release());
 }
 
 } // namespace ExtAuthz
 } // namespace Envoy
-

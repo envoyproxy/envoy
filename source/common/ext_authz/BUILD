@@ -19,12 +19,11 @@ envoy_cc_library(
         "//include/envoy/http:protocol_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:connection_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )
-

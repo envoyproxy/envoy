@@ -137,7 +137,6 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   // if (request_info.getResponseFlag(RequestInfo::ResponseFlag::Unauthorized)) {
   //  common_access_log.mutable_response_flags()->set_unauthorized(true);
   // }
-
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,

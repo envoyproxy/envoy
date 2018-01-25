@@ -11,7 +11,6 @@
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
-
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -61,7 +60,7 @@ private:
 
 class GrpcFactoryImpl : public ClientFactory {
 public:
-  GrpcFactoryImpl(const envoy::api::v2::GrpcService &grpc_service,
+  GrpcFactoryImpl(const envoy::api::v2::GrpcService& grpc_service,
                   Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
   // ExtAuthz::ClientFactory
@@ -90,31 +89,30 @@ public:
   }
 };
 
-class ExtAuthzCheckRequestGenerator: public CheckRequestGenerator {
+class ExtAuthzCheckRequestGenerator : public CheckRequestGenerator {
 public:
   ExtAuthzCheckRequestGenerator() {}
   ~ExtAuthzCheckRequestGenerator() {}
 
   // ExtAuthz::CheckRequestGenIntf
   void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                       const Envoy::Http::HeaderMap &headers,
+                       const Envoy::Http::HeaderMap& headers,
                        envoy::api::v2::auth::CheckRequest& request);
   void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                       envoy::api::v2::auth::CheckRequest& request);
 
 private:
-  std::unique_ptr<::envoy::api::v2::Address> getProtobufAddress(const Network::Address::InstanceConstSharedPtr&);
-  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Peer> getConnectionPeer(const Network::Connection *,
-                                                                                   const std::string&,
-                                                                                   const bool);
-  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Peer> getConnectionPeer(const Network::Connection&,
-                                                                                   const std::string&,
-                                                                                   const bool);
-  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Request> getHttpRequest(const Envoy::Http::StreamDecoderFilterCallbacks*,
-                                                                                   const Envoy::Http::HeaderMap &);
+  std::unique_ptr<::envoy::api::v2::Address>
+  getProtobufAddress(const Network::Address::InstanceConstSharedPtr&);
+  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Peer>
+  getConnectionPeer(const Network::Connection*, const std::string&, const bool);
+  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Peer>
+  getConnectionPeer(const Network::Connection&, const std::string&, const bool);
+  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Request>
+  getHttpRequest(const Envoy::Http::StreamDecoderFilterCallbacks*, const Envoy::Http::HeaderMap&);
   const std::string getProtocolStr(const Envoy::Http::Protocol&);
-  std::string getHeaderStr(const Envoy::Http::HeaderEntry *entry);
-  static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void *);
+  std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
+  static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };
 
 } // namespace ExtAuthz
