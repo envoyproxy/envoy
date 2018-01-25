@@ -83,4 +83,4 @@ openssl rand 79 > ticket_key_wrong_len
 
 rm *csr
 rm *srl
-rm -r crl_*
+rm crl_*
