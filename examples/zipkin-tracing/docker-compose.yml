@@ -6,7 +6,7 @@ services:
       context: ../
       dockerfile: front-proxy/Dockerfile-frontenvoy
     volumes:
-      - ./front-envoy-zipkin.json:/etc/front-envoy.json
+      - ./front-envoy-zipkin.yaml:/etc/front-envoy.yaml
     networks:
       - envoymesh
     expose:
@@ -21,7 +21,7 @@ services:
       context: ../front-proxy
       dockerfile: Dockerfile-service
     volumes:
-      - ./service1-envoy-zipkin.json:/etc/service-envoy.json
+      - ./service1-envoy-zipkin.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
@@ -36,7 +36,7 @@ services:
       context: ../front-proxy
       dockerfile: Dockerfile-service
     volumes:
-      - ./service2-envoy-zipkin.json:/etc/service-envoy.json
+      - ./service2-envoy-zipkin.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:

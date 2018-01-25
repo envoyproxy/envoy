@@ -42,6 +42,10 @@
   advice in the [C++ FAQ on the static initialization
   fiasco](https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use) for
   how to best handle this.
+* The Google C++ style guide points out that [constant vars should be named `kConstantVar`](https://google.github.io/styleguide/cppguide.html#Constant_Names).
+  In the Envoy codebase we use `ConstantVar` or `CONSTANT_VAR`. If you pick `CONSTANT_VAR`,
+  please be certain the name is globally significant to avoid potential conflicts with #defines,
+  which are not namespace-scoped, and may appear in externally controlled header files.
 * API-level comments should follow normal Doxygen conventions. Use `@param` to describe
   parameters and `@return <return-type>` for return values. Internal comments for
   methods and member variables may be regular C++ `//` comments or Doxygen at

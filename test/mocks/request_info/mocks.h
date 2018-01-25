@@ -35,15 +35,21 @@ public:
   MOCK_METHOD1(healthCheck, void(bool is_hc));
   MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(routeEntry, const Router::RouteEntry*());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
   Optional<std::chrono::microseconds> request_received_duration_;
   Optional<std::chrono::microseconds> response_received_duration_;
+  std::chrono::microseconds duration_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  Optional<Http::Protocol> protocol_;
+  Optional<uint32_t> response_code_;
+  uint64_t bytes_received_{};
+  uint64_t bytes_sent_{};
 };
 
 } // namespace RequestInfo

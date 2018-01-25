@@ -58,6 +58,8 @@ private:
   public:
     explicit LightStepTransporter(LightStepDriver& driver);
 
+    ~LightStepTransporter();
+
     // lightstep::AsyncTransporter
     void Send(const Protobuf::Message& request, Protobuf::Message& response,
               lightstep::AsyncTransporter::Callback& callback) override;
@@ -67,6 +69,7 @@ private:
     void onFailure(Http::AsyncClient::FailureReason) override;
 
   private:
+    Http::AsyncClient::Request* active_request_ = nullptr;
     lightstep::AsyncTransporter::Callback* active_callback_ = nullptr;
     Protobuf::Message* active_response_ = nullptr;
     LightStepDriver& driver_;

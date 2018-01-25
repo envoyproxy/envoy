@@ -21,14 +21,11 @@ using testing::_;
 namespace Envoy {
 namespace Upstream {
 
-typedef Grpc::MockAsyncClient<envoy::api::v2::LoadStatsRequest, envoy::api::v2::LoadStatsResponse>
-    LoadStatsMockAsyncClient;
-
 class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new LoadStatsMockAsyncClient()) {
+        async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("foo");
   }
 
@@ -43,7 +40,7 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_.reset(new LoadStatsReporter(
-        node_, cm_, stats_store_, LoadStatsAsyncClientPtr(async_client_), dispatcher_));
+        node_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
   }
 
   void expectSendMessage(const std::vector<envoy::api::v2::ClusterStats>& expected_cluster_stats) {
@@ -74,8 +71,8 @@ public:
   Event::TimerCb retry_timer_cb_;
   Event::MockTimer* response_timer_;
   Event::TimerCb response_timer_cb_;
-  Grpc::MockAsyncStream<envoy::api::v2::LoadStatsRequest> async_stream_;
-  LoadStatsMockAsyncClient* async_client_;
+  Grpc::MockAsyncStream async_stream_;
+  Grpc::MockAsyncClient* async_client_;
 };
 
 // Validate that stream creation results in a timer based retry.
@@ -86,6 +83,23 @@ TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
+}
+
+TEST_F(LoadStatsReporterTest, TestPubSub) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createLoadStatsReporter();
+  deliverLoadStatsResponse({"foo"});
+
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  response_timer_cb_();
+
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  response_timer_cb_();
+
+  deliverLoadStatsResponse({"bar"});
 }
 
 // Validate that the client can recover from a remote stream closure via retry.

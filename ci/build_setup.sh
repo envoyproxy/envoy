@@ -65,6 +65,7 @@ export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=stand
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --jobs=${NUM_CPUS} --show_task_finish ${BAZEL_BUILD_EXTRA_OPTIONS}"
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
+  --test_env=UBSAN_OPTIONS=print_stacktrace=1 \
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt

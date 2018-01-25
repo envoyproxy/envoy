@@ -6,7 +6,7 @@ There are 5 identities:
   *clientkey.pem* is its private key.
 - **Server**: It has the certificate *servercert.pem*, which is signed by the
   **CA** using the config *servercert.cfg*. *serverkey.pem* is its private key.
-- **Upsteam CA**: Certificate Authority for **Upstream**. It has the self-signed
+- **Upstream CA**: Certificate Authority for **Upstream**. It has the self-signed
   certificate *upstreamcacert.pem*. *upstreamcakey.pem* is its private key.
 - **Upstream**: It has the certificate *upstreamcert.pem*, which is signed by
   the **Upstream CA** using the config *upstreamcert.cfg*. *upstreamkey.pem* is

@@ -26,28 +26,9 @@ public:
 
   /**
    * Adds listener to the handler.
-   * @param factory supplies the configuration factory for new connections.
-   * @param socket supplies the already bound socket to listen on.
-   * @param scope supplies the stats scope to use for listener specific stats.
-   * @param listener_tag supplies an opaque tag that can be used to stop or remove the listener.
-   * @param listener_options listener configuration options.
+   * @param config listener configuration options.
    */
-  virtual void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                           Stats::Scope& scope, uint64_t listener_tag,
-                           const Network::ListenerOptions& listener_options) PURE;
-
-  /**
-   * Adds listener to the handler.
-   * @param factory supplies the configuration factory for new connections.
-   * @param socket supplies the already bound socket to listen on.
-   * @param scope supplies the stats scope to use for listener specific stats.
-   * @param listener_tag supplies an opaque tag that can be used to stop or remove the listener.
-   * @param listener_options listener configuration options.
-   */
-  virtual void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                              Network::ListenSocket& socket, Stats::Scope& scope,
-                              uint64_t listener_tag,
-                              const Network::ListenerOptions& listener_options) PURE;
+  virtual void addListener(ListenerConfig& config) PURE;
 
   /**
    * Find a listener based on the provided listener address value.

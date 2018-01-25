@@ -8,11 +8,13 @@
 #include "common/config/json_utility.h"
 #include "common/config/resources.h"
 #include "common/config/well_known_names.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
+#include "api/stats.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -31,7 +33,7 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
     ASSERT(api_type == ApiType::get().Grpc);
     api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
   }
-  api_config_source.add_cluster_name(cluster);
+  api_config_source.add_cluster_names(cluster);
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
@@ -66,8 +68,42 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   }
 }
 
+void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
+  // TODO(junr03): the file might be deleted between this check and the
+  // watch addition.
+  if (!Filesystem::fileExists(path)) {
+    throw EnvoyException(fmt::format(
+        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
+        path));
+  }
+}
+
+void Utility::checkApiConfigSourceSubscriptionBackingCluster(
+    const Upstream::ClusterManager::ClusterInfoMap& clusters,
+    const envoy::api::v2::ApiConfigSource& api_config_source) {
+  if (api_config_source.cluster_names().size() != 1) {
+    // TODO(htuch): Add support for multiple clusters, #1170.
+    throw EnvoyException(
+        "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
+  }
+
+  const auto& cluster_name = api_config_source.cluster_names()[0];
+  const auto& it = clusters.find(cluster_name);
+  if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
+      it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+    throw EnvoyException(fmt::format(
+        "envoy::api::v2::ConfigSource must have a statically "
+        "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
+        cluster_name));
+  }
+}
+
 std::chrono::milliseconds
 Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source) {
+  if (!api_config_source.has_refresh_delay()) {
+    throw EnvoyException("refresh_delay is required for REST API configuration sources");
+  }
+
   return std::chrono::milliseconds(
       Protobuf::util::TimeUtil::DurationToMilliseconds(api_config_source.refresh_delay()));
 }
@@ -128,35 +164,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-std::vector<Stats::TagExtractorPtr>
-Utility::createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap) {
-  std::vector<Stats::TagExtractorPtr> tag_extractors;
-
-  // Ensure no tag names are repeated.
-  std::unordered_set<std::string> names;
-  auto add_tag = [&names, &tag_extractors](const std::string& name, const std::string& regex) {
-    if (!names.emplace(name).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
-    }
-
-    tag_extractors.emplace_back(Stats::TagExtractorImpl::createTagExtractor(name, regex));
-  };
-
-  // Add defaults.
-  if (!bootstrap.stats_config().has_use_all_default_tags() ||
-      bootstrap.stats_config().use_all_default_tags().value()) {
-    for (const std::pair<std::string, std::string>& default_tag :
-         TagNames::get().name_regex_pairs_) {
-      add_tag(default_tag.first, default_tag.second);
-    }
-  }
-
-  // Add custom tags.
-  for (const envoy::api::v2::TagSpecifier& tag_specifier : bootstrap.stats_config().stats_tags()) {
-    add_tag(tag_specifier.tag_name(), tag_specifier.regex());
-  }
-
-  return tag_extractors;
+Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {
@@ -165,6 +174,38 @@ void Utility::checkObjNameLength(const std::string& error_prefix, const std::str
                                      error_prefix, name, name.length(),
                                      Stats::RawStatData::maxObjNameLength()));
   }
+}
+
+Grpc::AsyncClientFactoryPtr
+Utility::factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                                   const envoy::api::v2::ApiConfigSource& api_config_source,
+                                   Stats::Scope& scope) {
+  ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::GRPC);
+  envoy::api::v2::GrpcService grpc_service;
+  if (api_config_source.cluster_names().empty()) {
+    if (api_config_source.grpc_services().empty()) {
+      throw EnvoyException(
+          fmt::format("Missing gRPC services in envoy::api::v2::ApiConfigSource: {}",
+                      api_config_source.DebugString()));
+    }
+    // TODO(htuch): Implement multiple gRPC services.
+    if (api_config_source.grpc_services().size() != 1) {
+      throw EnvoyException(fmt::format(
+          "Only singleton gRPC service lists supported in envoy::api::v2::ApiConfigSource: {}",
+          api_config_source.DebugString()));
+    }
+    grpc_service.MergeFrom(api_config_source.grpc_services(0));
+  } else {
+    // TODO(htuch): cluster_names is deprecated, remove after 1.6.0.
+    if (api_config_source.cluster_names().size() != 1) {
+      throw EnvoyException(fmt::format(
+          "Only singleton cluster name lists supported in envoy::api::v2::ApiConfigSource: {}",
+          api_config_source.DebugString()));
+    }
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
+  }
+
+  return async_client_manager.factoryForGrpcService(grpc_service, scope);
 }
 
 } // namespace Config

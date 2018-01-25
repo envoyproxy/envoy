@@ -128,9 +128,9 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:logger_lib",
-        "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
     ],
 )
@@ -158,6 +158,7 @@ envoy_cc_library(
         ":grpc_mux_subscription_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:async_client_interface",
     ],
 )
 
@@ -264,6 +265,8 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
     ],
 )
@@ -304,6 +307,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:common_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",

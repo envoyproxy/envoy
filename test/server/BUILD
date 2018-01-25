@@ -25,6 +25,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/server:configuration_lib",
+        "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/stats:statsd_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
@@ -97,6 +98,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/server:options_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -121,7 +123,10 @@ envoy_cc_test(
     data = ["//test/common/ssl/test_data:certs"],
     deps = [
         ":utility_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/server:listener_manager_lib",
+        "//source/server/config/listener:original_dst_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

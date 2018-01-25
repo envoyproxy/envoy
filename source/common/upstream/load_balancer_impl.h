@@ -17,6 +17,13 @@ namespace Upstream {
  * Base class for all LB implementations.
  */
 class LoadBalancerBase {
+public:
+  // A utility function to chose a priority level based on a precomputed hash and
+  // a priority vector in the style of per_priority_load_
+  //
+  // Returns the priority, a number between 0 and per_priority_load.size()-1
+  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
+
 protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
@@ -28,18 +35,26 @@ protected:
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random);
 
-  uint32_t bestAvailablePriority() const { return best_available_host_set_->priority(); }
+  // Choose host set randomly, based on the per_priority_load_;
+  const HostSet& chooseHostSet();
+
+  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
-  // The lowest priority host set from priority_set_ with healthy hosts, or the
-  // zero-priority host set if all host sets are fully unhealthy.
-  // This is updated as the hosts and healthy hosts in priority_set_ are updated
-  // but will never be null.
-  const HostSet* best_available_host_set_;
+
+  // Called when a host set at the given priority level is updated. This updates
+  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
+  // priority levels.
+  void recalculatePerPriorityState(uint32_t priority);
+
+  // The percentage load (0-100) for each priority level
+  std::vector<uint32_t> per_priority_load_;
+  // The health (0-100) for each priority level.
+  std::vector<uint32_t> per_priority_health_;
 };
 
 /**
@@ -78,12 +93,13 @@ private:
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRouting(uint32_t priority);
+  bool earlyExitNonLocalityRouting();
 
   /**
    * Try to select upstream hosts from the same locality.
+   * @param host_set the last host set returned by chooseHostSet()
    */
-  const std::vector<HostSharedPtr>& tryChooseLocalLocalityHosts();
+  const std::vector<HostSharedPtr>& tryChooseLocalLocalityHosts(const HostSet& host_set);
 
   /**
    * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
@@ -97,7 +113,7 @@ private:
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
-  void regenerateLocalityRoutingStructures(uint32_t priority);
+  void regenerateLocalityRoutingStructures();
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
@@ -116,9 +132,6 @@ private:
   };
   typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
   // Routing state broken out for each priority level in priority_set_.
-  // With the current implementation we could save some CPU and memory by only
-  // tracking this for best_available_host_set_ but as we support gentle
-  // failover it's useful to precompute it for all priority levels.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
 };

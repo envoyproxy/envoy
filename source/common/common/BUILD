@@ -59,7 +59,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "hash_lib",
     hdrs = ["hash.h"],
-    external_deps = ["xxhash"],
+    external_deps = [
+        "abseil_strings",
+        "xxhash",
+    ],
 )
 
 envoy_cc_library(
@@ -117,12 +120,25 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = ["//include/envoy/common:time_interface"],
+)
+
+genrule(
+    name = "generate_version_number",
+    srcs = ["@envoy_api//:VERSION"],
+    outs = ["version_number.h"],
+    cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
 )
 
 envoy_cc_library(
     name = "version_includes",
-    hdrs = ["version.h"],
+    hdrs = [
+        "version.h",
+        ":generate_version_number",
+    ],
 )
 
 envoy_cc_library(
@@ -147,5 +163,17 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:callback",
+    ],
+)
+
+envoy_cc_library(
+    name = "shared_memory_hash_set_lib",
+    hdrs = ["shared_memory_hash_set.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        ":assert_lib",
+        ":logger_lib",
     ],
 )

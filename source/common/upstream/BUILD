@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -72,6 +73,8 @@ envoy_cc_library(
         "//source/common/config:cds_json_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
+        "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -87,11 +90,15 @@ envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
-    external_deps = ["envoy_health_check"],
+    external_deps = [
+        "envoy_health_check",
+        "grpc_health_proto",
+    ],
     deps = [
         ":host_utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
+        "//include/envoy/grpc:status",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/network:connection_interface",
@@ -100,11 +107,14 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -210,6 +220,9 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         ":load_balancer_lib",
         "//include/envoy/runtime:runtime_interface",
@@ -328,6 +341,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",

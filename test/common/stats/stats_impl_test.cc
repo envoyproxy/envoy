@@ -8,6 +8,7 @@
 
 #include "test/test_common/utility.h"
 
+#include "api/stats.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -110,6 +111,11 @@ TEST(TagExtractorTest, EmptyName) {
                             EnvoyException, "tag_name cannot be empty");
 }
 
+TEST(TagExtractorTest, BadRegex) {
+  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("cluster_name", "+invalid"),
+                          EnvoyException, "Invalid regex '\\+invalid':");
+}
+
 class DefaultTagRegexTester {
 public:
   DefaultTagRegexTester() {
@@ -189,6 +195,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("listener.[__1]_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
                          {listener_address, cipher_name});
+
+  // Cipher suite
+  Tag cipher_suite;
+  cipher_suite.name_ = tag_names.SSL_CIPHER_SUITE;
+  cipher_suite.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
+
+  regex_tester.testRegex("cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+                         "cluster.ssl.ciphers", {cluster_tag, cipher_suite});
 
   // ipv6 non-loopback (for alphabetical chars)
   listener_address.value_ = "[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543";
@@ -351,6 +365,51 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("http.fault_connection_manager.fault.fault_cluster.aborts_injected",
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
+}
+
+TEST(TagProducerTest, CheckConstructor) {
+  envoy::api::v2::StatsConfig stats_config;
+
+  // Should pass there were no tag name conflict.
+  auto& tag_specifier1 = *stats_config.mutable_stats_tags()->Add();
+  tag_specifier1.set_tag_name("test.x");
+  tag_specifier1.set_fixed_value("xxx");
+  TagProducerImpl{stats_config};
+
+  // Should raise an error when duplicate tag names are specified.
+  auto& tag_specifier2 = *stats_config.mutable_stats_tags()->Add();
+  tag_specifier2.set_tag_name("test.x");
+  tag_specifier2.set_fixed_value("yyy");
+  EXPECT_THROW_WITH_MESSAGE(TagProducerImpl{stats_config}, EnvoyException,
+                            fmt::format("Tag name '{}' specified twice.", "test.x"));
+
+  // Also should raise an error when user defined tag name conflicts with Envoy's default tag names.
+  stats_config.clear_stats_tags();
+  stats_config.mutable_use_all_default_tags()->set_value(true);
+  auto& custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
+  custom_tag_extractor.set_tag_name(Config::TagNames::get().CLUSTER_NAME);
+  EXPECT_THROW_WITH_MESSAGE(
+      TagProducerImpl{stats_config}, EnvoyException,
+      fmt::format("Tag name '{}' specified twice.", Config::TagNames::get().CLUSTER_NAME));
+
+  // Non-default custom name without regex should throw
+  stats_config.mutable_use_all_default_tags()->set_value(true);
+  stats_config.clear_stats_tags();
+  custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
+  custom_tag_extractor.set_tag_name("test_extractor");
+  EXPECT_THROW_WITH_MESSAGE(
+      TagProducerImpl{stats_config}, EnvoyException,
+      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+
+  // Also empty regex should throw
+  stats_config.mutable_use_all_default_tags()->set_value(true);
+  stats_config.clear_stats_tags();
+  custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
+  custom_tag_extractor.set_tag_name("test_extractor");
+  custom_tag_extractor.set_regex("");
+  EXPECT_THROW_WITH_MESSAGE(
+      TagProducerImpl{stats_config}, EnvoyException,
+      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
 
 } // namespace Stats

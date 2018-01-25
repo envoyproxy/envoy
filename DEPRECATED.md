@@ -10,6 +10,12 @@ The following features have been DEPRECATED and will be removed in the specified
 * DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
   instead.
 * CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT instead.
+* Rate limit service configuration via the `cluster_name` field is deprecated. Use `grpc_service`
+  instead.
+* gRPC service configuration via the `cluster_names` field in `ApiConfigSource` is deprecated. Use
+  `grpc_services` instead.
+* 'use_original_dst' field in the v2 LDS API is deprecated. Use listener filters and filter chain
+  matching instead.
 
 ## Version 1.5.0
 
@@ -40,4 +46,4 @@ The following features have been DEPRECATED and will be removed in the specified
 * The direction of network and HTTP filters in the configuration will be ignored from 1.4.0 and
   later removed from the configuration in the v2 APIs. Filter direction is now implied at the C++ type
   level. The `type()` methods on the `NamedNetworkFilterConfigFactory` and
-  `NamedHttpFilterConfigFactory` intefaces have been removed to reflect this.
+  `NamedHttpFilterConfigFactory` interfaces have been removed to reflect this.

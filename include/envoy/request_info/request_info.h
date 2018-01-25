@@ -11,6 +11,11 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
+
+namespace Router {
+class RouteEntry;
+} // namespace Router
+
 namespace RequestInfo {
 
 enum ResponseFlag {
@@ -37,11 +42,15 @@ enum ResponseFlag {
   // Abort with error code was injected.
   FaultInjected = 0x400,
   // Request was ratelimited locally by rate limit filter.
-  RateLimited = 0x800
+  RateLimited = 0x800,
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
+  LastFlag = RateLimited
 };
 
 /**
  * Additional information about a completed request for logging.
+ * TODO(mattklein123): This interface needs a thorough cleanup in terms of how we handle time
+ *                     durations. I will be following up with a dedicated change for this.
  */
 class RequestInfo {
 public:
@@ -64,7 +73,7 @@ public:
 
   /**
    * @return duration from request start to when the entire request was received from the
-   * downstream client in microseconds. Note: if unset, will return 0 microseconds.
+   * downstream client in microseconds.
    */
   virtual const Optional<std::chrono::microseconds>& requestReceivedDuration() const PURE;
 
@@ -76,15 +85,15 @@ public:
   virtual void requestReceivedDuration(MonotonicTime time) PURE;
 
   /**
-   * @return the duration from request start to when the entire response was received from the
-   * upstream host in microseconds. Note: if unset, will return 0 microseconds.
+   * @return the duration from request start to when the first byte of the response was received
+   * from the upstream host in microseconds.
    */
   virtual const Optional<std::chrono::microseconds>& responseReceivedDuration() const PURE;
 
   /**
-   * Set the duration from request start to when the entire response was received from the
-   * upstream host.
-   * @param time monotonic clock time when the response was received.
+   * Set the duration from request start to when the first byte of the response was received
+   * from the upstream host in microseconds.
+   * @param time monotonic clock time when the first byte of the response was received.
    */
   virtual void responseReceivedDuration(MonotonicTime time) PURE;
 
@@ -154,6 +163,12 @@ public:
    * inferred from proxy proto, x-forwarded-for, etc.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
+
+  /**
+   * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
+   * will be nullptr if no route was selected.
+   */
+  virtual const Router::RouteEntry* routeEntry() const PURE;
 };
 
 } // namespace RequestInfo

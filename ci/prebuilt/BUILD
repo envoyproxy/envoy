@@ -10,6 +10,13 @@ cc_library(
 )
 
 cc_library(
+    name = "benchmark",
+    srcs = ["thirdparty_build/lib/libbenchmark.a"],
+    hdrs = ["thirdparty_build/include/testing/base/public/benchmark.h"],
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
     name = "crypto",
     srcs = ["thirdparty_build/lib/libcrypto.a"],
     hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
@@ -72,4 +79,5 @@ cc_library(
         "thirdparty_build/include/zconf.h",
         "thirdparty_build/include/zlib.h",
     ],
+    includes = ["thirdparty_build/include"],
 )

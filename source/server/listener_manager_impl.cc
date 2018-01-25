@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -18,7 +19,7 @@ namespace Envoy {
 namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
-ProdListenerComponentFactory::createFilterFactoryList_(
+ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
@@ -30,6 +31,7 @@ ProdListenerComponentFactory::createFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", string_name);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -43,6 +45,30 @@ ProdListenerComponentFactory::createFilterFactoryList_(
       callback = factory.createFilterFactoryFromProto(*message, context);
     }
     ret.push_back(callback);
+  }
+  return ret;
+}
+
+std::vector<Configuration::ListenerFilterFactoryCb>
+ProdListenerComponentFactory::createListenerFilterFactoryList_(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+    Configuration::FactoryContext& context) {
+  std::vector<Configuration::ListenerFilterFactoryCb> ret;
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    const ProtobufTypes::String string_name = proto_config.name();
+    ENVOY_LOG(debug, "  filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+
+    // Now see if there is a factory that will accept the config.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            string_name);
+    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
 }
@@ -71,27 +97,54 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-                           const std::string& name, bool workers_started, uint64_t hash)
+                           const std::string& name, bool modifiable, bool workers_started,
+                           uint64_t hash)
     : parent_(parent),
       // TODO(htuch): Validate not pipe when doing v2.
       address_(
           Network::Utility::parseInternetAddress(config.address().socket_address().address(),
-                                                 config.address().socket_address().port_value())),
+                                                 config.address().socket_address().port_value(),
+                                                 !config.address().socket_address().ipv4_compat())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
-      use_proxy_proto_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)),
-      use_original_dst_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
+      hand_off_restored_destination_connections_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
+      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
-      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())) {
+      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
+      metadata_(config.has_metadata() ? config.metadata()
+                                      : envoy::api::v2::Metadata::default_instance()) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
+
+  if (!config.listener_filters().empty()) {
+    listener_filter_factories_ =
+        parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
+  }
+  // Add original dst listener filter if 'use_original_dst' flag is set.
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            Config::ListenerFilterNames::get().ORIGINAL_DST);
+    listener_filter_factories_.push_back(
+        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+  }
+  // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
+  // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
+  //                   is implemented, this needs to be run after the filter chain has been
+  //                   selected.
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+            Config::ListenerFilterNames::get().PROXY_PROTOCOL);
+    listener_filter_factories_.push_back(
+        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+  }
 
   // Skip lookup and update of the SSL Context if there is only one filter chain
   // and it doesn't enforce any SNI restrictions.
@@ -107,7 +160,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
                                          filter_chain.filter_chain_match().sni_domains().end());
     if (!filters_hash.valid()) {
       filters_hash.value(RepeatedPtrUtil::hash(filter_chain.filters()));
-      filter_factories_ = parent_.factory_.createFilterFactoryList(filter_chain.filters(), *this);
+      filter_factories_ =
+          parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this);
     } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
       throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
                                        "is currently not supported",
@@ -146,8 +200,12 @@ ListenerImpl::~ListenerImpl() {
   filter_factories_.clear();
 }
 
-bool ListenerImpl::createFilterChain(Network::Connection& connection) {
+bool ListenerImpl::createNetworkFilterChain(Network::Connection& connection) {
   return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
+}
+
+bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
+  return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
 }
 
 bool ListenerImpl::drainClose() const {
@@ -204,7 +262,8 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
                                      POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config) {
+bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
+                                              bool modifiable) {
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -217,18 +276,18 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
-  // Do a quick hash check to see if we have a duplicate before going further. This check needs
-  // to be done against both warming and active.
-  // TODO(mattklein123): In v2 move away from hashes and just do an explicit proto equality check.
+  // Do a quick blocked update check before going further. This check needs to be done against both
+  // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->hash() == hash) ||
+       (*existing_warming_listener)->blockUpdate(hash)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->hash() == hash)) {
-    ENVOY_LOG(debug, "duplicate listener '{}'. no add/update", name);
+       (*existing_active_listener)->blockUpdate(hash))) {
+    ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }
 
-  ListenerImplPtr new_listener(new ListenerImpl(config, *this, name, workers_started_, hash));
+  ListenerImplPtr new_listener(
+      new ListenerImpl(config, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
@@ -385,8 +444,8 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
   return ret;
 }
 
-std::vector<std::reference_wrapper<Listener>> ListenerManagerImpl::listeners() {
-  std::vector<std::reference_wrapper<Listener>> ret;
+std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::listeners() {
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
   ret.reserve(active_listeners_.size());
   for (const auto& listener : active_listeners_) {
     ret.push_back(*listener);
@@ -455,9 +514,11 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
-  if (existing_warming_listener == warming_listeners_.end() &&
-      existing_active_listener == active_listeners_.end()) {
-    ENVOY_LOG(debug, "unknown listener '{}'. no remove", name);
+  if ((existing_warming_listener == warming_listeners_.end() ||
+       (*existing_warming_listener)->blockRemove()) &&
+      (existing_active_listener == active_listeners_.end() ||
+       (*existing_active_listener)->blockRemove())) {
+    ENVOY_LOG(debug, "unknown/locked listener '{}'. no remove", name);
     return false;
   }
 
@@ -467,7 +528,7 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     warming_listeners_.erase(existing_warming_listener);
   }
 
-  // If there is an active listener
+  // If there is an active listener it needs to be moved to draining.
   if (existing_active_listener != active_listeners_.end()) {
     drainListener(std::move(*existing_active_listener));
     active_listeners_.erase(existing_active_listener);

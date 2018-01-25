@@ -48,6 +48,19 @@ private:
 };
 
 /**
+ * Well-known listener filter names.
+ */
+class ListenerFilterNameValues {
+public:
+  // Original destination listener filter
+  const std::string ORIGINAL_DST = "envoy.listener.original_dst";
+  // Proxy Protocol listener filter
+  const std::string PROXY_PROTOCOL = "envoy.listener.proxy_protocol";
+};
+
+typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
+
+/**
  * Well-known network filter names.
  */
 class NetworkFilterNameValues {
@@ -152,6 +165,8 @@ public:
   const std::string STATSD = "envoy.statsd";
   // DogStatsD compatible stastsd sink
   const std::string DOG_STATSD = "envoy.dog_statsd";
+  // MetricsService sink
+  const std::string METRICS_SERVICE = "envoy.metrics_service";
 };
 
 typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
@@ -163,6 +178,8 @@ class AccessLogNameValues {
 public:
   // File access log
   const std::string FILE = "envoy.file_access_log";
+  // HTTP gRPC access log
+  const std::string HTTP_GRPC = "envoy.http_grpc_access_log";
 };
 
 typedef ConstSingleton<AccessLogNameValues> AccessLogNames;
@@ -206,6 +223,8 @@ public:
   const std::string HTTP_USER_AGENT = "envoy.http_user_agent";
   // SSL cipher for a connection
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
+  // SSL cipher suite
+  const std::string SSL_CIPHER_SUITE = "cipher_suite";
   // Stats prefix for the Client SSL Auth network filter
   const std::string CLIENTSSL_PREFIX = "envoy.clientssl_prefix";
   // Stats prefix for the Mongo Proxy network filter
@@ -253,6 +272,14 @@ private:
 };
 
 typedef ConstSingleton<TagNameValues> TagNames;
+
+class TransportSocketNameValues {
+public:
+  const std::string RAW_BUFFER = "raw_buffer";
+  const std::string SSL = "ssl";
+};
+
+typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;
 
 } // namespace Config
 } // namespace Envoy

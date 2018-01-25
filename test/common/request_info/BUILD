@@ -15,6 +15,7 @@ envoy_cc_test(
         "//include/envoy/http:protocol_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/request_info:request_info_lib",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )

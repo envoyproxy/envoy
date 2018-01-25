@@ -28,7 +28,8 @@ def envoy_copts(repository, test = False):
         # TCLAP command line parser needs this to support int64_t/uint64_t
         "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
         "//conditions:default": [],
-    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository)
+    }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
+        envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
@@ -59,7 +60,7 @@ def envoy_linkopts():
             "-static-libstdc++",
             "-static-libgcc",
         ],
-    })
+    }) + envoy_select_exported_symbols(["-Wl,-E"])
 
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
@@ -164,14 +165,20 @@ def envoy_cc_binary(name,
                     data = [],
                     testonly = 0,
                     visibility = None,
+                    external_deps = [],
                     repository = "",
                     stamped = False,
                     deps = [],
-                    linkopts = envoy_linkopts()):
+                    linkopts = []):
+
+    if not linkopts:
+        linkopts = envoy_linkopts()
+
     # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
     if stamped:
         _git_stamped_genrule(repository, name)
         _git_stamped_genrule(repository, name + ".stripped")
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
     native.cc_binary(
         name = name,
         srcs = srcs,
@@ -360,4 +367,18 @@ def envoy_select_hot_restart(xs, repository = ""):
         repository + "//bazel:disable_hot_restart": [],
         "@bazel_tools//tools/osx:darwin": [],
         "//conditions:default": xs,
+    })
+
+# Selects the given values if Google gRPC is enabled in the current build.
+def envoy_select_google_grpc(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_google_grpc": [],
+        "//conditions:default": xs,
+    })
+
+# Select the given values if exporting is enabled in the current build.
+def envoy_select_exported_symbols(xs):
+    return select({
+        "@envoy//bazel:enable_exported_symbols": xs,
+        "//conditions:default": [],
     })

@@ -24,6 +24,7 @@ public:
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
+  const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
@@ -68,6 +69,7 @@ public:
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString Referer{"referer"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};
@@ -82,6 +84,7 @@ public:
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
   const LowerCaseString XB3Sampled{"x-b3-sampled"};
   const LowerCaseString XB3Flags{"x-b3-flags"};
+  const LowerCaseString XContentTypeOptions{"x-content-type-options"};
 
   struct {
     const std::string Close{"close"};
@@ -93,7 +96,13 @@ public:
   } UpgradeValues;
 
   struct {
+    const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
+  } CacheControlValues;
+
+  struct {
     const std::string Text{"text/plain"};
+    const std::string TextUtf8{"text/plain; charset=UTF-8"}; // TODO(jmarantz): fold this into Text
+    const std::string Html{"text/html; charset=UTF-8"};
     const std::string Grpc{"application/grpc"};
     const std::string GrpcWeb{"application/grpc-web"};
     const std::string GrpcWebProto{"application/grpc-web+proto"};
@@ -116,6 +125,7 @@ public:
 
   struct {
     const std::string _5xx{"5xx"};
+    const std::string GatewayError{"gateway-error"};
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
@@ -158,6 +168,10 @@ public:
   struct {
     const std::string Trailers{"trailers"};
   } TEValues;
+
+  struct {
+    const std::string Nosniff{"nosniff"};
+  } XContentTypeOptionValues;
 
   struct {
     const std::string True{"true"};

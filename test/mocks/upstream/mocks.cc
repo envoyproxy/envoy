@@ -82,11 +82,12 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
 MockThreadLocalCluster::~MockThreadLocalCluster() {}
 
 MockClusterManager::MockClusterManager() {
-  ON_CALL(*this, httpConnPoolForCluster(_, _, _)).WillByDefault(Return(&conn_pool_));
+  ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, adsMux()).WillByDefault(ReturnRef(ads_mux_));
+  ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
 
   // Matches are LIFO so "" will match first.

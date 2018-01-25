@@ -110,6 +110,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
@@ -141,6 +142,16 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_socket_config_interface",
+    hdrs = ["transport_socket_config.h"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:context_manager_interface",
         "//source/common/protobuf",
     ],
 )

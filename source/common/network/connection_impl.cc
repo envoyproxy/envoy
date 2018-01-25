@@ -16,21 +16,12 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
-
-namespace {
-Address::InstanceConstSharedPtr getNullLocalAddress(const Address::Instance& address) {
-  if (address.type() == Address::Type::Ip && address.ip()->version() == Address::IpVersion::v6) {
-    return Utility::getIpv6AnyAddress();
-  }
-  // Default to IPv4 any address.
-  return Utility::getIpv4AnyAddress();
-}
-} // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -52,63 +43,38 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
-ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
-                               Address::InstanceConstSharedPtr remote_address,
-                               Address::InstanceConstSharedPtr local_address,
-                               Address::InstanceConstSharedPtr bind_to_address,
-                               bool using_original_dst, bool connected)
-    : ConnectionImpl(dispatcher, fd, remote_address, local_address, bind_to_address,
-                     TransportSocketPtr{new RawBufferSocket}, using_original_dst, connected) {}
-
-ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
-                               Address::InstanceConstSharedPtr remote_address,
-                               Address::InstanceConstSharedPtr local_address,
-                               Address::InstanceConstSharedPtr bind_to_address,
-                               TransportSocketPtr&& transport_socket, bool using_original_dst,
+ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                bool connected)
-    : filter_manager_(*this, *this), remote_address_(remote_address),
-      local_address_((local_address == nullptr) ? getNullLocalAddress(*remote_address)
-                                                : local_address),
+    : ConnectionImpl(dispatcher, std::move(socket), std::make_unique<RawBufferSocket>(),
+                     connected) {}
 
-      write_buffer_(
-          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
-                                                  [this]() -> void { this->onHighWatermark(); })),
-      transport_socket_(std::move(transport_socket)), dispatcher_(dispatcher), fd_(fd),
-      id_(++next_global_id_), using_original_dst_(using_original_dst) {
+ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                               TransportSocketPtr&& transport_socket, bool connected)
+    : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
+      socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
+                                      [this]() -> void { this->onLowWatermark(); },
+                                      [this]() -> void { this->onHighWatermark(); })),
+      dispatcher_(dispatcher), id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(fd_ != -1);
+  RELEASE_ASSERT(fd() != -1);
 
   if (!connected) {
-    state_ |= InternalState::Connecting;
+    connecting_ = true;
   }
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
   file_event_ = dispatcher_.createFileEvent(
-      fd_, [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
+      fd(), [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
-
-  if (bind_to_address != nullptr) {
-    int rc = bind_to_address->bind(fd);
-    if (rc < 0) {
-      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", bind_to_address->asString(),
-                     strerror(errno));
-      // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
-      state_ |= InternalState::BindError;
-
-      // Trigger a write event to close this connection out-of-band.
-      file_event_->activate(Event::FileReadyType::Write);
-    }
-  }
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(fd_ == -1);
+  ASSERT(fd() == -1);
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -130,7 +96,7 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (fd_ == -1) {
+  if (fd() == -1) {
     return;
   }
 
@@ -148,16 +114,16 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   } else {
     // TODO(mattklein123): We need a flush timer here. We might never get open socket window.
     ASSERT(type == ConnectionCloseType::FlushWrite);
-    state_ |= InternalState::CloseWithFlush;
-    state_ &= ~InternalState::ReadEnabled;
+    close_with_flush_ = true;
+    read_enabled_ = false;
     file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
   }
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (fd_ == -1) {
+  if (fd() == -1) {
     return State::Closed;
-  } else if (state_ & InternalState::CloseWithFlush) {
+  } else if (close_with_flush_) {
     return State::Closing;
   } else {
     return State::Open;
@@ -165,7 +131,7 @@ Connection::State ConnectionImpl::state() const {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (fd_ == -1) {
+  if (fd() == -1) {
     return;
   }
 
@@ -178,8 +144,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   connection_stats_.reset();
 
   file_event_.reset();
-  ::close(fd_);
-  fd_ = -1;
+  socket_->close();
 
   raiseEvent(close_type);
 }
@@ -194,14 +159,14 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (fd_ == -1) {
+  if (fd() == -1) {
     return;
   }
 
   // Don't set NODELAY for unix domain sockets
   sockaddr addr;
   socklen_t len = sizeof(addr);
-  int rc = getsockname(fd_, &addr, &len);
+  int rc = getsockname(fd(), &addr, &len);
   RELEASE_ASSERT(rc == 0);
 
   if (addr.sa_family == AF_UNIX) {
@@ -210,7 +175,7 @@ void ConnectionImpl::noDelay(bool enable) {
 
   // Set NODELAY
   int new_value = enable;
-  rc = setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+  rc = setsockopt(fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #ifdef __APPLE__
   if (-1 == rc && errno == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
@@ -226,7 +191,7 @@ void ConnectionImpl::noDelay(bool enable) {
 uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
-  if (!(state_ & InternalState::ReadEnabled)) {
+  if (!read_enabled_) {
     return;
   }
 
@@ -239,10 +204,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
 
 void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
-
-  bool read_enabled = readEnabled();
-  UNREFERENCED_PARAMETER(read_enabled);
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled, disable);
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -255,12 +217,12 @@ void ConnectionImpl::readDisable(bool disable) {
   // TODO(mattklein123): Potentially support half-closed TCP connections. It's unclear if this is
   // required for any scenarios in which Envoy will be used (I don't know of any).
   if (disable) {
-    if (!read_enabled) {
+    if (!read_enabled_) {
       ++read_disable_count_;
       return;
     }
-    ASSERT(read_enabled);
-    state_ &= ~InternalState::ReadEnabled;
+    ASSERT(read_enabled_);
+    read_enabled_ = false;
     if (detect_early_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
@@ -271,8 +233,8 @@ void ConnectionImpl::readDisable(bool disable) {
       --read_disable_count_;
       return;
     }
-    ASSERT(!read_enabled);
-    state_ |= InternalState::ReadEnabled;
+    ASSERT(!read_enabled_);
+    read_enabled_ = true;
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -293,7 +255,7 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return state_ & InternalState::ReadEnabled; }
+bool ConnectionImpl::readEnabled() const { return read_enabled_; }
 
 void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
 
@@ -326,7 +288,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
-    if (!(state_ & InternalState::Connecting)) {
+    if (!connecting_) {
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
@@ -379,13 +341,13 @@ void ConnectionImpl::onHighWatermark() {
 void ConnectionImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (state_ & InternalState::ImmediateConnectionError) {
+  if (immediate_connection_error_) {
     ENVOY_CONN_LOG(debug, "raising immediate connect error", *this);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
 
-  if (state_ & InternalState::BindError) {
+  if (bind_error_) {
     ENVOY_CONN_LOG(debug, "raising bind error", *this);
     // Update stats here, rather than on bind failure, to give the caller a chance to
     // setConnectionStats.
@@ -411,7 +373,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore write event processing.
-  if (fd_ != -1 && (events & Event::FileReadyType::Read)) {
+  if (fd() != -1 && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
 }
@@ -419,12 +381,16 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
-  ASSERT(!(state_ & InternalState::Connecting));
+  ASSERT(!connecting_);
 
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
-  onRead(new_buffer_size);
+  if (result.bytes_processed_ != 0) {
+    // Skip onRead if no bytes were processed. For instance, if the connection was closed without
+    // producing more data.
+    onRead(new_buffer_size);
+  }
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close) {
@@ -436,16 +402,16 @@ void ConnectionImpl::onReadReady() {
 void ConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
 
-  if (state_ & InternalState::Connecting) {
+  if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
+    int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
     ASSERT(0 == rc);
     UNREFERENCED_PARAMETER(rc);
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
-      state_ &= ~InternalState::Connecting;
+      connecting_ = false;
       transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
@@ -468,7 +434,7 @@ void ConnectionImpl::onWriteReady() {
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if ((state_ & InternalState::CloseWithFlush) && new_buffer_size == 0) {
+  } else if (close_with_flush_ && new_buffer_size == 0) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
@@ -476,36 +442,10 @@ void ConnectionImpl::onWriteReady() {
       cb(result.bytes_processed_);
 
       // If a callback closes the socket, stop iterating.
-      if (fd_ == -1) {
+      if (fd() == -1) {
         return;
       }
     }
-  }
-}
-
-void ConnectionImpl::doConnect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this, remote_address_->asString());
-  int rc = remote_address_->connect(fd_);
-  if (rc == 0) {
-    // write will become ready.
-    ASSERT(state_ & InternalState::Connecting);
-  } else {
-    ASSERT(rc == -1);
-    if (errno == EINPROGRESS) {
-      ASSERT(state_ & InternalState::Connecting);
-      ENVOY_CONN_LOG(debug, "connection in progress", *this);
-    } else {
-      // read/write will become ready.
-      state_ |= InternalState::ImmediateConnectionError;
-      state_ &= ~InternalState::Connecting;
-      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
-    }
-  }
-
-  // The local address can only be retrieved for IP connections. Other
-  // types, such as UDS, don't have a notion of a local address.
-  if (remote_address_->type() == Address::Type::Ip) {
-    local_address_ = Address::addressFromFd(fd_);
   }
 }
 
@@ -535,10 +475,51 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
-    Event::Dispatcher& dispatcher, Address::InstanceConstSharedPtr address,
-    const Network::Address::InstanceConstSharedPtr source_address)
-    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address, nullptr,
-                     source_address, false, false) {}
+    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
+    const Network::Address::InstanceConstSharedPtr& source_address,
+    Network::TransportSocketPtr&& transport_socket)
+    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
+                     std::move(transport_socket), false) {
+  if (source_address != nullptr) {
+    const int rc = source_address->bind(fd());
+    if (rc < 0) {
+      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+                     strerror(errno));
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
+      bind_error_ = true;
+
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+    }
+  }
+}
+
+void ClientConnectionImpl::connect() {
+  ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
+  const int rc = socket_->remoteAddress()->connect(fd());
+  if (rc == 0) {
+    // write will become ready.
+    ASSERT(connecting_);
+  } else {
+    ASSERT(rc == -1);
+    if (errno == EINPROGRESS) {
+      ASSERT(connecting_);
+      ENVOY_CONN_LOG(debug, "connection in progress", *this);
+    } else {
+      // read/write will become ready.
+      immediate_connection_error_ = true;
+      connecting_ = false;
+      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
+    }
+  }
+
+  // The local address can only be retrieved for IP connections. Other
+  // types, such as UDS, don't have a notion of a local address.
+  if (socket_->remoteAddress()->type() == Address::Type::Ip) {
+    socket_->setLocalAddress(Address::addressFromFd(fd()));
+  }
+}
 
 } // namespace Network
 } // namespace Envoy

@@ -2,9 +2,10 @@
 
 import argparse
 import fileinput
-import re
 import os
 import os.path
+import re
+import subprocess
 import sys
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
@@ -35,7 +36,7 @@ def checkNamespace(file_path):
   with open(file_path) as f:
     text = f.read()
     if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
-       not re.search('NOLINT\(namespace-envoy\)', text, re.MULTILINE):
+       not 'NOLINT(namespace-envoy)' in text:
       printError("Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path)
       return False
   return True
@@ -45,16 +46,23 @@ def checkNamespace(file_path):
 def whitelistedForProtobufDeps(file_path):
   return any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST)
 
+def findSubstringAndPrintError(pattern, file_path, error_message):
+  with open(file_path) as f:
+    text = f.read()
+    if pattern in text:
+      printError(error_message)
+      for i, line in enumerate(text.splitlines()):
+        if pattern in line:
+          printError("  %s:%s" % (file_path, i + 1))
+      return False
+    return True
+
 def checkProtobufExternalDepsBuild(file_path):
   if whitelistedForProtobufDeps(file_path):
     return True
-  with open(file_path) as f:
-    if re.search('"protobuf"', f.read(), re.MULTILINE):
-      printError(
-          "%s has unexpected direct external dependency on protobuf, use "
-          "//source/common/protobuf instead." % file_path)
-      return False
-    return True
+  message = ("%s has unexpected direct external dependency on protobuf, use "
+    "//source/common/protobuf instead." % file_path)
+  return findSubstringAndPrintError('"protobuf"', file_path, message)
 
 
 def checkProtobufExternalDeps(file_path):
@@ -62,8 +70,7 @@ def checkProtobufExternalDeps(file_path):
     return True
   with open(file_path) as f:
     text = f.read()
-    if re.search('"google/protobuf', text, re.MULTILINE) or re.search(
-        "google::protobuf", text, re.MULTILINE):
+    if '"google/protobuf' in text or "google::protobuf" in text:
       printError(
           "%s has unexpected direct dependency on google.protobuf, use "
           "the definitions in common/protobuf/protobuf.h instead." % file_path)
@@ -79,12 +86,8 @@ def isBuildFile(file_path):
 
 
 def checkFileContents(file_path):
-  with open(file_path) as f:
-    text = f.read()
-    if re.search('\.  ', text, re.MULTILINE):
-      printError("%s has over-enthusiastic spaces" % file_path)
-      return False
-  return True
+  message = "%s has over-enthusiastic spaces:" % file_path
+  findSubstringAndPrintError('.  ', file_path, message)
 
 
 def fixFileContents(file_path):
@@ -96,12 +99,10 @@ def fixFileContents(file_path):
 
 def checkFilePath(file_path):
   if isBuildFile(file_path):
-    if os.system("%s %s | diff -q %s - > /dev/null" %
-                 (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
-      printError("envoy_build_fixer check failed for file: %s" % file_path)
-    if os.system("cat %s | %s -mode=fix | diff -q %s - > /dev/null" %
-                 (file_path, BUILDIFIER_PATH, file_path)) != 0:
-      printError("buildifier check failed for file: %s" % file_path)
+    command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
+    executeCommand(command, "envoy_build_fixer check failed", file_path)
+    command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
+    executeCommand(command, "buildifier check failed", file_path)
     checkProtobufExternalDepsBuild(file_path)
     return
   checkFileContents(file_path)
@@ -110,15 +111,31 @@ def checkFilePath(file_path):
     return
   checkNamespace(file_path)
   checkProtobufExternalDeps(file_path)
-  command = ("%s %s | diff -q %s - > /dev/null" % (HEADER_ORDER_PATH, file_path,
+  command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path,
                                                    file_path))
-  if os.system(command) != 0:
-    printError("header_order.py check failed for file: %s" % (file_path))
-  command = ("%s %s | diff -q %s - > /dev/null" % (CLANG_FORMAT_PATH, file_path,
-                                                   file_path))
-  if os.system(command) != 0:
-    printError("clang-format check failed for file: %s" % (file_path))
+  executeCommand(command, "header_order.py check failed", file_path)
 
+  command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path,
+                                                   file_path))
+  executeCommand(command, "clang-format check failed", file_path)
+
+# Example target outputs are:
+#   - "26,27c26"
+#   - "12,13d13"
+#   - "7a8,9"
+def executeCommand(command, error_message, file_path,
+        regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
+  try:
+    subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+  except subprocess.CalledProcessError as e:
+      if (e.returncode != 0 and e.returncode != 1):
+          print "ERROR: something went wrong while executing: %s" % e.cmd
+          sys.exit(1)
+      # In case we can't find any line numbers, call printError at first.
+      printError("%s for file: %s" % (error_message, file_path))
+      for line in e.output.splitlines():
+        for num in regex.findall(line):
+          printError("  %s:%s" % (file_path, num))
 
 def fixFilePath(file_path):
   if isBuildFile(file_path):

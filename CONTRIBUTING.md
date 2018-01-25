@@ -51,7 +51,16 @@ maximize the chances of your PR being merged.
 
 # Submitting a PR
 
-* Fork the repo and create your PR.
+* Fork the repo.
+* In your local repo, install the git hooks that implement various important pre-commit and
+  pre-push checks:
+
+  ```
+  ./support/bootstrap
+  ```
+
+  Please see [support/README.md](support/README.md) for more information on these hooks.
+* Create your PR.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
@@ -87,15 +96,15 @@ maximize the chances of your PR being merged.
   branch so that CI can pass) it is your responsibility to follow through with merging those
   changes back to master once the CI dance is done.
 
-# PR review policy for committers
+# PR review policy for maintainers
 
 * Typically we try to turn around reviews within one business day.
-* See [OWNERS.md](OWNERS.md) for the current list of committers.
-* It is generally expected that a senior committer should review every PR.
+* See [OWNERS.md](OWNERS.md) for the current list of maintainers.
+* It is generally expected that a senior maintainer should review every PR.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
   PR. This person does not necessarily need to have commit access.
 * The previous two points generally mean that every PR should have two approvals. (Exceptions can
-  be made by the senior committers).
+  be made by the senior maintainers).
 * The above rules may be waived for PRs which only update docs or comments, or trivial changes to
   tests and tools (where trivial is decided by the maintainer in question).
 * In general, we should also attempt to make sure that at least one of the approvals is *from an
@@ -103,7 +112,7 @@ maximize the chances of your PR being merged.
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
-* Anyone is welcome to review any PR that they want, whether they are a committer or not.
+* Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
 * Please **clean up the commit message** before merging. By default, GitHub fills the squash merge
   commit message with every individual commit from the PR. Generally, we want a commit message
   that is roughly equal to the original PR title and description.
@@ -111,6 +120,17 @@ maximize the chances of your PR being merged.
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
 # DCO: Sign your work
+
+Envoy ships commit hooks that allow you to auto-generate the DCO signoff line if
+it doesn't exist when you run `git commit`. Simply navigate to the Envoy project
+root and run:
+
+```bash
+./support/bootstrap
+```
+
+From here, simply commit as normal, and you will see the signoff at the bottom
+of each commit.
 
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right to
@@ -167,7 +187,24 @@ You can add the sign off when creating the git commit via `git commit -s`.
 
 If you want this to be automatic you can set up some aliases:
 
-```
+```bash
 git config --add alias.amend "commit -s --amend"
 git config --add alias.c "commit -s"
 ```
+
+## Fixing DCO
+
+If your PR fails the DCO check, it's necessary to fix the entire commit history in the PR. Best
+practice is to [squash](http://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html)
+the commit history to a single commit, append the DCO sign-off as described above, and [force
+push](https://git-scm.com/docs/git-push#git-push---force). For example, if you have 2 commits in
+your history:
+
+```bash
+git rebase -i HEAD^^
+(interactive squash + DCO append)
+git push origin -f
+```
+
+Note, that in general rewriting history in this way is a hinderance to the review process and this
+should only be done to correct a DCO mistake.
