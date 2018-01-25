@@ -173,7 +173,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
       }
     }
 
-    X509_STORE_set_flags(store_ctx, X509_V_FLAG_CRL_CHECK);
+    X509_STORE_set_flags(store_ctx, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
   }
 
   // use the server's cipher list preferences
