@@ -172,17 +172,15 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
 FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
   if (is_squashing_) {
     return FilterDataStatus::StopIterationAndBuffer;
-  } else {
-    return FilterDataStatus::Continue;
   }
+  return FilterDataStatus::Continue;
 }
 
 FilterTrailersStatus SquashFilter::decodeTrailers(HeaderMap&) {
   if (is_squashing_) {
     return FilterTrailersStatus::StopIteration;
-  } else {
-    return FilterTrailersStatus::Continue;
   }
+  return FilterTrailersStatus::Continue;
 }
 
 void SquashFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
