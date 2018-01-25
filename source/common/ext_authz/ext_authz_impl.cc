@@ -185,13 +185,13 @@ std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttp
   httpreq->set_id(std::to_string(sdfc->streamId()));
 
   // Set method
-  httpreq->set_method(std::move(getHeaderStr(headers.Method())));
+  httpreq->set_method(getHeaderStr(headers.Method()));
   // Set path
-  httpreq->set_path(std::move(getHeaderStr(headers.Path())));
+  httpreq->set_path(getHeaderStr(headers.Path()));
   // Set host
-  httpreq->set_host(std::move(getHeaderStr(headers.Host())));
+  httpreq->set_host(getHeaderStr(headers.Host()));
   // Set scheme
-  httpreq->set_scheme(std::move(getHeaderStr(headers.Scheme())));
+  httpreq->set_scheme(getHeaderStr(headers.Scheme()));
 
   // Set size
   // need to convert to google buffer 64t;
