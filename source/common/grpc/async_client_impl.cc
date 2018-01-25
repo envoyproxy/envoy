@@ -70,12 +70,16 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
     return;
   }
 
+  // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
+  // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ = Common::prepareHeaders(
       parent_.remote_cluster_name_, service_method_.service()->full_name(), service_method_.name());
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 
+// TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
+// https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
 void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
@@ -127,6 +131,8 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
+// TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
+// https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
 void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
