@@ -332,9 +332,11 @@ void HttpIntegrationTest::testRouterRedirect() {
 }
 
 void HttpIntegrationTest::testRouterDirectResponse() {
+  const std::string body = "Response body";
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
   static const std::string domain("direct.example.com");
   static const std::string prefix("/");
-  static const Http::Code status(Http::Code::NoContent);
+  static const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
       [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
@@ -344,13 +346,16 @@ void HttpIntegrationTest::testRouterDirectResponse() {
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
         virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
             static_cast<uint32_t>(status));
+        virtual_host->mutable_routes(0)->mutable_direct_response()->mutable_body()->set_filename(
+            file_path);
       });
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("204", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(body, response->body());
 }
 
 // Add a health check filter and verify correct behavior when draining.

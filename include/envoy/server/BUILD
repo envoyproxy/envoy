@@ -110,6 +110,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
