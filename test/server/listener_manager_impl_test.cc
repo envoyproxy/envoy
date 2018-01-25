@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/config/metadata.h"
 #include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -1179,6 +1180,34 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
                             EnvoyException, "Failed to load trusted CA certificates from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    filter_chains:
+    - filter_chain_match:
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: metadata_test
+          route_config:
+            virtual_hosts:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
+  ASSERT_NE(nullptr, context);
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+                .string_value());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {

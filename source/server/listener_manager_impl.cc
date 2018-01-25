@@ -115,7 +115,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
-      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())) {
+      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
+      metadata_(config.has_metadata() ? config.metadata()
+                                      : envoy::api::v2::Metadata::default_instance()) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
