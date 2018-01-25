@@ -48,6 +48,9 @@ void TlsContextJson::translateCommonTlsContext(
     validation_context->mutable_trusted_ca()->set_filename(
         json_tls_context.getString("ca_cert_file", ""));
   }
+  if (json_tls_context.hasObject("crl_file")) {
+    validation_context->mutable_crl()->set_filename(json_tls_context.getString("crl_file", ""));
+  }
   if (json_tls_context.hasObject("verify_certificate_hash")) {
     validation_context->add_verify_certificate_hash(
         json_tls_context.getString("verify_certificate_hash"));
@@ -59,10 +62,6 @@ void TlsContextJson::translateCommonTlsContext(
   const std::string cipher_suites_str{json_tls_context.getString("cipher_suites", "")};
   for (auto cipher_suite : StringUtil::splitToken(cipher_suites_str, ":")) {
     common_tls_context.mutable_tls_params()->add_cipher_suites(std::string{cipher_suite});
-  }
-
-  if (json_tls_context.hasObject("crl_file")) {
-    validation_context->mutable_crl()->set_filename(json_tls_context.getString("crl_file", ""));
   }
 
   const std::string ecdh_curves_str{json_tls_context.getString("ecdh_curves", "")};

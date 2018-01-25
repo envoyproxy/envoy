@@ -85,6 +85,30 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     verify_mode = SSL_VERIFY_PEER;
   }
 
+  if (!config.certificateRevocationList().empty()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.certificateRevocationList().data()),
+                        config.certificateRevocationList().size()));
+    RELEASE_ASSERT(bio != nullptr);
+
+    // Based on BoringSSL's X509_load_cert_crl_file().
+    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+    if (list == nullptr) {
+      throw EnvoyException(
+          fmt::format("Failed to load CRL from {}", config.certificateRevocationListPath()));
+    }
+
+    X509_STORE* store_ctx = SSL_CTX_get_cert_store(ctx_.get());
+    for (const X509_INFO* item : list.get()) {
+      if (item->crl) {
+        X509_STORE_add_crl(store_ctx, item->crl);
+      }
+    }
+
+    X509_STORE_set_flags(store_ctx, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+  }
+
   if (!config.verifySubjectAltNameList().empty()) {
     verify_subject_alt_name_list_ = config.verifySubjectAltNameList();
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
@@ -150,30 +174,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
       throw EnvoyException(
           fmt::format("Failed to load private key from {}", config.privateKeyPath()));
     }
-  }
-
-  if (!config.certificateRevocationList().empty()) {
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config.certificateRevocationList().data()),
-                        config.certificateRevocationList().size()));
-    RELEASE_ASSERT(bio != nullptr);
-
-    // Based on BoringSSL's X509_load_cert_crl_file().
-    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr) {
-      throw EnvoyException(
-          fmt::format("Failed to load CRL from {}", config.certificateRevocationListPath()));
-    }
-
-    X509_STORE* store_ctx = SSL_CTX_get_cert_store(ctx_.get());
-    for (const X509_INFO* item : list.get()) {
-      if (item->crl) {
-        X509_STORE_add_crl(store_ctx, item->crl);
-      }
-    }
-
-    X509_STORE_set_flags(store_ctx, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
   }
 
   // use the server's cipher list preferences

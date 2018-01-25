@@ -25,14 +25,6 @@ public:
   const std::string& caCertPath() const override {
     return (ca_cert_path_.empty() && !ca_cert_.empty()) ? INLINE_STRING : ca_cert_path_;
   }
-  const std::string& certChain() const override { return cert_chain_; }
-  const std::string& certChainPath() const override {
-    return (cert_chain_path_.empty() && !cert_chain_.empty()) ? INLINE_STRING : cert_chain_path_;
-  }
-  const std::string& privateKey() const override { return private_key_; }
-  const std::string& privateKeyPath() const override {
-    return (private_key_path_.empty() && !private_key_.empty()) ? INLINE_STRING : private_key_path_;
-  }
   const std::string& certificateRevocationList() const override {
     return certificate_revocation_list_;
   }
@@ -40,6 +32,14 @@ public:
     return (certificate_revocation_list_path_.empty() && !certificate_revocation_list_.empty())
                ? INLINE_STRING
                : certificate_revocation_list_path_;
+  }
+  const std::string& certChain() const override { return cert_chain_; }
+  const std::string& certChainPath() const override {
+    return (cert_chain_path_.empty() && !cert_chain_.empty()) ? INLINE_STRING : cert_chain_path_;
+  }
+  const std::string& privateKey() const override { return private_key_; }
+  const std::string& privateKeyPath() const override {
+    return (private_key_path_.empty() && !private_key_.empty()) ? INLINE_STRING : private_key_path_;
   }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
