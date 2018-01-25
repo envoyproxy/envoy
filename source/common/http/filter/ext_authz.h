@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 

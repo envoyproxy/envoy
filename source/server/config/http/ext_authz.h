@@ -8,7 +8,6 @@
 
 #include "api/filter/http/ext_authz.pb.h"
 
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -38,4 +37,3 @@ private:
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
-

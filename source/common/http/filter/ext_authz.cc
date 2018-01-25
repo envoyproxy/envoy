@@ -7,9 +7,9 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/ext_authz/ext_authz_impl.h"
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
-#include "common/ext_authz/ext_authz_impl.h"
 
 #include "fmt/format.h"
 
@@ -27,8 +27,7 @@ static const Http::HeaderMap* getDeniedHeader() {
 
 } // namespace
 
-void Filter::setCheckReqGenerator(Envoy::ExtAuthz::CheckRequestGenerator *crg)
-{
+void Filter::setCheckReqGenerator(Envoy::ExtAuthz::CheckRequestGenerator* crg) {
   ASSERT(check_req_generator_ == nullptr);
   check_req_generator_ = Envoy::ExtAuthz::CheckRequestGeneratorPtr{std::move(crg)};
 }
@@ -124,8 +123,7 @@ void Filter::complete(Envoy::ExtAuthz::CheckStatus status) {
 
   // We fail open/fail close based of filter config
   // if there is an error contacting the service.
-  if (status == CheckStatus::Denied ||
-      (status == CheckStatus::Error && !config_->failOpen())) {
+  if (status == CheckStatus::Denied || (status == CheckStatus::Error && !config_->failOpen())) {
     state_ = State::Responded;
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getDeniedHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);

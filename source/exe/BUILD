@@ -52,7 +52,6 @@ envoy_cc_library(
         "//source/server/config/network:ext_authz_lib",
         "//source/server/config/network:client_ssl_auth_lib",
         "//source/server/config/network:echo_lib",
-        "//source/server/config/network:ext_authz_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
