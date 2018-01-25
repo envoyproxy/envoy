@@ -10,7 +10,7 @@ DynamicOpenTracingDriver::DynamicOpenTracingDriver(Stats::Store& stats, const st
     : OpenTracingDriver{stats} {
   std::string error_message;
   opentracing::expected<opentracing::DynamicTracingLibraryHandle> library_handle_maybe =
-      opentracing::dynamically_load_tracing_library(library.c_str(), error_message);
+      opentracing::DynamicallyLoadTracingLibrary(library.c_str(), error_message);
   if (!library_handle_maybe) {
     if (error_message.empty()) {
       throw EnvoyException{fmt::format("{}", library_handle_maybe.error().message())};
