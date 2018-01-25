@@ -29,6 +29,11 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
+  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
+                                                Ssl::Context* ssl_ctx) override {
+    return Network::ConnectionPtr{createServerConnection_(socket.get(), ssl_ctx)};
+  }
+
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
@@ -46,20 +51,11 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
-                                      Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Scope& scope,
-                                      const Network::ListenerOptions& listener_options) override {
-    return Network::ListenerPtr{createListener_(conn_handler, socket, cb, scope, listener_options)};
-  }
-
-  Network::ListenerPtr
-  createSslListener(Network::ConnectionHandler& conn_handler, Ssl::ServerContext& ssl_ctx,
-                    Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                    Stats::Scope& scope,
-                    const Network::ListenerOptions& listener_options) override {
+  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                                      bool bind_to_port,
+                                      bool hand_off_restored_destination_connections) override {
     return Network::ListenerPtr{
-        createSslListener_(conn_handler, ssl_ctx, socket, cb, scope, listener_options)};
+        createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
   TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
@@ -77,6 +73,8 @@ public:
 
   // Event::Dispatcher
   MOCK_METHOD0(clearDeferredDeleteList, void());
+  MOCK_METHOD2(createServerConnection_,
+               Network::Connection*(Network::ConnectionSocket* socket, Ssl::Context* ssl_ctx));
   MOCK_METHOD3(createClientConnection_,
                Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
                                           Network::Address::InstanceConstSharedPtr source_address,
@@ -87,16 +85,10 @@ public:
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
-  MOCK_METHOD5(createListener_,
-               Network::Listener*(Network::ConnectionHandler& conn_handler,
-                                  Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                  Stats::Scope& scope,
-                                  const Network::ListenerOptions& listener_options));
-  MOCK_METHOD6(createSslListener_,
-               Network::Listener*(Network::ConnectionHandler& conn_handler,
-                                  Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                  Network::ListenerCallbacks& cb, Stats::Scope& scope,
-                                  const Network::ListenerOptions& listener_options));
+  MOCK_METHOD4(createListener_,
+               Network::Listener*(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                                  bool bind_to_port,
+                                  bool hand_off_restored_destination_connections));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletablePtr& to_delete));
   MOCK_METHOD0(exit, void());

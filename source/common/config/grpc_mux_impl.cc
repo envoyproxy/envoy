@@ -8,27 +8,12 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(
-    const envoy::api::v2::Node& node,
-    std::unique_ptr<
-        Grpc::AsyncClient<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
-        async_client,
-    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method)
+GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
+                         Event::Dispatcher& dispatcher,
+                         const Protobuf::MethodDescriptor& service_method)
     : node_(node), async_client_(std::move(async_client)), service_method_(service_method) {
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
 }
-
-GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node,
-                         Upstream::ClusterManager& cluster_manager,
-                         const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-                         const Protobuf::MethodDescriptor& service_method)
-    : GrpcMuxImpl(node,
-                  std::unique_ptr<Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                        envoy::api::v2::DiscoveryResponse>>(
-                      new Grpc::AsyncClientImpl<envoy::api::v2::DiscoveryRequest,
-                                                envoy::api::v2::DiscoveryResponse>(
-                          cluster_manager, remote_cluster_name)),
-                  dispatcher, service_method) {}
 
 GrpcMuxImpl::~GrpcMuxImpl() {
   for (const auto& api_state : api_state_) {

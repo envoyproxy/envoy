@@ -64,11 +64,16 @@ public:
             Utility::apiConfigSourceRefreshDelay(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
-      case envoy::api::v2::ApiConfigSource::GRPC:
+      case envoy::api::v2::ApiConfigSource::GRPC: {
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
-            node, cm, cluster_name, dispatcher,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats));
+            node,
+            Config::Utility::factoryForApiConfigSource(cm.grpcAsyncClientManager(),
+                                                       config.api_config_source(), scope)
+                ->create(),
+            dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
+            stats));
         break;
+      }
       default:
         NOT_REACHED;
       }

@@ -17,6 +17,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -195,7 +196,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();
 
-  // Determine if there is a route entry or a redirect for the request.
+  // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
@@ -209,11 +210,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Determine if there is a redirect for the request.
-  if (route_->redirectEntry()) {
-    config_.stats_.rq_redirect_.inc();
-    Http::Utility::sendRedirect(*callbacks_, route_->redirectEntry()->newPath(headers),
-                                route_->redirectEntry()->redirectResponseCode());
+  // Determine if there is a direct response for the request.
+  if (route_->directResponseEntry()) {
+    auto response_code = route_->directResponseEntry()->responseCode();
+    if (response_code >= Http::Code::MultipleChoices && response_code < Http::Code::BadRequest) {
+      config_.stats_.rq_redirect_.inc();
+      Http::Utility::sendRedirect(*callbacks_, route_->directResponseEntry()->newPath(headers),
+                                  response_code);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    config_.stats_.rq_direct_response_.inc();
+    sendLocalReply(route_->directResponseEntry()->responseCode(),
+                   route_->directResponseEntry()->responseBody(), false);
+    // TODO(brian-pane) support sending response_headers_to_add.
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -305,8 +314,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 }
 
 Http::ConnectionPool::Instance* Filter::getConnPool() {
+  // Choose protocol based on cluster configuration and downstream connection
+  // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
+  auto features = cluster_->features();
+
+  Http::Protocol protocol;
+  if (features & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+    protocol = callbacks_->requestInfo().protocol().value();
+  } else {
+    protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                                   : Http::Protocol::Http11;
+  }
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
-                                            this);
+                                            protocol, this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {

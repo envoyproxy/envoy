@@ -10,6 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "async_client_lib",
+    srcs = ["async_client_impl.cc"],
     hdrs = ["async_client_impl.h"],
     deps = [
         ":codec_lib",
@@ -17,6 +18,19 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "async_client_manager_lib",
+    srcs = ["async_client_manager_impl.cc"],
+    hdrs = ["async_client_manager_impl.h"],
+    deps = [
+        ":async_client_lib",
+        "//include/envoy/grpc:async_client_manager_interface",
+        "//include/envoy/singleton:manager_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
 

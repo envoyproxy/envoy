@@ -50,7 +50,8 @@ public:
                                             AccessLog::AccessLogManager& log_manager) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
-                                                     ResourcePriority priority) override;
+                                                     ResourcePriority priority,
+                                                     Http::Protocol protocol) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
@@ -146,7 +147,7 @@ struct ClusterManagerStats {
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-                     Stats::Store& stats, ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+                     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& primary_dispatcher);
@@ -167,6 +168,7 @@ public:
   ThreadLocalCluster* get(const std::string& cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
+                                                         Http::Protocol protocol,
                                                          LoadBalancerContext* context) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
                                                LoadBalancerContext* context) override;
@@ -182,6 +184,7 @@ public:
   }
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
+  Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
@@ -194,7 +197,14 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::array<Http::ConnectionPool::InstancePtr, NumResourcePriorities> ConnPools;
+      typedef std::array<Http::ConnectionPool::InstancePtr,
+                         NumResourcePriorities * Http::NumProtocols>
+          ConnPools;
+
+      size_t index(ResourcePriority priority, Http::Protocol protocol) {
+        ASSERT(NumResourcePriorities == 2); // One bit needed for priority
+        return enumToInt(protocol) << 1 | enumToInt(priority);
+      }
 
       ConnPools pools_;
       uint64_t drains_remaining_{};
@@ -205,7 +215,7 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry();
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
@@ -293,6 +303,7 @@ private:
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
+  Grpc::AsyncClientManagerPtr async_client_manager_;
 };
 
 } // namespace Upstream

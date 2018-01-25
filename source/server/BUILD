@@ -63,9 +63,11 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
+        "//source/common/network:connection_lib",
     ],
 )
 
@@ -116,6 +118,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:shared_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
@@ -201,10 +204,13 @@ envoy_cc_library(
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/config:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
+        "//source/server/config/listener:original_dst_lib",
+        "//source/server/config/listener:proxy_protocol_lib",
     ],
 )
 

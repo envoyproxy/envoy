@@ -2,11 +2,17 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <iterator>
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_split.h"
+#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -53,6 +59,8 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
              .count() != 0;
 }
 
+const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
+
 bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return false;
@@ -65,6 +73,60 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   } else {
     return true;
   }
+}
+
+absl::string_view StringUtil::ltrim(absl::string_view source) {
+  const absl::string_view::size_type pos = source.find_first_not_of(WhitespaceChars);
+  if (pos != absl::string_view::npos) {
+    source.remove_prefix(pos);
+  } else {
+    source.remove_prefix(source.size());
+  }
+  return source;
+}
+
+absl::string_view StringUtil::rtrim(absl::string_view source) {
+  const absl::string_view::size_type pos = source.find_last_not_of(WhitespaceChars);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos - 1);
+  } else {
+    source.remove_suffix(source.size());
+  }
+  return source;
+}
+
+absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
+
+bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
+                           absl::string_view key_token, bool trim_whitespace) {
+  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, trim_whitespace);
+  if (trim_whitespace) {
+    for (auto token : tokens) {
+      if (key_token == trim(token)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
+}
+
+absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter,
+                                        bool trim_whitespace) {
+  const absl::string_view::size_type pos = source.find(delimiter);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos);
+  }
+  return trim_whitespace ? rtrim(source) : source;
+}
+
+std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
+                                                      absl::string_view delimiters,
+                                                      bool keep_empty_string) {
+  if (keep_empty_string) {
+    return absl::StrSplit(source, absl::ByAnyChar(delimiters));
+  }
+  return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
 }
 
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
@@ -89,50 +151,10 @@ uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   return current - out;
 }
 
-void StringUtil::rtrim(std::string& source) {
-  std::size_t pos = source.find_last_not_of(" \t\f\v\n\r");
-  if (pos != std::string::npos) {
-    source.erase(pos + 1);
-  } else {
-    source.clear();
-  }
-}
-
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   strncpy(dst, src, size - 1);
   dst[size - 1] = '\0';
   return strlen(src);
-}
-
-std::vector<std::string> StringUtil::split(const std::string& source, char split) {
-  return StringUtil::split(source, std::string{split});
-}
-
-std::vector<std::string> StringUtil::split(const std::string& source, const std::string& split,
-                                           bool keep_empty_string) {
-  std::vector<std::string> ret;
-  size_t last_index = 0;
-  size_t next_index;
-
-  if (split.empty()) {
-    ret.emplace_back(source);
-    return ret;
-  }
-
-  do {
-    next_index = source.find(split, last_index);
-    if (next_index == std::string::npos) {
-      next_index = source.size();
-    }
-
-    if (next_index != last_index || keep_empty_string) {
-      ret.emplace_back(subspan(source, last_index, next_index));
-    }
-
-    last_index = next_index + split.size();
-  } while (next_index != source.size());
-
-  return ret;
 }
 
 std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
@@ -207,11 +229,45 @@ const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
   return s.empty() ? default_value : s;
 }
 
-std::string StringUtil::toUpper(const std::string& s) {
+std::string StringUtil::toUpper(absl::string_view s) {
   std::string upper_s;
-  std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s),
-                 [](unsigned char c) -> unsigned char { return std::toupper(c); });
+  upper_s.reserve(s.size());
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+bool Primes::isPrime(uint32_t x) {
+  if (x < 4) {
+    return true; // eliminates special-casing 2.
+  } else if ((x & 1) == 0) {
+    return false; // eliminates even numbers >2.
+  }
+
+  uint32_t limit = sqrt(x);
+  for (uint32_t factor = 3; factor <= limit; factor += 2) {
+    if ((x % factor) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint32_t Primes::findPrimeLargerThan(uint32_t x) {
+  x += (x % 2) + 1;
+  while (!isPrime(x)) {
+    x += 2;
+  }
+  return x;
+}
+
+std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type flags) {
+  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
+  // may allow us to remove this in favor of direct validation of regular expressions.
+  try {
+    return std::regex(regex, flags);
+  } catch (const std::regex_error& e) {
+    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
+  }
 }
 
 } // namespace Envoy

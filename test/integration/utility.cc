@@ -68,7 +68,10 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
               "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket()),
       host_description);
-  BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
+  BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
+    client.close();
+    dispatcher->exit();
+  }));
   Http::StreamEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);
 

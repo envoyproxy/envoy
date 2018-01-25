@@ -275,6 +275,7 @@ envoy_cc_test(
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",

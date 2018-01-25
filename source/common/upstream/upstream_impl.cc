@@ -112,7 +112,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       source_address_(getSourceAddress(config, source_address)),
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())) {
+      lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
+      metadata_(config.metadata()) {
 
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
@@ -152,6 +153,14 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     break;
   default:
     NOT_REACHED;
+  }
+
+  if (config.protocol_selection() == envoy::api::v2::Cluster::USE_CONFIGURED_PROTOCOL) {
+    // Make sure multiple protocol configurations are not present
+    if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
+      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
+                                       "configured with non-default 'protocol_selection' values"));
+    }
   }
 }
 
@@ -301,6 +310,9 @@ uint64_t ClusterInfoImpl::parseFeatures(const envoy::api::v2::Cluster& config) {
   uint64_t features = 0;
   if (config.has_http2_protocol_options()) {
     features |= Features::HTTP2;
+  }
+  if (config.protocol_selection() == envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL) {
+    features |= Features::USE_DOWNSTREAM_PROTOCOL;
   }
   return features;
 }

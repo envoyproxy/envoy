@@ -19,6 +19,8 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "api/base.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -323,6 +325,9 @@ public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
     static const uint64_t HTTP2 = 0x1;
+    // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
+    // This is used when creating connection pools.
+    static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
   };
 
   virtual ~ClusterInfo() {}
@@ -428,6 +433,11 @@ public:
    * @return the configuration for load balancer subsets.
    */
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
+
+  /**
+   * @return const envoy::api::v2::Metadata& the configuration metadata for this cluster.
+   */
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

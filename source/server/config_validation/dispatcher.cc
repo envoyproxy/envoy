@@ -17,18 +17,8 @@ Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
   NOT_IMPLEMENTED;
 }
 
-Network::ListenerPtr ValidationDispatcher::createListener(Network::ConnectionHandler&,
-                                                          Network::ListenSocket&,
-                                                          Network::ListenerCallbacks&,
-                                                          Stats::Scope&,
-                                                          const Network::ListenerOptions&) {
-  NOT_IMPLEMENTED;
-}
-
-Network::ListenerPtr
-ValidationDispatcher::createSslListener(Network::ConnectionHandler&, Ssl::ServerContext&,
-                                        Network::ListenSocket&, Network::ListenerCallbacks&,
-                                        Stats::Scope&, const Network::ListenerOptions&) {
+Network::ListenerPtr ValidationDispatcher::createListener(Network::ListenSocket&,
+                                                          Network::ListenerCallbacks&, bool, bool) {
   NOT_IMPLEMENTED;
 }
 

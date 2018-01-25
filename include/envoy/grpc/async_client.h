@@ -29,7 +29,7 @@ public:
 /**
  * An in-flight gRPC stream.
  */
-template <class RequestType> class AsyncStream {
+class AsyncStream {
 public:
   virtual ~AsyncStream() {}
 
@@ -40,7 +40,7 @@ public:
    *                   object, but callbacks may still be received until the stream is closed
    *                   remotely.
    */
-  virtual void sendMessage(const RequestType& request, bool end_stream) PURE;
+  virtual void sendMessage(const Protobuf::Message& request, bool end_stream) PURE;
 
   /**
    * Close the stream locally and send an empty DATA frame to the remote. No further methods may be
@@ -56,7 +56,7 @@ public:
   virtual void resetStream() PURE;
 };
 
-template <class ResponseType> class AsyncRequestCallbacks {
+class AsyncRequestCallbacks {
 public:
   virtual ~AsyncRequestCallbacks() {}
 
@@ -67,11 +67,18 @@ public:
   virtual void onCreateInitialMetadata(Http::HeaderMap& metadata) PURE;
 
   /**
+   * Factory for empty response messages.
+   * @return ProtobufTypes::MessagePtr a Protobuf::Message with the response
+   *         type for the request.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyResponse() PURE;
+
+  /**
    * Called when the async gRPC request succeeds. No further callbacks will be invoked.
    * @param response the gRPC response.
    * @param span a tracing span to fill with extra tags.
    */
-  virtual void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) PURE;
+  virtual void onSuccessUntyped(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) PURE;
 
   /**
    * Called when the async gRPC request fails. No further callbacks will be invoked.
@@ -83,6 +90,20 @@ public:
                          Tracing::Span& span) PURE;
 };
 
+// Templatized variant of AsyncRequestCallbacks.
+template <class ResponseType> class TypedAsyncRequestCallbacks : public AsyncRequestCallbacks {
+public:
+  ProtobufTypes::MessagePtr createEmptyResponse() override {
+    return std::make_unique<ResponseType>();
+  }
+
+  virtual void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) PURE;
+
+  void onSuccessUntyped(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) override {
+    onSuccess(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(response.release())), span);
+  }
+};
+
 /**
  * Notifies caller of async gRPC stream status.
  * Note the gRPC stream is full-duplex, even if the local to remote stream has been ended by
@@ -90,9 +111,16 @@ public:
  * to local stream is closed (onRemoteClose), and vice versa. Once the stream is closed remotely, no
  * further callbacks will be invoked.
  */
-template <class ResponseType> class AsyncStreamCallbacks {
+class AsyncStreamCallbacks {
 public:
   virtual ~AsyncStreamCallbacks() {}
+
+  /**
+   * Factory for empty response messages.
+   * @return ProtobufTypes::MessagePtr a Protobuf::Message with the response
+   *          type for the stream.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyResponse() PURE;
 
   /**
    * Called when populating the headers to send with initial metadata.
@@ -110,7 +138,7 @@ public:
    * Called when an async gRPC message is received.
    * @param response the gRPC message.
    */
-  virtual void onReceiveMessage(std::unique_ptr<ResponseType>&& message) PURE;
+  virtual void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) PURE;
 
   /**
    * Called when trailing metadata is recevied.
@@ -129,11 +157,25 @@ public:
   virtual void onRemoteClose(Status::GrpcStatus status, const std::string& message) PURE;
 };
 
+// Templatized variant of AsyncStreamCallbacks.
+template <class ResponseType> class TypedAsyncStreamCallbacks : public AsyncStreamCallbacks {
+public:
+  ProtobufTypes::MessagePtr createEmptyResponse() override {
+    return std::make_unique<ResponseType>();
+  }
+
+  virtual void onReceiveMessage(std::unique_ptr<ResponseType>&& message) PURE;
+
+  void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) override {
+    onReceiveMessage(std::unique_ptr<ResponseType>(dynamic_cast<ResponseType*>(message.release())));
+  }
+};
+
 /**
  * Supports sending gRPC requests and receiving responses asynchronously. This can be used to
  * implement either plain gRPC or streaming gRPC calls.
  */
-template <class RequestType, class ResponseType> class AsyncClient {
+class AsyncClient {
 public:
   virtual ~AsyncClient() {}
 
@@ -149,8 +191,7 @@ public:
    *         handle should just be used to cancel.
    */
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
-                             const RequestType& request,
-                             AsyncRequestCallbacks<ResponseType>& callbacks,
+                             const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                              Tracing::Span& parent_span,
                              const Optional<std::chrono::milliseconds>& timeout) PURE;
 
@@ -165,9 +206,11 @@ public:
    *         closeStream() is invoked by the caller to notify the client that the stream resources
    *         may be reclaimed.
    */
-  virtual AsyncStream<RequestType>* start(const Protobuf::MethodDescriptor& service_method,
-                                          AsyncStreamCallbacks<ResponseType>& callbacks) PURE;
+  virtual AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
+                             AsyncStreamCallbacks& callbacks) PURE;
 };
+
+typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
 
 } // namespace Grpc
 } // namespace Envoy

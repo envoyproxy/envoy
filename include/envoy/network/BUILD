@@ -73,6 +73,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
+    deps = ["//include/envoy/network:listen_socket_interface"],
 )
 
 envoy_cc_library(
