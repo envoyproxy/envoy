@@ -304,10 +304,13 @@ TEST(AbslUint128, TestByteOrder) {
   }
   {
     Address::Ipv6Instance address("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
-    absl::uint128 max_int = absl::MakeUint128(std::numeric_limits<uint64_t>::max(),
-                                              std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(max_int, address.ip()->ipv6()->address());
-    EXPECT_EQ(max_int, Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+    EXPECT_EQ(absl::Uint128Max(), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::Uint128Max(), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+  }
+  {
+    TestRandomGenerator rand;
+    absl::uint128 random_number = absl::MakeUint128(rand.random(), rand.random());
+    EXPECT_EQ(random_number, Utility::Ip6htonl(Utility::Ip6ntohl(random_number)));
   }
 }
 

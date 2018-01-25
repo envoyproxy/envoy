@@ -178,20 +178,16 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
       // Create an Ipv6Instance with only a port, which will thus have the any address.
       return std::make_shared<Ipv6Instance>(uint32_t(0));
     }
-    // We need to mask out the unused bits, but we don't have a uint128_t available.
-    // However, we know that the array returned by Ipv6::address() represents the address
-    // in network order (bit 7 of byte 0 is the high-order bit of the address), so we
-    // simply need to keep the leading length bits of the array, and get rid of the rest.
     sockaddr_in6 sa6;
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(0);
 
-    absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address());
     // The maximum number stored in absl::uint128 has every bit set to 1.
-    absl::uint128 max_int = absl::Uint128Max();
-    // Shifting the value to the left set all bits between 128-length and 128 to zero.
-    max_int <<= (128 - length);
-    ip6 &= max_int;
+    absl::uint128 mask = absl::Uint128Max();
+    // Shifting the value to the left sets all bits between 128-length and 128 to zero.
+    mask <<= (128 - length);
+    // This will mask out the unused bits of the address.
+    absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address()) & mask;
 
     absl::uint128 ip6_htonl = Utility::Ip6htonl(ip6);
     static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
