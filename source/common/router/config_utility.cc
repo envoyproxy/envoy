@@ -104,9 +104,9 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& 
     return EMPTY_STRING;
   }
   const auto& body = route.direct_response().body();
-  std::string filename = body.filename();
+  const std::string filename = body.filename();
   if (!filename.empty()) {
-    static const ssize_t kMaxFileSize = 4096;
+    static const ssize_t MaxFileSize = 4096;
     if (!Filesystem::fileExists(filename)) {
       throw EnvoyException(fmt::format("response body file {} does not exist", filename));
     }
@@ -114,21 +114,17 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& 
     if (size < 0) {
       throw EnvoyException(fmt::format("cannot determine size of response body file {}", filename));
     }
-    if (size > kMaxFileSize) {
+    if (size > MaxFileSize) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, kMaxFileSize));
+                                       filename, MaxFileSize));
     }
     return Filesystem::fileReadToEnd(filename);
   }
-  std::string inline_bytes = body.inline_bytes();
+  const std::string inline_bytes = body.inline_bytes();
   if (!inline_bytes.empty()) {
     return inline_bytes;
   }
-  std::string inline_string = body.inline_string();
-  if (!inline_string.empty()) {
-    return inline_string;
-  }
-  return EMPTY_STRING;
+  return body.inline_string();
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
