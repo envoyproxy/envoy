@@ -122,13 +122,13 @@ public:
   // External Authorization filter
   const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
 
-
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA, EXT_AUTHORIZATION}) {}
+                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
+                       EXT_AUTHORIZATION}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

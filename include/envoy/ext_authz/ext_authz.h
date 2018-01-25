@@ -42,9 +42,8 @@ public:
   virtual void complete(CheckStatus status) PURE;
 };
 
-
 class Client {
- public:
+public:
   // Destructor
   virtual ~Client() {}
 
@@ -54,9 +53,8 @@ class Client {
   virtual void cancel() PURE;
 
   // A check call.
-  virtual void check(RequestCallbacks &callback, const envoy::api::v2::auth::CheckRequest& request,
+  virtual void check(RequestCallbacks& callback, const envoy::api::v2::auth::CheckRequest& request,
                      Tracing::Span& parent_span) PURE;
-
 };
 
 typedef std::unique_ptr<Client> ClientPtr;
@@ -76,7 +74,6 @@ public:
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
 
-
 /**
  * An interface for creating ext_authz.proto (authorization) request.
  * CheckRequestGenerator is used to extract attributes from the TCP/HTTP request
@@ -85,11 +82,11 @@ typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
  */
 class CheckRequestGenerator {
 public:
-    // Destructor
+  // Destructor
   virtual ~CheckRequestGenerator() {}
 
   virtual void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                               const Envoy::Http::HeaderMap &headers,
+                               const Envoy::Http::HeaderMap& headers,
                                envoy::api::v2::auth::CheckRequest& request) PURE;
   virtual void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                               envoy::api::v2::auth::CheckRequest& request) PURE;
@@ -99,4 +96,3 @@ typedef std::unique_ptr<CheckRequestGenerator> CheckRequestGeneratorPtr;
 
 } // namespace ExtAuthz
 } // namespace Envoy
-
