@@ -11,6 +11,7 @@
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
+#include "common/protobuf/protobuf.h"
 
 #include "fmt/format.h"
 
@@ -81,9 +82,7 @@ ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& tim
 std::unique_ptr<::envoy::api::v2::Address> ExtAuthzCheckRequestGenerator::getProtobufAddress(
     const Network::Address::InstanceConstSharedPtr& instance) {
 
-  std::unique_ptr<::envoy::api::v2::Address> addr =
-      std::unique_ptr<::envoy::api::v2::Address>{new ::envoy::api::v2::Address()};
-  ASSERT(addr);
+  auto addr = std::make_unique<::envoy::api::v2::Address>();
 
   if (instance->type() == Network::Address::Type::Ip) {
     addr->mutable_socket_address()->set_address(instance->ip()->addressAsString());
@@ -99,9 +98,7 @@ std::unique_ptr<AttributeContext_Peer>
 ExtAuthzCheckRequestGenerator::getConnectionPeer(const Network::Connection* connection,
                                                  const std::string& service, const bool local) {
 
-  std::unique_ptr<AttributeContext_Peer> peer =
-      std::unique_ptr<AttributeContext_Peer>{new AttributeContext_Peer()};
-  ASSERT(peer);
+  auto peer = std::make_unique<AttributeContext_Peer>();
 
   // Set the address
   if (!local) {
@@ -162,8 +159,8 @@ const std::string ExtAuthzCheckRequestGenerator::getProtocolStr(const Envoy::Htt
 
 Envoy::Http::HeaderMap::Iterate
 ExtAuthzCheckRequestGenerator::fillHttpHeaders(const Envoy::Http::HeaderEntry& e, void* ctx) {
-  ::google::protobuf::Map<::std::string, ::std::string>* mhdrs =
-      static_cast<::google::protobuf::Map<::std::string, ::std::string>*>(ctx);
+  Envoy::Protobuf::Map<::std::string, ::std::string>* mhdrs =
+      static_cast<Envoy::Protobuf::Map<::std::string, ::std::string>*>(ctx);
   (*mhdrs)[std::string(e.key().c_str(), e.key().size())] =
       std::string(e.value().c_str(), e.value().size());
   return Envoy::Http::HeaderMap::Iterate::Continue;
@@ -180,8 +177,7 @@ std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttp
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
 
-  AttributeContext_HttpRequest* httpreq = new AttributeContext_HttpRequest();
-  ASSERT(httpreq);
+  auto httpreq = new AttributeContext_HttpRequest();
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
@@ -206,12 +202,11 @@ std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttp
   httpreq->set_protocol(getProtocolStr(sdfc->requestInfo().protocol().value()));
 
   // Fill in the headers
-  auto* mhdrs = httpreq->mutable_headers();
+  auto mhdrs = httpreq->mutable_headers();
   headers.iterate(fillHttpHeaders, mhdrs);
 
-  std::unique_ptr<AttributeContext_Request> req =
-      std::unique_ptr<AttributeContext_Request>{new AttributeContext_Request()};
-  ASSERT(req);
+  auto req = std::make_unique<AttributeContext_Request>();
+
   req->set_allocated_http(httpreq);
 
   return req;
@@ -221,8 +216,7 @@ void ExtAuthzCheckRequestGenerator::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers, envoy::api::v2::auth::CheckRequest& request) {
 
-  AttributeContext* attrs = request.mutable_attributes();
-  ASSERT(attrs);
+  auto attrs = request.mutable_attributes();
 
   Envoy::Http::StreamDecoderFilterCallbacks* cb =
       const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
@@ -236,8 +230,7 @@ void ExtAuthzCheckRequestGenerator::createHttpCheck(
 void ExtAuthzCheckRequestGenerator::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                                                    envoy::api::v2::auth::CheckRequest& request) {
 
-  AttributeContext* attrs = request.mutable_attributes();
-  ASSERT(attrs);
+  auto attrs = request.mutable_attributes();
 
   Network::ReadFilterCallbacks* cb = const_cast<Network::ReadFilterCallbacks*>(callbacks);
   attrs->set_allocated_source(getConnectionPeer(cb->connection(), "", false).release());

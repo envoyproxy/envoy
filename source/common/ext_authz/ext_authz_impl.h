@@ -91,9 +91,6 @@ public:
 
 class ExtAuthzCheckRequestGenerator : public CheckRequestGenerator {
 public:
-  ExtAuthzCheckRequestGenerator() {}
-  ~ExtAuthzCheckRequestGenerator() {}
-
   // ExtAuthz::CheckRequestGenIntf
   void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                        const Envoy::Http::HeaderMap& headers,
