@@ -15,6 +15,7 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -2188,6 +2189,9 @@ TEST(RouteMatcherTest, DirectResponse) {
 }
   )EOF";
 
+  const auto pathname =
+      TestEnvironment::writeStringToFileForTest("direct_response_body", "Example text 3");
+
   // A superset of v1_json, with API v2 direct-response configuration added.
   static const std::string v2_yaml = R"EOF(
 name: foo
@@ -2217,7 +2221,21 @@ virtual_hosts:
     domains: [direct.example.com]
     routes:
     - match: { prefix: /gone }
-      direct_response: { status: 410 }
+      direct_response:
+        status: 410
+        body: { inline_bytes: "RXhhbXBsZSB0ZXh0IDE=" }
+    - match: { prefix: /error }
+      direct_response:
+        status: 500
+        body: { inline_string: "Example text 2" }
+    - match: { prefix: /no_body }
+      direct_response:
+        status: 200
+    - match: { prefix: /static }
+      direct_response:
+        status: 200
+        body: { filename: )EOF" + pathname +
+                                     R"EOF(}
     - match: { prefix: / }
       route: { cluster: www2 }
   )EOF";
@@ -2267,6 +2285,26 @@ virtual_hosts:
       Http::TestHeaderMapImpl headers =
           genRedirectHeaders("direct.example.com", "/gone", true, false);
       EXPECT_EQ(Http::Code::Gone, config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_EQ("Example text 1", config.route(headers, 0)->directResponseEntry()->responseBody());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("direct.example.com", "/error", true, false);
+      EXPECT_EQ(Http::Code::InternalServerError,
+                config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_EQ("Example text 2", config.route(headers, 0)->directResponseEntry()->responseBody());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("direct.example.com", "/no_body", true, false);
+      EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_TRUE(config.route(headers, 0)->directResponseEntry()->responseBody().empty());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("direct.example.com", "/static", true, false);
+      EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+      EXPECT_EQ("Example text 3", config.route(headers, 0)->directResponseEntry()->responseBody());
     }
     {
       Http::TestHeaderMapImpl headers =

@@ -237,7 +237,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       response_headers_parser_(HeaderParser::configure(route.route().response_headers_to_add(),
                                                        route.route().response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
-      direct_response_code_(ConfigUtility::parseDirectResponseCode(route)) {
+      direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
+      direct_response_body_(ConfigUtility::parseDirectResponseBody(route)) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);

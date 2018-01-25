@@ -115,6 +115,16 @@ public:
   static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::Route& route);
 
   /**
+   * Returns the content of the response body to send with direct responses from a route.
+   * @param route supplies the Route configuration.
+   * @return Optional<std::string> the response body provided inline in the route's
+   *         direct_response if specified, or the contents of the file named in the
+   *         route's direct_response if specified, or an empty string otherwise.
+   * @throw EnvoyException if the route configuration contains an error.
+   */
+  static std::string parseDirectResponseBody(const envoy::api::v2::Route& route);
+
+  /**
    * Returns the HTTP Status Code enum parsed from proto.
    * @param code supplies the ClusterNotFoundResponseCode enum.
    * @return Returns the Http::Code version of the ClusterNotFoundResponseCode enum.
