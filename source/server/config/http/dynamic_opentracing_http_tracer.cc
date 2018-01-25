@@ -17,7 +17,7 @@ Tracing::HttpTracerPtr DynamicOpenTracingHttpTracerFactory::createHttpTracer(
     const Json::Object& json_config, Server::Instance& server,
     Upstream::ClusterManager& /*cluster_manager*/) {
   std::string library = json_config.getString("library");
-  std::string config = server.api().fileReadToEnd(json_config.getString("config_file"));
+  std::string config = json_config.getObject("config")->asJsonString();
   Tracing::DriverPtr dynamic_driver{
       new Tracing::DynamicOpenTracingDriver{server.stats(), library, config}};
   return Tracing::HttpTracerPtr(
