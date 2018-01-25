@@ -3,9 +3,9 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
-#include "envoy/ext_authz/ext_authz.h"
 
 #include "common/ext_authz/ext_authz_impl.h"
 #include "common/filter/ext_authz.h"
@@ -25,19 +25,19 @@ ExtAuthzConfigFactory::createFilter(const envoy::api::v2::filter::network::ExtAu
   ASSERT(proto_config.grpc_service().has_envoy_grpc());
   ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty());
 
-  ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(
-      new ExtAuthz::TcpFilter::Config(proto_config, context.scope(), context.runtime(), context.clusterManager()));
+  ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(new ExtAuthz::TcpFilter::Config(
+      proto_config, context.scope(), context.runtime(), context.clusterManager()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 20);
 
-  return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config, timeout_ms](
-    Network::FilterManager& filter_manager) -> void {
+  return [ grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
+           timeout_ms ](Network::FilterManager & filter_manager)
+      ->void {
 
-    ExtAuthz::GrpcFactoryImpl client_factory(grpc_service,
-                                             context.clusterManager().grpcAsyncClientManager(),
-                                             context.scope());
+    ExtAuthz::GrpcFactoryImpl client_factory(
+        grpc_service, context.clusterManager().grpcAsyncClientManager(), context.scope());
 
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
-      new ExtAuthz::TcpFilter::Instance(ext_authz_config, client_factory.create(std::chrono::milliseconds(timeout_ms)))});
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new ExtAuthz::TcpFilter::Instance(
+        ext_authz_config, client_factory.create(std::chrono::milliseconds(timeout_ms)))});
   };
 }
 

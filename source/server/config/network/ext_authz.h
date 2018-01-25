@@ -31,12 +31,10 @@ public:
   std::string name() override { return Config::NetworkFilterNames::get().EXT_AUTHORIZATION; }
 
 private:
-  NetworkFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::network::ExtAuthz& proto_config,
-               FactoryContext& context);
+  NetworkFilterFactoryCb createFilter(const envoy::api::v2::filter::network::ExtAuthz& proto_config,
+                                      FactoryContext& context);
 };
 
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
-

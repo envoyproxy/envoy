@@ -15,11 +15,10 @@ namespace TcpFilter {
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
   std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                              POOL_GAUGE_PREFIX(scope, final_prefix))};
+                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void Instance::setCheckReqGenerator(CheckRequestGenerator *crg)
-{
+void Instance::setCheckReqGenerator(CheckRequestGenerator* crg) {
   ASSERT(check_req_generator_ == nullptr);
   check_req_generator_ = CheckRequestGeneratorPtr{std::move(crg)};
 }
@@ -92,8 +91,7 @@ void Instance::complete(CheckStatus status) {
   }
 
   // We fail open if there is an error contacting the service.
-  if (status == CheckStatus::Denied ||
-      (status == CheckStatus::Error && !config_->failOpen())) {
+  if (status == CheckStatus::Denied || (status == CheckStatus::Error && !config_->failOpen())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   } else {

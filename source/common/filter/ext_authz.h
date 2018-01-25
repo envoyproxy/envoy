@@ -5,16 +5,16 @@
 #include <string>
 #include <vector>
 
+#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "api/filter/network/ext_authz.pb.h"
-
 #include "common/ext_authz/ext_authz_impl.h"
+
+#include "api/filter/network/ext_authz.pb.h"
 
 namespace Envoy {
 namespace ExtAuthz {
@@ -48,8 +48,9 @@ public:
   // @saumoh: TBD: Take care of grpc service != envoy_grpc()
   Config(const envoy::api::v2::filter::network::ExtAuthz& config, Stats::Scope& scope,
          Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-     : stats_(generateStats(config.stat_prefix(), scope)),
-      runtime_(runtime), cm_(cm), cluster_name_(config.grpc_service().envoy_grpc().cluster_name()), failure_mode_allow_(config.failure_mode_allow()) {}
+      : stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime), cm_(cm),
+        cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
+        failure_mode_allow_(config.failure_mode_allow()) {}
 
   Runtime::Loader& runtime() { return runtime_; }
   std::string cluster() { return cluster_name_; }
@@ -115,4 +116,3 @@ private:
 } // TcpFilter
 } // namespace ExtAuthz
 } // namespace Envoy
-

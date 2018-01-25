@@ -74,14 +74,14 @@ envoy_cc_library(
     hdrs = ["ext_authz.h"],
     external_deps = ["envoy_filter_network_ext_authz"],
     deps = [
+        "//include/envoy/ext_authz:ext_authz_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
-        "//include/envoy/ext_authz:ext_authz_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
-        "//source/common/tracing:http_tracer_lib",
         "//source/common/ext_authz:ext_authz_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
