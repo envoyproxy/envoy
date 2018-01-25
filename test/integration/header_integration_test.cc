@@ -101,7 +101,7 @@ public:
   }
 
   void prepareEDS() {
-    config_helper_.addConfigModifier([&](envoy::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 

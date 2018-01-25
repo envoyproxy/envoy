@@ -72,18 +72,17 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr clusterManagerFromProto(const envoy::bootstrap::v2::Bootstrap& bootstrap,
-                                            Stats::Store& stats, ThreadLocal::Instance& tls,
-                                            Runtime::Loader& runtime,
-                                            Runtime::RandomGenerator& random,
-                                            const LocalInfo::LocalInfo& local_info,
-                                            AccessLog::AccessLogManager& log_manager) override {
+  ClusterManagerPtr
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          AccessLog::AccessLogManager& log_manager) override {
     return ClusterManagerPtr{
         clusterManagerFromProto_(bootstrap, stats, tls, runtime, random, local_info, log_manager)};
   }
 
   MOCK_METHOD7(clusterManagerFromProto_,
-               ClusterManager*(const envoy::bootstrap::v2::Bootstrap& bootstrap,
+               ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                Stats::Store& stats, ThreadLocal::Instance& tls,
                                Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                const LocalInfo::LocalInfo& local_info,
@@ -108,7 +107,7 @@ public:
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  void create(const envoy::bootstrap::v2::Bootstrap& bootstrap) {
+  void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_));
@@ -119,15 +118,15 @@ public:
   AccessLog::MockAccessLogManager log_manager_;
 };
 
-envoy::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
-  envoy::bootstrap::v2::Bootstrap bootstrap;
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap);
   return bootstrap;
 }
 
-envoy::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
-  envoy::bootstrap::v2::Bootstrap bootstrap;
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   MessageUtil::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
@@ -377,7 +376,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
   }
   )EOF";
 
-  envoy::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
   envoy::api::v2::cluster::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_fallback_policy(
@@ -404,7 +403,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
   }
   )EOF";
 
-  envoy::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
   envoy::api::v2::cluster::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_fallback_policy(

@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <chrono>
 
-#include "envoy/api/v2/monitoring/stats.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/config/well_known_names.h"
@@ -368,7 +368,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 }
 
 TEST(TagProducerTest, CheckConstructor) {
-  envoy::api::v2::monitoring::StatsConfig stats_config;
+  envoy::config::metrics::v2::StatsConfig stats_config;
 
   // Should pass there were no tag name conflict.
   auto& tag_specifier1 = *stats_config.mutable_stats_tags()->Add();

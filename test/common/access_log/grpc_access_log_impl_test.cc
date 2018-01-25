@@ -127,7 +127,7 @@ public:
   }
 
   MockFilter* filter_{new NiceMock<MockFilter>()};
-  envoy::service::accesslog::v2::HttpGrpcAccessLogConfig config_;
+  envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogStreamer> streamer_{new MockGrpcAccessLogStreamer()};
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
 };

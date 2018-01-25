@@ -11,8 +11,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/monitoring/stats.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
@@ -48,7 +48,7 @@ private:
 
 class TagProducerImpl : public TagProducer {
 public:
-  TagProducerImpl(const envoy::api::v2::monitoring::StatsConfig& config);
+  TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
   TagProducerImpl() {}
 
   /**
@@ -60,8 +60,8 @@ public:
   std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
 
 private:
-  void reserveResources(const envoy::api::v2::monitoring::StatsConfig& config);
-  void addDefaultExtractors(const envoy::api::v2::monitoring::StatsConfig& config,
+  void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
+  void addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
                             std::unordered_set<std::string>& names);
 
   std::vector<TagExtractorPtr> tag_extractors_;

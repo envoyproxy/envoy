@@ -59,7 +59,7 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
 }
 
 HttpGrpcAccessLog::HttpGrpcAccessLog(
-    FilterPtr&& filter, const envoy::service::accesslog::v2::HttpGrpcAccessLogConfig& config,
+    FilterPtr&& filter, const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
     : filter_(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {}

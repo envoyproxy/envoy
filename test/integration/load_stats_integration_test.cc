@@ -1,3 +1,5 @@
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/api/v2/endpoint/load_report.pb.h"
 #include "envoy/service/discovery/v2/eds.pb.h"
 #include "envoy/service/load_stats/v2/lrs.pb.h"
 
@@ -16,7 +18,7 @@ class LoadStatsIntegrationTest : public HttpIntegrationTest,
 public:
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  void addEndpoint(envoy::service::discovery::v2::LocalityLbEndpoints& locality_lb_endpoints,
+  void addEndpoint(envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
                    uint32_t index, uint32_t& num_endpoints) {
     auto* socket_address = locality_lb_endpoints.add_lb_endpoints()
                                ->mutable_endpoint()
@@ -104,7 +106,7 @@ public:
 
   void initialize() override {
     updateClusterLoadAssignment({}, {}, {}, {});
-    config_helper_.addConfigModifier([this](envoy::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
@@ -197,11 +199,10 @@ public:
     }
   }
 
-  void
-  waitForLoadStatsRequest(const std::vector<envoy::service::load_stats::v2::UpstreamLocalityStats>&
-                              expected_locality_stats,
-                          uint64_t dropped = 0) {
-    Protobuf::RepeatedPtrField<envoy::service::load_stats::v2::ClusterStats> expected_cluster_stats;
+  void waitForLoadStatsRequest(
+      const std::vector<envoy::api::v2::endpoint::UpstreamLocalityStats>& expected_locality_stats,
+      uint64_t dropped = 0) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::endpoint::ClusterStats> expected_cluster_stats;
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
       cluster_stats->set_cluster_name("cluster_0");
@@ -261,10 +262,11 @@ public:
     test_server_->waitForCounterGe("load_reporter.requests", ++load_requests_);
   }
 
-  envoy::service::load_stats::v2::UpstreamLocalityStats
-  localityStats(const std::string& sub_zone, uint64_t success, uint64_t error, uint64_t active,
-                uint32_t priority = 0) {
-    envoy::service::load_stats::v2::UpstreamLocalityStats locality_stats;
+  envoy::api::v2::endpoint::UpstreamLocalityStats localityStats(const std::string& sub_zone,
+                                                                uint64_t success, uint64_t error,
+                                                                uint64_t active,
+                                                                uint32_t priority = 0) {
+    envoy::api::v2::endpoint::UpstreamLocalityStats locality_stats;
     auto* locality = locality_stats.mutable_locality();
     locality->set_region("some_region");
     locality->set_zone("zone_name");
@@ -454,7 +456,7 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
 
 // Validate the load reports for dropped requests make sense.
 TEST_P(LoadStatsIntegrationTest, Dropped) {
-  config_helper_.addConfigModifier([](envoy::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* thresholds = cluster_0->mutable_circuit_breakers()->add_thresholds();
     thresholds->mutable_max_pending_requests()->set_value(0);

@@ -107,7 +107,7 @@ void XfccIntegrationTest::initialize() {
         hcm.mutable_set_current_client_cert_details()->CopyFrom(sccd_);
       });
 
-  config_helper_.addConfigModifier([&](envoy::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto context = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_tls_context();
     auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(

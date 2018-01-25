@@ -1,3 +1,4 @@
+#include "envoy/api/v2/endpoint/load_report.pb.h"
 #include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/stats/stats_impl.h"
@@ -45,7 +46,7 @@ public:
   }
 
   void expectSendMessage(
-      const std::vector<envoy::service::load_stats::v2::ClusterStats>& expected_cluster_stats) {
+      const std::vector<envoy::api::v2::endpoint::ClusterStats>& expected_cluster_stats) {
     envoy::service::load_stats::v2::LoadStatsRequest expected_request;
     expected_request.mutable_node()->MergeFrom(node_);
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),

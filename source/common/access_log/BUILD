@@ -59,6 +59,7 @@ envoy_cc_library(
     hdrs = ["grpc_access_log_impl.h"],
     external_deps = [
         "envoy_accesslog",
+        "envoy_config_accesslog",
         "envoy_filter_accesslog",
     ],
     deps = [

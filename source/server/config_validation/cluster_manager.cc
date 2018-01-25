@@ -12,7 +12,7 @@ ValidationClusterManagerFactory::ValidationClusterManagerFactory(
                                 primary_dispatcher, local_info) {}
 
 ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
-    const envoy::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
+    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
     ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
   return ClusterManagerPtr{new ValidationClusterManager(
@@ -30,7 +30,7 @@ ValidationClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& c
 }
 
 ValidationClusterManager::ValidationClusterManager(
-    const envoy::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& primary_dispatcher)

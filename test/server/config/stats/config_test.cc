@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
@@ -30,7 +30,7 @@ namespace Configuration {
 TEST(StatsConfigTest, ValidTcpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
-  envoy::api::v2::monitoring::StatsdSink sink_config;
+  envoy::config::metrics::v2::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
@@ -52,7 +52,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
-  envoy::api::v2::monitoring::StatsdSink sink_config;
+  envoy::config::metrics::v2::StatsdSink sink_config;
   envoy::api::v2::Address& address = *sink_config.mutable_address();
   envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
@@ -77,7 +77,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
   EXPECT_THROW(
-      StatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::StatsdSink(), server),
+      StatsdSinkFactory().createStatsSink(envoy::config::metrics::v2::StatsdSink(), server),
       ProtoValidationException);
 }
 
@@ -88,7 +88,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, DogStatsdConfigLoopbackTest,
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = Config::StatsSinkNames::get().DOG_STATSD;
 
-  envoy::api::v2::monitoring::DogStatsdSink sink_config;
+  envoy::config::metrics::v2::DogStatsdSink sink_config;
   envoy::api::v2::Address& address = *sink_config.mutable_address();
   envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
@@ -113,7 +113,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 TEST(DogStatsdConfigTest, ValidateFail) {
   NiceMock<MockInstance> server;
   EXPECT_THROW(
-      DogStatsdSinkFactory().createStatsSink(envoy::api::v2::monitoring::DogStatsdSink(), server),
+      DogStatsdSinkFactory().createStatsSink(envoy::config::metrics::v2::DogStatsdSink(), server),
       ProtoValidationException);
 }
 

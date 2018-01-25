@@ -144,7 +144,7 @@ def _envoy_api_deps():
         )
     native.bind(
         name = "envoy_bootstrap",
-        actual = "@envoy_api//envoy/bootstrap/v2:bootstrap_cc",
+        actual = "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     )
     native.bind(
         name = "envoy_metrics",
@@ -156,23 +156,35 @@ def _envoy_api_deps():
     )
     native.bind(
         name = "envoy_ratelimit",
-        actual = "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+        actual = "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
     )
     native.bind(
         name = "envoy_accesslog",
         actual = "@envoy_api//envoy/service/accesslog/v2:als_cc",
     )
     native.bind(
+        name = "envoy_config_accesslog",
+        actual = "@envoy_api//envoy/config/accesslog/v2:als_cc",
+    )
+    native.bind(
         name = "envoy_stats",
-        actual = "@envoy_api//envoy/api/v2/monitoring:stats_cc",
+        actual = "@envoy_api//envoy/config/metrics/v2:stats_cc",
     )
     native.bind(
         name = "envoy_trace",
-        actual = "@envoy_api//envoy/api/v2/monitoring:trace_cc",
+        actual = "@envoy_api//envoy/config/trace/v2:trace_cc",
     )
     native.bind(
         name = "envoy_cluster",
         actual = "@envoy_api//envoy/api/v2/cluster:cluster_cc",
+    )
+    native.bind(
+        name = "envoy_endpoint",
+        actual = "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
+    )
+    native.bind(
+        name = "envoy_load_report",
+        actual = "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
     )
     native.bind(
         name = "envoy_circuit_breaker",

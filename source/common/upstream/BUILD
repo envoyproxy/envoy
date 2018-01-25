@@ -239,6 +239,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_base",
         "envoy_eds",
+        "envoy_endpoint",
     ],
     deps = [
         ":sds_subscription_lib",
@@ -264,6 +265,7 @@ envoy_cc_library(
     external_deps = [
         "envoy_base",
         "envoy_eds",
+        "envoy_endpoint",
     ],
     deps = [
         "//include/envoy/config:subscription_interface",

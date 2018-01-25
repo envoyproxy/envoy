@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -41,12 +41,11 @@ public:
         local_info_(local_info) {}
 
   // Upstream::ClusterManagerFactory
-  ClusterManagerPtr clusterManagerFromProto(const envoy::bootstrap::v2::Bootstrap& bootstrap,
-                                            Stats::Store& stats, ThreadLocal::Instance& tls,
-                                            Runtime::Loader& runtime,
-                                            Runtime::RandomGenerator& random,
-                                            const LocalInfo::LocalInfo& local_info,
-                                            AccessLog::AccessLogManager& log_manager) override;
+  ClusterManagerPtr
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          AccessLog::AccessLogManager& log_manager) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority,
@@ -146,7 +145,7 @@ struct ClusterManagerStats {
  */
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterManagerImpl(const envoy::bootstrap::v2::Bootstrap& bootstrap,
+  ClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory, Stats::Store& stats,
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,

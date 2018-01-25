@@ -1,3 +1,4 @@
+#include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/service/accesslog/v2/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -24,7 +25,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
@@ -36,7 +37,7 @@ public:
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.http_grpc_access_log");
 
-          envoy::service::accesslog::v2::HttpGrpcAccessLogConfig config;
+          envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",

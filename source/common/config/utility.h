@@ -3,7 +3,7 @@
 #include "envoy/api/v2/base.pb.h"
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -235,7 +235,8 @@ public:
    * @param bootstrap bootstrap proto.
    * @throws EnvoyException when the conflict of tag names is found.
    */
-  static Stats::TagProducerPtr createTagProducer(const envoy::bootstrap::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr
+  createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

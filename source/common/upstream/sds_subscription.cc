@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
@@ -41,7 +41,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
   // Since in the v2 EDS API we place all the endpoints for a given zone in the same proto, we first
   // need to bin the returned hosts list so that we group them by zone. We use an ordered map here
   // to provide better determinism for debug/test behavior.
-  std::map<std::string, Protobuf::RepeatedPtrField<envoy::service::discovery::v2::LbEndpoint>>
+  std::map<std::string, Protobuf::RepeatedPtrField<envoy::api::v2::endpoint::LbEndpoint>>
       zone_lb_endpoints;
   for (const Json::ObjectSharedPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;

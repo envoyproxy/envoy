@@ -7,8 +7,8 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/bootstrap/v2//bootstrap.pb.validate.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2//bootstrap.pb.validate.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -156,7 +156,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-void InstanceUtil::loadBootstrapConfig(envoy::bootstrap::v2::Bootstrap& bootstrap,
+void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                        const std::string& config_path, bool v2_only) {
   bool v2_config_loaded = false;
   try {
@@ -184,7 +184,7 @@ void InstanceImpl::initialize(Options& options,
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require

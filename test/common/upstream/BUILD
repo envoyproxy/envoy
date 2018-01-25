@@ -135,7 +135,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_test.cc"],
-    external_deps = ["envoy_eds"],
+    external_deps = [
+        "envoy_eds",
+        "envoy_load_report",
+        "envoy_endpoint",
+    ],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",

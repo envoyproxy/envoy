@@ -8,7 +8,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/cluster/cluster.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
@@ -193,8 +193,8 @@ public:
    * Allocate a cluster manager from configuration proto.
    */
   virtual ClusterManagerPtr
-  clusterManagerFromProto(const envoy::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
-                          ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                           AccessLog::AccessLogManager& log_manager) PURE;
 

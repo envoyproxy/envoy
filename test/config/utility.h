@@ -10,7 +10,7 @@
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/protocol.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/network/address_impl.h"
@@ -27,7 +27,7 @@ public:
   ConfigHelper(const Network::Address::IpVersion version,
                const std::string& config = HTTP_PROXY_CONFIG);
 
-  typedef std::function<void(envoy::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
+  typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
   typedef std::function<void(envoy::api::v2::filter::network::HttpConnectionManager&)>
       HttpModifierFunction;
 
@@ -87,7 +87,7 @@ public:
   void addConfigModifier(HttpModifierFunction function);
 
   // Return the bootstrap configuration for hand-off to Envoy.
-  const envoy::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
+  const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
@@ -101,7 +101,7 @@ private:
   envoy::api::v2::listener::Filter* getFilterFromListener();
 
   // The bootstrap proto Envoy will start up with.
-  envoy::bootstrap::v2::Bootstrap bootstrap_;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
 
   // The config modifiers added via addConfigModifier() which will be applied in finalize()
   std::vector<ConfigModifierFunction> config_modifiers_;

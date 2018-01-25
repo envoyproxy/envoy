@@ -1,3 +1,4 @@
+#include "envoy/config/metrics/v2/metrics_service.pb.h"
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 
 #include "common/common/version.h"
@@ -26,7 +27,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       metrics_service_cluster->set_name("metrics_service");
@@ -34,7 +35,7 @@ public:
 
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.metrics_service");
-      envoy::service::metrics::v2::MetricsServiceConfig config;
+      envoy::config::metrics::v2::MetricsServiceConfig config;
       config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("metrics_service");
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
     });

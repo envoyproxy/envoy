@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/api/v2/monitoring/stats.pb.h"
-#include "envoy/api/v2/monitoring/stats.pb.validate.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
@@ -17,7 +17,7 @@ namespace Configuration {
 Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                      Server::Instance& server) {
   const auto& sink_config =
-      MessageUtil::downcastAndValidate<const envoy::api::v2::monitoring::DogStatsdSink&>(config);
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::DogStatsdSink&>(config);
   Network::Address::InstanceConstSharedPtr address =
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
@@ -26,8 +26,8 @@ Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& co
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::api::v2::monitoring::DogStatsdSink>(
-      new envoy::api::v2::monitoring::DogStatsdSink());
+  return std::unique_ptr<envoy::config::metrics::v2::DogStatsdSink>(
+      new envoy::config::metrics::v2::DogStatsdSink());
 }
 
 std::string DogStatsdSinkFactory::name() { return Config::StatsSinkNames::get().DOG_STATSD; }

@@ -87,7 +87,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
 }
 
 TEST(UtilityTest, createTagProducer) {
-  envoy::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap);
   ASSERT(producer != nullptr);
   std::vector<Stats::Tag> tags;
