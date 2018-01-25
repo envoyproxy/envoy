@@ -20,6 +20,9 @@ LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::Cluster
                Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, ListenerManager& lm)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
+  // TODO: dummy to force linking the gRPC service proto
+  envoy::service::discovery::v2::LdsDummy dummy;
+
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::listener::Listener>(
       lds_config, local_info.node(), dispatcher, cm, random, *scope_,

@@ -56,6 +56,10 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", local_info);
+
+  // TODO: dummy to force linking the gRPC service proto
+  envoy::service::discovery::v2::RdsDummy dummy;
+
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);

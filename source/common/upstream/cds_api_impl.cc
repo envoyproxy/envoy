@@ -29,6 +29,10 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
+
+  // TODO: dummy to force linking the gRPC service proto
+  envoy::service::discovery::v2::CdsDummy dummy;
+
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::cluster::Cluster>(
           cds_config, local_info.node(), dispatcher, cm, random, *scope_,

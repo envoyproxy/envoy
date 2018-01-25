@@ -31,6 +31,10 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster,
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info);
+
+  // TODO: dummy to force linking the gRPC service proto
+  envoy::service::discovery::v2::EdsDummy dummy;
+
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::service::discovery::v2::ClusterLoadAssignment>(
