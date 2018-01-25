@@ -8,17 +8,16 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/ext_authz/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 
+#include "api/filter/network/ext_authz.pb.validate.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "api/filter/network/ext_authz.pb.validate.h"
 
 using testing::InSequence;
 using testing::Invoke;
@@ -64,7 +63,6 @@ public:
     }
   }
 
-
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -87,7 +85,8 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   envoy::api::v2::filter::network::ExtAuthz proto_config{};
   MessageUtil::loadFromJson(json_string, proto_config);
 
-  EXPECT_THROW(MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::ExtAuthz&>(proto_config),
+  EXPECT_THROW(MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::ExtAuthz&>(
+                   proto_config),
                ProtoValidationException);
 }
 
@@ -96,8 +95,7 @@ TEST_F(ExtAuthzFilterTest, OK) {
 
   EXPECT_CALL(*check_req_generator_, createTcpCheck(_, _));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-  EXPECT_CALL(*client_, check(_, _,
-                              testing::A<Tracing::Span&>()))
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
@@ -149,8 +147,7 @@ TEST_F(ExtAuthzFilterTest, OKWithSSLConnect) {
 
   EXPECT_CALL(*check_req_generator_, createTcpCheck(_, _));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-  EXPECT_CALL(*client_, check(_, _,
-                              testing::A<Tracing::Span&>()))
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 

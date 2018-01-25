@@ -59,10 +59,10 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
-        "//test/mocks/network:network_mocks",
         "//test/mocks/ext_authz:ext_authz_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:upstream_mocks",
     ],
 )
