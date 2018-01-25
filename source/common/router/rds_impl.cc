@@ -75,6 +75,8 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   // then there is no actual RDS server, and hence no RDS cluster name.
   if (rds.has_config_source() && rds.config_source().has_api_config_source()) {
     cluster_name_ = rds.config_source().api_config_source().cluster_names()[0];
+  } else if (rds.has_config_source() && rds.config_source().has_ads()) {
+    cluster_name_ = "ADS_CLUSTER";
   } else {
     cluster_name_ = "NOT_USING_CLUSTER";
   }
