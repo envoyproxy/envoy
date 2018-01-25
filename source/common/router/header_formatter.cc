@@ -11,7 +11,6 @@
 #include "common/json/json_loader.h"
 #include "common/request_info/utility.h"
 
-#include "absl/strings/str_cat.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -26,10 +25,10 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
     reason = fmt::format(", because {}", cause->what());
   }
 
-  return fmt::format("Incorrect header configuration. Expected format "
+  return fmt::format("Invalid header configuration. Expected format "
                      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                      "UPSTREAM_METADATA{}{}",
-                     absl::StrCat(params), reason);
+                     std::string(params), reason);
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
@@ -43,13 +42,11 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
   }
 
-  absl::string_view json = params_str;
-  json.remove_prefix(1);
-  json.remove_suffix(1);
+  absl::string_view json = params_str.substr(1, params_str.size() - 2); // trim parens
 
   std::vector<std::string> params;
   try {
-    Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(absl::StrCat(json));
+    Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(json));
 
     for (const auto& param : parsed_params->asObjectArray()) {
       params.emplace_back(param->asString());
@@ -132,10 +129,10 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     };
   } else if (field_name.find_first_of("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
-        parseUpstreamMetadataField(field_name.substr(sizeof("UPSTREAM_METADATA") - 1));
+        parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else {
     throw EnvoyException(
-        fmt::format("field '{}' not supported as custom header", absl::StrCat(field_name)));
+        fmt::format("field '{}' not supported as custom header", std::string(field_name)));
   }
 }
 

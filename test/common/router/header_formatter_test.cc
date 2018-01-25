@@ -166,20 +166,20 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
                             EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
                             "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA()", false),
                             EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(), because JSON supplied is not valid. "
                             "Error(offset 0, line 1): The document is empty.\n");
@@ -187,32 +187,32 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // One parameter.
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
                             EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(");
 
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
                             EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([a,b,c,d]");
 
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
                             EnvoyException,
-                            "Incorrect header configuration. Expected format "
+                            "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([\"a\",\"b\"]");
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
       RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false), EnvoyException,
-      "Incorrect header configuration. Expected format "
+      "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", 1]), because JSON field from line 1 accessed with type 'String' "
       "does not match actual type 'Integer'.");
@@ -221,7 +221,7 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   EXPECT_THROW_WITH_MESSAGE(
       RequestInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false),
       EnvoyException,
-      "Incorrect header configuration. Expected format "
+      "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is not valid. "
       "Error(offset 7, line 1): Incorrect hex digit after \\u escape in string.\n");
@@ -229,108 +229,194 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
       RequestInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false), EnvoyException,
-      "Incorrect header configuration. Expected format "
+      "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
       "does not match actual type 'Object'.");
 }
 
-TEST(HeaderParserTest, UnterminatedVariable) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-       {
-         "key": "x-client-ip",
-         "value": "%CLIENT_IP"
-       }
-    ]
-  }
-  )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add()),
-      EnvoyException,
-      "Invalid header configuration. Un-terminated variable expression "
-      "'CLIENT_IP'");
-}
+TEST(HeaderParserTest, TestParseInternal) {
+  struct TestCase {
+    std::string input_;
+    Optional<std::string> expected_output_;
+    Optional<std::string> expected_exception_;
+  };
 
-TEST(HeaderParserTest, UnterminatedVariableWithArgs) {
-  std::vector<std::pair<std::string, std::string>> test_cases({
-      {"%VAR(no array)%", "Invalid header configuration. Expecting JSON array of arguments after "
-                          "'VAR(', but found 'n'"},
-      {"%VAR( no array)%", "Invalid header configuration. Expecting JSON array of arguments after "
-                           "'VAR( ', but found 'n'"},
+  std::vector<TestCase> test_cases({
+      // Valid inputs
+      {"%PROTOCOL%", {"HTTP/1.1"}, {}},
+      {"[%PROTOCOL%", {"[HTTP/1.1"}, {}},
+      {"%PROTOCOL%]", {"HTTP/1.1]"}, {}},
+      {"[%PROTOCOL%]", {"[HTTP/1.1]"}, {}},
+      {"%%%PROTOCOL%", {"%HTTP/1.1"}, {}},
+      {"%PROTOCOL%%%", {"HTTP/1.1%"}, {}},
+      {"%%%PROTOCOL%%%", {"%HTTP/1.1%"}, {}},
+      {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
+      {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"])%]", {"value]"}, {}},
+      {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%]", {"[value]"}, {}},
+      {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
+      {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
+      {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+
+      // Unescaped %
+      {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
+      {"before %", {}, {"Invalid header configuration. Un-escaped % at position 7"}},
+      {"%% infix %", {}, {"Invalid header configuration. Un-escaped % at position 9"}},
+
+      // Unknown variable names
+      {"%INVALID%", {}, {"field 'INVALID' not supported as custom header"}},
+      {"before %INVALID%", {}, {"field 'INVALID' not supported as custom header"}},
+      {"%INVALID% after", {}, {"field 'INVALID' not supported as custom header"}},
+      {"before %INVALID% after", {}, {"field 'INVALID' not supported as custom header"}},
+
+      // Un-terminated variable expressions.
+      {"%VAR", {}, {"Invalid header configuration. Un-terminated variable expression 'VAR'"}},
+      {"%%%VAR", {}, {"Invalid header configuration. Un-terminated variable expression 'VAR'"}},
+      {"before %VAR",
+       {},
+       {"Invalid header configuration. Un-terminated variable expression 'VAR'"}},
+      {"before %%%VAR",
+       {},
+       {"Invalid header configuration. Un-terminated variable expression 'VAR'"}},
+      {"before %VAR after",
+       {},
+       {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
+      {"before %%%VAR after",
+       {},
+       {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
+      {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
+
+      // Un-terminated variable expressions with arguments.
+      {"%VAR(no array)%",
+       {},
+       {"Invalid header configuration. Expecting JSON array of arguments after "
+        "'VAR(', but found 'n'"}},
+      {"%VAR( no array)%",
+       {},
+       {"Invalid header configuration. Expecting JSON array of arguments after "
+        "'VAR( ', but found 'n'"}},
       {"%VAR([)",
-       "Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ')'"},
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ')'"}},
       {"%VAR([ )",
-       "Invalid header configuration. Expecting '\"' or whitespace after 'VAR([ ', but found ')'"},
-      {"%VAR([\"x\")%", "Invalid header configuration. Expecting ',', ']', or whitespace after "
-                        "'VAR([\"x\"', but found ')'"},
-      {"%VAR([\"x\" )%", "Invalid header configuration. Expecting ',', ']', or whitespace after "
-                         "'VAR([\"x\" ', but found ')'"},
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([ ', but found "
+        "')'"}},
+      {"%VAR([\"x\")%",
+       {},
+       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
+        "'VAR([\"x\"', but found ')'"}},
+      {"%VAR([\"x\" )%",
+       {},
+       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
+        "'VAR([\"x\" ', but found ')'"}},
       {"%VAR([\"x\\",
-       "Invalid header configuration. Un-terminated backslash in JSON string after 'VAR([\"x'"},
-      {"%VAR([\"x\"]!", "Invalid header configuration. Expecting ')' or whitespace after "
-                        "'VAR([\"x\"]', but found '!'"},
-      {"%VAR([\"x\"] !", "Invalid header configuration. Expecting ')' or whitespace after "
-                         "'VAR([\"x\"] ', but found '!'"},
-      {"%VAR([\"x\"])!", "Invalid header configuration. Expecting '%' or whitespace after "
-                         "'VAR([\"x\"])', but found '!'"},
-      {"%VAR([\"x\"]) !", "Invalid header configuration. Expecting '%' or whitespace after "
-                          "'VAR([\"x\"]) ', but found '!'"},
+       {},
+       {"Invalid header configuration. Un-terminated backslash in JSON string after 'VAR([\"x'"}},
+      {"%VAR([\"x\"]!",
+       {},
+       {"Invalid header configuration. Expecting ')' or whitespace after "
+        "'VAR([\"x\"]', but found '!'"}},
+      {"%VAR([\"x\"] !",
+       {},
+       {"Invalid header configuration. Expecting ')' or whitespace after "
+        "'VAR([\"x\"] ', but found '!'"}},
+      {"%VAR([\"x\"])!",
+       {},
+       {"Invalid header configuration. Expecting '%' or whitespace after "
+        "'VAR([\"x\"])', but found '!'"}},
+      {"%VAR([\"x\"]) !",
+       {},
+       {"Invalid header configuration. Expecting '%' or whitespace after "
+        "'VAR([\"x\"]) ', but found '!'"}},
+
+      // Argument errors
+      {"%VAR()%",
+       {},
+       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
+        "')'"}},
+      {"%VAR( )%",
+       {},
+       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR( ', but found "
+        "')'"}},
+      {"%VAR([])%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ']'"}},
+      {"%VAR( [ ] )%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR( [ ', but found "
+        "']'"}},
+      {"%VAR([\"ns\",])%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([\"ns\",', but "
+        "found ']'"}},
+      {"%VAR( [ \"ns\" , ] )%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR( [ \"ns\" , ', but "
+        "found ']'"}},
+      {"%VAR({\"ns\": \"key\"})%",
+       {},
+       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
+        "'{'"}},
+      {"%VAR(\"ns\", \"key\")%",
+       {},
+       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
+        "'\"'"}},
+
+      // Invalid arguments
+      {"%UPSTREAM_METADATA%",
+       {},
+       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+        "...]), actual format UPSTREAM_METADATA"}},
+      {"%UPSTREAM_METADATA([\"ns\"])%",
+       {},
+       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+        "...]), actual format UPSTREAM_METADATA([\"ns\"])"}},
   });
 
-  for (const auto& test_case : test_cases) {
-    const std::string& var = test_case.first;
-    const std::string& expected_message = test_case.second;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
 
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
+
+  // Metadata with percent signs in the key.
+  envoy::api::v2::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::Metadata>(
+      R"EOF(
+        filter_metadata:
+          ns:
+            key: value
+      )EOF");
+  ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+
+  for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption> to_add;
     envoy::api::v2::HeaderValueOption* header = to_add.Add();
     header->mutable_header()->set_key("x-header");
-    header->mutable_header()->set_value(var);
+    header->mutable_header()->set_value(test_case.input_);
 
-    EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException, expected_message);
-  }
-}
+    if (test_case.expected_exception_.valid()) {
+      EXPECT_FALSE(test_case.expected_output_.valid());
+      EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
+                                test_case.expected_exception_.value());
+      continue;
+    }
 
-TEST(HeaderParserTest, BarePercent) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-       {
-         "key": "x-header",
-         "value": "%"
-       }
-    ]
-  }
-  )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add()),
-      EnvoyException, "Invalid header configuration. Un-escaped % at position 0");
-}
+    HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
-TEST(HeaderParserTest, UnknownVariable) {
-  const std::string json = R"EOF(
-  {
-    "prefix": "/new_endpoint",
-    "prefix_rewrite": "/api/new_endpoint",
-    "cluster": "www2",
-    "request_headers_to_add": [
-       {
-         "key": "x-client-ip",
-         "value": "before %INVALID% after"
-       }
-    ]
+    Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+    req_header_parser->evaluateHeaders(headerMap, request_info);
+
+    std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
+
+    EXPECT_TRUE(headerMap.has("x-header")) << descriptor;
+    EXPECT_TRUE(test_case.expected_output_.valid()) << descriptor;
+    EXPECT_EQ(test_case.expected_output_.value(), headerMap.get_("x-header")) << descriptor;
   }
-  )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add()),
-      EnvoyException, "field 'INVALID' not supported as custom header");
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {
