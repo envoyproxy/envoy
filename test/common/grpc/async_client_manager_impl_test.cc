@@ -62,9 +62,10 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
   AsyncClientManagerImpl async_client_manager(cm_, tls_);
   envoy::api::v2::GrpcService grpc_service;
-  grpc_service.mutable_google_grpc();
+  grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
 #ifdef ENVOY_GOOGLE_GRPC
   EXPECT_NE(nullptr, async_client_manager.factoryForGrpcService(grpc_service, scope_));
