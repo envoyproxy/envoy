@@ -211,18 +211,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Determine if there is a direct response for the request.
-  if (route_->directResponseEntry()) {
-    auto response_code = route_->directResponseEntry()->responseCode();
+  const auto* direct_response = route_->directResponseEntry();
+  if (direct_response != nullptr) {
+    auto response_code = direct_response->responseCode();
     if (response_code >= Http::Code::MultipleChoices && response_code < Http::Code::BadRequest) {
       config_.stats_.rq_redirect_.inc();
-      Http::Utility::sendRedirect(*callbacks_, route_->directResponseEntry()->newPath(headers),
-                                  response_code);
+      Http::Utility::sendRedirect(*callbacks_, direct_response->newPath(headers), response_code);
       return Http::FilterHeadersStatus::StopIteration;
     }
     config_.stats_.rq_direct_response_.inc();
-    sendLocalReply(route_->directResponseEntry()->responseCode(),
-                   route_->directResponseEntry()->responseBody(), false);
-    // TODO(brian-pane) support sending response_headers_to_add.
+    Http::Utility::sendLocalReply(
+        [this, direct_response](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+          direct_response->finalizeResponseHeaders(*headers, callbacks_->requestInfo());
+          callbacks_->encodeHeaders(std::move(headers), end_stream);
+        },
+        [this](Buffer::Instance& data, bool end_stream) -> void {
+          callbacks_->encodeData(data, end_stream);
+        },
+        stream_destroyed_, direct_response->responseCode(), direct_response->responseBody());
     return Http::FilterHeadersStatus::StopIteration;
   }
 

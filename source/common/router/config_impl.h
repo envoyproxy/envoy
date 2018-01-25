@@ -52,6 +52,7 @@ typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedP
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
+  void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
