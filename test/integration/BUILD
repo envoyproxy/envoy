@@ -463,9 +463,6 @@ envoy_cc_test(
     srcs = [
         "squash_filter_integration_test.cc",
     ],
-    data = [
-        "//test/config/integration:squash_filter.json",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",

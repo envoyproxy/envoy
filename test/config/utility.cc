@@ -91,14 +91,14 @@ config:
         env: "{{ SQUASH_ENV_TEST }}"
       match_request: true
   attachment_timeout:
-    seconds: 0
-    nanos: 100000000
-  attachment_poll_period:
     seconds: 1
     nanos: 0
+  attachment_poll_period:
+    seconds: 2
+    nanos: 0
   request_timeout:
-    seconds: 0
-    nanos: 100000000
+    seconds: 1
+    nanos: 0
 )EOF";
 
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
