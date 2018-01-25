@@ -2666,9 +2666,9 @@ virtual_hosts:
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW_WITH_REGEX(ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
-                          EnvoyException,
-                          "Sum of weights in the weighted_cluster should add up to 100");
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
+                            EnvoyException,
+                            "Sum of weights in the weighted_cluster should add up to 100");
 
   yaml = R"EOF(
 virtual_hosts:
@@ -2688,9 +2688,9 @@ virtual_hosts:
                 weight: 3
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
-                          EnvoyException,
-                          "Sum of weights in the weighted_cluster should add up to 99");
+  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
+                            EnvoyException,
+                            "Sum of weights in the weighted_cluster should add up to 99");
 }
 
 TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
