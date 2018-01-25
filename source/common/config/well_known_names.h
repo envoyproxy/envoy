@@ -151,7 +151,7 @@ public:
   // Zipkin tracer
   const std::string ZIPKIN = "envoy.zipkin";
   // Dynamic tracer
-  const std::string DYNAMIC = "envoy.dynamic";
+  const std::string DYNAMIC_OT = "envoy.dynamic.ot";
 };
 
 typedef ConstSingleton<HttpTracerNameValues> HttpTracerNames;

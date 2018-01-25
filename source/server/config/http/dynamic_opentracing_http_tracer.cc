@@ -25,7 +25,7 @@ Tracing::HttpTracerPtr DynamicOpenTracingHttpTracerFactory::createHttpTracer(
 }
 
 std::string DynamicOpenTracingHttpTracerFactory::name() {
-  return Config::HttpTracerNames::get().DYNAMIC;
+  return Config::HttpTracerNames::get().DYNAMIC_OT;
 }
 
 /**
