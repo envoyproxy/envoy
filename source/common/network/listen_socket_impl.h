@@ -7,6 +7,7 @@
 
 #include "envoy/network/listen_socket.h"
 
+#include "common/common/assert.h"
 #include "common/ssl/context_impl.h"
 
 namespace Envoy {
@@ -48,6 +49,57 @@ typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;
 class UdsListenSocket : public ListenSocketImpl {
 public:
   UdsListenSocket(const std::string& uds_path);
+};
+
+class ConnectionSocketImpl : virtual public ConnectionSocket {
+public:
+  ConnectionSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
+                       const Address::InstanceConstSharedPtr& remote_address)
+      : fd_(fd), local_address_(local_address), remote_address_(remote_address) {}
+  ~ConnectionSocketImpl() { close(); }
+
+  // Network::ConnectionSocket
+  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
+                       bool restored) override {
+    ASSERT(!restored || *local_address != *local_address_);
+    local_address_ = local_address;
+    local_address_restored_ = restored;
+  }
+  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
+    remote_address_ = remote_address;
+  }
+  bool localAddressRestored() const override { return local_address_restored_; }
+  int fd() const override { return fd_; }
+  void close() override {
+    if (fd_ != -1) {
+      ::close(fd_);
+      fd_ = -1;
+    }
+  }
+
+protected:
+  int fd_;
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
+  bool local_address_restored_{false};
+};
+
+// ConnectionSocket used with server connections.
+class AcceptedSocketImpl : public ConnectionSocketImpl {
+public:
+  AcceptedSocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address,
+                     const Address::InstanceConstSharedPtr& remote_address)
+      : ConnectionSocketImpl(fd, local_address, remote_address) {}
+};
+
+// ConnectionSocket used with client connections.
+class ClientSocketImpl : public ConnectionSocketImpl {
+public:
+  ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address)
+      : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream), nullptr,
+                             remote_address) {}
 };
 
 } // namespace Network

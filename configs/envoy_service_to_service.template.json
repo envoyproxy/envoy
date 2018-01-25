@@ -362,7 +362,7 @@
       "name": "egress_{{ host['name'] }}",
       {% if host.get('ssl', False) -%}
       "ssl_context": {
-        "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt"
+        "ca_cert_file": "certs/cacert.pem"
         {% if host.get('sni', False) -%}
         ,"sni": "{{ host['sni'] }}"
         {% endif -%}
@@ -446,7 +446,7 @@
       "name": "lightstep_saas",
       "features": "http2",
       "ssl_context": {
-        "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
+        "ca_cert_file": "certs/cacert.pem",
         "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,

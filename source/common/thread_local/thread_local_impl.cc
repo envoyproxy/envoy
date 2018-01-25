@@ -48,12 +48,12 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
 
   if (main_thread) {
     main_thread_dispatcher_ = &dispatcher;
+    thread_local_data_.dispatcher_ = &dispatcher;
   } else {
     ASSERT(!containsReference(registered_threads_, dispatcher));
     registered_threads_.push_back(dispatcher);
+    dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
   }
-
-  dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
 }
 
 void InstanceImpl::removeSlot(SlotImpl& slot) {

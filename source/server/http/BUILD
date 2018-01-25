@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:instance_interface",
+        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:cluster_manager_interface",
