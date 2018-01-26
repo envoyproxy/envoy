@@ -10,6 +10,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/numeric/int128.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -35,9 +37,9 @@ public:
   virtual ~Ipv6() {}
 
   /**
-   * @return the 16-byte IPv6 address in network byte order.
+   * @return the absl::uint128 IPv6 address in network byte order.
    */
-  virtual std::array<uint8_t, 16> address() const PURE;
+  virtual absl::uint128 address() const PURE;
 };
 
 enum class IpVersion { v4, v6 };

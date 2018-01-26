@@ -1,6 +1,6 @@
 REPOSITORY_LOCATIONS = dict(
     com_google_absl = dict(
-        commit = "6de53819a7173bd446156237a37f53464b7732cc",
+        commit = "787891a3882795cee0364e8a0f0dda315578d155",
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
@@ -71,7 +71,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "fd1a8c4269910caa2d99bf919c0ad13fb3d70f4f",
+        commit = "a66448b203e3a4f8ebbea0a5b7beede5c25640f6",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

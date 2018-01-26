@@ -20,17 +20,18 @@ public:
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock"), FakeHttpConnection::Type::HTTP1));
 
-    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
-      auto* static_resources = bootstrap.mutable_static_resources();
-      for (int i = 0; i < static_resources->clusters_size(); ++i) {
-        auto* cluster = static_resources->mutable_clusters(i);
-        for (int j = 0; j < cluster->hosts_size(); ++j) {
-          cluster->mutable_hosts(j)->clear_socket_address();
-          cluster->mutable_hosts(j)->mutable_pipe()->set_path(
-              TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
-        }
-      }
-    });
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          auto* static_resources = bootstrap.mutable_static_resources();
+          for (int i = 0; i < static_resources->clusters_size(); ++i) {
+            auto* cluster = static_resources->mutable_clusters(i);
+            for (int j = 0; j < cluster->hosts_size(); ++j) {
+              cluster->mutable_hosts(j)->clear_socket_address();
+              cluster->mutable_hosts(j)->mutable_pipe()->set_path(
+                  TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
+            }
+          }
+        });
   }
 };
 } // namespace Envoy

@@ -68,6 +68,14 @@ openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pe
 openssl req -new -key expired_key.pem -out expired_cert.csr -config selfsigned_cert.cfg -batch -sha256
 openssl x509 -req -days -365 -in expired_cert.csr -signkey expired_key.pem -out expired_cert.pem
 
+# Initialize information for CRL process
+touch crl_index.txt crl_index.txt.attr
+echo 00 > crl_number
+
+# Revoke the certificate and generate a CRL
+openssl ca -revoke san_dns_cert.pem -keyfile ca_key.pem -cert ca_cert.pem -config ca_cert.cfg
+openssl ca -gencrl -keyfile ca_key.pem -cert ca_cert.pem -out ca_cert.crl -config ca_cert.cfg
+
 # Write session ticket key files
 openssl rand 80 > ticket_key_a
 openssl rand 80 > ticket_key_b
@@ -75,3 +83,4 @@ openssl rand 79 > ticket_key_wrong_len
 
 rm *csr
 rm *srl
+rm crl_*

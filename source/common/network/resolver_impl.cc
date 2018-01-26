@@ -1,5 +1,6 @@
 #include "common/network/resolver_impl.h"
 
+#include "envoy/api/v2/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/address.h"
 #include "envoy/network/resolver.h"
@@ -8,8 +9,6 @@
 #include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-
-#include "api/address.pb.h"
 
 namespace Envoy {
 namespace Network {
