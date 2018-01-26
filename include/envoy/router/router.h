@@ -9,7 +9,6 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -19,6 +18,8 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Router {

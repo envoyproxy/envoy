@@ -625,7 +625,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  envoy::api::v2::cluster::Cluster config;
+  envoy::api::v2::Cluster config;
   config.set_name("staticcluster");
   config.mutable_connect_timeout();
 

@@ -4,10 +4,11 @@
 #include <set>
 #include <vector>
 
-#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "api/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -198,7 +199,7 @@ public:
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
 public:
-  LoadBalancerSubsetInfoImpl(const envoy::api::v2::cluster::Cluster::LbSubsetConfig& subset_config)
+  LoadBalancerSubsetInfoImpl(const envoy::api::v2::Cluster::LbSubsetConfig& subset_config)
       : enabled_(!subset_config.subset_selectors().empty()),
         fallback_policy_(subset_config.fallback_policy()),
         default_subset_(subset_config.default_subset()) {
@@ -212,8 +213,7 @@ public:
 
   // Upstream::LoadBalancerSubsetInfo
   bool isEnabled() const override { return enabled_; }
-  envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
-  fallbackPolicy() const override {
+  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallbackPolicy() const override {
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
@@ -221,7 +221,7 @@ public:
 
 private:
   const bool enabled_;
-  const envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
   std::vector<std::set<std::string>> subset_keys_;
 };

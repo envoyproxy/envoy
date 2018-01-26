@@ -1,7 +1,6 @@
 #include "common/upstream/eds.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/service/discovery/v2/eds.pb.validate.h"
 
 #include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
@@ -13,14 +12,14 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/sds_subscription.h"
 
+#include "api/eds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster,
-                               Runtime::Loader& runtime, Stats::Store& stats,
-                               Ssl::ContextManager& ssl_context_manager,
+EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+                               Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                                const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
@@ -31,20 +30,16 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster,
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info);
-
-  // TODO: dummy to force linking the gRPC service proto
-  envoy::service::discovery::v2::EdsDummy dummy;
-
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::service::discovery::v2::ClusterLoadAssignment>(
+      envoy::api::v2::ClusterLoadAssignment>(
       eds_config, local_info.node(), dispatcher, cm, random, info_->statsScope(),
       [this, &eds_config, &cm, &dispatcher,
-       &random]() -> Config::Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
+       &random]() -> Config::Subscription<envoy::api::v2::ClusterLoadAssignment>* {
         return new SdsSubscription(info_->stats(), eds_config, cm, dispatcher, random);
       },
-      "envoy.service.discovery.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.service.discovery.v2.EndpointDiscoveryService.StreamEndpoints");
+      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
+      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }

@@ -1,5 +1,4 @@
 #include "envoy/common/exception.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/config/subscription_factory.h"
 
@@ -12,6 +11,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -25,29 +25,26 @@ namespace Config {
 class SubscriptionFactoryTest : public ::testing::Test {
 public:
   SubscriptionFactoryTest() : http_request_(&cm_.async_client_) {
-    legacy_subscription_.reset(
-        new MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>());
+    legacy_subscription_.reset(new MockSubscription<envoy::api::v2::ClusterLoadAssignment>());
   }
 
-  std::unique_ptr<Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>>
+  std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
   subscriptionFromConfigSource(const envoy::api::v2::ConfigSource& config) {
-    return SubscriptionFactory::subscriptionFromConfigSource<
-        envoy::service::discovery::v2::ClusterLoadAssignment>(
+    return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
         config, node_, dispatcher_, cm_, random_, stats_store_,
-        [this]() -> Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>* {
+        [this]() -> Subscription<envoy::api::v2::ClusterLoadAssignment>* {
           return legacy_subscription_.release();
         },
-        "envoy.service.discovery.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.service.discovery.v2.EndpointDiscoveryService.StreamEndpoints");
+        "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
+        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
   }
 
   envoy::api::v2::Node node_;
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
-  MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> callbacks_;
-  std::unique_ptr<MockSubscription<envoy::service::discovery::v2::ClusterLoadAssignment>>
-      legacy_subscription_;
+  MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
+  std::unique_ptr<MockSubscription<envoy::api::v2::ClusterLoadAssignment>> legacy_subscription_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
 };
@@ -232,7 +229,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::cluster::Cluster::EDS));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
       "envoy::api::v2::ConfigSource must have a statically defined non-EDS cluster: 'eds_cluster' "

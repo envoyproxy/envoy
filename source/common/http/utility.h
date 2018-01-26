@@ -4,11 +4,12 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/protocol.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 
 #include "common/json/json_loader.h"
+
+#include "api/protocol.pb.h"
 
 namespace Envoy {
 namespace Http {

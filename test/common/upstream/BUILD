@@ -53,6 +53,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_test",
     srcs = ["eds_test.cc"],
+    external_deps = ["envoy_eds"],
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
@@ -64,7 +65,6 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
     ],
 )
 
@@ -135,6 +135,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_test.cc"],
+    external_deps = ["envoy_eds"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",
@@ -142,9 +143,6 @@ envoy_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
-        "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
     ],
 )
 
@@ -235,6 +233,7 @@ envoy_cc_test(
     name = "sds_test",
     srcs = ["sds_test.cc"],
     data = glob(["test_data/**"]),
+    external_deps = ["envoy_base"],
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
@@ -250,7 +249,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:base_cc",
     ],
 )
 

@@ -165,7 +165,7 @@ After loading this configuration, the SLB's `LbSubsetMap` looks like this:
 <a name="diagram"></a>
 ![LbSubsetMap Diagram](subset_load_balancer_diagram.svg)
 
-Given these `envoy::api::v2::route::Route` entries:
+Given these `envoy::api::v2::Route` entries:
 
 ``` json
 "routes": [

@@ -3,8 +3,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/fault.pb.h"
-
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
 #include "common/mongo/proxy.h"
@@ -17,6 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
 
+#include "api/filter/fault.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

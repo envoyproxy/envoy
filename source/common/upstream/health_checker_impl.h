@@ -8,7 +8,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/health_check.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -24,6 +23,7 @@
 #include "common/network/filter_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "api/health_check.pb.h"
 #include "src/proto/grpc/health/v1/health.pb.h"
 
 namespace Envoy {

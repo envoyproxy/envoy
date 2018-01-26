@@ -2,8 +2,6 @@
 
 #include <unordered_set>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
@@ -16,6 +14,7 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
+#include "api/stats.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -91,7 +90,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   const auto& cluster_name = api_config_source.cluster_names()[0];
   const auto& it = clusters.find(cluster_name);
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
-      it->second.get().info()->type() == envoy::api::v2::cluster::Cluster::EDS) {
+      it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
     throw EnvoyException(fmt::format(
         "envoy::api::v2::ConfigSource must have a statically "
         "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
@@ -150,24 +149,22 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
 
 std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return MessageUtil::anyConvert<envoy::api::v2::listener::Listener>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return MessageUtil::anyConvert<envoy::api::v2::route::RouteConfiguration>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return MessageUtil::anyConvert<envoy::api::v2::cluster::Cluster>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return MessageUtil::anyConvert<envoy::service::discovery::v2::ClusterLoadAssignment>(resource)
-        .cluster_name();
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
   throw EnvoyException(
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 

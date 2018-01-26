@@ -1,6 +1,5 @@
 #include "server/config/access_log/file_access_log.h"
 
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -9,6 +8,8 @@
 #include "common/common/macros.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
+
+#include "api/filter/accesslog/accesslog.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

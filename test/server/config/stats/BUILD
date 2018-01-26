@@ -11,6 +11,9 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    external_deps = [
+        "envoy_bootstrap",
+    ],
     deps = [
         "//include/envoy/registry",
         "//source/common/config:well_known_names",
@@ -22,6 +25,5 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

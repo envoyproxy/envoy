@@ -1,6 +1,6 @@
 version_info: "0"
 resources:
-- "@type": type.googleapis.com/envoy.service.discovery.v2.ClusterLoadAssignment
+- "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
   cluster_name: cluster_1
   endpoints:
   - lb_endpoints:

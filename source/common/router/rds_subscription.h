@@ -3,11 +3,12 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
+
+#include "api/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -16,10 +17,9 @@ namespace Router {
  * Subscription implementation that reads host information from the v1 REST Route Discovery
  * Service.
  */
-class RdsSubscription
-    : public Http::RestApiFetcher,
-      public Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>,
-      Logger::Loggable<Logger::Id::upstream> {
+class RdsSubscription : public Http::RestApiFetcher,
+                        public Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>,
+                        Logger::Loggable<Logger::Id::upstream> {
 public:
   RdsSubscription(Envoy::Config::SubscriptionStats stats,
                   const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm,
@@ -29,8 +29,8 @@ public:
 private:
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
-             Envoy::Config::SubscriptionCallbacks<envoy::api::v2::route::RouteConfiguration>&
-                 callbacks) override {
+             Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>& callbacks)
+      override {
     // We can only handle a single cluster route configuration, it's a design error to ever use this
     // type of Subscription with more than a single cluster.
     ASSERT(resources.size() == 1);
@@ -57,8 +57,7 @@ private:
   std::string route_config_name_;
   std::string version_info_;
   const LocalInfo::LocalInfo& local_info_;
-  Envoy::Config::SubscriptionCallbacks<envoy::api::v2::route::RouteConfiguration>* callbacks_ =
-      nullptr;
+  Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>* callbacks_ = nullptr;
   Envoy::Config::SubscriptionStats stats_;
 };
 

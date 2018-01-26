@@ -1,11 +1,12 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/upstream/upstream_impl.h"
+
+#include "api/base.pb.h"
+#include "api/eds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -13,11 +14,10 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl
-    : public BaseDynamicClusterImpl,
-      Config::SubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment> {
+class EdsClusterImpl : public BaseDynamicClusterImpl,
+                       Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
 public:
-  EdsClusterImpl(const envoy::api::v2::cluster::Cluster& cluster, Runtime::Loader& runtime,
+  EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                  const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
@@ -39,8 +39,7 @@ private:
   void startPreInit() override;
 
   const ClusterManager& cm_;
-  std::unique_ptr<Config::Subscription<envoy::service::discovery::v2::ClusterLoadAssignment>>
-      subscription_;
+  std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
 };

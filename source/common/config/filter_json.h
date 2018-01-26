@@ -1,19 +1,20 @@
 #pragma once
 
-#include "envoy/api/v2/filter/http/buffer.pb.h"
-#include "envoy/api/v2/filter/http/fault.pb.h"
-#include "envoy/api/v2/filter/http/health_check.pb.h"
-#include "envoy/api/v2/filter/http/lua.pb.h"
-#include "envoy/api/v2/filter/http/rate_limit.pb.h"
-#include "envoy/api/v2/filter/http/router.pb.h"
-#include "envoy/api/v2/filter/http/transcoder.pb.h"
-#include "envoy/api/v2/filter/network/client_ssl_auth.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-#include "envoy/api/v2/filter/network/mongo_proxy.pb.h"
-#include "envoy/api/v2/filter/network/rate_limit.pb.h"
-#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.h"
 #include "envoy/json/json_object.h"
+
+#include "api/filter/http/buffer.pb.h"
+#include "api/filter/http/fault.pb.h"
+#include "api/filter/http/health_check.pb.h"
+#include "api/filter/http/lua.pb.h"
+#include "api/filter/http/rate_limit.pb.h"
+#include "api/filter/http/router.pb.h"
+#include "api/filter/http/transcoder.pb.h"
+#include "api/filter/network/client_ssl_auth.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
+#include "api/filter/network/mongo_proxy.pb.h"
+#include "api/filter/network/rate_limit.pb.h"
+#include "api/filter/network/redis_proxy.pb.h"
+#include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {
 namespace Config {
