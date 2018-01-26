@@ -1,10 +1,12 @@
+#include "envoy/config/metrics/v2/metrics_service.pb.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
 #include "test/integration/http_integration.h"
 
-#include "api/metrics_service.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -25,7 +27,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       metrics_service_cluster->set_name("metrics_service");
@@ -33,7 +35,7 @@ public:
 
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.metrics_service");
-      envoy::api::v2::MetricsServiceConfig config;
+      envoy::config::metrics::v2::MetricsServiceConfig config;
       config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("metrics_service");
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
     });
@@ -51,10 +53,10 @@ public:
   }
 
   void waitForMetricsRequest() {
-    envoy::api::v2::StreamMetricsMessage request_msg;
+    envoy::service::metrics::v2::StreamMetricsMessage request_msg;
     metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.api.v2.MetricsService/StreamMetrics",
+    EXPECT_STREQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
                  metrics_service_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc",
                  metrics_service_request_->headers().ContentType()->value().c_str());
@@ -105,7 +107,7 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   metrics_service_request_->startGrpcStream();
-  envoy::api::v2::StreamMetricsResponse response_msg;
+  envoy::service::metrics::v2::StreamMetricsResponse response_msg;
   metrics_service_request_->sendGrpcMessage(response_msg);
   metrics_service_request_->finishGrpcStream(Grpc::Status::Ok);
   test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);

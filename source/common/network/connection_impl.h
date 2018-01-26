@@ -48,17 +48,10 @@ class ConnectionImpl : public virtual Connection,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
   // TODO(lizan): Remove the old style constructor when factory is ready.
-  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
-                 Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address,
-                 Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
-                 bool connected);
+  ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket, bool connected);
 
-  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
-                 Address::InstanceConstSharedPtr remote_address,
-                 Address::InstanceConstSharedPtr local_address,
-                 Address::InstanceConstSharedPtr bind_to_address,
-                 TransportSocketPtr&& transport_socket, bool using_original_dst, bool connected);
+  ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                 TransportSocketPtr&& transport_socket, bool connected);
 
   ~ConnectionImpl();
 
@@ -79,8 +72,12 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return socket_->remoteAddress();
+  }
+  const Address::InstanceConstSharedPtr& localAddress() const override {
+    return socket_->localAddress();
+  }
   void setConnectionStats(const ConnectionStats& stats) override;
   Ssl::Connection* ssl() override { return transport_socket_->ssl(); }
   const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
@@ -88,7 +85,7 @@ public:
   void write(Buffer::Instance& data) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool usingOriginalDst() const override { return using_original_dst_; }
+  bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return above_high_watermark_; }
 
   // Network::BufferSource
@@ -96,7 +93,7 @@ public:
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
   // Network::TransportSocketCallbacks
-  int fd() override { return fd_; }
+  int fd() const override { return socket_->fd(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
@@ -112,20 +109,24 @@ public:
 
 protected:
   void closeSocket(ConnectionEvent close_type);
-  void doConnect();
 
   void onLowWatermark();
   void onHighWatermark();
 
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
-  Address::InstanceConstSharedPtr remote_address_;
-  Address::InstanceConstSharedPtr local_address_;
+  ConnectionSocketPtr socket_;
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
+
+protected:
+  bool connecting_{false};
+  bool immediate_connection_error_{false};
+  bool bind_error_{false};
+  Event::FileEventPtr file_event_;
 
 private:
   void onFileEvent(uint32_t events);
@@ -138,17 +139,11 @@ private:
   static std::atomic<uint64_t> next_global_id_;
 
   Event::Dispatcher& dispatcher_;
-  int fd_{-1};
-  Event::FileEventPtr file_event_;
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
   bool read_enabled_{true};
-  bool connecting_{false};
   bool close_with_flush_{false};
-  bool immediate_connection_error_{false};
-  bool bind_error_{false};
-  const bool using_original_dst_;
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   Buffer::Instance* current_write_buffer_{};
@@ -172,7 +167,7 @@ public:
                        Network::TransportSocketPtr&& transport_socket);
 
   // Network::ClientConnection
-  void connect() override { doConnect(); }
+  void connect() override;
 };
 
 } // namespace Network

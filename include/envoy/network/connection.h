@@ -207,10 +207,10 @@ public:
   virtual uint32_t bufferLimit() const PURE;
 
   /**
-   * @return boolean telling if the connection's local address is an original destination address,
-   * rather than the listener's address.
+   * @return boolean telling if the connection's local address has been restored to an original
+   *         destination address, rather than the address the connection was accepted at.
    */
-  virtual bool usingOriginalDst() const PURE;
+  virtual bool localAddressRestored() const PURE;
 
   /**
    * @return boolean telling if the connection is currently above the high watermark.
