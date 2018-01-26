@@ -309,7 +309,7 @@ TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
-                          "Failed to load CRL from .*/not_a_crl.crl$");
+                          "^Failed to load CRL from .*/not_a_crl.crl$");
 }
 
 TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
