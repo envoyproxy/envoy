@@ -3555,6 +3555,45 @@ virtual_hosts:
   }
 }
 
+TEST(RouteConfigurationV2, DirectResponse) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/"}
+        direct_response: { status: 200, body: { inline_string: "content" } }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  const auto* direct_response =
+      config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
+  EXPECT_NE(nullptr, direct_response);
+  EXPECT_EQ(Http::Code::OK, direct_response->responseCode());
+  EXPECT_STREQ("content", direct_response->responseBody().c_str());
+
+  std::string response_body(4097, 'A');
+  yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/"}
+        direct_response:
+          status: 200
+          body:
+            inline_string: )EOF" +
+         response_body + "\n";
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigImpl invalid_config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
+      EnvoyException, "response body size is 4097 bytes; maximum is 4096");
+}
+
 TEST(RouteConfigurationV2, Metadata) {
   std::string yaml = R"EOF(
 name: foo

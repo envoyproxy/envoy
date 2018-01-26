@@ -298,7 +298,6 @@ public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
                      Runtime::Loader& loader);
 
-  bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
   bool isDirectResponse() const { return direct_response_code_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;

@@ -212,16 +212,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Determine if there is a direct response for the request.
   const auto* direct_response = route_->directResponseEntry();
+  const auto& request_headers = headers;
   if (direct_response != nullptr) {
-    auto response_code = direct_response->responseCode();
-    if (response_code >= Http::Code::MultipleChoices && response_code < Http::Code::BadRequest) {
-      config_.stats_.rq_redirect_.inc();
-      Http::Utility::sendRedirect(*callbacks_, direct_response->newPath(headers), response_code);
-      return Http::FilterHeadersStatus::StopIteration;
-    }
     config_.stats_.rq_direct_response_.inc();
     Http::Utility::sendLocalReply(
-        [this, direct_response](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+        [this, direct_response, &request_headers](Http::HeaderMapPtr&& headers,
+                                                  bool end_stream) -> void {
+          const auto new_path = direct_response->newPath(request_headers);
+          if (!new_path.empty()) {
+            headers->addCopy(Http::LowerCaseString("location"), new_path);
+          }
           direct_response->finalizeResponseHeaders(*headers, callbacks_->requestInfo());
           callbacks_->encodeHeaders(std::move(headers), end_stream);
         },
