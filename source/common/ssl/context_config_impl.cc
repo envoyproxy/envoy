@@ -68,6 +68,9 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
           tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
   // TODO(htuch): Support multiple hashes.
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
+  if (ca_cert_.empty() && !certificate_revocation_list_.empty()) {
+    throw EnvoyException("Cannot have a CRL without a CA certificate");
+  }
 }
 
 const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::DataSource& source,

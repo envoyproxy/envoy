@@ -290,6 +290,7 @@ TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
     "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
     "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
   }
   )EOF";
@@ -302,12 +303,26 @@ TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
     "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
     "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
   }
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
                           "Failed to load CRL from .*/not_a_crl.crl$");
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigJson(json), EnvoyException,
+                            "Cannot have a CRL without a CA certificate");
 }
 
 } // namespace Ssl
