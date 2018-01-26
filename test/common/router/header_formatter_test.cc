@@ -1,5 +1,6 @@
 #include <string>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
@@ -11,7 +12,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/base.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
