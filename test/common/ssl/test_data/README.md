@@ -2,7 +2,8 @@
 There are 10 identities:
 - **CA**: Certificate Authority for **No SAN**, **SAN With URI** and **SAN With
   DNS**. It has the self-signed certificate *ca_cert.pem*. *ca_key.pem* is its
-  private key.
+  private key. Additionally, we create a CRL for this CA (*ca_cert.crl*) that
+  revokes the certificate *san_dns_cert.pem*.
 - **Intermediate CA**: Intermediate Certificate Authority, signed by the **CA**.
   It has the certificate *intermediate_ca_cert.pem". *intermediate_ca_key.pem*
   is its private key.
