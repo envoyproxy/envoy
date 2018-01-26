@@ -101,7 +101,7 @@ public:
     return MessageUtil::getJsonStringFromMessage(route_config_proto_);
   }
   const std::string& routeConfigName() const override { return route_config_name_; }
-  const std::string& clusterName() const override { return cluster_name_; }
+  const std::string& clusterConfig() const override { return cluster_config_; }
   const std::string versionInfo() const override { return subscription_->versionInfo(); }
 
   // Config::SubscriptionCallbacks
@@ -130,7 +130,7 @@ private:
   Upstream::ClusterManager& cm_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
-  std::string cluster_name_;
+  std::string cluster_config_;
   const std::string route_config_name_;
   bool initialized_{};
   uint64_t last_config_hash_{};

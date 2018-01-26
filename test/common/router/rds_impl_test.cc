@@ -215,7 +215,7 @@ TEST_F(RdsImplTest, Basic) {
 {
 "version_info": "",
 "route_config_name": "foo_route_config",
-"cluster_name": "foo_cluster",
+"cluster_config": {"cluster_names":["foo_cluster"],"refresh_delay":"1s"},
 "route_table_dump": {}
 }
 ]
@@ -248,7 +248,7 @@ TEST_F(RdsImplTest, Basic) {
 {
 "version_info": "hash_15ed54077da94d8b",
 "route_config_name": "foo_route_config",
-"cluster_name": "foo_cluster",
+"cluster_config": {"cluster_names":["foo_cluster"],"refresh_delay":"1s"},
 "route_table_dump": {"name":"foo_route_config"}
 }
 ]
@@ -327,7 +327,7 @@ TEST_F(RdsImplTest, Basic) {
 {
 "version_info": "hash_7a3f97b327d08382",
 "route_config_name": "foo_route_config",
-"cluster_name": "foo_cluster",
+"cluster_config": {"cluster_names":["foo_cluster"],"refresh_delay":"1s"},
 "route_table_dump": {"name":"foo_route_config","virtual_hosts":[{"name":"local_service","domains":["*"],"routes":[{"match":{"prefix":"/foo"},"route":{"cluster_header":":authority"}},{"match":{"prefix":"/bar"},"route":{"cluster":"bar"}}]}]}
 }
 ]
@@ -524,13 +524,13 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 {
 "version_info": "",
 "route_config_name": "foo_route_config",
-"cluster_name": "bar_cluster",
+"cluster_config": {"cluster_names":["bar_cluster"],"refresh_delay":"1s"},
 "route_table_dump": {}
 }
 ,{
 "version_info": "",
 "route_config_name": "foo_route_config",
-"cluster_name": "foo_cluster",
+"cluster_config": {"cluster_names":["foo_cluster"],"refresh_delay":"1s"},
 "route_table_dump": {}
 }
 ]
