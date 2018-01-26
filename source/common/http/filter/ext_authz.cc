@@ -49,7 +49,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
   if (check_req_generator_ == nullptr) {
     setCheckReqGenerator(new Envoy::ExtAuthz::ExtAuthzCheckRequestGenerator());
   }
-  envoy::api::v2::auth::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   check_req_generator_->createHttpCheck(callbacks_, headers, request);
 
   state_ = State::Calling;

@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/filter/http/ext_authz.pb.validate.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/http/filter/ext_authz.h"
@@ -18,7 +20,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "api/filter/http/ext_authz.pb.validate.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

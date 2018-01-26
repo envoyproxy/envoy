@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/filter/http/ext_authz.pb.h"
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
@@ -13,8 +14,6 @@
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
-
-#include "api/filter/http/ext_authz.pb.h"
 
 namespace Envoy {
 namespace Http {

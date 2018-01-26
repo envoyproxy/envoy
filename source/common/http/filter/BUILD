@@ -170,7 +170,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ext_authz_includes",
     hdrs = ["ext_authz.h"],
-    external_deps = ["envoy_filter_http_ext_authz"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/ext_authz:ext_authz_interface",
@@ -183,5 +182,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_validator_lib",
+        "@envoy_api//envoy/api/v2/filter/http:ext_authz_cc",
     ],
 )
