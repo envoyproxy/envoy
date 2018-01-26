@@ -215,8 +215,6 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
-const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
-
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
@@ -233,6 +231,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
+      total_cluster_weight_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
       request_headers_parser_(HeaderParser::configure(route.route().request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(route.route().response_headers_to_add(),
                                                        route.route().response_headers_to_remove())),
@@ -257,6 +257,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // from the weighted cluster (if any) are merged with and override
   // the criteria from the route.
   if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
+    ASSERT(total_cluster_weight_ > 0);
+
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
@@ -285,9 +287,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_weight != WeightedClusterEntry::MAX_CLUSTER_WEIGHT) {
+    if (total_weight != total_cluster_weight_) {
       throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
-                                       WeightedClusterEntry::MAX_CLUSTER_WEIGHT));
+                                       total_cluster_weight_));
     }
   }
 
@@ -471,7 +473,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
   }
 
-  uint64_t selected_value = random_value % WeightedClusterEntry::MAX_CLUSTER_WEIGHT;
+  uint64_t selected_value = random_value % total_cluster_weight_;
   uint64_t begin = 0UL;
   uint64_t end = 0UL;
 
@@ -480,13 +482,10 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) ||
-        (end >= WeightedClusterEntry::MAX_CLUSTER_WEIGHT)) {
-      // end > WeightedClusterEntry::MAX_CLUSTER_WEIGHT : This case can only occur
-      // with Runtimes, when the user specifies invalid weights such that
-      // sum(weights) > WeightedClusterEntry::MAX_CLUSTER_WEIGHT.
-      // In this case, terminate the search and just return the cluster
-      // whose weight cased the overflow
+    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
+      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
+      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
+      // terminate the search and just return the cluster whose weight caused the overflow.
       return cluster;
     }
     begin = end;
