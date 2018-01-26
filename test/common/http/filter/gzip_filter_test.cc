@@ -98,60 +98,18 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(8, config_->contentTypeValues().size());
 }
 
-// Bad configuration - memory_level is out of range.
-TEST_F(GzipFilterTest, BadConfigMemoryLevelOutOfRange) {
+// Verifies bad config params.
+TEST_F(GzipFilterTest, BadConfigurationParams) {
   gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 10 })EOF");
-}
-
-// Bad configuration - memory_level is zero.
-TEST_F(GzipFilterTest, BadConfigMemoryLevelZero) {
   gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 0 })EOF");
-}
-
-// Bad configuration - window_bits is out of range.
-TEST_F(GzipFilterTest, BadConfigWindowBitsOutOfRange) {
   gzipFilterBadConfigHelper(R"EOF({ "window_bits" : 16 })EOF");
-}
-
-// Bad configuration - window_bits is out of range.
-// This should failed when window bits bug in zlib gets fixed
-// and gzip.proto gets updated to support window size 8.
-TEST_F(GzipFilterTest, BadConfigWindowBitsBellowSupported) {
   gzipFilterBadConfigHelper(R"EOF({ "window_bits" : 8 })EOF");
-}
-
-// Bad configuration - content_length is zero.
-TEST_F(GzipFilterTest, BadConfigContentLengthZero) {
   gzipFilterBadConfigHelper(R"EOF({ "content_length" : 0 })EOF");
-}
-
-// Bad configuration - compression_level has invalid value.
-TEST_F(GzipFilterTest, BadConfigCompressionLevelInvalid) {
   gzipFilterBadConfigHelper(R"EOF({ "compression_level" : "banana" })EOF");
-}
-
-// Bad configuration - compression_strategy is invalid.
-TEST_F(GzipFilterTest, BadConfigCompressionStrategyInvalid) {
   gzipFilterBadConfigHelper(R"EOF({ "compression_strategy" : "banana" })EOF");
-}
-
-// Bad configuration - disable_on_etag has invalid value.
-TEST_F(GzipFilterTest, BadConfigDisableOnEtagInvalid) {
   gzipFilterBadConfigHelper(R"EOF({ "disable_on_etag" : "banana" })EOF");
-}
-
-// Bad configuration - disable_on_last_modified has invalid value.
-TEST_F(GzipFilterTest, BadConfigDisableLastModifiedInvalid) {
   gzipFilterBadConfigHelper(R"EOF({ "disable_on_last_modified" : "banana" })EOF");
-}
-
-// Bad configuration - config has invalid key/val.
-TEST_F(GzipFilterTest, BadConfigInvalidKey) {
   gzipFilterBadConfigHelper(R"EOF({ "banana" : "banana" })EOF");
-}
-
-// Bad configuration - content_type exceeded 30 items.
-TEST_F(GzipFilterTest, BadConfigContentTypeExceededLimit) {
   gzipFilterBadConfigHelper(R"EOF(
     {
       "content_type" : [
@@ -178,65 +136,222 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
-// Accept-Encoding: gzip;q=0, deflate.
-TEST_F(GzipFilterTest, AcceptEncodingValuesQ0) {
+// Verifies isAcceptEncodingAllowed function.
+TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=1.0, *;q=0.5"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {
+        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5\n"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate,gzip;q=1.0,*;q=0"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=0.2, br;q=1"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "*"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "*;q=1"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "gzip;q=0,*;q=1"}};
+    EXPECT_FALSE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0.5, *;q=0"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0, *;q=0"}};
+    EXPECT_FALSE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *;q=0"}};
+    EXPECT_FALSE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2"}};
+    EXPECT_FALSE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=1"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0"}};
+    EXPECT_FALSE(filter_->isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
+    EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
+  }
+}
+
+// Verifies that compression is skipped when accept-encoding header is not allowed.
+TEST_F(GzipFilterTest, AcceptEncodingNoCompression) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=0, deflate"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
-// Accept-Encoding: gzip;q=.5, deflate.
-TEST_F(GzipFilterTest, AcceptEncodingGzipQ5) {
+// Verifies that compression is NOT skipped when accept-encoding header is allowed.
+TEST_F(GzipFilterTest, AcceptEncodingCompression) {
   setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=.5, deflate"}}, true);
+  doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
-// Accept-Encoding: gzip;q=.5, identity.
-TEST_F(GzipFilterTest, AcceptEncodingGzipQ5Identity) {
+// Verifies isMinimumContentLength function.
+TEST_F(GzipFilterTest, isMinimumContentLength) {
   setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=.5, identity"}}, true);
-  doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
+  {
+    TestHeaderMapImpl headers = {{"content-length", "31"}};
+    EXPECT_TRUE(filter_->isMinimumContentLength(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-length", "29"}};
+    EXPECT_FALSE(filter_->isMinimumContentLength(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
+    EXPECT_TRUE(filter_->isMinimumContentLength(headers));
+  }
+
+  setUpTest(R"EOF({"content_length": 500})EOF");
+  {
+    TestHeaderMapImpl headers = {{"content-length", "501"}};
+    EXPECT_TRUE(filter_->isMinimumContentLength(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
+    EXPECT_TRUE(filter_->isMinimumContentLength(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-length", "499"}};
+    EXPECT_FALSE(filter_->isMinimumContentLength(headers));
+  }
 }
 
-// Accept-Encoding: deflate, gzip;q=0.5, identity;q=0.
-TEST_F(GzipFilterTest, AcceptEncodingGzipIdentityQ0) {
-  setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "deflate;q=1, gzip;q=0.8, identity;q=0"}},
-            true);
-  doResponseCompression({{":method", "get"}, {"content-length", "256"}});
-}
-
-// Accept-Encoding: *
-TEST_F(GzipFilterTest, AcceptEncodingWildcard) {
-  setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "*"}}, true);
-  doResponseCompression({{":method", "get"}, {"content-length", "256"}});
-}
-
-// Accept-Encoding: identity.
-TEST_F(GzipFilterTest, AcceptEncodingIdentity) {
-  setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "identity"}}, true);
-  doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
-}
-
-// Content-Length below default configuration.
-TEST_F(GzipFilterTest, ContentLengthBellowDefault) {
+// Verifies that compression is skipped when content-length header is NOT allowed.
+TEST_F(GzipFilterTest, ContentLengthNoCompression) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "10"}});
 }
 
-// Content-Length below 500.
-TEST_F(GzipFilterTest, ContentLengthBellowSomeValue) {
+// Verifies that compression is NOT skipped when content-length header is allowed.
+TEST_F(GzipFilterTest, ContentLengthCompression) {
   setUpTest(R"EOF({"content_length": 500})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
+  doResponseCompression({{":method", "get"}, {"content-length", "1000"}});
 }
 
-// Content-Type is not in the white-list.
-TEST_F(GzipFilterTest, ContentTypeNotSupported) {
+// Verifies isContentTypeAllowed function.
+TEST_F(GzipFilterTest, isContentTypeAllowed) {
+  setUpTest("{}");
+  {
+    TestHeaderMapImpl headers = {{"content-type", "text/html"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "text/xml"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "text/plain"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "application/javascript"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "image/svg+xml"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "application/json;charset=utf-8"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "application/json"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "application/xhtml+xml"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
+    EXPECT_FALSE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t\n"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+
+  setUpTest(R"EOF(
+    {
+      "content_type": [
+        "text/html",
+        "xyz/svg+xml"
+      ]
+    }
+  )EOF");
+  {
+    TestHeaderMapImpl headers = {{"content-type", "xyz/svg+xml"}};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "xyz/false"}};
+    EXPECT_FALSE(filter_->isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
+    EXPECT_FALSE(filter_->isContentTypeAllowed(headers));
+  }
+}
+
+// Verifies that compression is skipped when content-encoding header is NOT allowed.
+TEST_F(GzipFilterTest, ContentTypeNoCompression) {
   setUpTest(R"EOF(
     {
       "content_type": [
@@ -255,8 +370,8 @@ TEST_F(GzipFilterTest, ContentTypeNotSupported) {
       {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/jpeg"}});
 }
 
-// Content-Type contains paramater.
-TEST_F(GzipFilterTest, ContentTypeWithParameter) {
+// Verifies that compression is NOT skipped when content-encoding header is allowed.
+TEST_F(GzipFilterTest, ContentTypeCompression) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"},
@@ -264,8 +379,30 @@ TEST_F(GzipFilterTest, ContentTypeWithParameter) {
                          {"content-type", "application/json;charset=utf-8"}});
 }
 
-// Last-Modified disable true.
-TEST_F(GzipFilterTest, LastModifiedDisableTrue) {
+// Verifies isLastModifiedAllowed function.
+TEST_F(GzipFilterTest, isLastModifiedAllowed) {
+  setUpTest("{}");
+  {
+    TestHeaderMapImpl headers = {{"last-modified", "Wed, 21 Oct 2015 07:28:00 GMT"}};
+    EXPECT_TRUE(filter_->isLastModifiedAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isLastModifiedAllowed(headers));
+  }
+  setUpTest(R"EOF({ "disable_on_last_modified_header": true })EOF");
+  {
+    TestHeaderMapImpl headers = {{"last-modified", "Wed, 21 Oct 2015 07:28:00 GMT"}};
+    EXPECT_FALSE(filter_->isLastModifiedAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isLastModifiedAllowed(headers));
+  }
+}
+
+// Verifies that compression is skipped when content-encoding header is NOT allowed.
+TEST_F(GzipFilterTest, LastModifiedNoCompression) {
   setUpTest(R"EOF({ "disable_on_last_modified_header": true })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression({{":method", "get"},
@@ -273,8 +410,8 @@ TEST_F(GzipFilterTest, LastModifiedDisableTrue) {
                            {"last-modified", "Wed, 21 Oct 2015 07:28:00 GMT"}});
 }
 
-// Last-Modified default configuration.
-TEST_F(GzipFilterTest, LastModifiedDefault) {
+// Verifies that compression is NOT skipped when content-encoding header is allowed.
+TEST_F(GzipFilterTest, LastModifiedCompression) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"},
@@ -282,24 +419,49 @@ TEST_F(GzipFilterTest, LastModifiedDefault) {
                          {"last-modified", "Wed, 21 Oct 2015 07:28:00 GMT"}});
 }
 
-// Etag disable true.
-TEST_F(GzipFilterTest, EtagDisableTrue) {
+// Verifies isEtagAllowed function.
+TEST_F(GzipFilterTest, isEtagAllowed) {
+  setUpTest("{}");
+  {
+    TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
+    EXPECT_TRUE(filter_->isEtagAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
+    EXPECT_TRUE(filter_->isEtagAllowed(headers));
+    EXPECT_FALSE(headers.has("etag"));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isEtagAllowed(headers));
+    EXPECT_FALSE(headers.has("etag"));
+  }
+
+  setUpTest(R"EOF({ "disable_on_etag_header": true })EOF");
+  {
+    TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
+    EXPECT_FALSE(filter_->isEtagAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
+    EXPECT_FALSE(filter_->isEtagAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isEtagAllowed(headers));
+  }
+}
+
+// Verifies that compression is skipped when etag header is NOT allowed.
+TEST_F(GzipFilterTest, EtagNoCompression) {
   setUpTest(R"EOF({ "disable_on_etag_header": true })EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
 }
 
-// Weak Etag default configuration.
-TEST_F(GzipFilterTest, EtagDefault) {
-  setUpTest("{}");
-  doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  doResponseCompression(
-      {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
-}
-
-// Strong Etag and default configuration.
-TEST_F(GzipFilterTest, StrongEtag) {
+// Verifies that compression is skipped when etag header is NOT allowed.
+TEST_F(GzipFilterTest, EtagCompression) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   TestHeaderMapImpl headers{
@@ -310,7 +472,35 @@ TEST_F(GzipFilterTest, StrongEtag) {
   EXPECT_EQ("gzip", headers.get_("content-encoding"));
 }
 
-// Transfer-Encoding chunked.
+// Verifies isTransferEncodingAllowed function.
+TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
+  {
+    TestHeaderMapImpl headers = {};
+    EXPECT_TRUE(filter_->isTransferEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
+    EXPECT_TRUE(filter_->isTransferEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "deflate"}};
+    EXPECT_FALSE(filter_->isTransferEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "gzip"}};
+    EXPECT_FALSE(filter_->isTransferEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "gzip, chunked"}};
+    EXPECT_FALSE(filter_->isTransferEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t\n"}};
+    EXPECT_FALSE(filter_->isTransferEncodingAllowed(headers));
+  }
+}
+
+// Tests compression when Transfer-Encoding header exists.
 TEST_F(GzipFilterTest, TransferEncodingChunked) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
@@ -318,8 +508,8 @@ TEST_F(GzipFilterTest, TransferEncodingChunked) {
       {{":method", "get"}, {"content-length", "256"}, {"transfer-encoding", "chunked"}});
 }
 
-// Transfer-Encoding gzip.
-TEST_F(GzipFilterTest, TransferEncodingGzip) {
+// Tests compression when Transfer-Encoding header exists.
+TEST_F(GzipFilterTest, AcceptanceTransferEncodingGzip) {
   setUpTest("{}");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(

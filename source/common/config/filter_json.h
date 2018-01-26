@@ -20,6 +20,11 @@
 namespace Envoy {
 namespace Config {
 
+template <typename Enum> struct NameAndEnum {
+  const char* name;
+  Enum enumerator;
+};
+
 class FilterJson {
 public:
   /**
@@ -189,6 +194,5 @@ public:
   static void translateGzipFilter(const Json::Object& json_config,
                                   envoy::config::filter::http::squash::v2::Gzip& proto_config);
 };
-
 } // namespace Config
 } // namespace Envoy

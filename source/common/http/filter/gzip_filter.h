@@ -75,7 +75,7 @@ public:
   void onDestroy() override{};
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool) override;
+  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
   FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return FilterDataStatus::Continue;
   }
@@ -96,7 +96,9 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-private:
+  // Helpers Functions
+  // TODO(gsagula): We made them public to facilitate testing, but it should be moved into a common
+  // class at some point.
   bool hasCacheControlNoTransform(HeaderMap& headers) const;
   bool isAcceptEncodingAllowed(HeaderMap& headers) const;
   bool isContentTypeAllowed(HeaderMap& headers) const;
@@ -107,6 +109,7 @@ private:
 
   void insertVaryHeader(HeaderMap& headers);
 
+private:
   bool skip_compression_;
 
   Buffer::OwnedImpl compressed_data_;

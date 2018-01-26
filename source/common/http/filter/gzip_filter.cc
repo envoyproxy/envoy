@@ -11,16 +11,16 @@ namespace Http {
 
 namespace {
 // Default zlib memory level.
-const uint64_t DefaultMemoryLevel{5};
+const uint64_t DefaultMemoryLevel = 5;
 
 // Default and maximum compression window size.
-const uint64_t DefaultWindowBits{12};
+const uint64_t DefaultWindowBits = 12;
 
 // Minimum length of an upstream response that allows compression.
-const uint64_t MinimumContentLength{30};
+const uint64_t MinimumContentLength = 30;
 
 // When summed to window bits, this sets a gzip header and trailer around the compressed data.
-const uint64_t GzipHeaderValue{16};
+const uint64_t GzipHeaderValue = 16;
 
 // Used for verifying accept-encoding values.
 const char ZeroQvalueString[] = "q=0";
@@ -150,44 +150,41 @@ bool GzipFilter::hasCacheControlNoTransform(HeaderMap& headers) const {
   return false;
 }
 
-// https://tools.ietf.org/html/rfc7231#page-41
+// TODO(gsagula): Since gzip is the only available content-encoding in Envoy at the moment,
+// order/priority of preferred server encodings is disregarded (RFC2616-14.3). Replace this
+// with a data structure that parses Accept-Encoding values and allows fast lookup of
+// key/priority. Also, this should be part of some utility library.
+// https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
 bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
-  // TODO(gsagula): Since gzip is the only available content-encoding in Envoy at the moment,
-  // order/priority of preferred server encodings is disregarded (RFC2616-14.3). Replace this
-  // with a data structure that parses Accept-Encoding values and allows fast lookup of
-  // key/priority. Also, this should be part of some utility library.
+
   if (accept_encoding) {
-    bool is_identity{true};  // true if does not exist or is followed by `q=0`.
-    bool is_wildcard{false}; // true if found and not followed by `q=0`.
-    bool is_gzip{false};     // true if exists and not followed by `q=0`.
+    bool is_wildcard = false; // true if found and not followed by `q=0`.
 
-    for (const auto token :
-         StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",", false)) {
-      const auto value = StringUtil::trim(StringUtil::cropRight(token, ";", false));
-      const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";", false));
+    for (const auto token : StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",",
+                                                   false /* keep_empty */)) {
+      const auto value =
+          StringUtil::trim(StringUtil::cropRight(token, ";", false /* trim_whitespace */));
+      const auto q_value =
+          StringUtil::trim(StringUtil::cropLeft(token, ";", false /* trim_whitespace */));
 
+      // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        is_gzip = q_value.empty() ? true : (q_value != ZeroQvalueString);
+        return (q_value != ZeroQvalueString);
       }
+
+      // If value is the identity coding, just check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Identity) {
-        is_identity = q_value.empty() ? false : (q_value == ZeroQvalueString);
+        return (q_value != ZeroQvalueString);
       }
+
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = q_value.empty() ? true : (q_value != ZeroQvalueString);
+        is_wildcard = (q_value != ZeroQvalueString);
       }
     }
 
-    // rfc7231#5.3.4: An "identity" token is used as a synonym for "no encoding" in order to
-    // communicate when no encoding is preferred.
-    if (!is_identity) {
-      return false;
-    }
-
-    // rfc7231#5.3.4: If the representation has no content-coding, then it is acceptable by
-    // default unless specifically excluded by the Accept-Encoding field stating either
-    // "identity;q=0" or "*;q=0" without a more specific entry for "identity".
-    return is_gzip || is_wildcard;
+    // if neither identity nor gzip codings are present, we return the wildcard.
+    return is_wildcard;
   }
 
   return true;
@@ -196,7 +193,8 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
 bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
-    std::string value{StringUtil::cropRight(content_type->value().c_str(), ";")};
+    std::string value{
+        StringUtil::trim(StringUtil::cropRight(content_type->value().c_str(), ";", false))};
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
   return true;

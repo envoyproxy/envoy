@@ -166,7 +166,7 @@ public:
    * string views; default = true.
    * @return true if found and false otherwise.
    *
-   * E.g,
+   * E.g.,
    *
    * findToken("A=5; b", "=;", "5")   . true
    * findToken("A=5; b", "=;", "A=5") . false
@@ -185,6 +185,10 @@ public:
    * @param trim_whitespace remove leading and trailing whitespaces from each of the split
    * string views; default = true.
    * @return sub-string of the string view if any.
+   *
+   * E.g.,
+   *
+   * cropRight("foo ; ; ; ; ; ; ", "b", true) == "foo"
    */
   static absl::string_view cropRight(absl::string_view source, absl::string_view delimiters,
                                      bool trim_whitespace = true);
@@ -197,6 +201,10 @@ public:
    * @param trim_whitespace remove leading and trailing whitespaces from each of the split
    * string views; default = true.
    * @return sub-string of the string view if any.
+   *
+   * E.g.,
+   *
+   * cropLeft("foo ; ; ; ; ; ", ";", true) == "; ; ; ; "
    */
   static absl::string_view cropLeft(absl::string_view source, absl::string_view delimiters,
                                     bool trim_whitespace = true);

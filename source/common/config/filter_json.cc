@@ -447,37 +447,33 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
     *content_type = json_content_type;
   }
 
-  static const struct {
-    const char* level_str;
-    envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum level_enum;
-  } levels_map[] = {
-      {"default", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_DEFAULT},
-      {"best", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST},
-      {"speed", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED},
-  };
+  static const NameAndEnum<envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum> levels_map[] =
+      {
+          {"default", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_DEFAULT},
+          {"best", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST},
+          {"speed", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED},
+      };
 
   const auto json_compression_level = json_config.getString("compression_level", "default");
   for (const auto& level_map : levels_map) {
-    if (level_map.level_str == json_compression_level) {
-      proto_config.set_compression_level(level_map.level_enum);
+    if (level_map.name == json_compression_level) {
+      proto_config.set_compression_level(level_map.enumerator);
       break;
     }
   }
 
-  static const struct {
-    const char* strategy_str;
-    envoy::api::v2::filter::http::Gzip_CompressionStrategy strategy_enum;
-  } strategies_map[] = {
-      {"default", envoy::api::v2::filter::http::Gzip_CompressionStrategy_DEFAULT},
-      {"filtered", envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED},
-      {"huffman", envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN},
-      {"rle", envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE},
-  };
+  static const NameAndEnum<envoy::api::v2::filter::http::Gzip_CompressionStrategy>
+      strategies_map[] = {
+          {"default", envoy::api::v2::filter::http::Gzip_CompressionStrategy_DEFAULT},
+          {"filtered", envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED},
+          {"huffman", envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN},
+          {"rle", envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE},
+      };
 
   const auto json_compression_strategy = json_config.getString("compression_strategy", "default");
   for (const auto& strategy_map : strategies_map) {
-    if (strategy_map.strategy_str == json_compression_level) {
-      proto_config.set_compression_strategy(strategy_map.strategy_enum);
+    if (strategy_map.name == json_compression_level) {
+      proto_config.set_compression_strategy(strategy_map.enumerator);
       break;
     }
   }
