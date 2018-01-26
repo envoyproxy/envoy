@@ -256,6 +256,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // from the weighted cluster (if any) are merged with and override
   // the criteria from the route.
   if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
+    ASSERT(total_cluster_weight_ > 0);
+
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
@@ -282,10 +284,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                    std::move(cluster_metadata_match_criteria)));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
-    }
-
-    if (total_cluster_weight_ == 0) {
-      throw EnvoyException("total_weight in the weighted_cluster must be greater than 0");
     }
 
     if (total_weight != total_cluster_weight_) {

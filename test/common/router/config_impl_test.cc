@@ -2600,25 +2600,6 @@ TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
                EnvoyException);
 }
 
-TEST(RouteMatcherTest, WeightedClustersInvalidTotalWeight) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["www.lyft.com"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            total_weight: 0
-  )EOF";
-
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW_WITH_MESSAGE(ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
-                            EnvoyException,
-                            "total_weight in the weighted_cluster must be greater than 0");
-}
-
 TEST(RouteMatcherTest, WeightedClustersEmptyClustersList) {
   std::string json = R"EOF(
 {
