@@ -15,8 +15,6 @@ template <typename ArgFormatter>
 void format_arg(BasicFormatter<char, ArgFormatter>& f, const char*& format_str,
                 const absl::string_view sv) {
   BasicStringRef<char> str(sv.data(), sv.size());
-  //  typedef internal::MakeArg< BasicFormatter<char> > MakeArg;
-  //  format_str = f.format(format_str, MakeArg(str));
   format_str = f.format(format_str, internal::MakeArg<BasicFormatter<char>>(str));
 }
 
