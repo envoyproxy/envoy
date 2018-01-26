@@ -50,6 +50,17 @@ public:
   virtual const std::string& caCertPath() const PURE;
 
   /**
+   * @return The CRL to check if a cert is revoked.
+   */
+  virtual const std::string& certificateRevocationList() const PURE;
+
+  /**
+   * @return Path of the certificate revocation list, or "<inline>" if the CRL
+   * was inlined.
+   */
+  virtual const std::string& certificateRevocationListPath() const PURE;
+
+  /**
    * @return The certificate chain used to identify the local side.
    */
   virtual const std::string& certChain() const PURE;

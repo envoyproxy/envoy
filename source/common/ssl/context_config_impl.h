@@ -3,11 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/ssl/context_config.h"
 
 #include "common/json/json_loader.h"
-
-#include "api/sds.pb.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -25,6 +24,14 @@ public:
   const std::string& caCertPath() const override {
     return (ca_cert_path_.empty() && !ca_cert_.empty()) ? INLINE_STRING : ca_cert_path_;
   }
+  const std::string& certificateRevocationList() const override {
+    return certificate_revocation_list_;
+  }
+  const std::string& certificateRevocationListPath() const override {
+    return (certificate_revocation_list_path_.empty() && !certificate_revocation_list_.empty())
+               ? INLINE_STRING
+               : certificate_revocation_list_path_;
+  }
   const std::string& certChain() const override { return cert_chain_; }
   const std::string& certChainPath() const override {
     return (cert_chain_path_.empty() && !cert_chain_.empty()) ? INLINE_STRING : cert_chain_path_;
@@ -41,15 +48,16 @@ public:
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
 protected:
-  ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config);
+  ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config);
 
   static const std::string readDataSource(const envoy::api::v2::DataSource& source,
                                           bool allow_empty);
   static const std::string getDataSourcePath(const envoy::api::v2::DataSource& source);
 
 private:
-  static unsigned tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
-                                      unsigned default_version);
+  static unsigned
+  tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
+                      unsigned default_version);
 
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_ECDH_CURVES;
@@ -60,6 +68,8 @@ private:
   const std::string ecdh_curves_;
   const std::string ca_cert_;
   const std::string ca_cert_path_;
+  const std::string certificate_revocation_list_;
+  const std::string certificate_revocation_list_path_;
   const std::string cert_chain_;
   const std::string cert_chain_path_;
   const std::string private_key_;
@@ -72,7 +82,7 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  explicit ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config);
+  explicit ClientContextConfigImpl(const envoy::api::v2::auth::UpstreamTlsContext& config);
   explicit ClientContextConfigImpl(const Json::Object& config);
 
   // Ssl::ClientContextConfig
@@ -84,7 +94,7 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  explicit ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config);
+  explicit ServerContextConfigImpl(const envoy::api::v2::auth::DownstreamTlsContext& config);
   explicit ServerContextConfigImpl(const Json::Object& config);
 
   // Ssl::ServerContextConfig

@@ -9,6 +9,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -18,8 +19,6 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-
-#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -44,6 +43,13 @@ public:
    *         or an empty string otherwise.
    */
   virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Returns the response body to send with direct responses.
+   * @return std::string& the response body specified in the route configuration,
+   *         or an empty string if no response body is specified.
+   */
+  virtual const std::string& responseBody() const PURE;
 };
 
 /**

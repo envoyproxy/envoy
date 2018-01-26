@@ -1,6 +1,10 @@
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
+#include "common/config/metadata.h"
+#include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
@@ -48,24 +52,24 @@ public:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(
-      bool need_init,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
+  ListenerHandle* expectListenerCreate(bool need_init,
+                                       envoy::api::v2::listener::Listener::DrainType drain_type =
+                                           envoy::api::v2::listener::Listener_DrainType_DEFAULT) {
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
-                                      Configuration::FactoryContext& context)
-                -> std::vector<Configuration::NetworkFilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
-              if (need_init) {
-                context.initManager().registerTarget(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke([raw_listener, need_init](
+                             const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
+                             Configuration::FactoryContext& context)
+                             -> std::vector<Configuration::NetworkFilterFactoryCb> {
+          std::shared_ptr<ListenerHandle> notifier(raw_listener);
+          raw_listener->context_ = &context;
+          if (need_init) {
+            context.initManager().registerTarget(notifier->target_);
+          }
+          return {[notifier](Network::FilterManager&) -> void {}};
+        }));
 
     return raw_listener;
   }
@@ -95,12 +99,22 @@ class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
-    ON_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                 Configuration::FactoryContext& context)
-                                  -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
-        }));
+    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+                      Configuration::FactoryContext& context)
+                       -> std::vector<Configuration::NetworkFilterFactoryCb> {
+              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
+                                                                                   context);
+            }));
+    ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+               Configuration::FactoryContext& context)
+                -> std::vector<Configuration::ListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+                                                                                    context);
+            }));
   }
 };
 
@@ -266,7 +280,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   )EOF";
 
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -303,7 +317,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   )EOF";
 
   ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(
                                 parseListenerFromJson(listener_foo_different_address_json), true),
@@ -1168,6 +1182,232 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
                             EnvoyException, "Failed to load trusted CA certificates from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    filter_chains:
+    - filter_chain_match:
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: metadata_test
+          route_config:
+            virtual_hosts:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
+  ASSERT_NE(nullptr, context);
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+                .string_value());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "envoy.listener.original_dst"
+      config: {}
+  )EOF", // "
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(-1,
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+
+class OriginalDstTest : public Filter::Listener::OriginalDst {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
+    return Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
+  }
+};
+
+namespace Configuration {
+
+class OriginalDstTestConfigFactory : public NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                       FactoryContext&) override {
+    return [](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+
+  std::string name() override { return "test.listener.original_dst"; }
+};
+
+/**
+ * Static registration for the original dst filter. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<OriginalDstTestConfigFactory, NamedListenerFilterConfigFactory>
+    registered_;
+
+} // namespace Configuration
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "test.listener.original_dst"
+      config: {}
+  )EOF", // "
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(
+      -1, std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+  EXPECT_TRUE(socket.localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.localAddress()->asString());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { inline_string: "-----BEGIN X509 CRL-----\nMIIBbDCB1gIBATANBgkqhkiG9w0BAQsFADB2MQswCQYDVQQGEwJVUzETMBEGA1UE\nCBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzENMAsGA1UEChME\nTHlmdDEZMBcGA1UECxMQTHlmdCBFbmdpbmVlcmluZzEQMA4GA1UEAxMHVGVzdCBD\nQRcNMTcxMjIwMTcxNDA4WhcNMjcxMjE4MTcxNDA4WjAcMBoCCQDZy/Qp7iAfHxcN\nMTcxMjIwMTcxMjU0WqAOMAwwCgYDVR0UBAMCAQAwDQYJKoZIhvcNAQELBQADgYEA\nOTn5Fgb44xtFd9QGtbTElZ3iwdlcOxRHjgQMd+ydzEEZRMzMgb4/NmEsgXAsxbrx\ntKmpgll8TblscitkglvGk8s4obi/OtgxNIvn+7pOBTjmrgJkcktBUDEWRbLZjsZx\nyH+5teBZ0tH0tVy914QeGitZFV8awK1hlJwlAz9g/jo=\n-----END X509 CRL-----" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, InvalidCRLInline) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { inline_string: "-----BEGIN X509 CRL-----\nTOTALLY_NOT_A_CRL_HERE\n-----END X509 CRL-----\n" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load CRL from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            crl: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                          EnvoyException,
+                          "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
 } // namespace Server

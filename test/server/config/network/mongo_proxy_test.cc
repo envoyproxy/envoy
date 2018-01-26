@@ -1,11 +1,12 @@
 #include <string>
 
+#include "envoy/api/v2/filter/network/mongo_proxy.pb.h"
+
 #include "server/config/network/mongo_proxy.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/filter/network/mongo_proxy.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

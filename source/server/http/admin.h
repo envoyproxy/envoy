@@ -12,6 +12,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -37,12 +38,13 @@ class AdminImpl : public Admin,
 public:
   AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server, Stats::Scope& listener_scope);
+            Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
   Http::Code runCallback(const std::string& path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }
   Network::ListenSocket& mutable_socket() { return *socket_; }
+  Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
@@ -50,7 +52,8 @@ public:
   bool removeHandler(const std::string& prefix) override;
 
   // Network::FilterChainFactory
-  bool createFilterChain(Network::Connection& connection) override;
+  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -81,7 +84,7 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
-  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
+  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
 
 private:
   /**
@@ -162,6 +165,29 @@ private:
   Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
 
+  class AdminListener : public Network::ListenerConfig {
+  public:
+    AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
+        : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
+
+    // Network::ListenerConfig
+    Network::FilterChainFactory& filterChainFactory() override { return parent_; }
+    Network::ListenSocket& socket() override { return parent_.mutable_socket(); }
+    Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+    bool bindToPort() override { return true; }
+    bool handOffRestoredDestinationConnections() const override { return false; }
+    uint32_t perConnectionBufferLimitBytes() override { return 0; }
+    Stats::Scope& listenerScope() override { return *scope_; }
+    uint64_t listenerTag() const override { return 0; }
+    const std::string& name() const override { return name_; }
+
+    AdminImpl& parent_;
+    const std::string name_;
+    Stats::ScopePtr scope_;
+    Http::ConnectionManagerListenerStats stats_;
+  };
+
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
@@ -174,7 +200,7 @@ private:
   Optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  Http::ConnectionManagerListenerStats listener_stats_;
+  AdminListener listener_;
 };
 
 /**

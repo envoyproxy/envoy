@@ -21,5 +21,5 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 docker run --rm -t -i -e http_proxy=${http_proxy} -e https_proxy=${https_proxy} \
   -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
   -v "$PWD":/source -e NUM_CPUS --cap-add SYS_PTRACE "${IMAGE_NAME}":"${IMAGE_ID}" \
-  /bin/bash -lc "groupadd --gid $(id -g) -f envoygroup && useradd --uid $(id -u) --gid $(id -g) \
+  /bin/bash -lc "groupadd --gid $(id -g) -f envoygroup && useradd -o --uid $(id -u) --gid $(id -g) \
   --no-create-home --home-dir /source envoybuild && su envoybuild -c \"cd source && $*\""

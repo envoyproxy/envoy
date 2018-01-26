@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/listener_manager.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -150,7 +151,18 @@ MockListenerCallbacks::~MockListenerCallbacks() {}
 MockDrainDecision::MockDrainDecision() {}
 MockDrainDecision::~MockDrainDecision() {}
 
-MockFilterChainFactory::MockFilterChainFactory() {}
+MockListenerFilter::MockListenerFilter() {}
+MockListenerFilter::~MockListenerFilter() {}
+
+MockListenerFilterCallbacks::MockListenerFilterCallbacks() {}
+MockListenerFilterCallbacks::~MockListenerFilterCallbacks() {}
+
+MockListenerFilterManager::MockListenerFilterManager() {}
+MockListenerFilterManager::~MockListenerFilterManager() {}
+
+MockFilterChainFactory::MockFilterChainFactory() {
+  ON_CALL(*this, createListenerFilterChain(_)).WillByDefault(Return(true));
+}
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
 MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(80)) {
@@ -158,6 +170,12 @@ MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(
 }
 
 MockListenSocket::~MockListenSocket() {}
+
+MockConnectionSocket::MockConnectionSocket() : local_address_(new Address::Ipv4Instance(80)) {
+  ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
+}
+
+MockConnectionSocket::~MockConnectionSocket() {}
 
 MockListener::MockListener() {}
 MockListener::~MockListener() { onDestroy(); }

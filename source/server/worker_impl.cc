@@ -34,30 +34,13 @@ void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompl
   // to surface this.
   dispatcher_->post([this, &listener, completion]() -> void {
     try {
-      addListenerWorker(listener);
+      handler_->addListener(listener);
+      hooks_.onWorkerListenerAdded();
       completion(true);
     } catch (const Network::CreateListenerException& e) {
       completion(false);
     }
   });
-}
-
-void WorkerImpl::addListenerWorker(Network::ListenerConfig& listener) {
-  const Network::ListenerOptions listener_options = {.bind_to_port_ = listener.bindToPort(),
-                                                     .use_proxy_proto_ = listener.useProxyProto(),
-                                                     .use_original_dst_ = listener.useOriginalDst(),
-                                                     .per_connection_buffer_limit_bytes_ =
-                                                         listener.perConnectionBufferLimitBytes()};
-  if (listener.defaultSslContext()) {
-    handler_->addSslListener(listener.filterChainFactory(), *listener.defaultSslContext(),
-                             listener.socket(), listener.listenerScope(), listener.listenerTag(),
-                             listener_options);
-  } else {
-    handler_->addListener(listener.filterChainFactory(), listener.socket(),
-                          listener.listenerScope(), listener.listenerTag(), listener_options);
-  }
-
-  hooks_.onWorkerListenerAdded();
 }
 
 uint64_t WorkerImpl::numConnections() {

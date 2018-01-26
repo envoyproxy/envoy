@@ -93,8 +93,6 @@ envoy_cc_library(
     external_deps = [
         "path_matcher",
         "grpc_transcoding",
-        "http_api_protos",
-        "envoy_filter_http_transcoder",
     ],
     deps = [
         ":codec_lib",
@@ -104,6 +102,8 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/filter/http:transcoder_cc",
+        "@googleapis//:http_api_protos",
     ],
 )
 

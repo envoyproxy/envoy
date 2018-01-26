@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
@@ -19,8 +20,6 @@
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/router_ratelimit.h"
-
-#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -54,6 +53,7 @@ public:
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
+  const std::string& responseBody() const override { return EMPTY_STRING; }
 };
 
 class SslRedirectRoute : public Route {
@@ -72,7 +72,7 @@ private:
  */
 class CorsPolicyImpl : public CorsPolicy {
 public:
-  CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config);
+  CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config);
 
   // Router::CorsPolicy
   const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
@@ -99,7 +99,7 @@ class ConfigImpl;
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host,
+  VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
                   const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                   Upstream::ClusterManager& cm, bool validate_clusters);
 
@@ -119,7 +119,7 @@ private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
   struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const envoy::api::v2::VirtualCluster& virtual_cluster);
+    VirtualClusterEntry(const envoy::api::v2::route::VirtualCluster& virtual_cluster);
 
     // Router::VirtualCluster
     const std::string& name() const override { return name_; }
@@ -158,7 +158,7 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
  */
 class RetryPolicyImpl : public RetryPolicy {
 public:
-  RetryPolicyImpl(const envoy::api::v2::RouteAction& config);
+  RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
@@ -176,7 +176,7 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  ShadowPolicyImpl(const envoy::api::v2::RouteAction& config);
+  ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -193,8 +193,8 @@ private:
  */
 class HashPolicyImpl : public HashPolicy {
 public:
-  HashPolicyImpl(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policy);
+  HashPolicyImpl(const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                     hash_policy);
 
   // Router::HashPolicy
   Optional<uint64_t> generateHash(const std::string& downstream_addr,
@@ -269,7 +269,7 @@ private:
  */
 class DecoratorImpl : public Decorator {
 public:
-  DecoratorImpl(const envoy::api::v2::Decorator& decorator);
+  DecoratorImpl(const envoy::api::v2::route::Decorator& decorator);
 
   // Decorator::apply
   void apply(Tracing::Span& span) const override;
@@ -290,7 +290,10 @@ class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
-  RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
+  /**
+   * @throw EnvoyException with reason if the route configuration contains any errors
+   */
+  RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
@@ -334,6 +337,7 @@ public:
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return direct_response_code_.value(); }
+  const std::string& responseBody() const override { return direct_response_body_; }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -440,8 +444,6 @@ private:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
-    static const uint64_t MAX_CLUSTER_WEIGHT;
-
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -451,12 +453,12 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static Optional<RuntimeData> loadRuntimeData(const envoy::api::v2::RouteMatch& route);
+  static Optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
-  parseOpaqueConfig(const envoy::api::v2::Route& route);
+  parseOpaqueConfig(const envoy::api::v2::route::Route& route);
 
-  static DecoratorConstPtr parseDecorator(const envoy::api::v2::Route& route);
+  static DecoratorConstPtr parseDecorator(const envoy::api::v2::route::Route& route);
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -481,6 +483,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
@@ -492,6 +495,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const Optional<Http::Code> direct_response_code_;
+  std::string direct_response_body_;
 };
 
 /**
@@ -499,7 +503,7 @@ private:
  */
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
+  PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                        Runtime::Loader& loader);
 
   // Router::RouteEntry
@@ -518,7 +522,7 @@ private:
  */
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
+  PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Runtime::Loader& loader);
 
   // Router::RouteEntry
@@ -537,7 +541,7 @@ private:
  */
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
-  RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
+  RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                       Runtime::Loader& loader);
 
   // Router::RouteEntry
@@ -557,7 +561,7 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
+  RouteMatcher(const envoy::api::v2::route::RouteConfiguration& config,
                const ConfigImpl& global_http_config, Runtime::Loader& runtime,
                Upstream::ClusterManager& cm, bool validate_clusters);
 
@@ -587,7 +591,7 @@ private:
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
+  ConfigImpl(const envoy::api::v2::route::RouteConfiguration& config, Runtime::Loader& runtime,
              Upstream::ClusterManager& cm, bool validate_clusters_default);
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };

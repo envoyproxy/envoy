@@ -207,19 +207,19 @@ public:
   void start();
 
   void waitForCounterGe(const std::string& name, uint64_t value) {
-    while (counter(name)->value() < value) {
+    while (counter(name) == nullptr || counter(name)->value() < value) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) {
-    while (gauge(name)->value() < value) {
+    while (gauge(name) == nullptr || gauge(name)->value() < value) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) {
-    while (gauge(name)->value() != value) {
+    while (gauge(name) == nullptr || gauge(name)->value() != value) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }

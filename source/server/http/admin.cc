@@ -609,7 +609,7 @@ AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
                      const std::string& address_out_path,
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
-                     Stats::Scope& listener_scope)
+                     Stats::ScopePtr&& listener_scope)
     : server_(server), profile_path_(profile_path),
       socket_(new Network::TcpListenSocket(address, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
@@ -642,8 +642,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
-      listener_stats_(
-          Http::ConnectionManagerImpl::generateListenerStats("http.admin.", listener_scope)) {
+      listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -667,7 +666,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
 }
 
-bool AdminImpl::createFilterChain(Network::Connection& connection) {
+bool AdminImpl::createNetworkFilterChain(Network::Connection& connection) {
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
       server_.localInfo(), server_.clusterManager())});

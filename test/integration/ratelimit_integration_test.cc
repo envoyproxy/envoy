@@ -27,7 +27,7 @@ public:
   void initialize() override {
     config_helper_.addFilter(
         "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
-    config_helper_.addConfigModifier([this](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ratelimit_cluster->set_name("ratelimit");
@@ -172,6 +172,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
     test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
+    test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_504", 1);
     EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_timeout")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.ratelimit.upstream_rq_504")->value());
     break;
