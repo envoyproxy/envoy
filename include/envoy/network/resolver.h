@@ -5,9 +5,10 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/address.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+
+#include "api/address.pb.h"
 
 namespace Envoy {
 namespace Network {

@@ -14,8 +14,7 @@
 namespace Envoy {
 namespace Server {
 
-DrainManagerImpl::DrainManagerImpl(Instance& server,
-                                   envoy::api::v2::listener::Listener::DrainType drain_type)
+DrainManagerImpl::DrainManagerImpl(Instance& server, envoy::api::v2::Listener::DrainType drain_type)
     : server_(server), drain_type_(drain_type) {}
 
 bool DrainManagerImpl::drainClose() const {
@@ -25,8 +24,7 @@ bool DrainManagerImpl::drainClose() const {
   // if even in the case of server health check failure we had some period of drain ramp up. This
   // would allow the other side to fail health check for the host which will require some thread
   // jumps versus immediately start GOAWAY/connection thrashing.
-  if (drain_type_ == envoy::api::v2::listener::Listener_DrainType_DEFAULT &&
-      server_.healthCheckFailed()) {
+  if (drain_type_ == envoy::api::v2::Listener_DrainType_DEFAULT && server_.healthCheckFailed()) {
     return true;
   }
 

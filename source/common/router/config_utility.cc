@@ -73,25 +73,24 @@ bool ConfigUtility::matchQueryParams(
 }
 
 Http::Code ConfigUtility::parseRedirectResponseCode(
-    const envoy::api::v2::route::RedirectAction::RedirectResponseCode& code) {
+    const envoy::api::v2::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
-  case envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY:
+  case envoy::api::v2::RedirectAction::MOVED_PERMANENTLY:
     return Http::Code::MovedPermanently;
-  case envoy::api::v2::route::RedirectAction::FOUND:
+  case envoy::api::v2::RedirectAction::FOUND:
     return Http::Code::Found;
-  case envoy::api::v2::route::RedirectAction::SEE_OTHER:
+  case envoy::api::v2::RedirectAction::SEE_OTHER:
     return Http::Code::SeeOther;
-  case envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT:
+  case envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT:
     return Http::Code::TemporaryRedirect;
-  case envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT:
+  case envoy::api::v2::RedirectAction::PERMANENT_REDIRECT:
     return Http::Code::PermanentRedirect;
   default:
     NOT_IMPLEMENTED;
   }
 }
 
-Optional<Http::Code>
-ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route) {
+Optional<Http::Code> ConfigUtility::parseDirectResponseCode(const envoy::api::v2::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());
   } else if (route.has_direct_response()) {
@@ -100,7 +99,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route
   return Optional<Http::Code>();
 }
 
-std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::Route& route) {
+std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& route) {
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
   }
@@ -129,11 +128,11 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
-    const envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode& code) {
+    const envoy::api::v2::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {
-  case envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE:
+  case envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE:
     return Http::Code::ServiceUnavailable;
-  case envoy::api::v2::route::RouteAction::NOT_FOUND:
+  case envoy::api::v2::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
   default:
     NOT_IMPLEMENTED;

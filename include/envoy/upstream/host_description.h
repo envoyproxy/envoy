@@ -3,11 +3,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -16,8 +17,8 @@ namespace Upstream {
  * All per host stats. @see stats_macros.h
  *
  * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
- * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
- * latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * envoy.api.v2.UpstreamLocalityStats for the definitions of success/error. These are latched by
+ * LoadStatsReporter, independent of the normal stats sink flushing.
  */
 // clang-format off
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \

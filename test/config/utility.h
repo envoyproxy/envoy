@@ -5,15 +5,16 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/base.pb.h"
-#include "envoy/api/v2/cluster/cluster.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-#include "envoy/api/v2/protocol.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/network/address_impl.h"
+
+#include "api/base.pb.h"
+#include "api/bootstrap.pb.h"
+#include "api/cds.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
+#include "api/protocol.pb.h"
+#include "api/rds.pb.h"
 
 namespace Envoy {
 
@@ -27,7 +28,7 @@ public:
   ConfigHelper(const Network::Address::IpVersion version,
                const std::string& config = HTTP_PROXY_CONFIG);
 
-  typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
+  typedef std::function<void(envoy::api::v2::Bootstrap&)> ConfigModifierFunction;
   typedef std::function<void(envoy::api::v2::filter::network::HttpConnectionManager&)>
       HttpModifierFunction;
 
@@ -63,11 +64,10 @@ public:
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
   // Add an additional route to the configuration.
-  void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
-                bool validate_clusters,
-                envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                envoy::api::v2::route::VirtualHost::TlsRequirementType type =
-                    envoy::api::v2::route::VirtualHost::NONE);
+  void addRoute(
+      const std::string& host, const std::string& route, const std::string& cluster,
+      bool validate_clusters, envoy::api::v2::RouteAction::ClusterNotFoundResponseCode code,
+      envoy::api::v2::VirtualHost::TlsRequirementType type = envoy::api::v2::VirtualHost::NONE);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -87,7 +87,7 @@ public:
   void addConfigModifier(HttpModifierFunction function);
 
   // Return the bootstrap configuration for hand-off to Envoy.
-  const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
+  const envoy::api::v2::Bootstrap& bootstrap() { return bootstrap_; }
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
@@ -98,10 +98,10 @@ private:
   storeHttpConnectionManager(const envoy::api::v2::filter::network::HttpConnectionManager& hcm);
 
   // Snags the first filter from the first filter chain from the first listener.
-  envoy::api::v2::listener::Filter* getFilterFromListener();
+  envoy::api::v2::Filter* getFilterFromListener();
 
   // The bootstrap proto Envoy will start up with.
-  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
+  envoy::api::v2::Bootstrap bootstrap_;
 
   // The config modifiers added via addConfigModifier() which will be applied in finalize()
   std::vector<ConfigModifierFunction> config_modifiers_;

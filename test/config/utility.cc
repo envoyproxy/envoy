@@ -1,6 +1,5 @@
 #include "test/config/utility.h"
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
@@ -8,6 +7,8 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+
+#include "api/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 
@@ -206,8 +207,8 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
 
 void ConfigHelper::addRoute(const std::string& domains, const std::string& prefix,
                             const std::string& cluster, bool validate_clusters,
-                            envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                            envoy::api::v2::route::VirtualHost::TlsRequirementType type) {
+                            envoy::api::v2::RouteAction::ClusterNotFoundResponseCode code,
+                            envoy::api::v2::VirtualHost::TlsRequirementType type) {
   RELEASE_ASSERT(!finalized_);
   envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
@@ -276,7 +277,7 @@ void ConfigHelper::addSslConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 }
 
-envoy::api::v2::listener::Filter* ConfigHelper::getFilterFromListener() {
+envoy::api::v2::Filter* ConfigHelper::getFilterFromListener() {
   RELEASE_ASSERT(!finalized_);
   if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
     return nullptr;
@@ -317,7 +318,7 @@ void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
 }
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
-  addConfigModifier([function, this](envoy::config::bootstrap::v2::Bootstrap&) -> void {
+  addConfigModifier([function, this](envoy::api::v2::Bootstrap&) -> void {
     envoy::api::v2::filter::network::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);

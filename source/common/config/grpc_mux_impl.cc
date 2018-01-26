@@ -138,8 +138,7 @@ void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void GrpcMuxImpl::onReceiveMessage(
-    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse>&& message) {
+void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {

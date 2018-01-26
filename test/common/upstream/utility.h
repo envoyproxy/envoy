@@ -43,28 +43,28 @@ inline std::string clustersJson(const std::vector<std::string>& clusters) {
   return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
 }
 
-inline envoy::api::v2::cluster::Cluster parseClusterFromJson(const std::string& json_string) {
-  envoy::api::v2::cluster::Cluster cluster;
+inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
+  envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateCluster(*json_object_ptr, Optional<envoy::api::v2::ConfigSource>(),
                                     cluster);
   return cluster;
 }
 
-inline envoy::api::v2::cluster::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::cluster::Cluster cluster;
+inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::Cluster cluster;
   MessageUtil::loadFromYaml(yaml, cluster);
   return cluster;
 }
 
-inline envoy::api::v2::cluster::Cluster defaultStaticCluster(const std::string& name) {
+inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
   return parseClusterFromJson(defaultStaticClusterJson(name));
 }
 
-inline envoy::api::v2::cluster::Cluster
+inline envoy::api::v2::Cluster
 parseSdsClusterFromJson(const std::string& json_string,
                         const envoy::api::v2::ConfigSource eds_config) {
-  envoy::api::v2::cluster::Cluster cluster;
+  envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   return cluster;
