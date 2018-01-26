@@ -92,7 +92,7 @@ public:
   CallbackChecker checker_;
   MockMonotonicTimeSource time_source_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
-  envoy::api::v2::Cluster::OutlierDetection empty_outlier_detection_;
+  envoy::api::v2::cluster::OutlierDetection empty_outlier_detection_;
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
@@ -110,7 +110,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster::OutlierDetection outlier_detection;
+  envoy::api::v2::cluster::OutlierDetection outlier_detection;
   Json::ObjectSharedPtr custom_config = Json::Factory::loadFromString(json);
   Config::CdsJson::translateOutlierDetection(*custom_config, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100)));

@@ -183,10 +183,10 @@ int Ipv4Instance::connect(int fd) const {
 
 int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
 
-std::array<uint8_t, 16> Ipv6Instance::Ipv6Helper::address() const {
-  std::array<uint8_t, 16> result;
-  std::copy(std::begin(address_.sin6_addr.s6_addr), std::end(address_.sin6_addr.s6_addr),
-            std::begin(result));
+absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
+  absl::uint128 result{0};
+  static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
+  memcpy(&result, &address_.sin6_addr.s6_addr, sizeof(absl::uint128));
   return result;
 }
 

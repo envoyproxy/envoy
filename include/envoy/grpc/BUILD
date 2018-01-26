@@ -23,10 +23,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "async_client_manager_interface",
     hdrs = ["async_client_manager.h"],
-    external_deps = ["envoy_grpc_service"],
     deps = [
         ":async_client_interface",
         "//include/envoy/stats:stats_interface",
+        "@envoy_api//envoy/api/v2:grpc_service_cc",
     ],
 )
 
