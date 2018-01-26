@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/common/hash.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
@@ -11,7 +13,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,13 +25,14 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubscriptionImpl;
+typedef GrpcSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment>
+    GrpcEdsSubscriptionImpl;
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   GrpcSubscriptionTestHarness()
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
+            "envoy.service.discovery.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -46,7 +48,7 @@ public:
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
-    envoy::api::v2::DiscoveryRequest expected_request;
+    envoy::service::discovery::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     for (const auto& cluster : cluster_names) {
       expected_request.add_resource_names(cluster);
@@ -74,17 +76,19 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v2::DiscoveryResponse> response(
+        new envoy::service::discovery::v2::DiscoveryResponse());
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment>
+        typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
+        envoy::service::discovery::v2::ClusterLoadAssignment* load_assignment =
+            typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         response->add_resources()->PackFrom(*load_assignment);
       }
@@ -121,7 +125,8 @@ public:
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::api::v2::Node node_;
-  Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>
+      callbacks_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
   std::string last_response_nonce_;

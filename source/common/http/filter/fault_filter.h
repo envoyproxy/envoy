@@ -6,14 +6,13 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/api/v2/filter/http/fault.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/router/config_impl.h"
-
-#include "api/filter/http/fault.pb.h"
-#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Http {
