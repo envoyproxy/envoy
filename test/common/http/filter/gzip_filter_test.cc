@@ -138,6 +138,7 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
 
 // Verifies isAcceptEncodingAllowed function.
 TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
+  setUpTest("{}");
   {
     TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     EXPECT_TRUE(filter_->isAcceptEncodingAllowed(headers));
@@ -474,6 +475,7 @@ TEST_F(GzipFilterTest, EtagCompression) {
 
 // Verifies isTransferEncodingAllowed function.
 TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
+  setUpTest("{}");
   {
     TestHeaderMapImpl headers = {};
     EXPECT_TRUE(filter_->isTransferEncodingAllowed(headers));
