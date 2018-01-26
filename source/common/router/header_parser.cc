@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 
+#include <memory>
 #include <string>
 
 #include "common/common/assert.h"
@@ -38,7 +39,7 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
 
   absl::string_view format(header_value_option.header().value());
   if (format.empty()) {
-    return HeaderFormatterPtr{new PlainHeaderFormatter("", append)};
+    return std::make_unique<PlainHeaderFormatter>("", append);
   }
 
   std::vector<HeaderFormatterPtr> formatters;
@@ -200,7 +201,7 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
     return std::move(formatters[0]);
   }
 
-  return HeaderFormatterPtr{new CompoundHeaderFormatter(std::move(formatters), append)};
+  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append);
 }
 
 } // namespace

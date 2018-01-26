@@ -51,7 +51,7 @@ private:
 class PlainHeaderFormatter : public HeaderFormatter {
 public:
   PlainHeaderFormatter(const std::string& static_header_value, bool append)
-      : static_value_(static_header_value), append_(append){};
+      : static_value_(static_header_value), append_(append) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo&) const override {
@@ -70,7 +70,7 @@ private:
 class CompoundHeaderFormatter : public HeaderFormatter {
 public:
   CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append)
-      : formatters_(std::move(formatters)), append_(append){};
+      : formatters_(std::move(formatters)), append_(append) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override {
