@@ -18,15 +18,15 @@
 namespace Envoy {
 namespace ExtAuthz {
 
-using ::envoy::api::v2::auth::AttributeContext;
-using ::envoy::api::v2::auth::AttributeContext_HttpRequest;
-using ::envoy::api::v2::auth::AttributeContext_Peer;
-using ::envoy::api::v2::auth::AttributeContext_Request;
+using ::envoy::service::auth::v2::AttributeContext;
+using ::envoy::service::auth::v2::AttributeContext_HttpRequest;
+using ::envoy::service::auth::v2::AttributeContext_Peer;
+using ::envoy::service::auth::v2::AttributeContext_Request;
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const Optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.api.v2.auth.Authorization.Check")),
+          "envoy.service.auth.v2.Authorization.Check")),
       async_client_(std::move(async_client)), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
@@ -38,7 +38,7 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
-                           const envoy::api::v2::auth::CheckRequest& request,
+                           const envoy::service::auth::v2::CheckRequest& request,
                            Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -46,7 +46,7 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::api::v2::auth::CheckResponse>&& response,
+void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
                                Tracing::Span& span) {
   CheckStatus status = CheckStatus::OK;
   ASSERT(response->status().code() != Grpc::Status::GrpcStatus::Unknown);
@@ -214,7 +214,7 @@ std::unique_ptr<AttributeContext_Request> ExtAuthzCheckRequestGenerator::getHttp
 
 void ExtAuthzCheckRequestGenerator::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers, envoy::api::v2::auth::CheckRequest& request) {
+    const Envoy::Http::HeaderMap& headers, envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 
@@ -227,8 +227,9 @@ void ExtAuthzCheckRequestGenerator::createHttpCheck(
   attrs->set_allocated_request(getHttpRequest(callbacks, headers).release());
 }
 
-void ExtAuthzCheckRequestGenerator::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                                   envoy::api::v2::auth::CheckRequest& request) {
+void ExtAuthzCheckRequestGenerator::createTcpCheck(
+    const Network::ReadFilterCallbacks* callbacks,
+    envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 

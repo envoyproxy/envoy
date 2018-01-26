@@ -19,7 +19,7 @@
 namespace Envoy {
 namespace ExtAuthz {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::api::v2::auth::CheckResponse>
+typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>
     ExtAuthzAsyncCallbacks;
 
 struct ConstantValues {
@@ -40,12 +40,12 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::api::v2::auth::CheckRequest& request,
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::api::v2::auth::CheckResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
@@ -75,7 +75,7 @@ class NullClientImpl : public Client {
 public:
   // ExtAuthz::Client
   void cancel() override {}
-  void check(RequestCallbacks& callbacks, const envoy::api::v2::auth::CheckRequest&,
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest&,
              Tracing::Span&) override {
     callbacks.complete(CheckStatus::OK);
   }
@@ -94,18 +94,18 @@ public:
   // ExtAuthz::CheckRequestGenIntf
   void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                        const Envoy::Http::HeaderMap& headers,
-                       envoy::api::v2::auth::CheckRequest& request);
+                       envoy::service::auth::v2::CheckRequest& request);
   void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                      envoy::api::v2::auth::CheckRequest& request);
+                      envoy::service::auth::v2::CheckRequest& request);
 
 private:
   std::unique_ptr<::envoy::api::v2::Address>
   getProtobufAddress(const Network::Address::InstanceConstSharedPtr&);
-  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Peer>
+  std::unique_ptr<::envoy::service::auth::v2::AttributeContext_Peer>
   getConnectionPeer(const Network::Connection*, const std::string&, const bool);
-  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Peer>
+  std::unique_ptr<::envoy::service::auth::v2::AttributeContext_Peer>
   getConnectionPeer(const Network::Connection&, const std::string&, const bool);
-  std::unique_ptr<::envoy::api::v2::auth::AttributeContext_Request>
+  std::unique_ptr<::envoy::service::auth::v2::AttributeContext_Request>
   getHttpRequest(const Envoy::Http::StreamDecoderFilterCallbacks*, const Envoy::Http::HeaderMap&);
   const std::string getProtocolStr(const Envoy::Http::Protocol&);
   std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);

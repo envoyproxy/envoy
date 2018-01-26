@@ -10,9 +10,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
-
-#include "api/auth/external_auth.pb.h"
 
 namespace Envoy {
 namespace ExtAuthz {
@@ -53,7 +52,8 @@ public:
   virtual void cancel() PURE;
 
   // A check call.
-  virtual void check(RequestCallbacks& callback, const envoy::api::v2::auth::CheckRequest& request,
+  virtual void check(RequestCallbacks& callback,
+                     const envoy::service::auth::v2::CheckRequest& request,
                      Tracing::Span& parent_span) PURE;
 };
 
@@ -87,9 +87,9 @@ public:
 
   virtual void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                                const Envoy::Http::HeaderMap& headers,
-                               envoy::api::v2::auth::CheckRequest& request) PURE;
+                               envoy::service::auth::v2::CheckRequest& request) PURE;
   virtual void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                              envoy::api::v2::auth::CheckRequest& request) PURE;
+                              envoy::service::auth::v2::CheckRequest& request) PURE;
 };
 
 typedef std::unique_ptr<CheckRequestGenerator> CheckRequestGeneratorPtr;
