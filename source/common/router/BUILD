@@ -213,6 +213,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:optional",
         "//source/common/access_log:access_log_formatter_lib",
+        "//source/common/common:fmt_helpers_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
