@@ -64,7 +64,7 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
-    const envoy::api::v2::RateLimit::Action::HeaderValueMatch& action)
+    const envoy::api::v2::route::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)) {
   for (const auto& header_matcher : action.headers()) {
@@ -84,27 +84,27 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
   }
 }
 
-RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::RateLimit& config)
+RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const envoy::api::v2::route::RateLimit& config)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
-    case envoy::api::v2::RateLimit::Action::kSourceCluster:
+    case envoy::api::v2::route::RateLimit::Action::kSourceCluster:
       actions_.emplace_back(new SourceClusterAction());
       break;
-    case envoy::api::v2::RateLimit::Action::kDestinationCluster:
+    case envoy::api::v2::route::RateLimit::Action::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
       break;
-    case envoy::api::v2::RateLimit::Action::kRequestHeaders:
+    case envoy::api::v2::route::RateLimit::Action::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
       break;
-    case envoy::api::v2::RateLimit::Action::kRemoteAddress:
+    case envoy::api::v2::route::RateLimit::Action::kRemoteAddress:
       actions_.emplace_back(new RemoteAddressAction());
       break;
-    case envoy::api::v2::RateLimit::Action::kGenericKey:
+    case envoy::api::v2::route::RateLimit::Action::kGenericKey:
       actions_.emplace_back(new GenericKeyAction(action.generic_key()));
       break;
-    case envoy::api::v2::RateLimit::Action::kHeaderValueMatch:
+    case envoy::api::v2::route::RateLimit::Action::kHeaderValueMatch:
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
       break;
     default:
@@ -133,7 +133,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
 }
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::RateLimit>& rate_limits)
+    const Protobuf::RepeatedPtrField<envoy::api::v2::route::RateLimit>& rate_limits)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(

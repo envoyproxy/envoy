@@ -1,8 +1,12 @@
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/service/accesslog/v2/als.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
@@ -11,9 +15,9 @@ namespace Envoy {
 namespace {
 
 class AccessLogIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+                                 public Grpc::GrpcClientIntegrationParamTest {
 public:
-  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -21,7 +25,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
@@ -29,15 +33,15 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+        [this](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.http_grpc_access_log");
 
-          envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config;
+          envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
-              "accesslog");
+          setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
+                         fake_upstreams_.back()->localAddress());
           MessageUtil::jsonConvert(config, *access_log->mutable_config());
         });
 
@@ -53,14 +57,14 @@ public:
   }
 
   void waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage request_msg;
+    envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
     access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     EXPECT_STREQ("POST", access_log_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.api.v2.filter.accesslog.AccessLogService/StreamAccessLogs",
+    EXPECT_STREQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
                  access_log_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc", access_log_request_->headers().ContentType()->value().c_str());
 
-    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
     MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
@@ -84,8 +88,8 @@ public:
   FakeStreamPtr access_log_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AccessLogIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_CASE_P(IpVersionsCientType, AccessLogIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
@@ -142,7 +146,7 @@ http_logs:
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   access_log_request_->startGrpcStream();
-  envoy::api::v2::filter::accesslog::StreamAccessLogsResponse response_msg;
+  envoy::service::accesslog::v2::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);

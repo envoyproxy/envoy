@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 
@@ -18,7 +19,6 @@
 
 #include "test/test_common/printers.h"
 
-#include "api/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -192,9 +192,10 @@ public:
   /**
    * Parse bootstrap config from v1 JSON static config string.
    * @param json_string source v1 JSON static config string.
-   * @return envoy::api::v2::Bootstrap.
+   * @return envoy::config::bootstrap::v2::Bootstrap.
    */
-  static envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string);
+  static envoy::config::bootstrap::v2::Bootstrap
+  parseBootstrapFromJson(const std::string& json_string);
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.

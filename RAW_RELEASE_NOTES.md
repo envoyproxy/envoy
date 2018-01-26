@@ -38,7 +38,10 @@ final version.
 * Added support for :ref:`fixed stats tag values
   <envoy_api_field_TagSpecifier.fixed_value>` which will be added to all metrics.
 * Added `/runtime` admin endpoint to read the current runtime values.
+* Extended the health check filter to support computation of the health check response
+  based on the percent of healthy servers is upstream clusters.
 * Added `gateway-error` retry-on policy.
 * Added support for building envoy with exported symbols
   This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.
+* Added support for more granular weighted cluster routing by allowing the total weight to be specified in configuration.
 * Added support for custom request/response headers with mixed static and dynamic values.
