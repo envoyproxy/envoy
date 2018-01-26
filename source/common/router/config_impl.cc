@@ -258,7 +258,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // single cluster, pointing back to the parent. Metadata criteria
   // from the weighted cluster (if any) are merged with and override
   // the criteria from the route.
-  if (route.route().cluster_specifier_case() == envoy::api::v2::route::RouteAction::kWeightedClusters) {
+  if (route.route().cluster_specifier_case() ==
+      envoy::api::v2::route::RouteAction::kWeightedClusters) {
     ASSERT(total_cluster_weight_ > 0);
 
     uint64_t total_weight = 0UL;
