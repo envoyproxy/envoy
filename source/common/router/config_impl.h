@@ -54,6 +54,7 @@ public:
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
+  const std::string& responseBody() const override { return EMPTY_STRING; }
 };
 
 class SslRedirectRoute : public Route {
@@ -290,6 +291,9 @@ class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
+  /**
+   * @throw EnvoyException with reason if the route configuration contains any errors
+   */
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
                      Runtime::Loader& loader);
 
@@ -334,6 +338,7 @@ public:
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return direct_response_code_.value(); }
+  const std::string& responseBody() const override { return direct_response_body_; }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -440,8 +445,6 @@ private:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
-    static const uint64_t MAX_CLUSTER_WEIGHT;
-
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -481,6 +484,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
@@ -492,6 +496,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const Optional<Http::Code> direct_response_code_;
+  std::string direct_response_body_;
 };
 
 /**

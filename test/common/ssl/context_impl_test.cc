@@ -9,6 +9,7 @@
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -282,6 +283,46 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   envoy::api::v2::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(79, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
+  }
+  )EOF";
+
+  EXPECT_NO_THROW(loadConfigJson(json));
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+                          "^Failed to load CRL from .*/not_a_crl.crl$");
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+                          "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
 } // namespace Ssl

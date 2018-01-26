@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -96,6 +97,34 @@ Optional<Http::Code> ConfigUtility::parseDirectResponseCode(const envoy::api::v2
     return static_cast<Http::Code>(route.direct_response().status());
   }
   return Optional<Http::Code>();
+}
+
+std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::Route& route) {
+  if (!route.has_direct_response() || !route.direct_response().has_body()) {
+    return EMPTY_STRING;
+  }
+  const auto& body = route.direct_response().body();
+  const std::string filename = body.filename();
+  if (!filename.empty()) {
+    static const ssize_t MaxFileSize = 4096;
+    if (!Filesystem::fileExists(filename)) {
+      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
+    }
+    ssize_t size = Filesystem::fileSize(filename);
+    if (size < 0) {
+      throw EnvoyException(fmt::format("cannot determine size of response body file {}", filename));
+    }
+    if (size > MaxFileSize) {
+      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
+                                       filename, MaxFileSize));
+    }
+    return Filesystem::fileReadToEnd(filename);
+  }
+  const std::string inline_bytes = body.inline_bytes();
+  if (!inline_bytes.empty()) {
+    return inline_bytes;
+  }
+  return body.inline_string();
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(

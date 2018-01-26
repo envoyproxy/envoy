@@ -187,8 +187,31 @@ public:
    */
   static bool portInRangeList(const Address::Instance& address, const std::list<PortRange>& list);
 
+  /**
+   * Converts IPv6 absl::uint128 in network byte order to host byte order.
+   * @param address supplies the IPv6 address in network byte order.
+   * @return the absl::uint128 IPv6 address in host byte order.
+   */
+  static absl::uint128 Ip6ntohl(const absl::uint128& address);
+
+  /**
+   * Converts IPv6 absl::uint128 in host byte order to network byte order.
+   * @param address supplies the IPv6 address in host byte order.
+   * @return the absl::uint128 IPv6 address in network byte order.
+   */
+  static absl::uint128 Ip6htonl(const absl::uint128& address);
+
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
+
+  /**
+   * Takes a number and flips the order in byte chunks. The last byte of the input will be the
+   * first byte in the output. The second to last byte will be the second to first byte in the
+   * output. Etc..
+   * @param input supplies the input to have the bytes flipped.
+   * @return the absl::uint128 of the input having the bytes flipped.
+   */
+  static absl::uint128 flipOrder(const absl::uint128& input);
 };
 
 } // namespace Network

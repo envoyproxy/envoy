@@ -17,6 +17,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -219,8 +220,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
       return Http::FilterHeadersStatus::StopIteration;
     }
     config_.stats_.rq_direct_response_.inc();
-    sendLocalReply(route_->directResponseEntry()->responseCode(), "", false);
-    // TODO(brian-pane) support sending a response body and response_headers_to_add.
+    sendLocalReply(route_->directResponseEntry()->responseCode(),
+                   route_->directResponseEntry()->responseBody(), false);
+    // TODO(brian-pane) support sending response_headers_to_add.
     return Http::FilterHeadersStatus::StopIteration;
   }
 

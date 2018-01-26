@@ -44,6 +44,13 @@ public:
    *         or an empty string otherwise.
    */
   virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Returns the response body to send with direct responses.
+   * @return std::string& the response body specified in the route configuration,
+   *         or an empty string if no response body is specified.
+   */
+  virtual const std::string& responseBody() const PURE;
 };
 
 /**

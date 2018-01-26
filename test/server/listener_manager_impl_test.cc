@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/config/metadata.h"
 #include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -1181,6 +1182,34 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
                             EnvoyException, "Failed to load trusted CA certificates from <inline>");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    filter_chains:
+    - filter_chain_match:
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: metadata_test
+          route_config:
+            virtual_hosts:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
+  ASSERT_NE(nullptr, context);
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+                .string_value());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -1293,6 +1322,90 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
   EXPECT_TRUE(socket.localAddressRestored());
   EXPECT_EQ("127.0.0.2:2345", socket.localAddress()->asString());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { inline_string: "-----BEGIN X509 CRL-----\nMIIBbDCB1gIBATANBgkqhkiG9w0BAQsFADB2MQswCQYDVQQGEwJVUzETMBEGA1UE\nCBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzENMAsGA1UEChME\nTHlmdDEZMBcGA1UECxMQTHlmdCBFbmdpbmVlcmluZzEQMA4GA1UEAxMHVGVzdCBD\nQRcNMTcxMjIwMTcxNDA4WhcNMjcxMjE4MTcxNDA4WjAcMBoCCQDZy/Qp7iAfHxcN\nMTcxMjIwMTcxMjU0WqAOMAwwCgYDVR0UBAMCAQAwDQYJKoZIhvcNAQELBQADgYEA\nOTn5Fgb44xtFd9QGtbTElZ3iwdlcOxRHjgQMd+ydzEEZRMzMgb4/NmEsgXAsxbrx\ntKmpgll8TblscitkglvGk8s4obi/OtgxNIvn+7pOBTjmrgJkcktBUDEWRbLZjsZx\nyH+5teBZ0tH0tVy914QeGitZFV8awK1hlJwlAz9g/jo=\n-----END X509 CRL-----" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, InvalidCRLInline) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { inline_string: "-----BEGIN X509 CRL-----\nTOTALLY_NOT_A_CRL_HERE\n-----END X509 CRL-----\n" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load CRL from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            crl: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                          EnvoyException,
+                          "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
 } // namespace Server

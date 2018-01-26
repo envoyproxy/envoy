@@ -20,6 +20,8 @@
 #include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
 
+#include "api/base.pb.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -121,6 +123,11 @@ public:
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return const envoy::api::v2::Metadata& the config metadata associated with this listener.
+   */
+  virtual const envoy::api::v2::Metadata& listenerMetadata() const PURE;
 };
 
 /**
