@@ -50,7 +50,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
-    external_deps = ["envoy_filter_network_ext_authz"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/config:filter_json_lib",
@@ -64,5 +63,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2/filter/network:ext_authz_cc",
     ],
 )

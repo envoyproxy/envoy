@@ -24,7 +24,7 @@ void Instance::setCheckReqGenerator(CheckRequestGenerator* crg) {
 }
 
 void Instance::callCheck() {
-  envoy::api::v2::auth::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   if (check_req_generator_ == nullptr) {
     setCheckReqGenerator(new ExtAuthzCheckRequestGenerator());
   }

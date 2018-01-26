@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/api/v2/filter/network/ext_authz.pb.validate.h"
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -10,8 +11,6 @@
 #include "common/ext_authz/ext_authz_impl.h"
 #include "common/filter/ext_authz.h"
 #include "common/protobuf/utility.h"
-
-#include "api/filter/network/ext_authz.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

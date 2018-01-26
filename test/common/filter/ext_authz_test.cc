@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/filter/network/ext_authz.pb.validate.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/filter/ext_authz.h"
 #include "common/json/json_loader.h"
@@ -15,7 +17,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 
-#include "api/filter/network/ext_authz.pb.validate.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

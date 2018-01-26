@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/filter/network/ext_authz.pb.h"
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -13,8 +14,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/ext_authz/ext_authz_impl.h"
-
-#include "api/filter/network/ext_authz.pb.h"
 
 namespace Envoy {
 namespace ExtAuthz {
