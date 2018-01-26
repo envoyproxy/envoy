@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
@@ -19,6 +18,8 @@
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -294,8 +295,8 @@ public:
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
- * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * stats sink. See envoy.api.v2.ClusterStats for the definition of upstream_rq_dropped. These are
+ * latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
 // clang-format off
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER)                                                     \
@@ -366,13 +367,12 @@ public:
   /**
    * @return the service discovery type to use for resolving the cluster.
    */
-  virtual envoy::api::v2::cluster::Cluster::DiscoveryType type() const PURE;
+  virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>&
-  lbRingHashConfig() const PURE;
+  virtual const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

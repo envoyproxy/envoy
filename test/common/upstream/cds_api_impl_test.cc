@@ -63,7 +63,7 @@ public:
 
   void expectAdd(const std::string& cluster_name) {
     EXPECT_CALL(cm_, addOrUpdatePrimaryCluster(_))
-        .WillOnce(Invoke([cluster_name](const envoy::api::v2::cluster::Cluster& cluster) -> bool {
+        .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& cluster) -> bool {
           EXPECT_EQ(cluster_name, cluster.name());
           return true;
         }));
@@ -114,7 +114,7 @@ TEST_F(CdsApiImplTest, ValidateFail) {
 
   setup(true);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::cluster::Cluster> clusters;
+  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
   clusters.Add();
 
   EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters),

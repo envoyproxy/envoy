@@ -1,9 +1,10 @@
 #pragma once
 
-#include "envoy/api/v2/address.pb.h"
 #include "envoy/json/json_object.h"
 
 #include "common/protobuf/protobuf.h"
+
+#include "api/address.pb.h"
 
 namespace Envoy {
 namespace Config {

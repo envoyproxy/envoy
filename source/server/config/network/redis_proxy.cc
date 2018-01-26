@@ -3,7 +3,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/network/redis_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -11,6 +10,8 @@
 #include "common/redis/command_splitter_impl.h"
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
+
+#include "api/filter/network/redis_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

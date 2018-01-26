@@ -27,7 +27,7 @@ public:
   // Upstream::LoadBalancerSubsetInfo
   MOCK_CONST_METHOD0(isEnabled, bool());
   MOCK_CONST_METHOD0(fallbackPolicy,
-                     envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
+                     envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
   MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
   MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
 
@@ -46,9 +46,9 @@ public:
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
-  MOCK_CONST_METHOD0(type, envoy::api::v2::cluster::Cluster::DiscoveryType());
+  MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
-                     const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>&());
+                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -73,10 +73,9 @@ public:
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
-  envoy::api::v2::cluster::Cluster::DiscoveryType type_{
-      envoy::api::v2::cluster::Cluster::STRICT_DNS};
+  envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
-  Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
 };
 
 } // namespace Upstream

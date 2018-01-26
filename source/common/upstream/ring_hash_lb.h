@@ -30,7 +30,7 @@ class RingHashLoadBalancer : public LoadBalancerBase,
 public:
   RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
-                       const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config);
+                       const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
 
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
@@ -43,7 +43,7 @@ private:
   };
 
   struct Ring {
-    Ring(const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config,
+    Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
          const std::vector<HostSharedPtr>& hosts);
     HostConstSharedPtr chooseHost(uint64_t hash) const;
 
@@ -90,7 +90,7 @@ private:
 
   void refresh();
 
-  const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config_;
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
 };
 

@@ -1,5 +1,4 @@
 #include "envoy/common/exception.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
 
 #include "common/config/cds_json.h"
 #include "common/config/lds_json.h"
@@ -16,6 +15,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "api/eds.pb.h"
 #include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,20 +29,18 @@ namespace Envoy {
 namespace Config {
 
 TEST(UtilityTest, GetTypedResources) {
-  envoy::service::discovery::v2::DiscoveryResponse response;
-  EXPECT_EQ(
-      0, Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(response)
-             .size());
+  envoy::api::v2::DiscoveryResponse response;
+  EXPECT_EQ(0, Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(response).size());
 
-  envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_0;
+  envoy::api::v2::ClusterLoadAssignment load_assignment_0;
   load_assignment_0.set_cluster_name("0");
   response.add_resources()->PackFrom(load_assignment_0);
-  envoy::service::discovery::v2::ClusterLoadAssignment load_assignment_1;
+  envoy::api::v2::ClusterLoadAssignment load_assignment_1;
   load_assignment_1.set_cluster_name("1");
   response.add_resources()->PackFrom(load_assignment_1);
 
   auto typed_resources =
-      Utility::getTypedResources<envoy::service::discovery::v2::ClusterLoadAssignment>(response);
+      Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(response);
   EXPECT_EQ(2, typed_resources.size());
   EXPECT_EQ("0", typed_resources[0].cluster_name());
   EXPECT_EQ("1", typed_resources[1].cluster_name());
@@ -87,7 +85,7 @@ TEST(UtilityTest, TranslateApiConfigSource) {
 }
 
 TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  envoy::api::v2::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap);
   ASSERT(producer != nullptr);
   std::vector<Stats::Tag> tags;
@@ -114,7 +112,7 @@ TEST(UtilityTest, ObjNameLength) {
         R"EOF({ "name": ")EOF" + name + R"EOF(", "address": "foo", "filters":[]})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
 
-    envoy::api::v2::listener::Listener listener;
+    envoy::api::v2::Listener listener;
     EXPECT_THROW_WITH_MESSAGE(Config::LdsJson::translateListener(*json_object_ptr, listener),
                               EnvoyException, err_prefix + err_suffix);
   }
@@ -123,7 +121,7 @@ TEST(UtilityTest, ObjNameLength) {
     err_prefix = "Invalid virtual host name";
     std::string json = R"EOF({ "name": ")EOF" + name + R"EOF(", "domains": [], "routes": []})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::api::v2::route::VirtualHost vhost;
+    envoy::api::v2::VirtualHost vhost;
     EXPECT_THROW_WITH_MESSAGE(Config::RdsJson::translateVirtualHost(*json_object_ptr, vhost),
                               EnvoyException, err_prefix + err_suffix);
   }
@@ -134,7 +132,7 @@ TEST(UtilityTest, ObjNameLength) {
         R"EOF({ "name": ")EOF" + name +
         R"EOF(", "type": "static", "lb_type": "random", "connect_timeout_ms" : 1})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::api::v2::cluster::Cluster cluster;
+    envoy::api::v2::Cluster cluster;
     envoy::api::v2::ConfigSource eds_config;
     EXPECT_THROW_WITH_MESSAGE(
         Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
@@ -159,7 +157,7 @@ TEST(UtilityTest, UnixClusterDns) {
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
       R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
-  envoy::api::v2::cluster::Cluster cluster;
+  envoy::api::v2::Cluster cluster;
   envoy::api::v2::ConfigSource eds_config;
   EXPECT_THROW_WITH_MESSAGE(
       Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
@@ -174,7 +172,7 @@ TEST(UtilityTest, UnixClusterStatic) {
       R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
       R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
   auto json_object_ptr = Json::Factory::loadFromString(json);
-  envoy::api::v2::cluster::Cluster cluster;
+  envoy::api::v2::Cluster cluster;
   envoy::api::v2::ConfigSource eds_config;
   Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
@@ -215,7 +213,7 @@ TEST(UtilityTest, CheckApiConfigSourceSubscriptionBackingCluster) {
   // EDS Cluster backing EDS Cluster.
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::cluster::Cluster::EDS));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,

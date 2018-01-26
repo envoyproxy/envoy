@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -24,6 +23,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 
+#include "api/filter/network/http_connection_manager.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {

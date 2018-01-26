@@ -831,12 +831,11 @@ TEST_P(RandomLoadBalancerTest, Normal) {
 INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
 
 TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
-  auto subset_info = LoadBalancerSubsetInfoImpl(
-      envoy::api::v2::cluster::Cluster::LbSubsetConfig::default_instance());
+  auto subset_info =
+      LoadBalancerSubsetInfoImpl(envoy::api::v2::Cluster::LbSubsetConfig::default_instance());
 
   EXPECT_FALSE(subset_info.isEnabled());
-  EXPECT_TRUE(subset_info.fallbackPolicy() ==
-              envoy::api::v2::cluster::Cluster::LbSubsetConfig::NO_FALLBACK);
+  EXPECT_TRUE(subset_info.fallbackPolicy() == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 0);
   EXPECT_EQ(subset_info.subsetKeys().size(), 0);
 }
@@ -845,9 +844,8 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_value = ProtobufWkt::Value();
   subset_value.set_string_value("the value");
 
-  auto subset_config = envoy::api::v2::cluster::Cluster::LbSubsetConfig::default_instance();
-  subset_config.set_fallback_policy(
-      envoy::api::v2::cluster::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  subset_config.set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
   auto subset_selector = subset_config.mutable_subset_selectors()->Add();
   subset_selector->add_keys("selector_key");
@@ -856,7 +854,7 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
 
   EXPECT_TRUE(subset_info.isEnabled());
   EXPECT_TRUE(subset_info.fallbackPolicy() ==
-              envoy::api::v2::cluster::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+              envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));

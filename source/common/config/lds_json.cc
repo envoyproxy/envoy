@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Config {
 
 void LdsJson::translateListener(const Json::Object& json_listener,
-                                envoy::api::v2::listener::Listener& listener) {
+                                envoy::api::v2::Listener& listener) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   const std::string name = json_listener.getString("name", "");
@@ -48,7 +48,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
 
   const std::string drain_type = json_listener.getString("drain_type", "default");
   if (drain_type == "modify_only") {
-    listener.set_drain_type(envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
+    listener.set_drain_type(envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   } else {
     ASSERT(drain_type == "default");
   }

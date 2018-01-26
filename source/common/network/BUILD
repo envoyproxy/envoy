@@ -23,6 +23,9 @@ envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
+    external_deps = [
+        "envoy_address",
+    ],
     deps = [
         ":address_lib",
         ":utility_lib",
@@ -30,7 +33,6 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/api/v2:address_cc",
     ],
 )
 
@@ -134,13 +136,13 @@ envoy_cc_library(
     name = "raw_buffer_socket_lib",
     srcs = ["raw_buffer_socket.cc"],
     hdrs = ["raw_buffer_socket.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":utility_lib",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
-        "@envoy_api//envoy/api/v2:base_cc",
     ],
 )
 
@@ -148,6 +150,7 @@ envoy_cc_library(
     name = "resolver_lib",
     srcs = ["resolver_impl.cc"],
     hdrs = ["resolver_impl.h"],
+    external_deps = ["envoy_base"],
     deps = [
         ":utility_lib",
         "//include/envoy/network:address_interface",
@@ -156,7 +159,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:base_cc",
     ],
 )
 
@@ -166,6 +168,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = [
         "abseil_strings",
+        "envoy_base",
     ],
     deps = [
         ":address_lib",
@@ -174,6 +177,5 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:base_cc",
     ],
 )

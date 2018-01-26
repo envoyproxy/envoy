@@ -2,13 +2,14 @@
 
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/service/discovery/v2/common.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "api/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {

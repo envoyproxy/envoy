@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
@@ -16,6 +15,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+
+#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -29,13 +30,13 @@ public:
     // An empty header value allows for matching to be only based on header presence.
     // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
     // exact string matching.
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
+    HeaderData(const envoy::api::v2::HeaderMatcher& config)
         : name_(config.name()), value_(config.value()),
           is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
           regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
     HeaderData(const Json::Object& config)
         : HeaderData([&config] {
-            envoy::api::v2::route::HeaderMatcher header_matcher;
+            envoy::api::v2::HeaderMatcher header_matcher;
             Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
             return header_matcher;
           }()) {}
@@ -51,7 +52,7 @@ public:
   // equivalent of the QueryParameterMatcher proto in the RDS v2 API.
   class QueryParameterMatcher {
   public:
-    QueryParameterMatcher(const envoy::api::v2::route::QueryParameterMatcher& config)
+    QueryParameterMatcher(const envoy::api::v2::QueryParameterMatcher& config)
         : name_(config.name()), value_(config.value()),
           is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
           regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
@@ -101,8 +102,8 @@ public:
    * @param code supplies the RedirectResponseCode enum.
    * @return Returns the Http::Code version of the RedirectResponseCode.
    */
-  static Http::Code parseRedirectResponseCode(
-      const envoy::api::v2::route::RedirectAction::RedirectResponseCode& code);
+  static Http::Code
+  parseRedirectResponseCode(const envoy::api::v2::RedirectAction::RedirectResponseCode& code);
 
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
@@ -111,7 +112,7 @@ public:
    *         or the HTTP status code from the route's redirect if specified,
    *         or an empty Option otherwise.
    */
-  static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::route::Route& route);
+  static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::Route& route);
 
   /**
    * Returns the content of the response body to send with direct responses from a route.
@@ -121,7 +122,7 @@ public:
    *         route's direct_response if specified, or an empty string otherwise.
    * @throw EnvoyException if the route configuration contains an error.
    */
-  static std::string parseDirectResponseBody(const envoy::api::v2::route::Route& route);
+  static std::string parseDirectResponseBody(const envoy::api::v2::Route& route);
 
   /**
    * Returns the HTTP Status Code enum parsed from proto.
@@ -129,7 +130,7 @@ public:
    * @return Returns the Http::Code version of the ClusterNotFoundResponseCode enum.
    */
   static Http::Code parseClusterNotFoundResponseCode(
-      const envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode& code);
+      const envoy::api::v2::RouteAction::ClusterNotFoundResponseCode& code);
 };
 
 } // namespace Router

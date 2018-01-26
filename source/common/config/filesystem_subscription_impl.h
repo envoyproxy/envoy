@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -10,6 +9,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -56,7 +57,7 @@ private:
     stats_.update_attempt_.inc();
     bool config_update_available = false;
     try {
-      envoy::service::discovery::v2::DiscoveryResponse message;
+      envoy::api::v2::DiscoveryResponse message;
       MessageUtil::loadFromFile(path_, message);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
