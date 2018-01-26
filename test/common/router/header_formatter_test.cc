@@ -242,7 +242,7 @@ TEST(HeaderParserTest, TestParseInternal) {
     Optional<std::string> expected_exception_;
   };
 
-  std::vector<TestCase> test_cases({
+  static const TestCase test_cases[] = {
       // Valid inputs
       {"%PROTOCOL%", {"HTTP/1.1"}, {}},
       {"[%PROTOCOL%", {"[HTTP/1.1"}, {}},
@@ -374,7 +374,7 @@ TEST(HeaderParserTest, TestParseInternal) {
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA([\"ns\"])"}},
-  });
+  };
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
