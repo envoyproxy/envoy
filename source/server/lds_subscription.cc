@@ -1,13 +1,12 @@
 #include "server/lds_subscription.h"
 
-#include "envoy/api/v2/listener/listener.pb.h"
-
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
+#include "api/lds.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -47,7 +46,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
   response_json->validateSchema(Json::Schema::LDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> json_listeners = response_json->getObjectArray("listeners");
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::listener::Listener> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> resources;
   for (const Json::ObjectSharedPtr& json_listener : json_listeners) {
     Config::LdsJson::translateListener(*json_listener, *resources.Add());
   }

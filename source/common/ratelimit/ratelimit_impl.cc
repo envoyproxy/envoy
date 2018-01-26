@@ -75,14 +75,13 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
+GrpcFactoryImpl::GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
                                  Stats::Scope& scope) {
   envoy::api::v2::GrpcService grpc_service;
   grpc_service.MergeFrom(config.grpc_service());
   // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
-  if (config.service_specifier_case() ==
-      envoy::config::ratelimit::v2::RateLimitServiceConfig::kClusterName) {
+  if (config.service_specifier_case() == envoy::api::v2::RateLimitServiceConfig::kClusterName) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope);

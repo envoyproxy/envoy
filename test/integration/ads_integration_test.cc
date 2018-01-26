@@ -1,11 +1,3 @@
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
-#include "envoy/service/discovery/v2/cds.pb.h"
-#include "envoy/service/discovery/v2/common.pb.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
-#include "envoy/service/discovery/v2/lds.pb.h"
-#include "envoy/service/discovery/v2/rds.pb.h"
-
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -15,6 +7,11 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "api/cds.pb.h"
+#include "api/discovery.pb.h"
+#include "api/eds.pb.h"
+#include "api/lds.pb.h"
+#include "api/rds.pb.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionFailure;
@@ -61,7 +58,7 @@ public:
   AssertionResult compareDiscoveryRequest(const std::string& expected_type_url,
                                           const std::string& expected_version,
                                           const std::vector<std::string>& expected_resource_names) {
-    envoy::service::discovery::v2::DiscoveryRequest discovery_request;
+    envoy::api::v2::DiscoveryRequest discovery_request;
     ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
@@ -89,7 +86,7 @@ public:
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                              const std::string& version) {
-    envoy::service::discovery::v2::DiscoveryResponse discovery_response;
+    envoy::api::v2::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
@@ -98,8 +95,8 @@ public:
     ads_stream_->sendGrpcMessage(discovery_response);
   }
 
-  envoy::api::v2::cluster::Cluster buildCluster(const std::string& name) {
-    return TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(fmt::format(R"EOF(
+  envoy::api::v2::Cluster buildCluster(const std::string& name) {
+    return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: EDS
@@ -107,12 +104,11 @@ public:
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {{}}
     )EOF",
-                                                                                name));
+                                                                       name));
   }
 
-  envoy::service::discovery::v2::ClusterLoadAssignment
-  buildClusterLoadAssignment(const std::string& name) {
-    return TestUtility::parseYaml<envoy::service::discovery::v2::ClusterLoadAssignment>(
+  envoy::api::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name) {
+    return TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(
         fmt::format(R"EOF(
       cluster_name: {}
       endpoints:
@@ -127,9 +123,8 @@ public:
                     fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
-  envoy::api::v2::listener::Listener buildListener(const std::string& name,
-                                                   const std::string& route_config) {
-    return TestUtility::parseYaml<envoy::api::v2::listener::Listener>(
+  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config) {
+    return TestUtility::parseYaml<envoy::api::v2::Listener>(
         fmt::format(R"EOF(
       name: {}
       address:
@@ -150,9 +145,9 @@ public:
                     name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
   }
 
-  envoy::api::v2::route::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                             const std::string& cluster) {
-    return TestUtility::parseYaml<envoy::api::v2::route::RouteConfiguration>(fmt::format(R"EOF(
+  envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                      const std::string& cluster) {
+    return TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(fmt::format(R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -161,8 +156,7 @@ public:
         - match: {{ prefix: "/" }}
           route: {{ cluster: {} }}
     )EOF",
-                                                                                         name,
-                                                                                         cluster));
+                                                                                  name, cluster));
   }
 
   void makeSingleRequest() {
@@ -173,7 +167,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::api::v2::Bootstrap& bootstrap) {
       setGrpcService(
           *bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services(),
           "ads_cluster", fake_upstreams_.back()->localAddress());
@@ -183,7 +177,6 @@ public:
     ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
-    envoy::service::discovery::v2::AdsDummy dummy;
   }
 
   FakeHttpConnectionPtr ads_connection_;
@@ -198,24 +191,24 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   // Send initial configuration, validate we can process a request.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().Cluster,
-                                                          {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::service::discovery::v2::ClusterLoadAssignment>(
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
-  sendDiscoveryResponse<envoy::api::v2::route::RouteConfiguration>(
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       "1");
 
@@ -227,9 +220,9 @@ TEST_P(AdsIntegrationTest, Basic) {
   makeSingleRequest();
 
   // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
-  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("cluster_1"), buildCluster("cluster_2")}, "2");
-  sendDiscoveryResponse<envoy::service::discovery::v2::ClusterLoadAssignment>(
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")}, "2");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
@@ -237,7 +230,7 @@ TEST_P(AdsIntegrationTest, Basic) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"cluster_2", "cluster_1"}));
-  sendDiscoveryResponse<envoy::api::v2::route::RouteConfiguration>(
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
       "2");
   EXPECT_TRUE(
@@ -246,17 +239,16 @@ TEST_P(AdsIntegrationTest, Basic) {
   makeSingleRequest();
 
   // Upgrade LDS/RDS, validate we can process a request.
-  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(
-      Config::TypeUrl::get().Listener,
-      {buildListener("listener_1", "route_config_1"),
-       buildListener("listener_2", "route_config_2")},
-      "2");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener,
+                                                  {buildListener("listener_1", "route_config_1"),
+                                                   buildListener("listener_2", "route_config_2")},
+                                                  "2");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
                                       {"route_config_2", "route_config_1", "route_config_0"}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
                                       {"route_config_2", "route_config_1"}));
-  sendDiscoveryResponse<envoy::api::v2::route::RouteConfiguration>(
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_1", "cluster_1"),
        buildRouteConfig("route_config_2", "cluster_1")},
@@ -275,45 +267,45 @@ TEST_P(AdsIntegrationTest, Failure) {
   // Send initial configuration, failing each xDS once (via a type mismatch), validate we can
   // process a request.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::service::discovery::v2::ClusterLoadAssignment>(
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().Cluster, {buildClusterLoadAssignment("cluster_0")}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(Config::TypeUrl::get().Cluster,
-                                                          {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::api::v2::cluster::Cluster>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().ClusterLoadAssignment,
+                                                 {buildCluster("cluster_0")}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::service::discovery::v2::ClusterLoadAssignment>(
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
-  sendDiscoveryResponse<envoy::api::v2::route::RouteConfiguration>(
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().Listener, {buildRouteConfig("listener_0", "route_config_0")}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
-  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
 
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
-  sendDiscoveryResponse<envoy::api::v2::listener::Listener>(
-      Config::TypeUrl::get().RouteConfiguration, {buildListener("route_config_0", "cluster_0")},
-      "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().RouteConfiguration,
+                                                  {buildListener("route_config_0", "cluster_0")},
+                                                  "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
-  sendDiscoveryResponse<envoy::api::v2::route::RouteConfiguration>(
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       "1");
 

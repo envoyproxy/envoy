@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -13,6 +12,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
+#include "api/base.pb.h"
 #include "google/api/annotations.pb.h"
 
 namespace Envoy {
@@ -72,7 +72,7 @@ public:
   }
 
   void parseResponse(const Http::Message& response) override {
-    envoy::service::discovery::v2::DiscoveryResponse message;
+    envoy::api::v2::DiscoveryResponse message;
     const auto status = Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
     if (!status.ok()) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
@@ -108,7 +108,7 @@ private:
   std::string path_;
   Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
   Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
-  envoy::service::discovery::v2::DiscoveryRequest request_;
+  envoy::api::v2::DiscoveryRequest request_;
   SubscriptionStats stats_;
 };
 

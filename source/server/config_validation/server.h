@@ -89,13 +89,13 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   // Server::ListenerComponentFactory
-  std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context) override {
+  std::vector<Configuration::NetworkFilterFactoryCb>
+  createNetworkFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                 Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters, context);
   }
   std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
       Configuration::FactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
@@ -105,7 +105,7 @@ public:
     // validation mock.
     return nullptr;
   }
-  DrainManagerPtr createDrainManager(envoy::api::v2::listener::Listener::DrainType) override {
+  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType) override {
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }

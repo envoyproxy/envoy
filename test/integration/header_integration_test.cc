@@ -1,6 +1,3 @@
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
-
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
@@ -8,6 +5,8 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 
+#include "api/eds.pb.h"
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -101,12 +100,12 @@ public:
   }
 
   void prepareEDS() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 
       static_resources->mutable_clusters(0)->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(
+          TestUtility::parseYaml<envoy::api::v2::Cluster>(
               R"EOF(
                   name: cluster_0
                   type: EDS
@@ -123,7 +122,7 @@ public:
       // host must come before the eds-cluster's host to keep the upstreams and ports in the same
       // order.
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
               R"EOF(
                       name: unused-cluster
                       type: STATIC
@@ -136,7 +135,7 @@ public:
               Network::Test::getLoopbackAddressString(version_))));
 
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::cluster::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
               R"EOF(
                       name: eds-cluster
                       type: STATIC
@@ -230,17 +229,16 @@ public:
         eds_stream_ = eds_connection_->waitForNewStream(*dispatcher_);
         eds_stream_->startGrpcStream();
 
-        envoy::service::discovery::v2::DiscoveryRequest discovery_request;
+        envoy::api::v2::DiscoveryRequest discovery_request;
         eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
 
-        envoy::service::discovery::v2::DiscoveryResponse discovery_response;
+        envoy::api::v2::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-        envoy::service::discovery::v2::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::service::discovery::v2::ClusterLoadAssignment>(
-                fmt::format(
-                    R"EOF(
+        envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
+            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+                R"EOF(
                 cluster_name: cluster_0
                 endpoints:
                 - lb_endpoints:
@@ -254,8 +252,8 @@ public:
                         test.namespace:
                           key: metadata-value
               )EOF",
-                    Network::Test::getLoopbackAddressString(GetParam()),
-                    fake_upstreams_[0]->localAddress()->ip()->port()));
+                Network::Test::getLoopbackAddressString(GetParam()),
+                fake_upstreams_[0]->localAddress()->ip()->port()));
 
         discovery_response.add_resources()->PackFrom(cluster_load_assignment);
         eds_stream_->sendGrpcMessage(discovery_response);

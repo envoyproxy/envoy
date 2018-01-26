@@ -57,6 +57,7 @@ envoy_cc_library(
     name = "grpc_access_log_lib",
     srcs = ["grpc_access_log_impl.cc"],
     hdrs = ["grpc_access_log_impl.h"],
+    external_deps = ["envoy_filter_accesslog"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -65,8 +66,5 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/api/v2/filter/accesslog:accesslog_cc",
-        "@envoy_api//envoy/config/accesslog/v2:als_cc",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
     ],
 )
