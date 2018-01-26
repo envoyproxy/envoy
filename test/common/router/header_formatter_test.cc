@@ -1,6 +1,5 @@
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
