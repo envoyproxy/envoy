@@ -210,9 +210,59 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(ConnectionImplTest, SocketOptions) {
+  Network::ClientConnectionPtr upstream_connection_;
+  bool options_set = false;
+
+  setUpBasicConnection();
+
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection_->write(buffer);
+  client_connection_->connect();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        client_connection_->close(ConnectionCloseType::NoFlush);
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  read_filter_.reset(new NiceMock<MockReadFilter>());
+
+  auto options = std::make_shared<MockSocketOptions>();
+
+  EXPECT_CALL(*options, setOptions(_)).WillOnce(Invoke([&](Network::ConnectionSocket&) -> bool {
+    options_set = true;
+    return true;
+  }));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        socket->setOptionsForUpstreamConnections(options);
+        Network::ConnectionPtr new_connection =
+            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+
+        upstream_connection_ = dispatcher_->createClientConnection(
+            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            server_connection_->socketOptionsForUpstreamConnections());
+      }));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_TRUE(options_set);
+}
+
 struct MockConnectionStats {
   Connection::ConnectionStats toBufferStats() {
-    return {rx_total_, rx_current_, tx_total_, tx_current_, &bind_errors_};
+    return {rx_total_, rx_current_, tx_total_, tx_current_, &bind_errors_, &socket_options_errors_};
   }
 
   StrictMock<Stats::MockCounter> rx_total_;
@@ -220,7 +270,29 @@ struct MockConnectionStats {
   StrictMock<Stats::MockCounter> tx_total_;
   StrictMock<Stats::MockGauge> tx_current_;
   StrictMock<Stats::MockCounter> bind_errors_;
+  StrictMock<Stats::MockCounter> socket_options_errors_;
 };
+
+TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
+  dispatcher_.reset(new Event::DispatcherImpl);
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+
+  auto options = std::make_shared<MockSocketOptions>();
+
+  EXPECT_CALL(*options, setOptions(_)).WillOnce(Invoke([&](Network::ConnectionSocket&) -> bool {
+    return false;
+  }));
+
+  client_connection_ = dispatcher_->createClientConnection(
+      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), options);
+
+  MockConnectionStats connection_stats;
+  client_connection_->setConnectionStats(connection_stats.toBufferStats());
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  EXPECT_CALL(connection_stats.socket_options_errors_, inc());
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
 
 TEST_P(ConnectionImplTest, ConnectionStats) {
   setUpBasicConnection();

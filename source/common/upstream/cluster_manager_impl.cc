@@ -604,26 +604,22 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     HostSharedPtr old_host, ConnPoolsContainer& container) {
-  for (const Http::ConnectionPool::InstancePtr& pool : container.pools_) {
-    if (pool) {
-      container.drains_remaining_++;
-    }
+  std::vector<Http::ConnectionPool::Instance*> to_be_drained;
+  for (const auto& pair : container.pools_) {
+    const Http::ConnectionPool::InstancePtr& pool = pair.second;
+    container.drains_remaining_++;
+    to_be_drained.emplace_back(pool.get());
   }
 
-  for (const Http::ConnectionPool::InstancePtr& pool : container.pools_) {
-    if (!pool) {
-      continue;
-    }
-
+  for (Http::ConnectionPool::Instance* pool : to_be_drained) {
     pool->addDrainedCallback([this, old_host]() -> void {
       ConnPoolsContainer& container = host_http_conn_pool_map_[old_host];
       ASSERT(container.drains_remaining_ > 0);
       container.drains_remaining_--;
       if (container.drains_remaining_ == 0) {
-        for (Http::ConnectionPool::InstancePtr& pool : container.pools_) {
-          if (pool) {
-            thread_local_dispatcher_.deferredDelete(std::move(pool));
-          }
+        for (auto& pair : container.pools_) {
+          Http::ConnectionPool::InstancePtr& pool = pair.second;
+          thread_local_dispatcher_.deferredDelete(std::move(pool));
         }
         host_http_conn_pool_map_.erase(old_host);
       }
@@ -673,11 +669,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
   const auto& container = config.host_http_conn_pool_map_.find(host);
   if (container != config.host_http_conn_pool_map_.end()) {
-    for (const Http::ConnectionPool::InstancePtr& pool : container->second.pools_) {
-      if (pool == nullptr) {
-        continue;
-      }
-
+    for (const auto& pair : container->second.pools_) {
+      const Http::ConnectionPool::InstancePtr& pool = pair.second;
       pool->drainConnections();
     }
   }
@@ -768,14 +761,29 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  const auto idx = container.index(priority, protocol);
-  if (!container.pools_[idx]) {
-    container.pools_[idx] = parent_.parent_.factory_.allocateConnPool(
-        parent_.thread_local_dispatcher_, host, priority, protocol);
+  // Inherit socket options from downstream connection, if set.
+  uint32_t hash_key = 0;
+  bool have_options = false;
+
+  if (context && context->downstreamConnection()) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options =
+        context->downstreamConnection()->socketOptionsForUpstreamConnections();
+    if (options) {
+      have_options = true;
+      hash_key = options->hashKey();
+    }
   }
 
-  return container.pools_[idx].get();
+  ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
+  const auto key = container.key(priority, protocol, hash_key);
+  if (!container.pools_[key]) {
+    container.pools_[key] = parent_.parent_.factory_.allocateConnPool(
+        parent_.thread_local_dispatcher_, host, priority, protocol,
+        have_options ? context->downstreamConnection()->socketOptionsForUpstreamConnections()
+                     : nullptr);
+  }
+
+  return container.pools_[key].get();
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
@@ -786,16 +794,16 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
                                                   local_info, log_manager, primary_dispatcher_)};
 }
 
-Http::ConnectionPool::InstancePtr
-ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                            ResourcePriority priority, Http::Protocol protocol) {
+Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
+    Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority)};
+        new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority, options)};
   } else {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http1::ConnPoolImplProd(dispatcher, host, priority)};
+        new Http::Http1::ConnPoolImplProd(dispatcher, host, priority, options)};
   }
 }
 

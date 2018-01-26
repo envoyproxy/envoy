@@ -9,6 +9,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
@@ -85,6 +86,9 @@ public:
     Stats::Gauge& write_current_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
+    // Counter* as this is an optional counter. Socket options errors will not be tracked if this is
+    // nullptr.
+    Stats::Counter* socket_options_errors_;
   };
 
   virtual ~Connection() {}
@@ -216,6 +220,13 @@ public:
    * @return boolean telling if the connection is currently above the high watermark.
    */
   virtual bool aboveHighWatermark() const PURE;
+
+  /**
+   * Get the socket options to be set on all new upstream ClientConnections created to forward
+   * traffic received on this connection.
+   */
+  virtual const ConnectionSocket::OptionsSharedPtr&
+  socketOptionsForUpstreamConnections() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

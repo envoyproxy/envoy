@@ -48,10 +48,10 @@ public:
                                             Runtime::RandomGenerator& random,
                                             const LocalInfo::LocalInfo& local_info,
                                             AccessLog::AccessLogManager& log_manager) override;
-  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                     HostConstSharedPtr host,
-                                                     ResourcePriority priority,
-                                                     Http::Protocol protocol) override;
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, Http::Protocol protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
@@ -197,13 +197,12 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::array<Http::ConnectionPool::InstancePtr,
-                         NumResourcePriorities * Http::NumProtocols>
-          ConnPools;
+      typedef std::unordered_map<uint64_t, Http::ConnectionPool::InstancePtr> ConnPools;
 
-      size_t index(ResourcePriority priority, Http::Protocol protocol) {
+      uint64_t key(ResourcePriority priority, Http::Protocol protocol, uint32_t hash_key) {
         ASSERT(NumResourcePriorities == 2); // One bit needed for priority
-        return enumToInt(protocol) << 1 | enumToInt(priority);
+        ASSERT(Http::NumProtocols <= 4);    // Two bits needed for priority
+        return uint64_t(hash_key) << 3 | uint64_t(protocol) << 1 | uint64_t(priority);
       }
 
       ConnPools pools_;

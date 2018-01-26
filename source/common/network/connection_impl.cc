@@ -358,6 +358,17 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
+  if (socket_options_error_) {
+    ENVOY_CONN_LOG(debug, "raising setsockopt error", *this);
+    // Update stats here, rather than on setsockopt failure, to give the caller a chance to
+    // setConnectionStats.
+    if (connection_stats_ && connection_stats_->socket_options_errors_) {
+      connection_stats_->socket_options_errors_->inc();
+    }
+    closeSocket(ConnectionEvent::LocalClose);
+    return;
+  }
+
   if (events & Event::FileReadyType::Closed) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
@@ -477,7 +488,8 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
-    Network::TransportSocketPtr&& transport_socket)
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
   if (source_address != nullptr) {
@@ -488,6 +500,16 @@ ClientConnectionImpl::ClientConnectionImpl(
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
       bind_error_ = true;
+
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+    }
+  }
+  if (options) {
+    if (!options->setOptions(*socket_)) {
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
+      socket_options_error_ = true;
 
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);

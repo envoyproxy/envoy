@@ -47,7 +47,9 @@ private:
           parent_(parent) {}
 
     // Upstream::Host
-    CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
+    CreateConnectionData createConnection(
+        Event::Dispatcher& dispatcher,
+        const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) const override;
 
     LogicalDnsCluster& parent_;
   };
