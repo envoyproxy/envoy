@@ -321,8 +321,8 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(loadConfigJson(json), EnvoyException,
-                            "Cannot have a CRL without a CA certificate");
+  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+                          "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
 } // namespace Ssl

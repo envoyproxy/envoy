@@ -69,7 +69,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
   // TODO(htuch): Support multiple hashes.
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
   if (ca_cert_.empty() && !certificate_revocation_list_.empty()) {
-    throw EnvoyException("Cannot have a CRL without a CA certificate");
+    throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA certificates",
+                                     certificateRevocationListPath()));
   }
 }
 
