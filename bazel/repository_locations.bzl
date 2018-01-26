@@ -1,6 +1,6 @@
 REPOSITORY_LOCATIONS = dict(
     com_google_absl = dict(
-        commit = "6de53819a7173bd446156237a37f53464b7732cc",
+        commit = "787891a3882795cee0364e8a0f0dda315578d155",
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(

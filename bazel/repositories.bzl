@@ -310,6 +310,10 @@ def _com_google_absl():
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
+    native.bind(
+        name = "abseil_int128",
+        actual = "@com_google_absl//absl/numeric:int128",
+    )
 
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")
