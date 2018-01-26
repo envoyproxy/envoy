@@ -96,7 +96,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/http:squash_cc",      
+        "@envoy_api//envoy/api/v2/filter/http:squash_cc",
     ],
 )
 

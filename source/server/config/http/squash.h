@@ -3,11 +3,10 @@
 #include <regex>
 #include <string>
 
+#include "envoy/api/v2/filter/http/squash.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-
-#include "envoy/api/v2/filter/http/squash.pb.h"
 
 namespace Envoy {
 namespace Server {
