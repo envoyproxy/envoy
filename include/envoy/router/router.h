@@ -33,8 +33,8 @@ public:
 
   /**
    * Do potentially destructive header transforms on response headers prior to forwarding. For
-   * adding or removing headers. This should only be called ONCE immediately after obtaining
-   * the initial response headers.
+   * example, adding or removing headers. This should only be called ONCE immediately after
+   * obtaining the initial response headers.
    * @param headers supplies the response headers, which may be modified during this call.
    * @param request_info holds additional information about the request.
    */

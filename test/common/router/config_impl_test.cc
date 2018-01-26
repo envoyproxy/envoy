@@ -3555,6 +3555,7 @@ virtual_hosts:
   }
 }
 
+// Test the parsing of direct response configurations within routes.
 TEST(RouteConfigurationV2, DirectResponse) {
   std::string yaml = R"EOF(
 name: foo
@@ -3575,9 +3576,12 @@ virtual_hosts:
   EXPECT_NE(nullptr, direct_response);
   EXPECT_EQ(Http::Code::OK, direct_response->responseCode());
   EXPECT_STREQ("content", direct_response->responseBody().c_str());
+}
 
+// Test the parsing of a direct response configuration where the response body is too large.
+TEST(RouteConfigurationV2, DirectResponseTooLarge) {
   std::string response_body(4097, 'A');
-  yaml = R"EOF(
+  std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: direct
@@ -3589,6 +3593,9 @@ virtual_hosts:
           body:
             inline_string: )EOF" +
          response_body + "\n";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl invalid_config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
       EnvoyException, "response body size is 4097 bytes; maximum is 4096");

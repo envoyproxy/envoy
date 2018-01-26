@@ -212,19 +212,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Determine if there is a direct response for the request.
   const auto* direct_response = route_->directResponseEntry();
-  const auto& request_headers = headers;
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
     Http::Utility::sendLocalReply(
-        [this, direct_response, &request_headers](Http::HeaderMapPtr&& headers,
-                                                  bool end_stream) -> void {
-          const auto new_path = direct_response->newPath(request_headers);
-          if (!new_path.empty()) {
-            headers->addCopy(Http::LowerCaseString("location"), new_path);
-          }
-          direct_response->finalizeResponseHeaders(*headers, callbacks_->requestInfo());
-          callbacks_->encodeHeaders(std::move(headers), end_stream);
-        },
+        [ this, direct_response, &request_headers = headers ](Http::HeaderMapPtr && headers,
+                                                              bool end_stream)
+            ->void {
+              const auto new_path = direct_response->newPath(request_headers);
+              if (!new_path.empty()) {
+                headers->addCopy(Http::LowerCaseString("location"), new_path);
+              }
+              direct_response->finalizeResponseHeaders(*headers, callbacks_->requestInfo());
+              callbacks_->encodeHeaders(std::move(headers), end_stream);
+            },
         [this](Buffer::Instance& data, bool end_stream) -> void {
           callbacks_->encodeData(data, end_stream);
         },
