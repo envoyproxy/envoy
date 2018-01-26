@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 
 namespace Envoy {
@@ -35,6 +36,7 @@ public:
    * @return Ssl::ServerContext* the default SSL context.
    */
   virtual Ssl::ServerContext* defaultSslContext() PURE;
+  virtual TransportSocketFactory& transportSocketFactory() PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.

@@ -190,8 +190,8 @@ public:
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection =
-              dispatcher_->createServerConnection(std::move(socket), nullptr);
+          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+              std::move(socket), Network::Test::createRawBufferSocket());
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
 

@@ -99,6 +99,8 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 TransportSocketPtr createRawBufferSocket();
 
+TransportSocketFactoryPtr createRawBufferSocketFactory();
+
 } // namespace Test
 } // namespace Network
 } // namespace Envoy

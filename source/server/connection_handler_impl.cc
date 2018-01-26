@@ -184,8 +184,9 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(
 }
 
 void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSocketPtr&& socket) {
+  auto ts = config_.transportSocketFactory().createTransportSocket();
   Network::ConnectionPtr new_connection =
-      parent_.dispatcher_.createServerConnection(std::move(socket), config_.defaultSslContext());
+      parent_.dispatcher_.createServerConnection(std::move(socket), std::move(ts));
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());
   onNewConnection(std::move(new_connection));
 }

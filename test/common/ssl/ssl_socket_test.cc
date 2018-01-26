@@ -50,8 +50,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
-  ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, "", {}, true, manager,
+                                                        stats_store);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
@@ -61,18 +61,18 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
-  Ssl::ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
+  Ssl::ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket());
+      client_ssl_socket_factory.createTransportSocket());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -131,17 +131,17 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   ContextManagerImpl manager(runtime);
   std::string new_session = EMPTY_STRING;
 
-  std::vector<ServerContextPtr> server_contexts;
+  std::vector<Network::TransportSocketFactoryPtr> server_transport_socket_factories;
   for (const auto& filter_chain : server_proto.filter_chains()) {
     if (filter_chain.has_tls_context()) {
       std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
                                            filter_chain.filter_chain_match().sni_domains().end());
       Ssl::ServerContextConfigImpl server_ctx_config(filter_chain.tls_context());
-      server_contexts.emplace_back(manager.createSslServerContext(
-          "test_listener", sni_domains, stats_store, server_ctx_config, false));
+      server_transport_socket_factories.emplace_back(new Ssl::ServerSslSocketFactory(
+          server_ctx_config, "test_listener", sni_domains, false, manager, stats_store));
     }
   }
-  ASSERT(server_contexts.size() >= 1);
+  ASSERT(server_transport_socket_factories.size() >= 1);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
@@ -150,11 +150,11 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   ClientContextConfigImpl client_ctx_config(client_ctx_proto);
-  ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
+  ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket());
+      client_ssl_socket_factory.createTransportSocket());
 
   if (!client_session.empty()) {
     Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
@@ -173,8 +173,8 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), server_contexts[0].get());
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_transport_socket_factories[0]->createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -678,8 +678,8 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
-  ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, "", {}, true, manager,
+                                                        stats_store);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -698,8 +698,8 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -734,8 +734,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
-  ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, "", {}, true, manager,
+                                                        stats_store);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -774,8 +774,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -812,10 +812,10 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Json::ObjectSharedPtr server_ctx_loader2 = TestEnvironment::jsonLoadFromString(server_ctx_json2);
   ServerContextConfigImpl server_ctx_config1(*server_ctx_loader1);
   ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2);
-  ServerContextPtr server_ctx1(
-      manager.createSslServerContext("server1", {}, stats_store, server_ctx_config1, false));
-  ServerContextPtr server_ctx2(
-      manager.createSslServerContext("server2", {}, stats_store, server_ctx_config2, false));
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory1(server_ctx_config1, "server1", {}, false,
+                                                         manager, stats_store);
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory2(server_ctx_config2, "server2", {}, false,
+                                                         manager, stats_store);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
@@ -840,10 +840,11 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::ConnectionPtr server_connection;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        ServerContext* ctx = socket->localAddress() == socket1.localAddress() ? server_ctx1.get()
-                                                                              : server_ctx2.get();
+        Network::TransportSocketFactory& tsf = socket->localAddress() == socket1.localAddress()
+                                                   ? server_ssl_socket_factory1
+                                                   : server_ssl_socket_factory2;
         Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), ctx);
+            dispatcher.createServerConnection(std::move(socket), tsf.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1133,10 +1134,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Json::ObjectSharedPtr server2_ctx_loader = TestEnvironment::jsonLoadFromString(server2_ctx_json);
   ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader);
   ContextManagerImpl manager(runtime);
-  ServerContextPtr server_ctx(
-      manager.createSslServerContext("server1", {}, stats_store, server_ctx_config, false));
-  ServerContextPtr server2_ctx(
-      manager.createSslServerContext("server2", {}, stats_store, server2_ctx_config, false));
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, "server1", {}, false,
+                                                        manager, stats_store);
+  Ssl::ServerSslSocketFactory server2_ssl_socket_factory(server2_ctx_config, "server2", {}, false,
+                                                         manager, stats_store);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -1169,11 +1170,12 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket, bool) -> void {
-        ServerContext* ctx = accepted_socket->localAddress() == socket.localAddress()
-                                 ? server_ctx.get()
-                                 : server2_ctx.get();
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(accepted_socket), ctx);
+        Network::TransportSocketFactory& tsf =
+            accepted_socket->localAddress() == socket.localAddress() ? server_ssl_socket_factory
+                                                                     : server2_ssl_socket_factory;
+
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(accepted_socket), tsf.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1241,8 +1243,8 @@ TEST_P(SslSocketTest, SslError) {
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
-  ServerContextPtr server_ctx(
-      manager.createSslServerContext("", {}, stats_store, server_ctx_config, true));
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, "", {}, true, manager,
+                                                        stats_store);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
@@ -1261,8 +1263,8 @@ TEST_P(SslSocketTest, SslError) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
@@ -1880,7 +1882,8 @@ public:
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
     server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_));
     manager_.reset(new ContextManagerImpl(runtime_));
-    server_ctx_ = manager_->createSslServerContext("", {}, stats_store_, *server_ctx_config_, true);
+    server_ssl_socket_factory_.reset(
+        new ServerSslSocketFactory(*server_ctx_config_, "", {}, true, *manager_, stats_store_));
 
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -1903,8 +1906,8 @@ public:
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection =
-              dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
+          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+              std::move(socket), server_ssl_socket_factory_->createTransportSocket());
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
@@ -1986,8 +1989,8 @@ public:
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection =
-              dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
+          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+              std::move(socket), server_ssl_socket_factory_->createTransportSocket());
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
@@ -2053,7 +2056,7 @@ public:
   Json::ObjectSharedPtr server_ctx_loader_;
   std::unique_ptr<ServerContextConfigImpl> server_ctx_config_;
   std::unique_ptr<ContextManagerImpl> manager_;
-  ServerContextPtr server_ctx_;
+  Network::TransportSocketFactoryPtr server_ssl_socket_factory_;
   Network::ListenerPtr listener_;
   Json::ObjectSharedPtr client_ctx_loader_;
   std::unique_ptr<ClientContextConfigImpl> client_ctx_config_;
@@ -2103,8 +2106,8 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createTransportSocket());
         new_connection->setBufferLimits(0);
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
