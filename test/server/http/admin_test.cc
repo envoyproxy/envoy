@@ -1,10 +1,16 @@
 #include <fstream>
+#include <unordered_map>
+
+#include "envoy/json/json_object.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/http/message_impl.h"
+#include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
 
 #include "server/http/admin.h"
 
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -26,7 +32,8 @@ public:
   AdminFilterTest()
       : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
                TestEnvironment::temporaryPath("admin.address"),
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_),
+               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
+               listener_scope_.createScope("listener.admin.")),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -68,7 +75,8 @@ public:
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_) {
+               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
+               listener_scope_.createScope("listener.admin.")) {
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
   }
@@ -100,9 +108,10 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path(
-      "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), server_, listener_scope_);
+  AdminImpl admin_bad_profile_path("/dev/null",
+                                   TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
+                                   "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                   server_, listener_scope_.createScope("listener.admin."));
   Http::HeaderMapImpl header_map;
   admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
@@ -119,7 +128,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, bad_path,
                                        Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                       server_, listener_scope_);
+                                       server_, listener_scope_.createScope("listener.admin."));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
@@ -194,6 +203,75 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+}
+
+TEST_P(AdminInstanceTest, Runtime) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  Runtime::MockSnapshot snapshot;
+  Runtime::MockLoader loader;
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
+  EXPECT_EQ("int_key: 1\nother_key: bar\nstring_key: foo\n", TestUtility::bufferToString(response));
+}
+
+TEST_P(AdminInstanceTest, RuntimeJSON) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  Runtime::MockSnapshot snapshot;
+  Runtime::MockLoader loader;
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime?format=json", header_map, response));
+
+  std::string output = TestUtility::bufferToString(response);
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(output);
+
+  EXPECT_TRUE(json->hasObject("runtime"));
+  std::vector<Json::ObjectSharedPtr> pairs = json->getObjectArray("runtime");
+  EXPECT_EQ(3, pairs.size());
+
+  Json::ObjectSharedPtr pair = pairs[0];
+  EXPECT_EQ("int_key", pair->getString("name", ""));
+  EXPECT_EQ(1, pair->getInteger("value", -1));
+
+  pair = pairs[1];
+  EXPECT_EQ("other_key", pair->getString("name", ""));
+  EXPECT_EQ("bar", pair->getString("value", ""));
+
+  pair = pairs[2];
+  EXPECT_EQ("string_key", pair->getString("name", ""));
+  EXPECT_EQ("foo", pair->getString("value", ""));
+}
+
+TEST_P(AdminInstanceTest, RuntimeBadFormat) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
+  Runtime::MockSnapshot snapshot;
+  Runtime::MockLoader loader;
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  EXPECT_EQ(Http::Code::BadRequest,
+            admin_.runCallback("/runtime?format=foo", header_map, response));
+  EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {

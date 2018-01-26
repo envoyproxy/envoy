@@ -42,7 +42,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(router_config_json);
-  envoy::api::v2::RouteConfiguration route_config;
+  envoy::api::v2::route::RouteConfiguration route_config;
   Config::RdsJson::translateRouteConfiguration(*loader, route_config);
 
   std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
@@ -187,8 +187,8 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  if (tool_config.route_->redirectEntry() != nullptr) {
-    actual = tool_config.route_->redirectEntry()->newPath(*tool_config.headers_);
+  if (tool_config.route_->directResponseEntry() != nullptr) {
+    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
   return compareResults(actual, expected, "path_redirect");

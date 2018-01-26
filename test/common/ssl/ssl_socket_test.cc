@@ -57,9 +57,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
@@ -71,6 +69,12 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -113,8 +117,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   }
 }
 
-const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
-                             const envoy::api::v2::UpstreamTlsContext& client_ctx_proto,
+const std::string testUtilV2(const envoy::api::v2::listener::Listener& server_proto,
+                             const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
                              const std::string& client_session, bool expect_success,
                              const std::string& expected_protocol_version,
                              const std::string& expected_server_cert_digest,
@@ -143,9 +147,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createSslListener(
-      connection_handler, *server_contexts[0], socket, callbacks, stats_store,
-      Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   ClientContextConfigImpl client_ctx_config(client_ctx_proto);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
@@ -169,6 +171,12 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), server_contexts[0].get());
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -255,6 +263,166 @@ TEST_P(SslSocketTest, GetCertDigest) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json,
+           "4444fbca965d916475f04fb4dd234dd556adb028ceb4300fa8ad6f2983c6aaa3", "", "", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
+TEST_P(SslSocketTest, GetCertDigestInline) {
+  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+
+  // From test/common/ssl/test_data/san_dns_cert.pem.
+  server_cert->mutable_certificate_chain()->set_inline_bytes(
+      "-----BEGIN CERTIFICATE-----\n"
+      "MIIDDDCCAnWgAwIBAgIJAPOCjrJP13nQMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\n"
+      "BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\n"
+      "c2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\n"
+      "DgYDVQQDEwdUZXN0IENBMB4XDTE3MDcwOTAxMzkzMloXDTE5MDcwOTAxMzkzMlow\n"
+      "ejELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\n"
+      "biBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\n"
+      "ZXJpbmcxFDASBgNVBAMTC1Rlc3QgU2VydmVyMIGfMA0GCSqGSIb3DQEBAQUAA4GN\n"
+      "ADCBiQKBgQDARNUJMFkWF0E6mbdz/nkydVC4TU2SgR95vhJhWpG6xKkCNoXkJxNz\n"
+      "XOmFUUIXQyq7FnIWACYuMrE2KXnomeCGP9A6M21lumNseYSLX3/b+ao4E6gimm1/\n"
+      "Gp8C3FaoAs8Ep7VE+o2DMIfTIPJhFf6RBFPundGhEm8/gv+QObVhKQIDAQABo4Gd\n"
+      "MIGaMAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQDAgXgMB0GA1UdJQQWMBQGCCsGAQUF\n"
+      "BwMCBggrBgEFBQcDATAeBgNVHREEFzAVghNzZXJ2ZXIxLmV4YW1wbGUuY29tMB0G\n"
+      "A1UdDgQWBBRCcUr8mIigWlR61OX/gmDY5vBV6jAfBgNVHSMEGDAWgBQ7eKRRTxaE\n"
+      "kxxIKHoMrSuWQcp9eTANBgkqhkiG9w0BAQsFAAOBgQAtn05e8U41heun5L7MKflv\n"
+      "tJM7w0whavdS8hLe63CxnS98Ap973mSiShKG+OxSJ0ClMWIZPy+KyC+T8yGIaynj\n"
+      "wEEuoSGRWmhzcMMnZWxqQyD95Fsx6mtdnq/DJxiYzmH76fALe/538j8pTcoygSGD\n"
+      "NWw1EW8TEwlFyuvCrlWQcg==\n"
+      "-----END CERTIFICATE-----");
+
+  // From test/common/ssl/test_data/san_dns_key.pem.
+  server_cert->mutable_private_key()->set_inline_bytes(
+      "-----BEGIN RSA PRIVATE KEY-----\n"
+      "MIICXQIBAAKBgQDARNUJMFkWF0E6mbdz/nkydVC4TU2SgR95vhJhWpG6xKkCNoXk\n"
+      "JxNzXOmFUUIXQyq7FnIWACYuMrE2KXnomeCGP9A6M21lumNseYSLX3/b+ao4E6gi\n"
+      "mm1/Gp8C3FaoAs8Ep7VE+o2DMIfTIPJhFf6RBFPundGhEm8/gv+QObVhKQIDAQAB\n"
+      "AoGBAJM64kukC0QAUMHX/gRD5HkAHuzSvUknuXuXUincmeWEPMtmBwdb6OgZSPT+\n"
+      "8XYwx+L14Cz6tkIALXWFM0YrtyKfVdELRRs8dw5nenzK3wOeo/N/7XL4kwim4kV3\n"
+      "q817RO6NUN76vHOsvQMFsPlEfCZpOTIGJEJBI7eFLP0djOMlAkEA/yWEPfQoER/i\n"
+      "X6uNyXrU51A6gxyZg7rPNP0cxxRhDedtsJPNY6Tlu90v9SiTgQLUTp7BINH24t9a\n"
+      "MST1tmax+wJBAMDpeRy52q+sqLXI1C2oHPuXrXzeyp9pynV/9tsYL9+qoyP2XcEZ\n"
+      "DaI0tfXDJXOdYIaDnSfB50eqQUnaTmQjtCsCQGUFGaLd9K8zDJIMforzUzByl3gp\n"
+      "7q41XK0COk6oRvUWWFu9aWi2dS84mDBc7Gn8EMtAF/9CopmZDUC//XlGl9kCQQCr\n"
+      "6yWw8PywFHohzwEwUyLJIKpOnyoKGTiBsHGpXYvEk4hiEzwISzB4PutuQuRMfZM5\n"
+      "LW/Pr6FSn6shivjTi3ITAkACMTBczBQ+chMBcTXDqyqwccQOIhupxani9wfZhsrm\n"
+      "ZXbTTxnUZioQ2l/7IWa+K2O2NrWWT7b3KpCAob0bJsQz\n"
+      "-----END RSA PRIVATE KEY-----");
+
+  // From test/common/ssl/test_data/ca_certificates.pem.
+  filter_chain->mutable_tls_context()
+      ->mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_inline_bytes("-----BEGIN CERTIFICATE-----\n"
+                         "MIICzTCCAjagAwIBAgIJAPAEjHA3MX2BMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\n"
+                         "BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\n"
+                         "c2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\n"
+                         "DgYDVQQDEwdGYWtlIENBMB4XDTE3MDcwOTAxMzkzMloXDTI3MDcwNzAxMzkzMlow\n"
+                         "djELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\n"
+                         "biBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\n"
+                         "ZXJpbmcxEDAOBgNVBAMTB0Zha2UgQ0EwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJ\n"
+                         "AoGBAK/89R7j0kwhGh7NDAiuhlVmN1Hh73sGRzDBgON/ZfmJSgkvZIwQ4+hu0wZ6\n"
+                         "wjN0am1iIKyp8O1OkmKurcfCRQM2QGiIUI7v7rSa0GzqENoEsQGXVk8/yhwD8Ys9\n"
+                         "IPLTWXLVyh49yh5FCs6nt2/LrIuZX/K2cZQx+VuLCcg5sTllAgMBAAGjYzBhMA8G\n"
+                         "A1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBRRsE37S/H/\n"
+                         "lCd1pWH4sCn9qrON3TAfBgNVHSMEGDAWgBRRsE37S/H/lCd1pWH4sCn9qrON3TAN\n"
+                         "BgkqhkiG9w0BAQsFAAOBgQAvFbQm1PrqeWlZssPDPfI5dlo2KEL9VedIlThqDU4z\n"
+                         "MStNR/Tfw2A0WtjOyjm2R0viqLu8JdDe8umUqO9DkRhZOaUtLgQEkaQn75z8WQPk\n"
+                         "Sj+kenx0v3GMrPZMAsELiPG5PcSk8l5prDgU7VkzNvoCtypCsB7RQRyvZs52Qih3\n"
+                         "Ug==\n"
+                         "-----END CERTIFICATE-----\n"
+                         "-----BEGIN CERTIFICATE-----\n"
+                         "MIICzTCCAjagAwIBAgIJAOrzsOodDleaMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\n"
+                         "BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\n"
+                         "c2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\n"
+                         "DgYDVQQDEwdUZXN0IENBMB4XDTE3MDcwOTAxMzkzMloXDTI3MDcwNzAxMzkzMlow\n"
+                         "djELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\n"
+                         "biBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\n"
+                         "ZXJpbmcxEDAOBgNVBAMTB1Rlc3QgQ0EwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJ\n"
+                         "AoGBAJuJh8N5TheTHLKOxsLSAfiIu9VDeKPsV98KRJJaYCMoaof3j9wBs65HzIat\n"
+                         "AunuV4DVZZ2c/x7/v741oWadYd3yqL7XSzQaeBvhXi+wv3g17FYrdxaowG7cfmsh\n"
+                         "gCp7/9TRW0bRGL6Qp6od/u62L8dprdHXxnck/+sZMupam9YrAgMBAAGjYzBhMA8G\n"
+                         "A1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBQ7eKRRTxaE\n"
+                         "kxxIKHoMrSuWQcp9eTAfBgNVHSMEGDAWgBQ7eKRRTxaEkxxIKHoMrSuWQcp9eTAN\n"
+                         "BgkqhkiG9w0BAQsFAAOBgQCN00/2k9k8HNeJ8eYuFH10jnc+td7+OaYWpRSEKCS7\n"
+                         "ux3KAu0UFt90mojEMClt4Y6uP4oXTWbRzMzAgQHldHU8Gkj8tYnv7mToX7Bh/xdc\n"
+                         "19epzjCmo/4Q6+16GZZvltiFjkkHSZEVI5ggljy1QdMIPRegsKKmX9mjZSCSSXD6\n"
+                         "SA==\n"
+                         "-----END CERTIFICATE-----");
+
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client_ctx.mutable_common_tls_context()->add_tls_certificates();
+
+  // From test/common/ssl/test_data/san_uri_cert.pem.
+  client_cert->mutable_certificate_chain()->set_inline_bytes(
+      "-----BEGIN CERTIFICATE-----\n"
+      "MIIDFDCCAn2gAwIBAgIJAN6Kky/8alfaMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\n"
+      "BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\n"
+      "c2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\n"
+      "DgYDVQQDEwdUZXN0IENBMB4XDTE3MDcwOTAxMzkzMloXDTE5MDcwOTAxMzkzMlow\n"
+      "ejELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\n"
+      "biBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\n"
+      "ZXJpbmcxFDASBgNVBAMTC1Rlc3QgU2VydmVyMIGfMA0GCSqGSIb3DQEBAQUAA4GN\n"
+      "ADCBiQKBgQDQNSdVcQBlmLBHoyMtMJrYRMI4HkuCYqubvBD9gfZbt+bux5Lh2CRT\n"
+      "RVB9fUTh/bQ9fzZ+XpZu2OLG/otHi20Yu5XPgXL5+OSzCdzMqujGs8Ft9ugZI2UL\n"
+      "TufqMfesbs7y8cJg2y+UpQZlXlJ2iImMkqdomOsrNvzFzT3/LRncywIDAQABo4Gl\n"
+      "MIGiMAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQDAgXgMB0GA1UdJQQWMBQGCCsGAQUF\n"
+      "BwMCBggrBgEFBQcDATAmBgNVHREEHzAdhhtzcGlmZmU6Ly9seWZ0LmNvbS90ZXN0\n"
+      "LXRlYW0wHQYDVR0OBBYEFCmCEC8ABzXj8S4E++Whd37lIhg5MB8GA1UdIwQYMBaA\n"
+      "FDt4pFFPFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAF6p8V73RNLS\n"
+      "jWcS/NUuRFWNqJ0pGc06wsb7JnVnSn12zPrpzwTQOPHZYY+KZC8TtgpnLgLobWVu\n"
+      "mlDkUA5/25A1O+smL2nquUaix/I3X71U3MKo59JzrxNV3mlBSOmv9K1r/jpxZ96d\n"
+      "mMXJ1d7L5pUWxa3q0ANg+mywtpGMvqHL\n"
+      "-----END CERTIFICATE-----");
+
+  // From test/common/ssl/test_data/san_uri_key.pem.
+  client_cert->mutable_private_key()->set_inline_bytes(
+      "-----BEGIN RSA PRIVATE KEY-----\n"
+      "MIICWwIBAAKBgQDQNSdVcQBlmLBHoyMtMJrYRMI4HkuCYqubvBD9gfZbt+bux5Lh\n"
+      "2CRTRVB9fUTh/bQ9fzZ+XpZu2OLG/otHi20Yu5XPgXL5+OSzCdzMqujGs8Ft9ugZ\n"
+      "I2ULTufqMfesbs7y8cJg2y+UpQZlXlJ2iImMkqdomOsrNvzFzT3/LRncywIDAQAB\n"
+      "AoGAUczQS00+LqwydbKuW07BRz6cX5fnaq6BZYoZ0r+AnsA9xoo6NujIPL76xJK2\n"
+      "wWL/sTmNm1BmId6sGipfZhhtH5kELxddygGYotTYfL9NHxf0FA3uPGnGVIEQphwa\n"
+      "orAe5NVpORUzZwYQdxohXR25+DnDb4cM7TktNb32P0hO2KECQQDqqRHdYzh/EPyz\n"
+      "7LEUsBPD28ijb+sFfSce+YFYVUuJBtN6zHnnpnbkuQK7EbRGVEB2XrpFj/3AFktz\n"
+      "tHymGI1NAkEA4yRCPSC5VEH9jJa6gpij7t8LPJ5gOh2EvrvzFVyN49E4hE2H1kKP\n"
+      "1kKs8TKbsNFgHhOxwsmTnOV0ZHlZ0THmdwJAJyDqCbBxyz5Z5Oai4IA7y3zqh9Yx\n"
+      "qkikLVYNa11NqxuoR+Gwsh/f02PGQMtC9Dc4SISjKtZHya/uBO0jm86cQQJAE10c\n"
+      "9H8crY0uo1SaM9X1a8DCAXny9CFeFrCJKZIJWpmUetrtMJveDUMD4VASK8G9svK0\n"
+      "3ck3d1GsWYBq4sWhQwJAKP1jLt3nwQEuSS88Yi2dMC3iPCWMljatC3u6976etDg7\n"
+      "AoETSNx+UIqKSg6LsNYqs4omsDPnZ2j+4m2fvHaVJg==\n"
+      "-----END RSA PRIVATE KEY-----");
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client_ctx, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
   }
   )EOF";
@@ -517,9 +685,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -530,6 +696,12 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -569,9 +741,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -602,6 +772,12 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -646,12 +822,8 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener1 = dispatcher.createSslListener(
-      connection_handler, *server_ctx1, socket1, callbacks, stats_store,
-      Network::ListenerOptions::listenerOptionsWithBindToPort());
-  Network::ListenerPtr listener2 = dispatcher.createSslListener(
-      connection_handler, *server_ctx2, socket2, callbacks, stats_store,
-      Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
+  Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
@@ -666,6 +838,14 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
 
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        ServerContext* ctx = socket->localAddress() == socket1.localAddress() ? server_ctx1.get()
+                                                                              : server_ctx2.get();
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), ctx);
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke(
           [&](Network::ConnectionPtr& conn) -> void { server_connection = std::move(conn); }));
@@ -858,6 +1038,38 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCert) {
                               GetParam());
 }
 
+// Sessions cannot be resumed because the server certificates are different, CN/SANs are identical,
+// but the issuer is different.
+TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertIntermediateCA) {
+  std::string server_ctx_json1 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string server_ctx_json2 = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
+    "session_ticket_key_paths": [
+      "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
+    ]
+  }
+  )EOF";
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_json1, server_ctx_json2, client_ctx_json, false,
+                              GetParam());
+}
+
 // Sessions cannot be resumed because the server certificates are different and the SANs
 // are not identical
 TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
@@ -931,12 +1143,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
-  Network::ListenerPtr listener2 = dispatcher.createSslListener(
-      connection_handler, *server2_ctx, socket2, callbacks, stats_store,
-      Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -959,6 +1167,15 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket, bool) -> void {
+        ServerContext* ctx = accepted_socket->localAddress() == socket.localAddress()
+                                 ? server_ctx.get()
+                                 : server2_ctx.get();
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(accepted_socket), ctx);
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -1031,9 +1248,7 @@ TEST_P(SslSocketTest, SslError) {
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
-                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1044,6 +1259,12 @@ TEST_P(SslSocketTest, SslError) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher.createServerConnection(std::move(socket), server_ctx.get());
+        callbacks.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
@@ -1062,19 +1283,19 @@ TEST_P(SslSocketTest, SslError) {
 }
 
 TEST_P(SslSocketTest, ProtocolVersions) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::TlsCertificate* server_cert =
+  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
-  envoy::api::v2::TlsParameters* server_params =
+  envoy::api::v2::auth::TlsParameters* server_params =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
-  envoy::api::v2::TlsParameters* client_params =
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::TlsParameters* client_params =
       client_ctx.mutable_common_tls_context()->mutable_tls_params();
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
@@ -1082,74 +1303,74 @@ TEST_P(SslSocketTest, ProtocolVersions) {
 
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client_ctx, "", true, "TLSv1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using TLSv1.1 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using TLSv1.2 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using TLSv1.3 (client) and defaults (server) fails.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
              GetParam());
 
   // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.3", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.0 (server) succeeds.
   // ssl.handshake logged by both: client & server.
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client_ctx, "", true, "TLSv1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.1 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_1);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.1", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.2 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_2);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
 
   // Connection using defaults (client) and TLSv1.3 (server) succeeds.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
              GetParam());
 
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
   // ssl.handshake logged by both: client & server.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.3", "", "", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, SniCertificate) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1157,17 +1378,17 @@ TEST_P(SslSocketTest, SniCertificate) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com, *.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("*.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Connection to server1.example.com succeeds, client receives san_dns_cert.pem (exact match).
   // ssl.handshake logged by both: client & server.
@@ -1195,8 +1416,8 @@ TEST_P(SslSocketTest, SniCertificate) {
              GetParam());
 
   // no_san_cert.pem: * (no SNI restrictions)
-  envoy::api::v2::FilterChain* filter_chain3 = listener.add_filter_chains();
-  envoy::api::v2::TlsCertificate* server_cert3 =
+  envoy::api::v2::listener::FilterChain* filter_chain3 = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert3 =
       filter_chain3->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert3->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
@@ -1219,13 +1440,13 @@ TEST_P(SslSocketTest, SniCertificate) {
 }
 
 TEST_P(SslSocketTest, SniSessionResumption) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com, *
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
   filter_chain1->mutable_filter_chain_match()->add_sni_domains(""); // Catch-all, no SNI.
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1235,10 +1456,10 @@ TEST_P(SslSocketTest, SniSessionResumption) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
 
   // san_multiple_dns_cert.pem: server2.example.com, *.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("*.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1248,9 +1469,9 @@ TEST_P(SslSocketTest, SniSessionResumption) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
 
   // san_multiple_dns_cert.pem: protected.example.com (same certificate as #2, but different SNI)
-  envoy::api::v2::FilterChain* filter_chain3 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain3 = listener.add_filter_chains();
   filter_chain3->mutable_filter_chain_match()->add_sni_domains("protected.example.com");
-  envoy::api::v2::TlsCertificate* server_cert3 =
+  envoy::api::v2::auth::TlsCertificate* server_cert3 =
       filter_chain3->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert3->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1259,7 +1480,7 @@ TEST_P(SslSocketTest, SniSessionResumption) {
   filter_chain3->mutable_tls_context()->mutable_session_ticket_keys()->add_keys()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Connection to www.example.com succeeds, new session established.
   client_ctx.set_sni("www.example.com");
@@ -1298,12 +1519,12 @@ TEST_P(SslSocketTest, SniSessionResumption) {
 }
 
 TEST_P(SslSocketTest, SniClientCertificate) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_multiple_dns_cert.pem: *.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("*.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1314,9 +1535,9 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 
   // san_multiple_dns_cert.pem: protected.example.com
   // (same certificate as #1, but requires Client Certificate)
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("protected.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
@@ -1325,7 +1546,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
   filter_chain2->mutable_tls_context()->mutable_session_ticket_keys()->add_keys()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"));
   filter_chain2->mutable_tls_context()->mutable_require_client_certificate()->set_value(true);
-  envoy::api::v2::CertificateValidationContext* validation_ctx2 =
+  envoy::api::v2::auth::CertificateValidationContext* validation_ctx2 =
       filter_chain2->mutable_tls_context()
           ->mutable_common_tls_context()
           ->mutable_validation_context();
@@ -1333,7 +1554,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
   validation_ctx2->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Connection to www.example.com succeeds.
   // ssl.handshake logged by both: client & server.
@@ -1349,7 +1570,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 
   // Connection to protected.example.com with a valid client certificate fails, beacuse its SAN
   // is not whitelisted.
-  envoy::api::v2::TlsCertificate* client_cert =
+  envoy::api::v2::auth::TlsCertificate* client_cert =
       client_ctx.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
@@ -1373,12 +1594,12 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 }
 
 TEST_P(SslSocketTest, SniALPN) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1386,20 +1607,20 @@ TEST_P(SslSocketTest, SniALPN) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test ALPN.
   server_ctx1->add_alpn_protocols("srv1");
@@ -1423,12 +1644,12 @@ TEST_P(SslSocketTest, SniALPN) {
 }
 
 TEST_P(SslSocketTest, SniCipherSuites) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1436,20 +1657,20 @@ TEST_P(SslSocketTest, SniCipherSuites) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test cipher suites.
   server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
@@ -1486,12 +1707,12 @@ TEST_P(SslSocketTest, SniCipherSuites) {
 }
 
 TEST_P(SslSocketTest, SniEcdhCurves) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1499,20 +1720,20 @@ TEST_P(SslSocketTest, SniEcdhCurves) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test ECDH curves.
   server_ctx1->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
@@ -1549,12 +1770,12 @@ TEST_P(SslSocketTest, SniEcdhCurves) {
 }
 
 TEST_P(SslSocketTest, SniProtocolVersions) {
-  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
-  envoy::api::v2::FilterChain* filter_chain1 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
   filter_chain1->mutable_filter_chain_match()->add_sni_domains("server1.example.com");
-  envoy::api::v2::TlsCertificate* server_cert1 =
+  envoy::api::v2::auth::TlsCertificate* server_cert1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert1->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
@@ -1562,39 +1783,39 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
 
   // san_multiple_dns_cert.pem: server2.example.com
-  envoy::api::v2::FilterChain* filter_chain2 = listener.add_filter_chains();
+  envoy::api::v2::listener::FilterChain* filter_chain2 = listener.add_filter_chains();
   filter_chain2->mutable_filter_chain_match()->add_sni_domains("server2.example.com");
-  envoy::api::v2::TlsCertificate* server_cert2 =
+  envoy::api::v2::auth::TlsCertificate* server_cert2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert2->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_cert.pem"));
   server_cert2->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/ssl/test_data/san_multiple_dns_key.pem"));
 
-  envoy::api::v2::CommonTlsContext* server_ctx1 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx1 =
       filter_chain1->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::CommonTlsContext* server_ctx2 =
+  envoy::api::v2::auth::CommonTlsContext* server_ctx2 =
       filter_chain2->mutable_tls_context()->mutable_common_tls_context();
-  envoy::api::v2::UpstreamTlsContext client_ctx;
+  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
 
   // Test protocol versions.
   server_ctx1->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_2);
+      envoy::api::v2::auth::TlsParameters::TLSv1_2);
   server_ctx1->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_3);
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
 
   server_ctx2->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_0);
+      envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_ctx2->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_2);
+      envoy::api::v2::auth::TlsParameters::TLSv1_2);
 
   // Connection to server1.example.com using TLSv1.3 succeeds.
   // ssl.handshake logged by both: client & server.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_3);
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_3);
+      envoy::api::v2::auth::TlsParameters::TLSv1_3);
   testUtilV2(listener, client_ctx, "", true, "TLSv1.3",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e", "", "",
              "ssl.handshake", 2, GetParam());
@@ -1607,9 +1828,9 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
   // Connection to server1.example.com using TLSv1.0 fails.
   client_ctx.set_sni("server1.example.com");
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_0);
+      envoy::api::v2::auth::TlsParameters::TLSv1_0);
   client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::api::v2::TlsParameters::TLSv1_0);
+      envoy::api::v2::auth::TlsParameters::TLSv1_0);
   testUtilV2(listener, client_ctx, "", false, "", "", "", "", "ssl.connection_error", 1,
              GetParam());
 
@@ -1621,21 +1842,47 @@ TEST_P(SslSocketTest, SniProtocolVersions) {
              "ssl.handshake", 2, GetParam());
 }
 
+TEST_P(SslSocketTest, RevokedCertificate) {
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
+  }
+  )EOF";
+
+  // This should fail, since the certificate has been revoked.
+  std::string revoked_client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
+  }
+  )EOF";
+  testUtil(revoked_client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_error",
+           false, GetParam());
+
+  // This should succeed, since the cert isn't revoked.
+  std::string successful_client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert2.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
+  }
+  )EOF";
+  testUtil(successful_client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.handshake", true,
+           GetParam());
+}
+
 class SslReadBufferLimitTest : public SslCertsTest,
                                public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  void initialize(uint32_t read_buffer_limit) {
+  void initialize() {
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
     server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_));
     manager_.reset(new ContextManagerImpl(runtime_));
     server_ctx_ = manager_->createSslServerContext("", {}, stats_store_, *server_ctx_config_, true);
 
-    listener_ = dispatcher_->createSslListener(
-        connection_handler_, *server_ctx_, socket_, listener_callbacks_, stats_store_,
-        {.bind_to_port_ = true,
-         .use_proxy_proto_ = false,
-         .use_original_dst_ = false,
-         .per_connection_buffer_limit_bytes_ = read_buffer_limit});
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
     client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
@@ -1652,8 +1899,15 @@ public:
 
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
-    initialize(read_buffer_limit);
+    initialize();
 
+    EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+          Network::ConnectionPtr new_connection =
+              dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
+          new_connection->setBufferLimits(read_buffer_limit);
+          listener_callbacks_.onNewConnection(std::move(new_connection));
+        }));
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           server_connection_ = std::move(conn);
@@ -1725,11 +1979,18 @@ public:
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
-    initialize(read_buffer_limit);
+    initialize();
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
+    EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+          Network::ConnectionPtr new_connection =
+              dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
+          new_connection->setBufferLimits(read_buffer_limit);
+          listener_callbacks_.onNewConnection(std::move(new_connection));
+        }));
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           server_connection_ = std::move(conn);
@@ -1838,8 +2099,15 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
 
-  initialize(0);
+  initialize();
 
+  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection =
+            dispatcher_->createServerConnection(std::move(socket), server_ctx_.get());
+        new_connection->setBufferLimits(0);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection_ = std::move(conn);

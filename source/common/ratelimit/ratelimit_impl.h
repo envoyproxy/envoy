@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -14,17 +16,11 @@
 
 #include "source/common/ratelimit/ratelimit.pb.h"
 
-#include "api/bootstrap.pb.h"
-
 namespace Envoy {
 namespace RateLimit {
 
-typedef Grpc::AsyncClient<pb::lyft::ratelimit::RateLimitRequest,
-                          pb::lyft::ratelimit::RateLimitResponse>
-    RateLimitAsyncClient;
-typedef std::unique_ptr<RateLimitAsyncClient> RateLimitAsyncClientPtr;
-
-typedef Grpc::AsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse> RateLimitAsyncCallbacks;
+typedef Grpc::TypedAsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse>
+    RateLimitAsyncCallbacks;
 
 struct ConstantValues {
   const std::string TraceStatus = "ratelimit_status";
@@ -39,7 +35,7 @@ typedef ConstSingleton<ConstantValues> Constants;
 // one today).
 class GrpcClientImpl : public Client, public RateLimitAsyncCallbacks {
 public:
-  GrpcClientImpl(RateLimitAsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                  const Optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
@@ -60,7 +56,7 @@ public:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  RateLimitAsyncClientPtr async_client_;
+  Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncRequest* request_{};
   Optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
@@ -68,15 +64,14 @@ private:
 
 class GrpcFactoryImpl : public ClientFactory {
 public:
-  GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
-                  Upstream::ClusterManager& cm);
+  GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
+                  Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
   // RateLimit::ClientFactory
   ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) override;
 
 private:
-  const std::string cluster_name_;
-  Upstream::ClusterManager& cm_;
+  Grpc::AsyncClientFactoryPtr async_client_factory_;
 };
 
 class NullClientImpl : public Client {

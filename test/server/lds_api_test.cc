@@ -1,3 +1,5 @@
+#include "envoy/service/discovery/v2/lds.pb.h"
+
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 
@@ -55,11 +57,11 @@ public:
 
   void expectAdd(const std::string& listener_name, bool updated) {
     EXPECT_CALL(listener_manager_, addOrUpdateListener(_, true))
-        .WillOnce(
-            Invoke([listener_name, updated](const envoy::api::v2::Listener& config, bool) -> bool {
-              EXPECT_EQ(listener_name, config.name());
-              return updated;
-            }));
+        .WillOnce(Invoke([listener_name, updated](const envoy::api::v2::listener::Listener& config,
+                                                  bool) -> bool {
+          EXPECT_EQ(listener_name, config.name());
+          return updated;
+        }));
   }
 
   void expectRequest() {
@@ -80,7 +82,7 @@ public:
   }
 
   void makeListenersAndExpectCall(const std::vector<std::string>& listener_names) {
-    std::vector<std::reference_wrapper<Listener>> refs;
+    std::vector<std::reference_wrapper<Network::ListenerConfig>> refs;
     listeners_.clear();
     for (const auto& name : listener_names) {
       listeners_.emplace_back();
@@ -104,7 +106,7 @@ public:
   Http::AsyncClient::Callbacks* callbacks_{};
 
 private:
-  std::list<NiceMock<MockListener>> listeners_;
+  std::list<NiceMock<Network::MockListenerConfig>> listeners_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -113,7 +115,7 @@ TEST_F(LdsApiTest, ValidateFail) {
 
   setup(true);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  Protobuf::RepeatedPtrField<envoy::api::v2::listener::Listener> listeners;
   listeners.Add();
 
   EXPECT_THROW(lds_->onConfigUpdate(listeners), ProtoValidationException);

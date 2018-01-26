@@ -16,9 +16,11 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:instance_interface",
+        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -53,7 +55,6 @@ envoy_cc_library(
     name = "health_check_lib",
     srcs = ["health_check.cc"],
     hdrs = ["health_check.h"],
-    external_deps = ["envoy_filter_http_health_check"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -70,5 +71,6 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/server/config/network:http_connection_manager_lib",
+        "@envoy_api//envoy/api/v2/filter/http:health_check_cc",
     ],
 )

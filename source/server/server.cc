@@ -7,6 +7,8 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/config/bootstrap/v2//bootstrap.pb.validate.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -34,9 +36,6 @@
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
-
-#include "api/bootstrap.pb.h"
-#include "api/bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -157,7 +156,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-void InstanceUtil::loadBootstrapConfig(envoy::api::v2::Bootstrap& bootstrap,
+void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                        const std::string& config_path, bool v2_only) {
   bool v2_config_loaded = false;
   try {
@@ -185,13 +184,12 @@ void InstanceImpl::initialize(Options& options,
             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  tag_extractors_ = Config::Utility::createTagExtractors(bootstrap);
-  stats_store_.setTagExtractors(tag_extractors_);
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap));
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
@@ -217,13 +215,11 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
-  admin_scope_ = stats_store_.createScope("listener.admin.");
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
                              initial_config.admin().profilePath(), options.adminAddressPath(),
-                             initial_config.admin().address(), *this, *admin_scope_));
-
-  handler_->addListener(*admin_, admin_->mutable_socket(), *admin_scope_, 0,
-                        Network::ListenerOptions::listenerOptionsWithBindToPort());
+                             initial_config.admin().address(), *this,
+                             stats_store_.createScope("listener.admin.")));
+  handler_->addListener(admin_->listener());
 
   loadServerFlags(initial_config.flagsPath());
 

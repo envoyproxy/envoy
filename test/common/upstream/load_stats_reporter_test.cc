@@ -1,3 +1,6 @@
+#include "envoy/api/v2/endpoint/load_report.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/stats/stats_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 
@@ -6,7 +9,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -21,14 +23,11 @@ using testing::_;
 namespace Envoy {
 namespace Upstream {
 
-typedef Grpc::MockAsyncClient<envoy::api::v2::LoadStatsRequest, envoy::api::v2::LoadStatsResponse>
-    LoadStatsMockAsyncClient;
-
 class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new LoadStatsMockAsyncClient()) {
+        async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("foo");
   }
 
@@ -43,11 +42,12 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_.reset(new LoadStatsReporter(
-        node_, cm_, stats_store_, LoadStatsAsyncClientPtr(async_client_), dispatcher_));
+        node_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
   }
 
-  void expectSendMessage(const std::vector<envoy::api::v2::ClusterStats>& expected_cluster_stats) {
-    envoy::api::v2::LoadStatsRequest expected_request;
+  void expectSendMessage(
+      const std::vector<envoy::api::v2::endpoint::ClusterStats>& expected_cluster_stats) {
+    envoy::service::load_stats::v2::LoadStatsRequest expected_request;
     expected_request.mutable_node()->MergeFrom(node_);
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
@@ -55,8 +55,8 @@ public:
   }
 
   void deliverLoadStatsResponse(const std::vector<std::string>& cluster_names) {
-    std::unique_ptr<envoy::api::v2::LoadStatsResponse> response(
-        new envoy::api::v2::LoadStatsResponse());
+    std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse> response(
+        new envoy::service::load_stats::v2::LoadStatsResponse());
     response->mutable_load_reporting_interval()->set_seconds(42);
     std::copy(cluster_names.begin(), cluster_names.end(),
               Protobuf::RepeatedPtrFieldBackInserter(response->mutable_clusters()));
@@ -74,8 +74,8 @@ public:
   Event::TimerCb retry_timer_cb_;
   Event::MockTimer* response_timer_;
   Event::TimerCb response_timer_cb_;
-  Grpc::MockAsyncStream<envoy::api::v2::LoadStatsRequest> async_stream_;
-  LoadStatsMockAsyncClient* async_client_;
+  Grpc::MockAsyncStream async_stream_;
+  Grpc::MockAsyncClient* async_client_;
 };
 
 // Validate that stream creation results in a timer based retry.

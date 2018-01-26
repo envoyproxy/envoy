@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -72,29 +73,67 @@ bool ConfigUtility::matchQueryParams(
 }
 
 Http::Code ConfigUtility::parseRedirectResponseCode(
-    const envoy::api::v2::RedirectAction::RedirectResponseCode& code) {
+    const envoy::api::v2::route::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
-  case envoy::api::v2::RedirectAction::MOVED_PERMANENTLY:
+  case envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY:
     return Http::Code::MovedPermanently;
-  case envoy::api::v2::RedirectAction::FOUND:
+  case envoy::api::v2::route::RedirectAction::FOUND:
     return Http::Code::Found;
-  case envoy::api::v2::RedirectAction::SEE_OTHER:
+  case envoy::api::v2::route::RedirectAction::SEE_OTHER:
     return Http::Code::SeeOther;
-  case envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT:
+  case envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT:
     return Http::Code::TemporaryRedirect;
-  case envoy::api::v2::RedirectAction::PERMANENT_REDIRECT:
+  case envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT:
     return Http::Code::PermanentRedirect;
   default:
     NOT_IMPLEMENTED;
   }
 }
 
+Optional<Http::Code>
+ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route) {
+  if (route.has_redirect()) {
+    return parseRedirectResponseCode(route.redirect().response_code());
+  } else if (route.has_direct_response()) {
+    return static_cast<Http::Code>(route.direct_response().status());
+  }
+  return Optional<Http::Code>();
+}
+
+std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::Route& route) {
+  if (!route.has_direct_response() || !route.direct_response().has_body()) {
+    return EMPTY_STRING;
+  }
+  const auto& body = route.direct_response().body();
+  const std::string filename = body.filename();
+  if (!filename.empty()) {
+    static const ssize_t MaxFileSize = 4096;
+    if (!Filesystem::fileExists(filename)) {
+      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
+    }
+    ssize_t size = Filesystem::fileSize(filename);
+    if (size < 0) {
+      throw EnvoyException(fmt::format("cannot determine size of response body file {}", filename));
+    }
+    if (size > MaxFileSize) {
+      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
+                                       filename, MaxFileSize));
+    }
+    return Filesystem::fileReadToEnd(filename);
+  }
+  const std::string inline_bytes = body.inline_bytes();
+  if (!inline_bytes.empty()) {
+    return inline_bytes;
+  }
+  return body.inline_string();
+}
+
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
-    const envoy::api::v2::RouteAction::ClusterNotFoundResponseCode& code) {
+    const envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {
-  case envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE:
+  case envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE:
     return Http::Code::ServiceUnavailable;
-  case envoy::api::v2::RouteAction::NOT_FOUND:
+  case envoy::api::v2::route::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
   default:
     NOT_IMPLEMENTED;

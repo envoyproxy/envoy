@@ -21,6 +21,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "async_client_manager_interface",
+    hdrs = ["async_client_manager.h"],
+    deps = [
+        ":async_client_interface",
+        "//include/envoy/stats:stats_interface",
+        "@envoy_api//envoy/api/v2:grpc_service_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "status",
     hdrs = ["status.h"],
 )

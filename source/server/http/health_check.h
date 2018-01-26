@@ -5,13 +5,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/filter/http/health_check.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-
-#include "api/filter/http/health_check.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -68,15 +67,20 @@ private:
 
 typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerSharedPtr;
 
+typedef std::map<std::string, double> ClusterMinHealthyPercentages;
+typedef std::shared_ptr<const ClusterMinHealthyPercentages>
+    ClusterMinHealthyPercentagesConstSharedPtr;
+
 /**
  * Health check responder filter.
  */
 class HealthCheckFilter : public Http::StreamFilter {
 public:
   HealthCheckFilter(Server::Configuration::FactoryContext& context, bool pass_through_mode,
-                    HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint)
+                    HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint,
+                    ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages)
       : context_(context), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
-        endpoint_(endpoint) {}
+        endpoint_(endpoint), cluster_min_healthy_percentages_(cluster_min_healthy_percentages) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -107,7 +111,8 @@ private:
   bool handling_{};
   bool health_check_request_{};
   bool pass_through_mode_{};
-  HealthCheckCacheManagerSharedPtr cache_manager_{};
+  HealthCheckCacheManagerSharedPtr cache_manager_;
   const std::string endpoint_;
+  ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
 };
 } // namespace Envoy

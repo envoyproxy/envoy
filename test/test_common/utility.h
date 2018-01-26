@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 
@@ -18,7 +19,6 @@
 
 #include "test/test_common/printers.h"
 
-#include "api/bootstrap.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -33,6 +33,14 @@ namespace Envoy {
     ADD_FAILURE() << "Exception should take place. It did not.";                                   \
   } catch (expected_exception & e) {                                                               \
     EXPECT_EQ(message, std::string(e.what()));                                                     \
+  }
+
+#define EXPECT_THROW_WITH_REGEX(statement, expected_exception, regex_str)                          \
+  try {                                                                                            \
+    statement;                                                                                     \
+    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
+  } catch (expected_exception & e) {                                                               \
+    EXPECT_THAT(e.what(), ::testing::ContainsRegex(regex_str));                                    \
   }
 
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
@@ -121,10 +129,29 @@ public:
    * @return bool indicating whether the protos are equal. Type name and string serialization are
    *         used for equality testing.
    */
-  template <class ProtoType> static bool protoEqual(const ProtoType& lhs, const ProtoType& rhs) {
+  static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
     return lhs.GetTypeName() == rhs.GetTypeName() &&
            lhs.SerializeAsString() == rhs.SerializeAsString();
   }
+
+  /**
+   * Split a string.
+   * @param source supplies the string to split.
+   * @param split supplies the char to split on.
+   * @return vector of strings computed after splitting `source` around all instances of `split`.
+   */
+  static std::vector<std::string> split(const std::string& source, char split);
+
+  /**
+   * Split a string.
+   * @param source supplies the string to split.
+   * @param split supplies the string to split on.
+   * @param keep_empty_string result contains empty strings if the string starts or ends with
+   * 'split', or if instances of 'split' are adjacent.
+   * @return vector of strings computed after splitting `source` around all instances of `split`.
+   */
+  static std::vector<std::string> split(const std::string& source, const std::string& split,
+                                        bool keep_empty_string = false);
 
   /**
    * Compare two RepeatedPtrFields of the same type for equality.
@@ -165,9 +192,10 @@ public:
   /**
    * Parse bootstrap config from v1 JSON static config string.
    * @param json_string source v1 JSON static config string.
-   * @return envoy::api::v2::Bootstrap.
+   * @return envoy::config::bootstrap::v2::Bootstrap.
    */
-  static envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string);
+  static envoy::config::bootstrap::v2::Bootstrap
+  parseBootstrapFromJson(const std::string& json_string);
 
   /**
    * Returns a "novel" IPv4 loopback address, if available.

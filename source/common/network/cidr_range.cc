@@ -90,24 +90,9 @@ bool CidrRange::isInRange(const Instance& address) const {
     }
     break;
   case IpVersion::v6:
-    int length = length_;
-    // Loop through address bytes and compare. Address is in network byte order.
-    for (int i = 0; i < 16; i++) {
-      if (length < 8) {
-        // Compare relevant bits.
-        return (address.ip()->ipv6()->address()[i] >> (8 - length) ==
-                address_->ip()->ipv6()->address()[i] >> (8 - length));
-      } else {
-        if (address.ip()->ipv6()->address()[i] == address_->ip()->ipv6()->address()[i]) {
-          if (length == 8) {
-            return true;
-          } else {
-            length -= 8;
-          }
-        } else {
-          break;
-        }
-      }
+    if ((Utility::Ip6ntohl(address_->ip()->ipv6()->address()) >> (128 - length_)) ==
+        (Utility::Ip6ntohl(address.ip()->ipv6()->address()) >> (128 - length_))) {
+      return true;
     }
     break;
   }
@@ -139,12 +124,13 @@ CidrRange CidrRange::create(const envoy::api::v2::CidrRange& cidr) {
 
 // static
 CidrRange CidrRange::create(const std::string& range) {
-  std::vector<std::string> parts = StringUtil::split(range, '/');
+  const auto parts = StringUtil::splitToken(range, "/");
   if (parts.size() == 2) {
-    InstanceConstSharedPtr ptr = Utility::parseInternetAddress(parts[0]);
+    InstanceConstSharedPtr ptr = Utility::parseInternetAddress(std::string{parts[0]});
     if (ptr->type() == Type::Ip) {
       uint64_t length64;
-      if (StringUtil::atoul(parts[1].c_str(), length64, 10)) {
+      const std::string part{parts[1]};
+      if (StringUtil::atoul(part.c_str(), length64, 10)) {
         if ((ptr->ip()->version() == IpVersion::v6 && length64 <= 128) ||
             (ptr->ip()->version() == IpVersion::v4 && length64 <= 32)) {
           return create(std::move(ptr), static_cast<uint32_t>(length64));
@@ -192,28 +178,20 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
       // Create an Ipv6Instance with only a port, which will thus have the any address.
       return std::make_shared<Ipv6Instance>(uint32_t(0));
     }
-    // We need to mask out the unused bits, but we don't have a uint128_t available.
-    // However, we know that the array returned by Ipv6::address() represents the address
-    // in network order (bit 7 of byte 0 is the high-order bit of the address), so we
-    // simply need to keep the leading length bits of the array, and get rid of the rest.
     sockaddr_in6 sa6;
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(0);
-    std::array<uint8_t, 16> ip6 = address->ip()->ipv6()->address();
-    for (int i = 0; i < 16; ++i) {
-      if (length == 0) {
-        // We've retained all the bits we need, the remaining are all zero.
-        sa6.sin6_addr.s6_addr[i] = 0;
-      } else if (length < 8) {
-        // We're retaining only the high-order length bits of this byte.
-        sa6.sin6_addr.s6_addr[i] = ip6[i] & (0xff << (8 - length));
-        length = 0;
-      } else {
-        // We're keeping all of these bits.
-        sa6.sin6_addr.s6_addr[i] = ip6[i];
-        length -= 8;
-      }
-    }
+
+    // The maximum number stored in absl::uint128 has every bit set to 1.
+    absl::uint128 mask = absl::Uint128Max();
+    // Shifting the value to the left sets all bits between 128-length and 128 to zero.
+    mask <<= (128 - length);
+    // This will mask out the unused bits of the address.
+    absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address()) & mask;
+
+    absl::uint128 ip6_htonl = Utility::Ip6htonl(ip6);
+    static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
+    memcpy(&sa6.sin6_addr.s6_addr, &ip6_htonl, sizeof(absl::uint128));
     return std::make_shared<Ipv6Instance>(sa6);
   }
   }

@@ -1,10 +1,17 @@
 #pragma once
 
+#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
+#include "envoy/service/discovery/v2/cds.pb.h"
+#include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/service/discovery/v2/lds.pb.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -15,13 +22,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
-
-#include "api/base.pb.h"
-#include "api/cds.pb.h"
-#include "api/eds.pb.h"
-#include "api/filter/network/http_connection_manager.pb.h"
-#include "api/lds.pb.h"
-#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -50,7 +50,7 @@ public:
    */
   template <class ResourceType>
   static Protobuf::RepeatedPtrField<ResourceType>
-  getTypedResources(const envoy::api::v2::DiscoveryResponse& response) {
+  getTypedResources(const envoy::service::discovery::v2::DiscoveryResponse& response) {
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
@@ -230,13 +230,13 @@ public:
   static std::string resourceName(const ProtobufWkt::Any& resource);
 
   /**
-   * Creates the set of stats tag extractors requested by the config and transfers ownership to the
-   * caller.
+   * Create TagProducer instance. Check all tag names for conflicts to avoid
+   * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
-   * @return std::vector<Stats::TagExtractorPtr> tag extractor vector.
+   * @throws EnvoyException when the conflict of tag names is found.
    */
-  static std::vector<Stats::TagExtractorPtr>
-  createTagExtractors(const envoy::api::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr
+  createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.
@@ -245,6 +245,17 @@ public:
    * @param name supplies the name to check for length limits.
    */
   static void checkObjNameLength(const std::string& error_prefix, const std::string& name);
+
+  /**
+   * Obtain gRPC async client factory from a envoy::api::v2::ApiConfigSource.
+   * @param async_client_manager gRPC async client manager.
+   * @param api_config_source envoy::api::v2::ApiConfigSource. Must have config type GRPC.
+   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
+   */
+  static Grpc::AsyncClientFactoryPtr
+  factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                            const envoy::api::v2::ApiConfigSource& api_config_source,
+                            Stats::Scope& scope);
 };
 
 } // namespace Config

@@ -21,11 +21,6 @@ envoy_cc_library(
     name = "configuration_lib",
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
-    external_deps = [
-        "envoy_bootstrap",
-        "envoy_lds",
-        "envoy_trace",
-    ],
     deps = [
         ":lds_api_lib",
         "//include/envoy/http:filter_interface",
@@ -46,6 +41,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/config/trace/v2:trace_cc",
+        "@envoy_api//envoy/service/discovery/v2:lds_cc",
     ],
 )
 
@@ -63,9 +61,11 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
+        "//source/common/network:connection_lib",
     ],
 )
 
@@ -116,6 +116,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:shared_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
@@ -158,7 +159,6 @@ envoy_cc_library(
     name = "lds_api_lib",
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
-    external_deps = ["envoy_lds"],
     deps = [
         ":lds_subscription_lib",
         "//include/envoy/config:subscription_interface",
@@ -169,6 +169,7 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/service/discovery/v2:lds_cc",
     ],
 )
 
@@ -176,7 +177,6 @@ envoy_cc_library(
     name = "lds_subscription_lib",
     srcs = ["lds_subscription.cc"],
     hdrs = ["lds_subscription.h"],
-    external_deps = ["envoy_lds"],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
@@ -185,6 +185,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
+        "@envoy_api//envoy/service/discovery/v2:lds_cc",
     ],
 )
 
@@ -192,7 +193,6 @@ envoy_cc_library(
     name = "listener_manager_lib",
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
-    external_deps = ["envoy_lds"],
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",
@@ -201,10 +201,14 @@ envoy_cc_library(
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/config:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
+        "//source/server/config/listener:original_dst_lib",
+        "//source/server/config/listener:proxy_protocol_lib",
+        "@envoy_api//envoy/service/discovery/v2:lds_cc",
     ],
 )
 
@@ -212,7 +216,6 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    external_deps = ["envoy_bootstrap"],
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
@@ -248,6 +251,7 @@ envoy_cc_library(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/server/http:admin_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 

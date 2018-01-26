@@ -167,7 +167,6 @@ envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
-    external_deps = ["envoy_filter_http_router"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
@@ -176,6 +175,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
+        "@envoy_api//envoy/api/v2/filter/http:router_cc",
     ],
 )
 

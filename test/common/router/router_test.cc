@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
@@ -15,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -28,6 +30,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -1524,10 +1527,10 @@ TEST_F(RouterTest, AltStatName) {
 }
 
 TEST_F(RouterTest, Redirect) {
-  MockRedirectEntry redirect;
-  EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
-  EXPECT_CALL(redirect, redirectResponseCode()).WillOnce(Return(Http::Code::MovedPermanently));
-  EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
+  MockDirectResponseEntry direct_response;
+  EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::MovedPermanently));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -1538,10 +1541,10 @@ TEST_F(RouterTest, Redirect) {
 }
 
 TEST_F(RouterTest, RedirectFound) {
-  MockRedirectEntry redirect;
-  EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
-  EXPECT_CALL(redirect, redirectResponseCode()).WillOnce(Return(Http::Code::Found));
-  EXPECT_CALL(*callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
+  MockDirectResponseEntry direct_response;
+  EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::Found));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
   Http::TestHeaderMapImpl response_headers{{":status", "302"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -1549,6 +1552,39 @@ TEST_F(RouterTest, RedirectFound) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, DirectResponse) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+}
+
+TEST_F(RouterTest, DirectResponseWithBody) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  const std::string response_body("static response");
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(response_body));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "15"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
 
 TEST(RouterFilterUtilityTest, finalTimeout) {

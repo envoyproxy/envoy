@@ -9,6 +9,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -23,24 +24,32 @@ namespace Envoy {
 namespace Router {
 
 /**
- * A routing primitive that creates a redirect path.
+ * A routing primitive that specifies a direct (non-proxied) HTTP response.
  */
-class RedirectEntry {
+class DirectResponseEntry {
 public:
-  virtual ~RedirectEntry() {}
+  virtual ~DirectResponseEntry() {}
+
+  /**
+   * Returns the HTTP status code to return.
+   * @return Http::Code the response Code.
+   */
+  virtual Http::Code responseCode() const PURE;
 
   /**
    * Returns the redirect path based on the request headers.
    * @param headers supplies the request headers.
-   * @return std::string the redirect URL.
+   * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
+   *         or an empty string otherwise.
    */
   virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
 
   /**
-   * Returns the HTTP status code to use when redirecting a request.
-   * @return Http::Code the redirect response Code.
+   * Returns the response body to send with direct responses.
+   * @return std::string& the response body specified in the route configuration,
+   *         or an empty string if no response body is specified.
    */
-  virtual Http::Code redirectResponseCode() const PURE;
+  virtual const std::string& responseBody() const PURE;
 };
 
 /**
@@ -93,12 +102,13 @@ class RetryPolicy {
 public:
   // clang-format off
   static const uint32_t RETRY_ON_5XX                     = 0x1;
-  static const uint32_t RETRY_ON_CONNECT_FAILURE         = 0x2;
-  static const uint32_t RETRY_ON_RETRIABLE_4XX           = 0x4;
-  static const uint32_t RETRY_ON_REFUSED_STREAM          = 0x8;
-  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x10;
-  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x20;
-  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x40;
+  static const uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
+  static const uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
+  static const uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
+  static const uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
+  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
+  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
+  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
   // clang-format on
 
   virtual ~RetryPolicy() {}
@@ -391,6 +401,12 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
+
+  /**
+   * @return const envoy::api::v2::Metadata& return the metadata provided in the config for this
+   * route.
+   */
+  virtual const envoy::api::v2::Metadata& metadata() const PURE;
 };
 
 /**
@@ -416,16 +432,16 @@ public:
 typedef std::unique_ptr<const Decorator> DecoratorConstPtr;
 
 /**
- * An interface that holds a RedirectEntry or a RouteEntry for a request.
+ * An interface that holds a DirectResponseEntry or RouteEntry for a request.
  */
 class Route {
 public:
   virtual ~Route() {}
 
   /**
-   * @return the redirect entry or nullptr if there is no redirect needed for the request.
+   * @return the direct response entry or nullptr if there is no direct response for the request.
    */
-  virtual const RedirectEntry* redirectEntry() const PURE;
+  virtual const DirectResponseEntry* directResponseEntry() const PURE;
 
   /**
    * @return the route entry or nullptr if there is no matching route for the request.
@@ -449,7 +465,7 @@ public:
 
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
-   * route entry or a redirect entry) for the request.
+   * route entry or a direct response entry) for the request.
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.

@@ -11,20 +11,19 @@ envoy_package()
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
-    external_deps = [
-        "envoy_bootstrap",
-        "envoy_cds",
-    ],
     deps = [
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
+        "@envoy_api//envoy/api/v2/cluster:cluster_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -42,12 +41,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
-    external_deps = ["envoy_base"],
     deps = [
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_macros",
+        "@envoy_api//envoy/api/v2:base_cc",
     ],
 )
 
@@ -63,9 +62,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_balancer_type_interface",
     hdrs = ["load_balancer_type.h"],
-    external_deps = ["envoy_cds"],
     deps = [
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/cluster:cluster_cc",
     ],
 )
 

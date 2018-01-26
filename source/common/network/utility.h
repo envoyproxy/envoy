@@ -4,10 +4,11 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
-#include "api/address.pb.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -176,7 +177,7 @@ public:
    * @param str is the string containing the port numbers and ranges
    * @param list is the list to append the new data structures to
    */
-  static void parsePortRangeList(const std::string& string, std::list<PortRange>& list);
+  static void parsePortRangeList(absl::string_view string, std::list<PortRange>& list);
 
   /**
    * Checks whether a given port number appears in at least one of the port ranges in a list
@@ -186,8 +187,31 @@ public:
    */
   static bool portInRangeList(const Address::Instance& address, const std::list<PortRange>& list);
 
+  /**
+   * Converts IPv6 absl::uint128 in network byte order to host byte order.
+   * @param address supplies the IPv6 address in network byte order.
+   * @return the absl::uint128 IPv6 address in host byte order.
+   */
+  static absl::uint128 Ip6ntohl(const absl::uint128& address);
+
+  /**
+   * Converts IPv6 absl::uint128 in host byte order to network byte order.
+   * @param address supplies the IPv6 address in host byte order.
+   * @return the absl::uint128 IPv6 address in network byte order.
+   */
+  static absl::uint128 Ip6htonl(const absl::uint128& address);
+
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
+
+  /**
+   * Takes a number and flips the order in byte chunks. The last byte of the input will be the
+   * first byte in the output. The second to last byte will be the second to first byte in the
+   * output. Etc..
+   * @param input supplies the input to have the bytes flipped.
+   * @return the absl::uint128 of the input having the bytes flipped.
+   */
+  static absl::uint128 flipOrder(const absl::uint128& input);
 };
 
 } // namespace Network

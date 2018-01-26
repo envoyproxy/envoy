@@ -89,10 +89,15 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   // Server::ListenerComponentFactory
-  std::vector<Configuration::NetworkFilterFactoryCb>
-  createFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                          Configuration::FactoryContext& context) override {
-    return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
+  std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      Configuration::FactoryContext& context) override {
+    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters, context);
+  }
+  std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::FactoryContext& context) override {
+    return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
   Network::ListenSocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                                     bool) override {
@@ -100,7 +105,7 @@ public:
     // validation mock.
     return nullptr;
   }
-  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType) override {
+  DrainManagerPtr createDrainManager(envoy::api::v2::listener::Listener::DrainType) override {
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }
@@ -118,7 +123,6 @@ private:
 
   Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
-  std::vector<Stats::TagExtractorPtr> tag_extractors_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

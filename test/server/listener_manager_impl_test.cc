@@ -1,6 +1,10 @@
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
+#include "common/config/metadata.h"
+#include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
@@ -48,24 +52,24 @@ public:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(
-      bool need_init,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
+  ListenerHandle* expectListenerCreate(bool need_init,
+                                       envoy::api::v2::listener::Listener::DrainType drain_type =
+                                           envoy::api::v2::listener::Listener_DrainType_DEFAULT) {
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>&,
-                                      Configuration::FactoryContext& context)
-                -> std::vector<Configuration::NetworkFilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
-              if (need_init) {
-                context.initManager().registerTarget(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke([raw_listener, need_init](
+                             const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
+                             Configuration::FactoryContext& context)
+                             -> std::vector<Configuration::NetworkFilterFactoryCb> {
+          std::shared_ptr<ListenerHandle> notifier(raw_listener);
+          raw_listener->context_ = &context;
+          if (need_init) {
+            context.initManager().registerTarget(notifier->target_);
+          }
+          return {[notifier](Network::FilterManager&) -> void {}};
+        }));
 
     return raw_listener;
   }
@@ -95,12 +99,22 @@ class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
-    ON_CALL(listener_factory_, createFilterFactoryList(_, _))
-        .WillByDefault(Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                 Configuration::FactoryContext& context)
-                                  -> std::vector<Configuration::NetworkFilterFactoryCb> {
-          return ProdListenerComponentFactory::createFilterFactoryList_(filters, context);
-        }));
+    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillByDefault(
+            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+                      Configuration::FactoryContext& context)
+                       -> std::vector<Configuration::NetworkFilterFactoryCb> {
+              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
+                                                                                   context);
+            }));
+    ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+               Configuration::FactoryContext& context)
+                -> std::vector<Configuration::ListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+                                                                                    context);
+            }));
   }
 };
 
@@ -266,7 +280,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   )EOF";
 
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -303,7 +317,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   )EOF";
 
   ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(
                                 parseListenerFromJson(listener_foo_different_address_json), true),
@@ -1040,6 +1054,360 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniWithTwoDifferentFilterChains) 
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': use of different filter "
                             "chains is currently not supported");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
+  const std::string yaml = R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIC3jCCAkegAwIBAgIJAJvUixVO/5pTMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE4MDExNTIyNDAyN1oXDTI4MDExMzIyNDAyN1ow\ngYMxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1T\nYW4gRnJhbmNpc2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2lu\nZWVyaW5nMR0wGwYDVQQDDBRUZXN0IEludGVybWVkaWF0ZSBDQTCBnzANBgkqhkiG\n9w0BAQEFAAOBjQAwgYkCgYEAxd1kOhV+/2n+rJWKvrtkyyqkWgBXXhH15G9cusaR\nzJtwxsvtPRYZ9nTc+A6GDFgZ0TS1sq/WJXfs3guMpFObXU+tSlezxHVRpWPTXKff\nhblqtZMPKW5q5LmOHxKi8GUxwDnEeAiZmzstGCYkRKn+GmLYe26vFGBw4MvM89Vm\necMCAwEAAaNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYw\nHQYDVR0OBBYEFIuDOLnI5iZPpH230VFAuWeNYuWdMB8GA1UdIwQYMBaAFDt4pFFP\nFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAGO77sBFzn63pM2Oy4XS\n+FEcFj/lB4vBh4r8jtzdf5EMaKUeXY9i57MTryPTJZRFXW6BuQ/B3hiOW2fwkCdL\neHd0MwGv95cn1PCWZh1IidVrtrDeu0oLxhRk5mcflaaLBuGADUD3Y1ms2sl90Ean\n6C+0EHH2O6Emesx9IhPZRx4H\n-----END CERTIFICATE-----" }
+              private_key: { inline_string: "-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQCxhu9J/53yAeuCx+o62qsaSdxFDvoC/ypBxuPv4UDDGaXoT3XB\n2u749XnwYGmnXbY0Wdxi0khfevDtfRGzMI0JdQM8J90JfEnXUIclt9P0P44GOeDJ\nwwRoG+cYW+7XX4xr2fpSmqbvRcqU3K63v8F0sAUrJptpntAgjQGSnXcjMwIDAQAB\nAoGAJk4kQcZLEVYCuDRkwRA/zStUwP3rSkw+lPTSaAcljzNwjgDfOtX/rG5jQk+7\nXGanEwK0wAn5nciMReIvuIdoVt7zEtFygZ7D3yKh+Ywu0AYC8TaiszAaL0efMnAW\nMtpgyrAoMB4bFON3oyNVZM161+cdrU0PrEDqh+GHl8abpokCQQDfn2jE3WmS/a36\n2Dt/e3yjNE/4xDshAcHkNmF+jpcB66bls5ZU5Yv07RUVExQ30fw3v+ADMxmNYg2f\nqpAF2getAkEAyzr9GwgdKeruErwlLhMOG327zTcZlHZXU5Q378/S3bKi3c/voGCb\nexKjxRBZTzSw5hfrOzbCEpMLcwZaoBiyXwJBAJAH2XAq98vQDpXpXfEPNUjc8cFV\niowI2LxHdmYQKxz2jemW0PXfX1Siuxh20GffnOa/c+Y7rHKOvB2hut+5/YUCQQCF\nnBx2vxjdTBSEwKj455IoxLrJKeZpUnwK+LDluo35Ls4gYeo6WAkgGpsMnbj5d7yt\nKSB/Z3qj14R5dL3z7wilAkEAp78JPrvWP5zc3YOmmr9s8IQ3almspwnlh1mdcgoX\n4rHe3U4jRZwE6fw8W9G4QsFRlez1Re6g8T7yoFXiZETGqQ==\n-----END RSA PRIVATE KEY-----" }
+          validation_context:
+              trusted_ca: { inline_string: "-----BEGIN CERTIFICATE-----\nMIICzTCCAjagAwIBAgIJAOrzsOodDleaMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE3MDcwOTAxMzkzMloXDTI3MDcwNzAxMzkzMlow\ndjELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh\nbiBGcmFuY2lzY28xDTALBgNVBAoTBEx5ZnQxGTAXBgNVBAsTEEx5ZnQgRW5naW5l\nZXJpbmcxEDAOBgNVBAMTB1Rlc3QgQ0EwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJ\nAoGBAJuJh8N5TheTHLKOxsLSAfiIu9VDeKPsV98KRJJaYCMoaof3j9wBs65HzIat\nAunuV4DVZZ2c/x7/v741oWadYd3yqL7XSzQaeBvhXi+wv3g17FYrdxaowG7cfmsh\ngCp7/9TRW0bRGL6Qp6od/u62L8dprdHXxnck/+sZMupam9YrAgMBAAGjYzBhMA8G\nA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBQ7eKRRTxaE\nkxxIKHoMrSuWQcp9eTAfBgNVHSMEGDAWgBQ7eKRRTxaEkxxIKHoMrSuWQcp9eTAN\nBgkqhkiG9w0BAQsFAAOBgQCN00/2k9k8HNeJ8eYuFH10jnc+td7+OaYWpRSEKCS7\nux3KAu0UFt90mojEMClt4Y6uP4oXTWbRzMzAgQHldHU8Gkj8tYnv7mToX7Bh/xdc\n19epzjCmo/4Q6+16GZZvltiFjkkHSZEVI5ggljy1QdMIPRegsKKmX9mjZSCSSXD6\nSA==\n-----END CERTIFICATE-----" }
+  )EOF";
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateKeyFilename) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIC3jCCAkegAwIBAgIJAJvUixVO/5pTMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp\nc2NvMQ0wCwYDVQQKEwRMeWZ0MRkwFwYDVQQLExBMeWZ0IEVuZ2luZWVyaW5nMRAw\nDgYDVQQDEwdUZXN0IENBMB4XDTE4MDExNTIyNDAyN1oXDTI4MDExMzIyNDAyN1ow\ngYMxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1T\nYW4gRnJhbmNpc2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2lu\nZWVyaW5nMR0wGwYDVQQDDBRUZXN0IEludGVybWVkaWF0ZSBDQTCBnzANBgkqhkiG\n9w0BAQEFAAOBjQAwgYkCgYEAxd1kOhV+/2n+rJWKvrtkyyqkWgBXXhH15G9cusaR\nzJtwxsvtPRYZ9nTc+A6GDFgZ0TS1sq/WJXfs3guMpFObXU+tSlezxHVRpWPTXKff\nhblqtZMPKW5q5LmOHxKi8GUxwDnEeAiZmzstGCYkRKn+GmLYe26vFGBw4MvM89Vm\necMCAwEAAaNmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYw\nHQYDVR0OBBYEFIuDOLnI5iZPpH230VFAuWeNYuWdMB8GA1UdIwQYMBaAFDt4pFFP\nFoSTHEgoegytK5ZByn15MA0GCSqGSIb3DQEBCwUAA4GBAGO77sBFzn63pM2Oy4XS\n+FEcFj/lB4vBh4r8jtzdf5EMaKUeXY9i57MTryPTJZRFXW6BuQ/B3hiOW2fwkCdL\neHd0MwGv95cn1PCWZh1IidVrtrDeu0oLxhRk5mcflaaLBuGADUD3Y1ms2sl90Ean\n6C+0EHH2O6Emesx9IhPZRx4H\n-----END CERTIFICATE-----" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true), EnvoyException,
+      TestEnvironment::substitute("Failed to load incomplete certificate from {{ test_rundir }}"
+                                  "/test/common/ssl/test_data/san_dns_chain3.pem, ",
+                                  Network::Address::IpVersion::v4));
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateChain) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "invalid" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load certificate chain from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediateCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { inline_string: "-----BEGIN CERTIFICATE-----\nMIIDGjCCAoOgAwIBAgIJALE/9j8tvBGNMA0GCSqGSIb3DQEBCwUAMIGDMQswCQYD\nVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5j\naXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQTHlmdCBFbmdpbmVlcmluZzEd\nMBsGA1UEAwwUVGVzdCBJbnRlcm1lZGlhdGUgQ0EwHhcNMTgwMTE1MjI0MDI3WhcN\nMjAwMTE1MjI0MDI3WjB6MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5p\nYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UE\nCwwQTHlmdCBFbmdpbmVlcmluZzEUMBIGA1UEAwwLVGVzdCBTZXJ2ZXIwgZ8wDQYJ\nKoZIhvcNAQEBBQADgY0AMIGJAoGBALGG70n/nfIB64LH6jraqxpJ3EUO+gL/KkHG\n4+/hQMMZpehPdcHa7vj1efBgaaddtjRZ3GLSSF968O19EbMwjQl1Azwn3Ql8SddQ\nhyW30/Q/jgY54MnDBGgb5xhb7tdfjGvZ+lKapu9FypTcrre/wXSwBSsmm2me0CCN\nAZKddyMzAgMBAAGjgZ0wgZowDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwHQYD\nVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMB4GA1UdEQQXMBWCE3NlcnZlcjEu\nZXhhbXBsZS5jb20wHQYDVR0OBBYEFBZcRXhGXlFghYQ9/R6yF7XTHzkxMB8GA1Ud\nIwQYMBaAFIuDOLnI5iZPpH230VFAuWeNYuWdMA0GCSqGSIb3DQEBCwUAA4GBAFZg\n6ZznS3KuEus6ZJsLJH7J0BMKmpdj5hM0M++TBnP8LVy73ETc95Y2sxvB/B2c7f2v\nwjz4nGd5O3kkiVlMrQ44GPUKrO3/Ltix+MT3ixuF7Z7vLFKwkIG2d0RXJVVb1MOM\nw1bmtABHf8sVAFF6RZtjshWSaZYvIhiG1FedV4Vw\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\ninvalid" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load certificate chain from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+              private_key: { inline_string: "invalid" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load private key from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem" }
+          validation_context:
+              trusted_ca: { inline_string: "invalid" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load trusted CA certificates from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    filter_chains:
+    - filter_chain_match:
+      filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: metadata_test
+          route_config:
+            virtual_hosts:
+            - name: "some_virtual_host"
+              domains: ["some.domain"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: service_foo }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
+  ASSERT_NE(nullptr, context);
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+                .string_value());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "envoy.listener.original_dst"
+      config: {}
+  )EOF", // "
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(-1,
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
+                                     Network::Address::InstanceConstSharedPtr{
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+
+class OriginalDstTest : public Filter::Listener::OriginalDst {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
+    return Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
+  }
+};
+
+namespace Configuration {
+
+class OriginalDstTestConfigFactory : public NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                       FactoryContext&) override {
+    return [](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+
+  std::string name() override { return "test.listener.original_dst"; }
+};
+
+/**
+ * Static registration for the original dst filter. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<OriginalDstTestConfigFactory, NamedListenerFilterConfigFactory>
+    registered_;
+
+} // namespace Configuration
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "test.listener.original_dst"
+      config: {}
+  )EOF", // "
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(
+      -1, std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+  EXPECT_TRUE(socket.localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.localAddress()->asString());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { inline_string: "-----BEGIN X509 CRL-----\nMIIBbDCB1gIBATANBgkqhkiG9w0BAQsFADB2MQswCQYDVQQGEwJVUzETMBEGA1UE\nCBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzENMAsGA1UEChME\nTHlmdDEZMBcGA1UECxMQTHlmdCBFbmdpbmVlcmluZzEQMA4GA1UEAxMHVGVzdCBD\nQRcNMTcxMjIwMTcxNDA4WhcNMjcxMjE4MTcxNDA4WjAcMBoCCQDZy/Qp7iAfHxcN\nMTcxMjIwMTcxMjU0WqAOMAwwCgYDVR0UBAMCAQAwDQYJKoZIhvcNAQELBQADgYEA\nOTn5Fgb44xtFd9QGtbTElZ3iwdlcOxRHjgQMd+ydzEEZRMzMgb4/NmEsgXAsxbrx\ntKmpgll8TblscitkglvGk8s4obi/OtgxNIvn+7pOBTjmrgJkcktBUDEWRbLZjsZx\nyH+5teBZ0tH0tVy914QeGitZFV8awK1hlJwlAz9g/jo=\n-----END X509 CRL-----" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, InvalidCRLInline) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            crl: { inline_string: "-----BEGIN X509 CRL-----\nTOTALLY_NOT_A_CRL_HERE\n-----END X509 CRL-----\n" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "Failed to load CRL from <inline>");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            crl: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                          EnvoyException,
+                          "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
 } // namespace Server

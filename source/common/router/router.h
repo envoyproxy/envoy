@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/filter/http/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -23,8 +24,6 @@
 #include "common/http/utility.h"
 #include "common/request_info/request_info_impl.h"
 
-#include "api/filter/http/router.pb.h"
-
 namespace Envoy {
 namespace Router {
 
@@ -36,6 +35,7 @@ namespace Router {
   COUNTER(no_route)                                                                                \
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
+  COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_total)
 // clang-format on
 

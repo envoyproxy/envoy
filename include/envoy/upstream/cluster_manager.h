@@ -7,7 +7,10 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/cluster/cluster.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
@@ -15,9 +18,6 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
-
-#include "api/bootstrap.pb.h"
-#include "api/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,7 +38,7 @@ public:
    *
    * @return true if the action results in an add/update of a cluster.
    */
-  virtual bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) PURE;
+  virtual bool addOrUpdatePrimaryCluster(const envoy::api::v2::cluster::Cluster& cluster) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
@@ -129,6 +129,11 @@ public:
   virtual Config::GrpcMux& adsMux() PURE;
 
   /**
+   * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
+   */
+  virtual Grpc::AsyncClientManager& grpcAsyncClientManager() PURE;
+
+  /**
    * Return the current version info string for dynamic clusters, if CDS is setup.
    *
    * @return std::string the current version info string for dynamic clusters,
@@ -187,12 +192,11 @@ public:
   /**
    * Allocate a cluster manager from configuration proto.
    */
-  virtual ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
-                                                    Stats::Store& stats, ThreadLocal::Instance& tls,
-                                                    Runtime::Loader& runtime,
-                                                    Runtime::RandomGenerator& random,
-                                                    const LocalInfo::LocalInfo& local_info,
-                                                    AccessLog::AccessLogManager& log_manager) PURE;
+  virtual ClusterManagerPtr
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          AccessLog::AccessLogManager& log_manager) PURE;
 
   /**
    * Allocate an HTTP connection pool.
@@ -205,7 +209,7 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
+  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::cluster::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
                                             bool added_via_api) PURE;

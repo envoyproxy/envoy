@@ -1,12 +1,11 @@
 #pragma once
 
+#include "envoy/api/v2/address.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/resolver.h"
 
 #include "common/network/address_impl.h"
-
-#include "api/address.pb.h"
 
 namespace Envoy {
 namespace Network {

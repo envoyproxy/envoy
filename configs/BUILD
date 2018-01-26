@@ -21,9 +21,12 @@ envoy_py_test_binary(
 
 genrule(
     name = "example_configs",
-    srcs = ["//examples:configs"],
+    srcs = [
+        "//examples:configs",
+        "//test/config/integration/certs",
+    ],
     outs = ["example_configs.tar"],
-    cmd = "$(location configgen.sh) $(location configgen) $(@D) $(locations //examples:configs)",
+    cmd = "$(location configgen.sh) $(location configgen) $(@D) $(locations //examples:configs) $(locations //test/config/integration/certs)",
     tools = [
         "configgen.sh",
         ":configgen",

@@ -93,7 +93,7 @@ public:
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
    */
-  static void loadBootstrapConfig(envoy::api::v2::Bootstrap& bootstrap,
+  static void loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                   const std::string& config_path, bool v2_only);
 };
 
@@ -177,7 +177,6 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
-  std::vector<Stats::TagExtractorPtr> tag_extractors_;
   std::unique_ptr<ServerStats> server_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
@@ -192,7 +191,6 @@ private:
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<Configuration::Main> config_;
-  Stats::ScopePtr admin_scope_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   LocalInfo::LocalInfoPtr local_info_;
