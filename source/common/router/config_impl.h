@@ -445,8 +445,6 @@ private:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
-    static const uint64_t MAX_CLUSTER_WEIGHT;
-
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -486,6 +484,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
