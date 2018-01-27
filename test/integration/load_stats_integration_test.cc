@@ -1,6 +1,6 @@
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
-#include "envoy/service/discovery/v2/eds.pb.h"
 #include "envoy/service/load_stats/v2/lrs.pb.h"
 
 #include "common/config/resources.h"
@@ -36,7 +36,7 @@ public:
                                    const std::vector<uint32_t>& p1_winter_upstreams,
                                    const std::vector<uint32_t>& p1_dragon_upstreams) {
     uint32_t num_endpoints = 0;
-    envoy::service::discovery::v2::ClusterLoadAssignment cluster_load_assignment;
+    envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
 
     auto* winter = cluster_load_assignment.add_endpoints();
@@ -74,7 +74,7 @@ public:
     }
 
     // Write to file the DiscoveryResponse and trigger inotify watch.
-    envoy::service::discovery::v2::DiscoveryResponse eds_response;
+    envoy::api::v2::DiscoveryResponse eds_response;
     eds_response.set_version_info(std::to_string(eds_version_++));
     eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     eds_response.add_resources()->PackFrom(cluster_load_assignment);

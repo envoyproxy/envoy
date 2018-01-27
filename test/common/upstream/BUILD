@@ -64,7 +64,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 
@@ -142,9 +142,9 @@ envoy_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
     ],
 )
 

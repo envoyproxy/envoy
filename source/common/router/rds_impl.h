@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
@@ -14,7 +15,6 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/admin.h"
-#include "envoy/service/discovery/v2/rds.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 

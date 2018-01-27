@@ -21,7 +21,7 @@ LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::Cluster
                Stats::Scope& scope, ListenerManager& lm)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
   // TODO: dummy to force linking the gRPC service proto
-  envoy::service::discovery::v2::LdsDummy dummy;
+  envoy::api::v2::LdsDummy dummy;
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::listener::Listener>(
@@ -31,8 +31,8 @@ LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::Cluster
         return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
                                    dispatcher, random, local_info);
       },
-      "envoy.service.discovery.v2.ListenerDiscoveryService.FetchListeners",
-      "envoy.service.discovery.v2.ListenerDiscoveryService.StreamListeners");
+      "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
+      "envoy.api.v2.ListenerDiscoveryService.StreamListeners");
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.registerTarget(*this);
 }

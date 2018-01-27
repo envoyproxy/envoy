@@ -2,11 +2,11 @@
 
 #include <functional>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/discovery/v2/cds.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"

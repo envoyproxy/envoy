@@ -2,10 +2,10 @@
 
 #include <functional>
 
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/init.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/service/discovery/v2/lds.pb.h"
 
 #include "common/common/logger.h"
 

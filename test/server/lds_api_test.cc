@@ -1,4 +1,4 @@
-#include "envoy/service/discovery/v2/lds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
 
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"

@@ -31,7 +31,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
   Config::Utility::checkLocalInfo("cds", local_info);
 
   // TODO: dummy to force linking the gRPC service proto
-  envoy::service::discovery::v2::CdsDummy dummy;
+  envoy::api::v2::CdsDummy dummy;
 
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::cluster::Cluster>(
@@ -41,8 +41,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
             return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
                                        eds_config, cm, dispatcher, random, local_info);
           },
-          "envoy.service.discovery.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.service.discovery.v2.ClusterDiscoveryService.StreamClusters");
+          "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
+          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {

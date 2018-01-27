@@ -1,8 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/service/discovery/v2/common.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
