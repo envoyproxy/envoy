@@ -96,9 +96,10 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  // Helpers Functions
-  // TODO(gsagula): We made them public to facilitate testing, but it should be moved into a common
-  // class at some point.
+  // Helper Functions
+  // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally is to have
+  // these functions available in a more generic class that allows checking the gzip policy and
+  // other types of compression (when implemented in Envoy).
   bool hasCacheControlNoTransform(HeaderMap& headers) const;
   bool isAcceptEncodingAllowed(HeaderMap& headers) const;
   bool isContentTypeAllowed(HeaderMap& headers) const;
