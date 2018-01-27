@@ -3,12 +3,13 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/api/v2/filter/http/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
 #include "common/http/filter/ratelimit.h"
 #include "common/protobuf/utility.h"
+
+#include "api/filter/http/rate_limit.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

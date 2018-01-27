@@ -1,6 +1,3 @@
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
-
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
@@ -25,7 +22,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
@@ -37,7 +34,7 @@ public:
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.http_grpc_access_log");
 
-          envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config;
+          envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
@@ -57,14 +54,14 @@ public:
   }
 
   void waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
+    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage request_msg;
     access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     EXPECT_STREQ("POST", access_log_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
+    EXPECT_STREQ("/envoy.api.v2.filter.accesslog.AccessLogService/StreamAccessLogs",
                  access_log_request_->headers().Path()->value().c_str());
     EXPECT_STREQ("application/grpc", access_log_request_->headers().ContentType()->value().c_str());
 
-    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
+    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage expected_request_msg;
     MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
@@ -146,7 +143,7 @@ http_logs:
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   access_log_request_->startGrpcStream();
-  envoy::service::accesslog::v2::StreamAccessLogsResponse response_msg;
+  envoy::api::v2::filter::accesslog::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);

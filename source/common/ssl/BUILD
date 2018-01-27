@@ -40,6 +40,7 @@ envoy_cc_library(
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
     external_deps = [
+        "envoy_sds",
         "ssl",
     ],
     deps = [
@@ -48,7 +49,6 @@ envoy_cc_library(
         "//source/common/config:tls_context_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -15,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {

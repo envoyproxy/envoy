@@ -25,6 +25,7 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
+    external_deps = ["envoy_filter_network_rate_limit"],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -32,7 +33,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2/filter/network:rate_limit_cc",
     ],
 )
 
@@ -40,6 +40,9 @@ envoy_cc_library(
     name = "tcp_proxy_lib",
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
+    external_deps = [
+        "envoy_filter_network_tcp_proxy",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -62,6 +65,5 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
         "//source/common/request_info:request_info_lib",
-        "@envoy_api//envoy/api/v2/filter/network:tcp_proxy_cc",
     ],
 )

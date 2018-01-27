@@ -44,3 +44,4 @@ final version.
 * Added support for building envoy with exported symbols
   This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.
 * Added support for more granular weighted cluster routing by allowing the total weight to be specified in configuration.
+* Added support for custom request/response headers with mixed static and dynamic values.

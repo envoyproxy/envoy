@@ -1,17 +1,17 @@
 #include "common/config/tls_context_json.h"
 
-#include "envoy/api/v2/auth/cert.pb.validate.h"
-
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
 #include "common/protobuf/utility.h"
+
+#include "api/sds.pb.validate.h"
 
 namespace Envoy {
 namespace Config {
 
 void TlsContextJson::translateDownstreamTlsContext(
     const Json::Object& json_tls_context,
-    envoy::api::v2::auth::DownstreamTlsContext& downstream_tls_context) {
+    envoy::api::v2::DownstreamTlsContext& downstream_tls_context) {
   translateCommonTlsContext(json_tls_context, *downstream_tls_context.mutable_common_tls_context());
   JSON_UTIL_SET_BOOL(json_tls_context, downstream_tls_context, require_client_certificate);
 
@@ -25,15 +25,14 @@ void TlsContextJson::translateDownstreamTlsContext(
 
 void TlsContextJson::translateUpstreamTlsContext(
     const Json::Object& json_tls_context,
-    envoy::api::v2::auth::UpstreamTlsContext& upstream_tls_context) {
+    envoy::api::v2::UpstreamTlsContext& upstream_tls_context) {
   translateCommonTlsContext(json_tls_context, *upstream_tls_context.mutable_common_tls_context());
   upstream_tls_context.set_sni(json_tls_context.getString("sni", ""));
   MessageUtil::validate(upstream_tls_context);
 }
 
 void TlsContextJson::translateCommonTlsContext(
-    const Json::Object& json_tls_context,
-    envoy::api::v2::auth::CommonTlsContext& common_tls_context) {
+    const Json::Object& json_tls_context, envoy::api::v2::CommonTlsContext& common_tls_context) {
   const std::string alpn_protocols_str{json_tls_context.getString("alpn_protocols", "")};
   for (auto alpn_protocol : StringUtil::splitToken(alpn_protocols_str, ",")) {
     common_tls_context.add_alpn_protocols(std::string{alpn_protocol});
@@ -71,8 +70,8 @@ void TlsContextJson::translateCommonTlsContext(
   }
 }
 
-void TlsContextJson::translateTlsCertificate(
-    const Json::Object& json_tls_context, envoy::api::v2::auth::TlsCertificate& tls_certificate) {
+void TlsContextJson::translateTlsCertificate(const Json::Object& json_tls_context,
+                                             envoy::api::v2::TlsCertificate& tls_certificate) {
   if (json_tls_context.hasObject("cert_chain_file")) {
     tls_certificate.mutable_certificate_chain()->set_filename(
         json_tls_context.getString("cert_chain_file", ""));

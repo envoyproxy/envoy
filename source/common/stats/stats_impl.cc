@@ -122,8 +122,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   return data;
 }
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
-    : TagProducerImpl() {
+TagProducerImpl::TagProducerImpl(const envoy::api::v2::StatsConfig& config) : TagProducerImpl() {
   // To check name conflict.
   std::unordered_set<std::string> names;
   reserveResources(config);
@@ -135,14 +134,12 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& 
     }
 
     // If no tag value is found, fallback to default regex to keep backward compatibility.
-    if (tag_specifier.tag_value_case() ==
-            envoy::config::metrics::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
-        tag_specifier.tag_value_case() == envoy::config::metrics::v2::TagSpecifier::kRegex) {
+    if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
+        tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kRegex) {
       tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
           tag_specifier.tag_name(), tag_specifier.regex()));
 
-    } else if (tag_specifier.tag_value_case() ==
-               envoy::config::metrics::v2::TagSpecifier::kFixedValue) {
+    } else if (tag_specifier.tag_value_case() == envoy::api::v2::TagSpecifier::kFixedValue) {
       default_tags_.emplace_back(
           Stats::Tag{.name_ = tag_specifier.tag_name(), .value_ = tag_specifier.fixed_value()});
     }
@@ -160,7 +157,7 @@ std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Ta
 }
 
 // Roughly estimate the size of the vectors.
-void TagProducerImpl::reserveResources(const envoy::config::metrics::v2::StatsConfig& config) {
+void TagProducerImpl::reserveResources(const envoy::api::v2::StatsConfig& config) {
   default_tags_.reserve(config.stats_tags().size());
 
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
@@ -171,7 +168,7 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v2::StatsCo
   }
 }
 
-void TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
+void TagProducerImpl::addDefaultExtractors(const envoy::api::v2::StatsConfig& config,
                                            std::unordered_set<std::string>& names) {
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& extractor : Config::TagNames::get().name_regex_pairs_) {

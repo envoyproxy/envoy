@@ -35,7 +35,7 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    envoy::config::bootstrap::v2::Bootstrap bootstrap;
+    envoy::api::v2::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_.configPath(),
                                               options_.v2ConfigOnly());
     Server::Configuration::InitialImpl initial_config(bootstrap);
@@ -50,18 +50,17 @@ public:
     }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                       Server::Configuration::FactoryContext& context)
-                       -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                           context);
-            }));
+        .WillByDefault(Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                  Server::Configuration::FactoryContext& context)
+                                  -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
+          return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
+                                                                                       context);
+        }));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-                Server::Configuration::FactoryContext& context)
-                -> std::vector<Server::Configuration::ListenerFilterFactoryCb> {
+        .WillByDefault(
+            Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+                       Server::Configuration::FactoryContext& context)
+                       -> std::vector<Server::Configuration::ListenerFilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
                   filters, context);
             }));

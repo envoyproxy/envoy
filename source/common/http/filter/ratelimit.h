@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/http/rate_limit.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
@@ -14,6 +13,8 @@
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
+
+#include "api/filter/http/rate_limit.pb.h"
 
 namespace Envoy {
 namespace Http {

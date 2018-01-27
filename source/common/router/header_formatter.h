@@ -6,6 +6,8 @@
 
 #include "envoy/access_log/access_log.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -32,7 +34,7 @@ typedef std::unique_ptr<HeaderFormatter> HeaderFormatterPtr;
  */
 class RequestInfoHeaderFormatter : public HeaderFormatter {
 public:
-  RequestInfoHeaderFormatter(const std::string& field_name, bool append);
+  RequestInfoHeaderFormatter(absl::string_view field_name, bool append);
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override;
@@ -49,7 +51,7 @@ private:
 class PlainHeaderFormatter : public HeaderFormatter {
 public:
   PlainHeaderFormatter(const std::string& static_header_value, bool append)
-      : static_value_(static_header_value), append_(append){};
+      : static_value_(static_header_value), append_(append) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::RequestInfo::RequestInfo&) const override {
@@ -59,6 +61,29 @@ public:
 
 private:
   const std::string static_value_;
+  const bool append_;
+};
+
+/**
+ * A formatter that produces a value by concatenating the results of multiple HeaderFormatters.
+ */
+class CompoundHeaderFormatter : public HeaderFormatter {
+public:
+  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append)
+      : formatters_(std::move(formatters)), append_(append) {}
+
+  // HeaderFormatter::format
+  const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override {
+    std::string buf;
+    for (const auto& formatter : formatters_) {
+      buf += formatter->format(request_info);
+    }
+    return buf;
+  };
+  bool append() const override { return append_; }
+
+private:
+  const std::vector<HeaderFormatterPtr> formatters_;
   const bool append_;
 };
 

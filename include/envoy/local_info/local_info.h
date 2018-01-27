@@ -2,9 +2,10 @@
 
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace LocalInfo {

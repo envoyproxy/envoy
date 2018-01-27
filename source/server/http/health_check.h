@@ -5,12 +5,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/http/health_check.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
+
+#include "api/filter/http/health_check.pb.h"
 
 namespace Envoy {
 namespace Server {

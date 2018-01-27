@@ -27,8 +27,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::api::v2::route::RateLimit parseRateLimitFromJson(const std::string& json_string) {
-  envoy::api::v2::route::RateLimit rate_limit;
+envoy::api::v2::RateLimit parseRateLimitFromJson(const std::string& json_string) {
+  envoy::api::v2::RateLimit rate_limit;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRateLimit(*json_object_ptr, rate_limit);
   return rate_limit;
@@ -100,7 +100,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 class RateLimitConfiguration : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    envoy::api::v2::route::RouteConfiguration route_config;
+    envoy::api::v2::RouteConfiguration route_config;
     auto json_object_ptr = Json::Factory::loadFromString(json);
     Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
     config_.reset(new ConfigImpl(route_config, runtime_, cm_, true));
