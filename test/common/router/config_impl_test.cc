@@ -3592,7 +3592,7 @@ virtual_hosts:
           status: 200
           body:
             inline_string: )EOF" +
-         response_body + "\n";
+                     response_body + "\n";
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
