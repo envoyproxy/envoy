@@ -98,7 +98,7 @@ public:
 
   // Router::RdsRouteConfigProvider
   std::string configAsJson() const override {
-    return MessageUtil::getJsonStringFromMessage(route_config_proto_);
+    return MessageUtil::getJsonStringFromMessage(route_config_proto_, true);
   }
   const std::string& routeConfigName() const override { return route_config_name_; }
   const std::string& configSource() const override { return config_source_; }

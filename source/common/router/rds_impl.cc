@@ -74,7 +74,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),
   // then there is no actual RDS server, and hence no RDS cluster name.
   if (rds.has_config_source()) {
-    config_source_ = MessageUtil::getJsonStringFromMessage(rds.config_source());
+    config_source_ = MessageUtil::getJsonStringFromMessage(rds.config_source(), true);
   } else {
     config_source_ = "NOT_USING_CLUSTER";
   }
