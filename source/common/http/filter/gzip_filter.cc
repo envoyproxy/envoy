@@ -32,7 +32,6 @@ const std::unordered_set<std::string> defaultContentEncoding() {
                           "application/json", "image/svg+xml", "text/xml",
                           "application/xhtml+xml"});
 }
-
 } // namespace
 
 GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)

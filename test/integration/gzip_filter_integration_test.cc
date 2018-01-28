@@ -278,6 +278,4 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   ASSERT_STREQ("gzip", response_->headers().ContentEncoding()->value().c_str());
   ASSERT_STREQ("cookie, accept-encoding", response_->headers().Vary()->value().c_str());
 }
-
-
 } // namespace Envoy
