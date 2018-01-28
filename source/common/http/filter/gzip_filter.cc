@@ -42,8 +42,7 @@ GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzi
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
-      disable_on_etag_header_(gzip.disable_on_etag_header()),
-      disable_on_last_modified_header_(gzip.disable_on_last_modified_header()) {}
+      disable_on_etag_header_(gzip.disable_on_etag_header()) {}
 
 ZlibCompressionLevelEnum
 GzipFilterConfig::compressionLevelEnum(GzipV2CompressionLevelEnum compression_level) {
@@ -101,9 +100,9 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
 FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
       isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
-      isLastModifiedAllowed(headers) && isTransferEncodingAllowed(headers) &&
-      !headers.ContentEncoding() && isEtagAllowed(headers)) {
+      isEtagAllowed(headers) && isTransferEncodingAllowed(headers) && !headers.ContentEncoding()) {
 
+    sanitizeEtagHeader(headers);
     insertVaryHeader(headers);
     headers.removeContentLength();
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
@@ -200,29 +199,8 @@ bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
   return true;
 }
 
-// TODO(gsagula): It seems that every proxy has a different opinion how to handle Etag. Some
-// discussions around this topic have been going on for over a decade, e.g.,
-// https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
-// This design attempts to stay more on the safe side by preserving weak etags and removing
-// the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
 bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
-  const Http::HeaderEntry* etag = headers.Etag();
-  if (config_->disableOnEtagHeader()) {
-    return !etag;
-  }
-
-  if (etag) {
-    absl::string_view value(etag->value().c_str());
-    if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
-      headers.removeEtag();
-    }
-  }
-
-  return true;
-}
-
-bool GzipFilter::isLastModifiedAllowed(HeaderMap& headers) const {
-  return !(config_->disableOnLastModifiedHeader() && headers.LastModified());
+  return !(config_->disableOnEtagHeader() && headers.Etag());
 }
 
 bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
@@ -265,6 +243,21 @@ void GzipFilter::insertVaryHeader(HeaderMap& headers) {
     headers.insertVary().value(new_header);
   } else {
     headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
+  }
+}
+
+// TODO(gsagula): It seems that every proxy has a different opinion how to handle Etag. Some
+// discussions around this topic have been going on for over a decade, e.g.,
+// https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
+// This design attempts to stay more on the safe side by preserving weak etags and removing
+// the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
+void GzipFilter::sanitizeEtagHeader(HeaderMap& headers) {
+  const Http::HeaderEntry* etag = headers.Etag();
+  if (etag) {
+    absl::string_view value(etag->value().c_str());
+    if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+      headers.removeEtag();
+    }
   }
 }
 

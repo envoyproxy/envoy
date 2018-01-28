@@ -70,7 +70,6 @@ public:
           - text/html
           - application/json
         disable_on_etag_header: true
-        disable_on_last_modified_header: true
     )EOF"};
 
   const std::string default_config{"name: envoy.gzip"};
@@ -279,5 +278,6 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   ASSERT_STREQ("gzip", response_->headers().ContentEncoding()->value().c_str());
   ASSERT_STREQ("cookie, accept-encoding", response_->headers().Vary()->value().c_str());
 }
+
 
 } // namespace Envoy

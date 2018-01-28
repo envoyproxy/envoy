@@ -32,7 +32,6 @@ public:
   ZlibCompressionStrategyEnum compressionStrategy() const { return compression_strategy_; }
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
-  bool disableOnLastModifiedHeader() const { return disable_on_last_modified_header_; }
   uint64_t memoryLevel() const { return memory_level_; }
   uint64_t minimumLength() const { return content_length_; }
   uint64_t windowBits() const { return window_bits_; }
@@ -59,7 +58,6 @@ private:
   std::unordered_set<std::string> content_type_values_;
 
   bool disable_on_etag_header_;
-  bool disable_on_last_modified_header_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -96,21 +94,21 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  // Helper Functions
-  // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally is to have
-  // these functions available in a more generic class that allows checking the gzip policy and
-  // other types of compression (when implemented in Envoy).
+private:
+  // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally all
+  // the logic in these private member functions would be availale in another class.
+  friend class GzipFilterTest;
+
   bool hasCacheControlNoTransform(HeaderMap& headers) const;
   bool isAcceptEncodingAllowed(HeaderMap& headers) const;
   bool isContentTypeAllowed(HeaderMap& headers) const;
   bool isEtagAllowed(HeaderMap& headers) const;
-  bool isLastModifiedAllowed(HeaderMap& headers) const;
   bool isMinimumContentLength(HeaderMap& headers) const;
   bool isTransferEncodingAllowed(HeaderMap& headers) const;
 
+  void sanitizeEtagHeader(HeaderMap& headers);
   void insertVaryHeader(HeaderMap& headers);
 
-private:
   bool skip_compression_;
 
   Buffer::OwnedImpl compressed_data_;
