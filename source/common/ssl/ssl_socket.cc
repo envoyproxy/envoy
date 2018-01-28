@@ -237,19 +237,17 @@ std::string SslSocket::peerCertificate() const {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr);
   RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1);
-  BUF_MEM* bio_buf = nullptr;
-  BIO_get_mem_ptr(buf.get(), &bio_buf);
-  RELEASE_ASSERT(bio_buf != nullptr);
-  RELEASE_ASSERT(bio_buf->data != nullptr);
-  RELEASE_ASSERT(bio_buf->length != 0);
-  std::string pem = std::string(bio_buf->data, bio_buf->length);
+  const uint8_t* output = nullptr;
+  size_t length;
+  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
+  std::string pem = std::string(reinterpret_cast<const char*>(output), length);
   // URL encoding shortcut
   std::vector<std::pair<const absl::string_view, std::string>> replacements;
   replacements.push_back({"\n", "%0A"});
-  replacements.push_back({"=", "%3D"});
   replacements.push_back({" ", "%20"});
   replacements.push_back({"+", "%2B"});
   replacements.push_back({"/", "%2F"});
+  replacements.push_back({"=", "%3D"});
   absl::StrReplaceAll(replacements, &pem);
   return pem;
 }
