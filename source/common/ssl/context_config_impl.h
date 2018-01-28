@@ -25,6 +25,14 @@ public:
   const std::string& caCertPath() const override {
     return (ca_cert_path_.empty() && !ca_cert_.empty()) ? INLINE_STRING : ca_cert_path_;
   }
+  const std::string& certificateRevocationList() const override {
+    return certificate_revocation_list_;
+  }
+  const std::string& certificateRevocationListPath() const override {
+    return (certificate_revocation_list_path_.empty() && !certificate_revocation_list_.empty())
+               ? INLINE_STRING
+               : certificate_revocation_list_path_;
+  }
   const std::string& certChain() const override { return cert_chain_; }
   const std::string& certChainPath() const override {
     return (cert_chain_path_.empty() && !cert_chain_.empty()) ? INLINE_STRING : cert_chain_path_;
@@ -60,6 +68,8 @@ private:
   const std::string ecdh_curves_;
   const std::string ca_cert_;
   const std::string ca_cert_path_;
+  const std::string certificate_revocation_list_;
+  const std::string certificate_revocation_list_path_;
   const std::string cert_chain_;
   const std::string cert_chain_path_;
   const std::string private_key_;

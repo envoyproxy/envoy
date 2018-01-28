@@ -43,6 +43,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       ca_cert_(readDataSource(config.validation_context().trusted_ca(), true)),
       ca_cert_path_(getDataSourcePath(config.validation_context().trusted_ca())),
+      certificate_revocation_list_(readDataSource(config.validation_context().crl(), true)),
+      certificate_revocation_list_path_(getDataSourcePath(config.validation_context().crl())),
       cert_chain_(config.tls_certificates().empty()
                       ? ""
                       : readDataSource(config.tls_certificates()[0].certificate_chain(), true)),
@@ -66,6 +68,10 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& con
           tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
   // TODO(htuch): Support multiple hashes.
   ASSERT(config.validation_context().verify_certificate_hash().size() <= 1);
+  if (ca_cert_.empty() && !certificate_revocation_list_.empty()) {
+    throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA certificates",
+                                     certificateRevocationListPath()));
+  }
 }
 
 const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::DataSource& source,
