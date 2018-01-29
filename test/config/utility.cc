@@ -80,6 +80,27 @@ config:
     endpoint: /healthcheck
 )EOF";
 
+const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
+    R"EOF(
+name: envoy.squash
+config:
+  cluster: squash
+  attachment_template:
+    spec:
+      attachment:
+        env: "{{ SQUASH_ENV_TEST }}"
+      match_request: true
+  attachment_timeout:
+    seconds: 1
+    nanos: 0
+  attachment_poll_period:
+    seconds: 2
+    nanos: 0
+  request_timeout:
+    seconds: 1
+    nanos: 0
+)EOF";
+
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
   RELEASE_ASSERT(!finalized_);
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
