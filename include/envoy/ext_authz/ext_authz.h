@@ -5,11 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
-#include "envoy/http/filter.h"
-#include "envoy/http/header_map.h"
-#include "envoy/network/filter.h"
 #include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -38,7 +34,7 @@ public:
   /**
    * Called when a check request is complete. The resulting status is supplied.
    */
-  virtual void complete(CheckStatus status) PURE;
+  virtual void onComplete(CheckStatus status) PURE;
 };
 
 class Client {
@@ -51,48 +47,21 @@ public:
    */
   virtual void cancel() PURE;
 
-  // A check call.
+  /**
+   * Request a check call to an external authorization service which can use the
+   * passed request parameters to make a permit/deny decision.
+   * @param callback supplies the completion callbacks.
+   *        NOTE: The callback may happen within the calling stack.
+   * @param request is the proto message with the attributes of the specific payload.
+   * @param parent_span source for generating an egress child span as part of the trace.
+   *
+   */
   virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v2::CheckRequest& request,
                      Tracing::Span& parent_span) PURE;
 };
 
 typedef std::unique_ptr<Client> ClientPtr;
-
-/**
- * An interface for creating a  external authorization client.
- */
-class ClientFactory {
-public:
-  virtual ~ClientFactory() {}
-
-  /**
-   * Return a new authz client.
-   */
-  virtual ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) PURE;
-};
-
-typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
-
-/**
- * An interface for creating ext_authz.proto (authorization) request.
- * CheckRequestGenerator is used to extract attributes from the TCP/HTTP request
- * and fill out the details in the authorization protobuf that is sent to authorization
- * service.
- */
-class CheckRequestGenerator {
-public:
-  // Destructor
-  virtual ~CheckRequestGenerator() {}
-
-  virtual void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                               const Envoy::Http::HeaderMap& headers,
-                               envoy::service::auth::v2::CheckRequest& request) PURE;
-  virtual void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                              envoy::service::auth::v2::CheckRequest& request) PURE;
-};
-
-typedef std::unique_ptr<CheckRequestGenerator> CheckRequestGeneratorPtr;
 
 } // namespace ExtAuthz
 } // namespace Envoy

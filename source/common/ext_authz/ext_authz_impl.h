@@ -8,9 +8,12 @@
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -58,40 +61,45 @@ private:
   RequestCallbacks* callbacks_{};
 };
 
-class GrpcFactoryImpl : public ClientFactory {
+/**
+ * An interface for creating ext_authz.proto (authorization) request.
+ * CheckRequestGenerator is used to extract attributes from the TCP/HTTP request
+ * and fill out the details in the authorization protobuf that is sent to authorization
+ * service.
+ */
+class CheckRequestGenerator {
 public:
-  GrpcFactoryImpl(const envoy::api::v2::GrpcService& grpc_service,
-                  Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
+  // Destructor
+  virtual ~CheckRequestGenerator() {}
 
-  // ExtAuthz::ClientFactory
-  ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) override;
-
-private:
-  Grpc::AsyncClientFactoryPtr async_client_factory_;
-  std::string cluster_name_;
+  /**
+   * createHttpCheck is used to extract the attributes from the stream and the http headers
+   * and fill them up in the CheckRequest proto message.
+   * @param callbacks supplies the Http stream context from which data can be extracted.
+   * @param headers supplies the heeader map with http headers that will be used to create the
+   *        check request.
+   * @param request is the reference to the check request that will be filled up.
+   *
+   */
+  virtual void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                               const Envoy::Http::HeaderMap& headers,
+                               envoy::service::auth::v2::CheckRequest& request) PURE;
+  /**
+   * createTcpCheck is used to extract the attributes from the network layer and fill them up
+   * in the CheckRequest proto message.
+   * @param callbacks supplies the networklayer context from which data can be extracted.
+   * @param request is the reference to the check request that will be filled up.
+   *
+   */
+  virtual void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
+                              envoy::service::auth::v2::CheckRequest& request) PURE;
 };
 
-class NullClientImpl : public Client {
-public:
-  // ExtAuthz::Client
-  void cancel() override {}
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest&,
-             Tracing::Span&) override {
-    callbacks.complete(CheckStatus::OK);
-  }
-};
-
-class NullFactoryImpl : public ClientFactory {
-public:
-  // ExtAuthz::ClientFactory
-  ClientPtr create(const Optional<std::chrono::milliseconds>&) override {
-    return ClientPtr{new NullClientImpl()};
-  }
-};
+typedef std::unique_ptr<CheckRequestGenerator> CheckRequestGeneratorPtr;
 
 class ExtAuthzCheckRequestGenerator : public CheckRequestGenerator {
 public:
-  // ExtAuthz::CheckRequestGenIntf
+  // ExtAuthz::CheckRequestGenerator
   void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                        const Envoy::Http::HeaderMap& headers,
                        envoy::service::auth::v2::CheckRequest& request);
@@ -99,14 +107,17 @@ public:
                       envoy::service::auth::v2::CheckRequest& request);
 
 private:
-  std::unique_ptr<::envoy::api::v2::Address>
-  getProtobufAddress(const Network::Address::InstanceConstSharedPtr&);
-  std::unique_ptr<::envoy::service::auth::v2::AttributeContext_Peer>
-  getConnectionPeer(const Network::Connection*, const std::string&, const bool);
-  std::unique_ptr<::envoy::service::auth::v2::AttributeContext_Peer>
-  getConnectionPeer(const Network::Connection&, const std::string&, const bool);
-  std::unique_ptr<::envoy::service::auth::v2::AttributeContext_Request>
-  getHttpRequest(const Envoy::Http::StreamDecoderFilterCallbacks*, const Envoy::Http::HeaderMap&);
+  void addressToProtobufAddress(envoy::api::v2::Address& proto_address,
+                                const Network::Address::Instance& address);
+  void setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+                          const Network::Connection& connection, const std::string& service,
+                          const bool local);
+  void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
+                      const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                      const Envoy::Http::HeaderMap& headers);
+  void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
+                             const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                             const Envoy::Http::HeaderMap& headers);
   const std::string getProtocolStr(const Envoy::Http::Protocol&);
   std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);

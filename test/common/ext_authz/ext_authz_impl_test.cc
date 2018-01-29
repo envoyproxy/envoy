@@ -32,7 +32,7 @@ namespace ExtAuthz {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  MOCK_METHOD1(complete, void(CheckStatus status));
+  MOCK_METHOD1(onComplete, void(CheckStatus status));
 };
 
 class ExtAuthzGrpcClientTest : public testing::Test {
@@ -74,7 +74,7 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
     response->set_allocated_status(status);
     EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_unauthorized"));
-    EXPECT_CALL(request_callbacks_, complete(CheckStatus::Denied));
+    EXPECT_CALL(request_callbacks_, onComplete(CheckStatus::Denied));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -93,7 +93,7 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     status->set_code(Grpc::Status::GrpcStatus::Ok);
     response->set_allocated_status(status);
     EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
-    EXPECT_CALL(request_callbacks_, complete(CheckStatus::OK));
+    EXPECT_CALL(request_callbacks_, onComplete(CheckStatus::OK));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -105,7 +105,7 @@ TEST_F(ExtAuthzGrpcClientTest, Basic) {
     client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
     response.reset(new envoy::service::auth::v2::CheckResponse());
-    EXPECT_CALL(request_callbacks_, complete(CheckStatus::Error));
+    EXPECT_CALL(request_callbacks_, onComplete(CheckStatus::Error));
     client_.onFailure(Grpc::Status::Unknown, "", span_);
   }
 }
@@ -122,36 +122,11 @@ TEST_F(ExtAuthzGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-TEST(ExtAuthzGrpcFactoryTest, Create) {
-  envoy::api::v2::GrpcService config;
-  config.mutable_envoy_grpc()->set_cluster_name("foo");
-  Grpc::MockAsyncClientManager async_client_manager;
-  Stats::MockStore scope;
-  EXPECT_CALL(async_client_manager, factoryForGrpcService(ProtoEq(config), Ref(scope)))
-      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
-  GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(Optional<std::chrono::milliseconds>());
-}
-
-TEST(ExtAuthzNullFactoryTest, Basic) {
-  NullFactoryImpl factory;
-  ClientPtr client = factory.create(Optional<std::chrono::milliseconds>());
-  MockRequestCallbacks request_callbacks;
-  envoy::service::auth::v2::CheckRequest request;
-  EXPECT_CALL(request_callbacks, complete(CheckStatus::OK));
-  client->check(request_callbacks, request, Tracing::NullSpan::instance());
-  client->cancel();
-}
-
 class ExtAuthzCheckRequestGeneratorTest : public testing::Test {
 public:
   ExtAuthzCheckRequestGeneratorTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     protocol_ = Envoy::Http::Protocol::Http10;
-    // ssl_ = new Envoy::Ssl::MockConnection();
-    // Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("1.2.3.4", 111)};
   };
 
   Network::Address::InstanceConstSharedPtr addr_;
@@ -185,10 +160,9 @@ TEST_F(ExtAuthzCheckRequestGeneratorTest, BasicHttp) {
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
-
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
-  EXPECT_CALL(callbacks_, requestInfo()).Times(2).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).WillOnce(ReturnRef(protocol_));
+  EXPECT_CALL(callbacks_, requestInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol_));
   check_request_generator_.createHttpCheck(&callbacks_, headers, request);
 }
 

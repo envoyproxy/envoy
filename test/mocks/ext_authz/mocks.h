@@ -5,6 +5,8 @@
 
 #include "envoy/ext_authz/ext_authz.h"
 
+#include "common/ext_authz/ext_authz_impl.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
