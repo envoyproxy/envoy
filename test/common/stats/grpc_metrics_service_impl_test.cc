@@ -19,7 +19,7 @@ namespace Metrics {
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
   typedef Grpc::MockAsyncStream MockMetricsStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>
+  typedef Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse>
       MetricsServiceCallbacks;
 
   GrpcMetricsStreamerImplTest() {
@@ -56,11 +56,10 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream1, sendMessage(_, false));
-  envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
+  envoy::api::v2::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
   // Verify that sending an empty response message doesn't do anything bad.
-  callbacks1->onReceiveMessage(
-      std::make_unique<envoy::service::metrics::v2::StreamMetricsResponse>());
+  callbacks1->onReceiveMessage(std::make_unique<envoy::api::v2::StreamMetricsResponse>());
 }
 
 // Test that stream failure is handled correctly.
@@ -74,21 +73,21 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
             return nullptr;
           }));
   EXPECT_CALL(local_info_, node());
-  envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
+  envoy::api::v2::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
 }
 
 class MockGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   // GrpcMetricsStreamer
-  MOCK_METHOD1(send, void(envoy::service::metrics::v2::StreamMetricsMessage& message));
+  MOCK_METHOD1(send, void(envoy::api::v2::StreamMetricsMessage& message));
 };
 
 class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   int metric_count;
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
+  void send(envoy::api::v2::StreamMetricsMessage& message) {
     metric_count = message.envoy_metrics_size();
   }
 };

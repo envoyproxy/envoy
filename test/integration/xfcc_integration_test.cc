@@ -3,8 +3,6 @@
 #include <regex>
 #include <unordered_map>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
@@ -16,6 +14,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/network/http_connection_manager.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
@@ -107,7 +106,7 @@ void XfccIntegrationTest::initialize() {
         hcm.mutable_set_current_client_cert_details()->CopyFrom(sccd_);
       });
 
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
     auto context = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_tls_context();
     auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(

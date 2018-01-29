@@ -15,7 +15,7 @@ namespace Upstream {
 RingHashLoadBalancer::RingHashLoadBalancer(
     PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
-    const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config)
+    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
     : LoadBalancerBase(priority_set, stats, runtime, random), config_(config),
       factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
@@ -103,9 +103,8 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   }
 }
 
-RingHashLoadBalancer::Ring::Ring(
-    const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& config,
-    const std::vector<HostSharedPtr>& hosts) {
+RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+                                 const std::vector<HostSharedPtr>& hosts) {
   ENVOY_LOG(trace, "ring hash: building ring");
   if (hosts.empty()) {
     return;

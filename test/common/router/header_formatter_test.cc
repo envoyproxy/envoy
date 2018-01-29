@@ -1,6 +1,5 @@
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
@@ -21,15 +20,15 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Router {
 
-static envoy::api::v2::route::Route parseRouteFromJson(const std::string& json_string) {
-  envoy::api::v2::route::Route route;
+static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) {
+  envoy::api::v2::Route route;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRoute(*json_object_ptr, route);
   return route;
 }
 
-static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::route::Route route;
+static envoy::api::v2::Route parseRouteFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::Route route;
   MessageUtil::loadFromYaml(yaml, route);
   return route;
 }
@@ -590,7 +589,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   )EOF";
 
   // Disable append mode.
-  envoy::api::v2::route::RouteAction route_action = parseRouteFromJson(json).route();
+  envoy::api::v2::RouteAction route_action = parseRouteFromJson(json).route();
   route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
 

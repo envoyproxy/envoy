@@ -5,8 +5,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/route/route.pb.validate.h"
-
 #include "common/common/assert.h"
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
@@ -15,6 +13,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
 
+#include "api/rds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -37,7 +36,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
 }
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
-    const envoy::api::v2::route::RouteConfiguration& config, Runtime::Loader& runtime,
+    const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
     Upstream::ClusterManager& cm)
     : config_(new ConfigImpl(config, runtime, cm, true)) {}
 
@@ -56,24 +55,20 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", local_info);
-
-  // TODO: dummy to force linking the gRPC service proto
-  envoy::service::discovery::v2::RdsDummy dummy;
-
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::route::RouteConfiguration>(
+      envoy::api::v2::RouteConfiguration>(
       rds.config_source(), local_info.node(), dispatcher, cm, random, *scope_,
       [this, &rds, &dispatcher, &random,
-       &local_info]() -> Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>* {
+       &local_info]() -> Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>* {
         return new RdsSubscription(Envoy::Config::Utility::generateStats(*scope_), rds, cm_,
                                    dispatcher, random, local_info);
       },
-      "envoy.service.discovery.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.service.discovery.v2.RouteDiscoveryService.StreamRoutes");
+      "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
+      "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
 
   // In V2 we use a Subscription model where the fetch can happen via gRPC, REST, or
   // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),

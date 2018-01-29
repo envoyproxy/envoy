@@ -24,7 +24,7 @@ public:
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
       ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
       const LoadBalancerSubsetInfo& subsets,
-      const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& lb_ring_hash_config);
+      const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -129,12 +129,12 @@ private:
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
 
   const LoadBalancerType lb_type_;
-  const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
-  const envoy::api::v2::cluster::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
   const std::vector<std::set<std::string>> subset_keys_;
 

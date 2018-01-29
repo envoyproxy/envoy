@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
@@ -15,6 +14,8 @@
 #include "common/singleton/const_singleton.h"
 
 #include "source/common/ratelimit/ratelimit.pb.h"
+
+#include "api/bootstrap.pb.h"
 
 namespace Envoy {
 namespace RateLimit {
@@ -64,7 +65,7 @@ private:
 
 class GrpcFactoryImpl : public ClientFactory {
 public:
-  GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
+  GrpcFactoryImpl(const envoy::api::v2::RateLimitServiceConfig& config,
                   Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope);
 
   // RateLimit::ClientFactory

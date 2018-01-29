@@ -2,12 +2,13 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
 #include "common/filter/tcp_proxy.h"
+
+#include "api/filter/network/tcp_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

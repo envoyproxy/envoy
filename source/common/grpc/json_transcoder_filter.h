@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/filter/http/transcoder.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -10,6 +9,7 @@
 #include "common/grpc/transcoder_input_stream_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "api/filter/http/transcoder.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"

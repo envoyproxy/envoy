@@ -2,7 +2,6 @@
 
 #include <unordered_set>
 
-#include "envoy/api/v2/cluster/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
@@ -12,6 +11,8 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 
+#include "api/cds.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -19,7 +20,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LoadBalancerSubsetInfo& subsets,
-    const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>& lb_ring_hash_config)
+    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), stats_(stats),
       runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_(subsets.defaultSubset()), subset_keys_(subsets.subsetKeys()),
@@ -123,13 +124,13 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority,
                                               const std::vector<HostSharedPtr>& hosts_added,
                                               const std::vector<HostSharedPtr>& hosts_removed) {
-  if (fallback_policy_ == envoy::api::v2::cluster::Cluster::LbSubsetConfig::NO_FALLBACK) {
+  if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
     return;
   }
 
   HostPredicate predicate;
 
-  if (fallback_policy_ == envoy::api::v2::cluster::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
+  if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
     predicate = [](const Host&) -> bool { return true; };
   } else {
     predicate =

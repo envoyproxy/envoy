@@ -1,6 +1,5 @@
 #include <string>
 
-#include "envoy/api/v2/filter/http/router.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -27,6 +26,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "api/filter/http/router.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
