@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
+#include "common/ext_authz/ext_authz_impl.h"
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
@@ -76,7 +77,7 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
-  void complete(Envoy::ExtAuthz::CheckStatus status) override;
+  void onComplete(Envoy::ExtAuthz::CheckStatus status) override;
 
   void setCheckReqGenerator(Envoy::ExtAuthz::CheckRequestGenerator* crg);
 

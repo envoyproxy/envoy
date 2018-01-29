@@ -129,7 +129,7 @@ TEST_F(HttpExtAuthzFilterTest, OkResponse) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized))
       .Times(0);
-  request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::OK);
+  request_callbacks_->onComplete(Envoy::ExtAuthz::CheckStatus::OK);
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
@@ -141,7 +141,7 @@ TEST_F(HttpExtAuthzFilterTest, ImmediateOkResponse) {
 
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
-        callbacks.complete(Envoy::ExtAuthz::CheckStatus::OK);
+        callbacks.onComplete(Envoy::ExtAuthz::CheckStatus::OK);
       })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -169,7 +169,7 @@ TEST_F(HttpExtAuthzFilterTest, DeniedResponse) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized));
-  request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::Denied);
+  request_callbacks_->onComplete(Envoy::ExtAuthz::CheckStatus::Denied);
 
   EXPECT_EQ(
       1U,
@@ -201,7 +201,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::Error);
+  request_callbacks_->onComplete(Envoy::ExtAuthz::CheckStatus::Error);
 
   EXPECT_EQ(
       1U,
@@ -219,7 +219,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  request_callbacks_->complete(Envoy::ExtAuthz::CheckStatus::Error);
+  request_callbacks_->onComplete(Envoy::ExtAuthz::CheckStatus::Error);
 
   EXPECT_EQ(
       1U,

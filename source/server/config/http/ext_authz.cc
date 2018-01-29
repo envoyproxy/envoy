@@ -30,11 +30,14 @@ ExtAuthzFilterConfig::createFilter(const envoy::api::v2::filter::http::ExtAuthz&
            timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks)
       ->void {
 
-    ExtAuthz::GrpcFactoryImpl client_factory(
-        grpc_service, context.clusterManager().grpcAsyncClientManager(), context.scope());
+    auto async_client_factory =
+        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
+                                                                                context.scope());
 
-    callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new Http::ExtAuthz::Filter(
-        filter_config, client_factory.create(std::chrono::milliseconds(timeout_ms)))});
+    auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
+        std::move(async_client_factory->create()), std::chrono::milliseconds(timeout_ms));
+    callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
+        new Http::ExtAuthz::Filter(filter_config, std::move(client))});
   };
 }
 

@@ -91,7 +91,7 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::complete(Envoy::ExtAuthz::CheckStatus status) {
+void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
   ASSERT(cluster_);
 
   state_ = State::Complete;
