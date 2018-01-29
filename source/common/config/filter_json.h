@@ -6,6 +6,7 @@
 #include "envoy/api/v2/filter/http/lua.pb.h"
 #include "envoy/api/v2/filter/http/rate_limit.pb.h"
 #include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/api/v2/filter/http/squash.pb.h"
 #include "envoy/api/v2/filter/http/transcoder.pb.h"
 #include "envoy/api/v2/filter/network/client_ssl_auth.pb.h"
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
@@ -156,6 +157,14 @@ public:
   static void
   translateClientSslAuthFilter(const Json::Object& json_config,
                                envoy::api::v2::filter::network::ClientSSLAuth& proto_config);
+
+  /**
+   * Translate a v1 JSON SquashConfig object to v2 envoy::api::v2::filter::http::Squash.
+   * @param json_config source v1 JSON HTTP SquashConfig object.
+   * @param proto_config destination v2 envoy::api::v2::filter::http::Squash.
+   */
+  static void translateSquashConfig(const Json::Object& json_config,
+                                    envoy::api::v2::filter::http::Squash& proto_config);
 };
 
 } // namespace Config
