@@ -8,7 +8,7 @@ curl -L -o /etc/yum.repos.d/alonid-llvm-5.0.0-epel-7.repo \
   https://copr.fedorainfracloud.org/coprs/alonid/llvm-5.0.0/repo/epel-7/alonid-llvm-5.0.0-epel-7.repo
 
 # dependencies for bazel and build_recipes
-yum install -y java-1.8.0-openjdk-devel unzip which \
+yum install -y java-1.8.0-openjdk-devel unzip which openssl rpm-build \
                cmake3 devtoolset-4-gcc-c++ git golang libtool make patch rsync wget \
                clang-5.0.0 devtoolset-4-libatomic-devel llvm-5.0.0 python-virtualenv
 yum clean all
