@@ -52,7 +52,6 @@ public:
   // Listener
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
-  Ssl::ServerContext* defaultSslContext() override { return nullptr; }
   Network::TransportSocketFactory& transportSocketFactory() override {
     return transport_socket_factory_;
   }
@@ -343,7 +342,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
-  Ssl::ServerContext* defaultSslContext() override { return nullptr; }
   TransportSocketFactory& transportSocketFactory() override { return transport_socket_factory_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }

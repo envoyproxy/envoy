@@ -33,9 +33,8 @@ public:
   virtual ListenSocket& socket() PURE;
 
   /**
-   * @return Ssl::ServerContext* the default SSL context.
+   * @return TransportSocketFacotry& the transport socket factory.
    */
-  virtual Ssl::ServerContext* defaultSslContext() PURE;
   virtual TransportSocketFactory& transportSocketFactory() PURE;
 
   /**

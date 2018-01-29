@@ -37,7 +37,6 @@ public:
 
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocket& socket() override { return socket_; }
-    Ssl::ServerContext* defaultSslContext() override { return nullptr; }
     Network::TransportSocketFactory& transportSocketFactory() override {
       return transport_socket_factory_;
     }

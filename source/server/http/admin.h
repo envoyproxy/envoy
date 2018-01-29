@@ -175,7 +175,6 @@ private:
     // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocket& socket() override { return parent_.mutable_socket(); }
-    Ssl::ServerContext* defaultSslContext() override { return nullptr; }
     Network::TransportSocketFactory& transportSocketFactory() override {
       return parent_.transport_socket_factory_;
     }

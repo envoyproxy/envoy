@@ -218,9 +218,6 @@ public:
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
-  Ssl::ServerContext* defaultSslContext() override {
-    return tls_contexts_.empty() ? nullptr : tls_contexts_[0].get();
-  }
   Network::TransportSocketFactory& transportSocketFactory() override {
     return *transport_socket_factories_[0];
   }
