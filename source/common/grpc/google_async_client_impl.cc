@@ -39,9 +39,9 @@ AsyncRequest* GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& serv
                                           AsyncRequestCallbacks& callbacks,
                                           Tracing::Span& parent_span,
                                           const Optional<std::chrono::milliseconds>& timeout) {
-  auto grpc_stream = std::make_unique<GoogleAsyncRequestImpl>(*this, service_method, request,
-                                                              callbacks, parent_span, timeout);
-  auto* const async_request = grpc_stream.get();
+  auto* const async_request =
+      new GoogleAsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
+  std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
   if (grpc_stream->call_failed()) {
