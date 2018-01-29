@@ -146,13 +146,8 @@ private:
     // which gives us what we want for zero copy, but relies on grpc::internal details; we can't get
     // a grpc_byte_buffer from grpc::ByteBuffer to use this.
     PendingMessage(const Protobuf::Message& request, bool end_stream)
-        : slice_(
-              [&request] {
-                const std::string buf = request.SerializeAsString();
-                return grpc_slice_from_copied_buffer(buf.c_str(), buf.size());
-              }(),
-              grpc::Slice::STEAL_REF),
-          buf_(grpc::ByteBuffer(&slice_, 1)), end_stream_(end_stream) {}
+        : slice_(request.SerializeAsString()), buf_(grpc::ByteBuffer(&slice_, 1)),
+          end_stream_(end_stream) {}
     // End-of-stream with no additional message.
     PendingMessage() : end_stream_(true) {}
 

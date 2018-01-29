@@ -24,9 +24,9 @@ AsyncRequest* AsyncClientImpl::send(const Protobuf::MethodDescriptor& service_me
                                     const Protobuf::Message& request,
                                     AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                                     const Optional<std::chrono::milliseconds>& timeout) {
-  auto* const async_request =
-      new AsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
-  std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
+  auto grpc_stream = std::make_unique<AsyncRequestImpl>(*this, service_method, request, callbacks,
+                                                        parent_span, timeout);
+  auto* const async_request = grpc_stream.get();
 
   grpc_stream->initialize(true);
   if (grpc_stream->hasResetStream()) {
@@ -40,8 +40,8 @@ AsyncRequest* AsyncClientImpl::send(const Protobuf::MethodDescriptor& service_me
 AsyncStream* AsyncClientImpl::start(const Protobuf::MethodDescriptor& service_method,
                                     AsyncStreamCallbacks& callbacks) {
   const Optional<std::chrono::milliseconds> no_timeout;
-  std::unique_ptr<AsyncStreamImpl> grpc_stream{
-      new AsyncStreamImpl(*this, service_method, callbacks, no_timeout)};
+  auto grpc_stream =
+      std::make_unique<AsyncStreamImpl>(*this, service_method, callbacks, no_timeout);
 
   grpc_stream->initialize(false);
   if (grpc_stream->hasResetStream()) {
