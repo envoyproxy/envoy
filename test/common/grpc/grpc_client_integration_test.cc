@@ -609,6 +609,7 @@ TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
+  dispatcher_helper_.runDispatcher();
   stream->sendServerTrailers(Status::GrpcStatus::ResourceExhausted, "error message",
                              empty_metadata_);
   dispatcher_helper_.runDispatcher();
