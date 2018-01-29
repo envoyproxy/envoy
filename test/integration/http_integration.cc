@@ -293,8 +293,8 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
 // Add a route that uses unknown cluster (expect 404 Not Found).
 void HttpIntegrationTest::testRouterClusterNotFound404() {
   config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
-                          envoy::api::v2::RouteAction::NOT_FOUND,
-                          envoy::api::v2::VirtualHost::NONE);
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -306,8 +306,8 @@ void HttpIntegrationTest::testRouterClusterNotFound404() {
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
 void HttpIntegrationTest::testRouterClusterNotFound503() {
   config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
-                          envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::VirtualHost::NONE);
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::NONE);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -319,8 +319,8 @@ void HttpIntegrationTest::testRouterClusterNotFound503() {
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 void HttpIntegrationTest::testRouterRedirect() {
   config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
-                          envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::VirtualHost::ALL);
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -805,8 +805,8 @@ void HttpIntegrationTest::testAbsolutePath() {
   // Configure www.redirect.com to send a redirect, and ensure the redirect is
   // encountered via absolute URL.
   config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
-                          envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::VirtualHost::ALL);
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
 
   initialize();
@@ -828,8 +828,8 @@ void HttpIntegrationTest::testAbsolutePathWithPort() {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
   config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
-                          envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::VirtualHost::ALL);
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   Buffer::OwnedImpl buffer("GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n");
@@ -851,8 +851,8 @@ void HttpIntegrationTest::testAbsolutePathWithoutPort() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   // Set a matcher for namewithport:1234 and verify http://namewithport does not match
   config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
-                          envoy::api::v2::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::VirtualHost::ALL);
+                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
+                          envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   Buffer::OwnedImpl buffer("GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n");
@@ -881,7 +881,7 @@ void HttpIntegrationTest::testConnect() {
 }
 
 void HttpIntegrationTest::testEquivalent(const std::string& request) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
     auto static_resources = bootstrap.mutable_static_resources();
     auto* old_listener = static_resources->mutable_listeners(0);

@@ -93,7 +93,7 @@ public:
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
    */
-  static void loadBootstrapConfig(envoy::api::v2::Bootstrap& bootstrap,
+  static void loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                   const std::string& config_path, bool v2_only);
 };
 

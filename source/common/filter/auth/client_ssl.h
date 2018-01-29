@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/api/v2/filter/network/client_ssl_auth.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -15,8 +16,6 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-
-#include "api/filter/network/client_ssl_auth.pb.h"
 
 namespace Envoy {
 namespace Filter {

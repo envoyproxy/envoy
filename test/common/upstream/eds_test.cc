@@ -1,3 +1,5 @@
+#include "envoy/service/discovery/v2/eds.pb.h"
+
 #include "common/config/utility.h"
 #include "common/upstream/eds.h"
 
@@ -8,7 +10,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -53,7 +54,7 @@ protected:
 
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  envoy::api::v2::Cluster eds_cluster_;
+  envoy::api::v2::cluster::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<EdsClusterImpl> cluster_;
@@ -64,14 +65,14 @@ protected:
 
 // Negative test for protoc-gen-validate constraints.
 TEST_F(EdsTest, ValidateFail) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   resources.Add();
   EXPECT_THROW(cluster_->onConfigUpdate(resources), ProtoValidationException);
 }
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("wrong name");
   bool initialized = false;
@@ -92,7 +93,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
 
 // Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongSize) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
   auto* cluster_load_assignment = resources.Add();
@@ -106,7 +107,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
 
 // Validate that onConfigUpdate() with the expected cluster accepts config.
 TEST_F(EdsTest, OnConfigUpdateSuccess) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   bool initialized = false;
@@ -125,7 +126,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
       "lb_type": "round_robin"
     }
     )EOF");
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("name");
   bool initialized = false;
@@ -136,7 +137,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
 TEST_F(EdsTest, EndpointMetadata) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment->add_endpoints();
@@ -190,7 +191,7 @@ TEST_F(EdsTest, EndpointMetadata) {
 
 // Validate that onConfigUpdate() updates the endpoint locality.
 TEST_F(EdsTest, EndpointLocality) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment->add_endpoints();
@@ -233,7 +234,7 @@ TEST_F(EdsTest, EndpointLocality) {
 
 // Validate that onConfigUpdate() updates bins hosts per locality as expected.
 TEST_F(EdsTest, EndpointHostsPerLocality) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   uint32_t port = 1000;
@@ -300,7 +301,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
 
 // Validate that onConfigUpdate() updates bins hosts per priority as expected.
 TEST_F(EdsTest, EndpointHostsPerPriority) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   uint32_t port = 1000;
@@ -360,7 +361,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 // Make sure config updates with P!=0 are rejected for the local cluster.
 TEST_F(EdsTest, NoPriorityForLocalCluster) {
   cm_.local_cluster_name_ = "fare";
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   uint32_t port = 1000;
@@ -396,7 +397,7 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
 // Set up an EDS config with multiple priorities and localities and make sure
 // they are loaded and reloaded as expected.
 TEST_F(EdsTest, PriorityAndLocality) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name("fare");
   uint32_t port = 1000;

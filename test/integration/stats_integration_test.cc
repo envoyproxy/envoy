@@ -1,8 +1,9 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 
-#include "api/bootstrap.pb.h"
-#include "api/stats.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -38,7 +39,7 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 }
 
 TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
   });
   initialize();
@@ -48,7 +49,7 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
 }
 
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(true);
   });
   initialize();
@@ -66,7 +67,7 @@ TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
 // specifier having use defined regex.
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractorNameWithUserDefinedRegex) {
   std::string tag_name = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
     tag_specifier->set_tag_name(tag_name);
@@ -81,7 +82,7 @@ TEST_P(StatsIntegrationTest, WithDefaultTagExtractorNameWithUserDefinedRegex) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierMissingTagValue) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
     tag_specifier->set_tag_name("envoy.http_conn_manager_prefix");
@@ -95,7 +96,7 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierMissingTagValue) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
     tag_specifier->set_tag_name("my.http_conn_manager_prefix");
@@ -110,7 +111,7 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
     tag_specifier->set_tag_name("test.x");
     tag_specifier->set_fixed_value("xxx");
