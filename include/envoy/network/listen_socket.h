@@ -106,23 +106,23 @@ public:
 
     /**
      * @return bits that can be used to separate upstream connections based on the options. Should
-     *         return zero if connections with different options can be pooled together.
+     *         return zero if connections with different options can be pooled together. This is
+     *         limited to 32 bits to allow these bits to be efficiently combined into a larger hash
+     *         key used in connection pool lookups.
      */
     virtual uint32_t hashKey() const PURE;
   };
   typedef std::shared_ptr<Options> OptionsSharedPtr;
 
   /**
-   * Set the socket options to be set on all upstream ClientConnections created to forward
-   * traffic received on this socket.
+   * Set the socket options for later retrieval with options().
    */
-  virtual void setOptionsForUpstreamConnections(const OptionsSharedPtr&) PURE;
+  virtual void setOptions(const OptionsSharedPtr&) PURE;
 
   /**
-   * @return the socket options to be set on all new upstream ClientConnections created to forward
-   * traffic received on this socket.
+   * @return the socket options stored earlier with setOptions(), if any.
    */
-  virtual const ConnectionSocket::OptionsSharedPtr& optionsForUpstreamConnections() const PURE;
+  virtual const ConnectionSocket::OptionsSharedPtr& options() const PURE;
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;

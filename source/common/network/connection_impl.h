@@ -87,8 +87,8 @@ public:
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return above_high_watermark_; }
-  const ConnectionSocket::OptionsSharedPtr& socketOptionsForUpstreamConnections() const override {
-    return socket_->optionsForUpstreamConnections();
+  const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
+    return socket_->options();
   }
 
   // Network::BufferSource

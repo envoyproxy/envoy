@@ -234,7 +234,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
   }));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setOptionsForUpstreamConnections(options);
+        socket->setOptions(options);
         Network::ConnectionPtr new_connection =
             dispatcher_->createServerConnection(std::move(socket), nullptr);
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -247,7 +247,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-            server_connection_->socketOptionsForUpstreamConnections());
+            server_connection_->socketOptions());
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -284,7 +284,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
   }));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setOptionsForUpstreamConnections(options);
+        socket->setOptions(options);
         Network::ConnectionPtr new_connection =
             dispatcher_->createServerConnection(std::move(socket), nullptr);
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -297,7 +297,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-            server_connection_->socketOptionsForUpstreamConnections());
+            server_connection_->socketOptions());
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
 

@@ -219,11 +219,9 @@ public:
   virtual bool aboveHighWatermark() const PURE;
 
   /**
-   * Get the socket options to be set on all new upstream ClientConnections created to forward
-   * traffic received on this connection.
+   * Get the socket options set on this connection.
    */
-  virtual const ConnectionSocket::OptionsSharedPtr&
-  socketOptionsForUpstreamConnections() const PURE;
+  virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

@@ -79,16 +79,16 @@ public:
       fd_ = -1;
     }
   }
-  void setOptionsForUpstreamConnections(const OptionsSharedPtr& options) override {
-    upstream_socket_options_ = options;
+  void setOptions(const OptionsSharedPtr& options) override {
+    options_ = options;
   }
-  const ConnectionSocket::OptionsSharedPtr& optionsForUpstreamConnections() const override {
-    return upstream_socket_options_;
+  const ConnectionSocket::OptionsSharedPtr& options() const override {
+    return options_;
   }
 
 protected:
   int fd_;
-  OptionsSharedPtr upstream_socket_options_{nullptr};
+  OptionsSharedPtr options_{nullptr};
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};

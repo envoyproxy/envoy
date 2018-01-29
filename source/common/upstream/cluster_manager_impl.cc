@@ -765,9 +765,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   uint32_t hash_key = 0;
   bool have_options = false;
 
+  // Use downstream connection socket options for computing connection pool hash key, if any.
+  // This allows socket options to control connection pooling so that connections with
+  // different options are not pooled together.
   if (context && context->downstreamConnection()) {
     const Network::ConnectionSocket::OptionsSharedPtr& options =
-        context->downstreamConnection()->socketOptionsForUpstreamConnections();
+        context->downstreamConnection()->socketOptions();
     if (options) {
       have_options = true;
       hash_key = options->hashKey();
@@ -779,8 +782,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   if (!container.pools_[key]) {
     container.pools_[key] = parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
-        have_options ? context->downstreamConnection()->socketOptionsForUpstreamConnections()
-                     : nullptr);
+        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
   }
 
   return container.pools_[key].get();
