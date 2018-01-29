@@ -34,12 +34,12 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
-        "@envoy_api//envoy/service/discovery/v2:cds_cc",
-        "@envoy_api//envoy/service/discovery/v2:common_cc",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
-        "@envoy_api//envoy/service/discovery/v2:lds_cc",
-        "@envoy_api//envoy/service/discovery/v2:rds_cc",
     ],
 )
 
@@ -346,7 +346,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/config:resources_lib",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 

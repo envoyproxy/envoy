@@ -366,13 +366,12 @@ public:
   /**
    * @return the service discovery type to use for resolving the cluster.
    */
-  virtual envoy::api::v2::cluster::Cluster::DiscoveryType type() const PURE;
+  virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const Optional<envoy::api::v2::cluster::Cluster::RingHashLbConfig>&
-  lbRingHashConfig() const PURE;
+  virtual const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

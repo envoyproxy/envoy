@@ -50,8 +50,7 @@ public:
                                                      HostConstSharedPtr host,
                                                      ResourcePriority priority,
                                                      Http::Protocol protocol) override;
-  ClusterSharedPtr clusterFromProto(const envoy::api::v2::cluster::Cluster& cluster,
-                                    ClusterManager& cm,
+  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
@@ -153,7 +152,7 @@ public:
                      Event::Dispatcher& primary_dispatcher);
 
   // Upstream::ClusterManager
-  bool addOrUpdatePrimaryCluster(const envoy::api::v2::cluster::Cluster& cluster) override;
+  bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -279,7 +278,7 @@ private:
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const envoy::api::v2::cluster::Cluster& cluster, bool added_via_api);
+  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const std::vector<HostSharedPtr>& hosts_added,

@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/api/v2/base.pb.h"
-#include "envoy/api/v2/cluster/cluster.pb.h"
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/protocol.pb.h"
 #include "envoy/api/v2/route/route.pb.h"

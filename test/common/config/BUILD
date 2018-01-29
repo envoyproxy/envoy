@@ -28,7 +28,7 @@ envoy_cc_test_library(
         "//test/mocks/config:config_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 
@@ -43,9 +43,9 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
-        "@envoy_api//envoy/service/discovery/v2:common_cc",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
     ],
 )
 
@@ -70,7 +70,7 @@ envoy_cc_test_library(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 
@@ -97,7 +97,7 @@ envoy_cc_test_library(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 
@@ -115,7 +115,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:base_cc",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 
@@ -164,7 +164,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 

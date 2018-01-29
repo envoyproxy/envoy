@@ -35,7 +35,7 @@ public:
       // metrics_service gRPC service definition.
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.metrics_service");
-      envoy::service::metrics::v2::MetricsServiceConfig config;
+      envoy::config::metrics::v2::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());

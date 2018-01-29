@@ -40,17 +40,15 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
 
-envoy::api::v2::route::RouteConfiguration
-parseRouteConfigurationFromJson(const std::string& json_string) {
-  envoy::api::v2::route::RouteConfiguration route_config;
+envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
+  envoy::api::v2::RouteConfiguration route_config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
   return route_config;
 }
 
-envoy::api::v2::route::RouteConfiguration
-parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::route::RouteConfiguration route_config;
+envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::RouteConfiguration route_config;
   MessageUtil::loadFromYaml(yaml, route_config);
   return route_config;
 }
@@ -692,7 +690,7 @@ request_headers_to_add:
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
 
-  envoy::api::v2::route::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 
   ConfigImpl config(route_config, runtime, cm, true);
 
@@ -1254,7 +1252,7 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  envoy::api::v2::route::RouteConfiguration route_config_;
+  envoy::api::v2::RouteConfiguration route_config_;
   HashPolicy::AddCookieCallback add_cookie_nop_;
 
 private:
@@ -3480,7 +3478,7 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
 }
 
 TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
-  auto route_config = envoy::api::v2::route::RouteConfiguration();
+  auto route_config = envoy::api::v2::RouteConfiguration();
   auto* vhost = route_config.add_virtual_hosts();
   vhost->set_name("vhost");
   vhost->add_domains("www.lyft.com");

@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+#include "envoy/api/v2/lds.pb.validate.h"
 #include "envoy/api/v2/listener/listener.pb.validate.h"
 
 #include "common/common/cleanup.h"
@@ -20,19 +21,16 @@ LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::Cluster
                Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, ListenerManager& lm)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
-  // TODO: dummy to force linking the gRPC service proto
-  envoy::service::discovery::v2::LdsDummy dummy;
-
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::listener::Listener>(
-      lds_config, local_info.node(), dispatcher, cm, random, *scope_,
-      [this, &lds_config, &cm, &dispatcher, &random,
-       &local_info]() -> Config::Subscription<envoy::api::v2::listener::Listener>* {
-        return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
-                                   dispatcher, random, local_info);
-      },
-      "envoy.service.discovery.v2.ListenerDiscoveryService.FetchListeners",
-      "envoy.service.discovery.v2.ListenerDiscoveryService.StreamListeners");
+  subscription_ =
+      Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
+          lds_config, local_info.node(), dispatcher, cm, random, *scope_,
+          [this, &lds_config, &cm, &dispatcher, &random,
+           &local_info]() -> Config::Subscription<envoy::api::v2::Listener>* {
+            return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,
+                                       dispatcher, random, local_info);
+          },
+          "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
+          "envoy.api.v2.ListenerDiscoveryService.StreamListeners");
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.registerTarget(*this);
 }

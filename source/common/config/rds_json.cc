@@ -106,7 +106,7 @@ void RdsJson::translateQueryParameterMatcher(
 }
 
 void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
-                                          envoy::api::v2::route::RouteConfiguration& route_config) {
+                                          envoy::api::v2::RouteConfiguration& route_config) {
   json_route_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   for (const auto json_virtual_host : json_route_config.getObjectArray("virtual_hosts", true)) {

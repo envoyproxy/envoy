@@ -71,8 +71,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "a66448b203e3a4f8ebbea0a5b7beede5c25640f6",
-        remote = "https://github.com/envoyproxy/data-plane-api",
+        commit = "7870ecc189b85dfeccf3ac51c5d31d6f16a18927",
+        remote = "https://github.com/kyessenov/envoy-api",
     ),
     grpc_httpjson_transcoding = dict(
         commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",

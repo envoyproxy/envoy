@@ -63,7 +63,7 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     lb_endpoint->mutable_load_balancing_weight()->set_value(weight);
   }
 
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v2::ClusterLoadAssignment> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
   cluster_load_assignment->set_cluster_name(cluster_name_);
   for (auto it : zone_lb_endpoints) {
