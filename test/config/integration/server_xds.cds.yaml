@@ -1,6 +1,6 @@
 version_info: "0"
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.cluster.Cluster
+- "@type": type.googleapis.com/envoy.api.v2.Cluster
   name: cluster_1
   connect_timeout: { seconds: 5 }
   type: EDS

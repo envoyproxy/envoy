@@ -151,9 +151,8 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
   return file_names;
 }
 
-envoy::config::bootstrap::v2::Bootstrap
-TestUtility::parseBootstrapFromJson(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+envoy::api::v2::Bootstrap TestUtility::parseBootstrapFromJson(const std::string& json_string) {
+  envoy::api::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
   return bootstrap;

@@ -1,5 +1,3 @@
-#include "envoy/service/discovery/v2/lds.pb.h"
-
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 
@@ -57,11 +55,11 @@ public:
 
   void expectAdd(const std::string& listener_name, bool updated) {
     EXPECT_CALL(listener_manager_, addOrUpdateListener(_, true))
-        .WillOnce(Invoke([listener_name, updated](const envoy::api::v2::listener::Listener& config,
-                                                  bool) -> bool {
-          EXPECT_EQ(listener_name, config.name());
-          return updated;
-        }));
+        .WillOnce(
+            Invoke([listener_name, updated](const envoy::api::v2::Listener& config, bool) -> bool {
+              EXPECT_EQ(listener_name, config.name());
+              return updated;
+            }));
   }
 
   void expectRequest() {
@@ -115,7 +113,7 @@ TEST_F(LdsApiTest, ValidateFail) {
 
   setup(true);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::listener::Listener> listeners;
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
   listeners.Add();
 
   EXPECT_THROW(lds_->onConfigUpdate(listeners), ProtoValidationException);

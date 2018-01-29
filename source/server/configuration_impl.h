@@ -9,8 +9,6 @@
 #include <unordered_map>
 #include <utility>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -24,6 +22,9 @@
 #include "common/network/utility.h"
 
 #include "server/lds_api.h"
+
+#include "api/bootstrap.pb.h"
+#include "api/trace.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -120,7 +121,7 @@ public:
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Instance& server,
+  void initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& server,
                   Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
@@ -142,10 +143,9 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const envoy::config::trace::v2::Tracing& configuration, Instance& server);
+  void initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server);
 
-  void initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                            Instance& server);
+  void initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<LdsApi> lds_api_;
@@ -164,7 +164,7 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  InitialImpl(const envoy::api::v2::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }

@@ -2,10 +2,11 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/http/rate_limit.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
+
+#include "api/filter/http/rate_limit.pb.h"
 
 namespace Envoy {
 namespace Server {

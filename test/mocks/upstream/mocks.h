@@ -150,7 +150,7 @@ public:
   }
 
   // Upstream::ClusterManager
-  MOCK_METHOD1(addOrUpdatePrimaryCluster, bool(const envoy::api::v2::cluster::Cluster& cluster));
+  MOCK_METHOD1(addOrUpdatePrimaryCluster, bool(const envoy::api::v2::Cluster& cluster));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));

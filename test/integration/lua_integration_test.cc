@@ -18,7 +18,7 @@ public:
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::api::v2::Bootstrap& bootstrap) {
       auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lua_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lua_cluster->set_name("lua_cluster");

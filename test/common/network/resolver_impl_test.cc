@@ -2,7 +2,6 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
@@ -16,6 +15,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "api/address.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

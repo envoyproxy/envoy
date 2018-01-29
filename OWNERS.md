@@ -49,3 +49,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * John Millikin ([jmillikin-stripe](https://github.com/jmillikin-stripe)) (jmillikin@stripe.com)
   * Bazel/build.
+* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
+  * abseil and performance work.

@@ -15,7 +15,7 @@ namespace Upstream {
 MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
   ON_CALL(*this, fallbackPolicy())
-      .WillByDefault(Return(envoy::api::v2::cluster::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillByDefault(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
   ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
   ON_CALL(*this, subsetKeys()).WillByDefault(ReturnRef(subset_keys_));
 }

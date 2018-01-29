@@ -5,8 +5,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/init/init.h"
@@ -14,12 +12,14 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/admin.h"
-#include "envoy/service/discovery/v2/rds.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
+
+#include "api/filter/network/http_connection_manager.pb.h"
+#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -45,7 +45,7 @@ public:
  */
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
-  StaticRouteConfigProviderImpl(const envoy::api::v2::route::RouteConfiguration& config,
+  StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
                                 Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   // Router::RouteConfigProvider
@@ -82,7 +82,7 @@ class RouteConfigProviderManagerImpl;
 class RdsRouteConfigProviderImpl
     : public RdsRouteConfigProvider,
       public Init::Target,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::route::RouteConfiguration>,
+      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigProviderImpl();
@@ -128,8 +128,7 @@ private:
 
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::route::RouteConfiguration>>
-      subscription_;
+  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
   std::string cluster_name_;
   const std::string route_config_name_;
@@ -140,7 +139,7 @@ private:
   std::function<void()> initialize_callback_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
-  envoy::api::v2::route::RouteConfiguration route_config_proto_;
+  envoy::api::v2::RouteConfiguration route_config_proto_;
 
   friend class RouteConfigProviderManagerImpl;
 };

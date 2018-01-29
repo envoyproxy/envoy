@@ -4,11 +4,12 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/router/header_formatter.h"
+
+#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Router {

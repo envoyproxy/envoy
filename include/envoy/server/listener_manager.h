@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
@@ -9,6 +8,8 @@
 #include "envoy/server/guarddog.h"
 
 #include "common/protobuf/protobuf.h"
+
+#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -35,9 +36,9 @@ public:
    * @param context supplies the factory creation context.
    * @return std::vector<Configuration::NetworkFilterFactoryCb> the list of filter factories.
    */
-  virtual std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context) PURE;
+  virtual std::vector<Configuration::NetworkFilterFactoryCb>
+  createNetworkFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+                                 Configuration::FactoryContext& context) PURE;
 
   /**
    * Creates a list of listener filter factories.
@@ -46,15 +47,14 @@ public:
    * @return std::vector<Configuration::ListenerFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
       Configuration::FactoryContext& context) PURE;
 
   /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */
-  virtual DrainManagerPtr
-  createDrainManager(envoy::api::v2::listener::Listener::DrainType drain_type) PURE;
+  virtual DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) PURE;
 
   /**
    * @return uint64_t a listener tag usable for connection handler tracking.
@@ -84,8 +84,7 @@ public:
    *         a duplicate of the existing listener. This routine will throw an EnvoyException if
    *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::api::v2::listener::Listener& config,
-                                   bool modifiable) PURE;
+  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
