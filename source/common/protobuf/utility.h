@@ -178,18 +178,11 @@ public:
   /**
    * Extract JSON as string from a google.protobuf.Message.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
-   * @return std::string of JSON object.
-   */
-  static std::string getJsonStringFromMessage(const Protobuf::Message& message);
-
-  /**
-   * Extract JSON as string from a google.protobuf.Message.
-   * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
    * @return std::string of formatted JSON object.
    */
   static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              const bool pretty_print);
+                                              const bool pretty_print = false);
 
   /**
    * Extract JSON object from a google.protobuf.Message.

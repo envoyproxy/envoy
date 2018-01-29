@@ -76,10 +76,6 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   return json;
 }
 
-std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message) {
-  return getJsonStringFromMessage(message, false);
-}
-
 void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
   // TODO(htuch): Consolidate with the inflight cleanups here.
   Protobuf::util::JsonOptions json_options;
