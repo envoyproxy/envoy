@@ -186,7 +186,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     absl::uint128 mask = absl::Uint128Max();
     // Shifting the value to the left sets all bits between 128-length and 128 to zero.
     mask <<= (128 - length);
-    // This will mask out the unused bits of the address.F
+    // This will mask out the unused bits of the address.
     absl::uint128 ip6 = Utility::Ip6ntohl(address->ip()->ipv6()->address()) & mask;
 
     absl::uint128 ip6_htonl = Utility::Ip6htonl(ip6);
