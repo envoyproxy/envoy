@@ -41,9 +41,6 @@ public:
     // The RPC does not have required credentials for the RPC to succeed.
     Unauthenticated = 16,
 
-    // Maximum value of valid status codes.
-    MaximumValid = Unauthenticated,
-
     // This is a non-GRPC error code, indicating the status code in gRPC headers
     // was invalid.
     InvalidCode = -1,
