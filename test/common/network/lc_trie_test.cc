@@ -13,8 +13,6 @@ namespace LcTrie {
 
 class LcTrieTest : public testing::Test {
 public:
-  LcTrieTest() {}
-
   void setup(const std::vector<std::vector<std::string>>& cidr_range_strings,
              double fill_factor = 0, uint32_t root_branch_factor = 0) {
     std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> output;

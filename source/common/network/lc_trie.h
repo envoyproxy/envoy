@@ -55,7 +55,7 @@ public:
    *             if no prefix contains 'ip_address' or there is no data for the IP version of the
    *             ip_address.
    */
-  std::string getTag(const Network::Address::InstanceConstSharedPtr ip_address) const;
+  std::string getTag(const Network::Address::InstanceConstSharedPtr& ip_address) const;
 
 private:
   /**
