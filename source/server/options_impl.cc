@@ -5,11 +5,11 @@
 #include <iostream>
 #include <string>
 
+#include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/version.h"
 #include "common/stats/stats_impl.h"
 
-#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 

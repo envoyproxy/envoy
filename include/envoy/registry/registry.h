@@ -5,8 +5,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "fmt/format.h"
-#include "fmt/ostream.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Registry {

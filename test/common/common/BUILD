@@ -25,10 +25,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "fmt_helpers_test",
-    srcs = ["fmt_helpers_test.cc"],
+    name = "fmt_test",
+    srcs = ["fmt_test.cc"],
     deps = [
-        "//source/common/common:fmt_helpers_lib",
+        "//source/common/common:fmt_lib",
         "//source/common/common:logger_lib",
     ],
 )

@@ -5,13 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {

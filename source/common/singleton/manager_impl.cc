@@ -3,8 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
-
-#include "fmt/format.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Singleton {

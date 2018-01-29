@@ -2,13 +2,12 @@
 
 #include "envoy/api/v2/listener/listener.pb.h"
 
+#include "common/common/fmt.h"
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

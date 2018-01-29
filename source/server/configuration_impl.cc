@@ -13,14 +13,13 @@
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

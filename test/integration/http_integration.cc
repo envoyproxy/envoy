@@ -13,6 +13,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/fmt.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -24,7 +25,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;

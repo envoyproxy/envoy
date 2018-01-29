@@ -57,8 +57,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "fmt_helpers_lib",
-    hdrs = ["fmt_helpers.h"],
+    name = "fmt_lib",
+    hdrs = ["fmt.h"],
     external_deps = ["abseil_strings"],
 )
 
@@ -75,7 +75,10 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [":utility_lib"],
+    deps = [
+        ":fmt_lib",
+        ":utility_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -89,6 +92,7 @@ envoy_cc_library(
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
     deps = [
+        ":fmt_lib",
         ":macros",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -129,7 +133,10 @@ envoy_cc_library(
     external_deps = [
         "abseil_strings",
     ],
-    deps = ["//include/envoy/common:time_interface"],
+    deps = [
+        ":fmt_lib",
+        "//include/envoy/common:time_interface",
+    ],
 )
 
 genrule(
@@ -152,6 +159,7 @@ envoy_cc_library(
     srcs = ["version.cc"],
     linkstamp = "version_linkstamp.cc",
     deps = [
+        ":fmt_lib",
         ":version_includes",
         "//source/common/common:macros",
     ],

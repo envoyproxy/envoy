@@ -6,9 +6,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Config {

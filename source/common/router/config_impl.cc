@@ -16,6 +16,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
@@ -25,8 +26,6 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {

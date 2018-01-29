@@ -25,7 +25,7 @@
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "fmt/format.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Network {

@@ -5,6 +5,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 #include "common/config/json_utility.h"
@@ -15,8 +16,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Config {

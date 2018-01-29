@@ -14,6 +14,7 @@
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -25,7 +26,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;

@@ -2,11 +2,11 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/common/fmt.h"
 #include "common/json/json_loader.h"
 
 #include "test/integration/utility.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 

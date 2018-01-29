@@ -12,6 +12,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
@@ -30,8 +31,6 @@
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {

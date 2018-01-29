@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -18,7 +19,6 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {

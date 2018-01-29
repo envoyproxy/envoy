@@ -5,12 +5,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 
+#include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
-
-#include "fmt/format.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
