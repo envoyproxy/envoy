@@ -158,7 +158,6 @@ public:
 private:
   struct Ipv6Helper : public Ipv6 {
     absl::uint128 address() const override;
-
     uint32_t port() const;
 
     std::string makeFriendlyAddress() const;
