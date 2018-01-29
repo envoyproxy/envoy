@@ -40,15 +40,9 @@ public:
     return;                                                                                        \
   }
 
-#ifdef ENVOY_GOOGLE_GRPC
-#define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
-  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
-                   testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc))
-#else
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc))
-#endif
 
 } // namespace Grpc
 } // namespace Envoy

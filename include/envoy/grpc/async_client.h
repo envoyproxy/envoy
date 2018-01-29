@@ -129,8 +129,7 @@ public:
   virtual void onCreateInitialMetadata(Http::HeaderMap& metadata) PURE;
 
   /**
-   * Called when initial metadata is received. This will be called with empty metadata on a
-   * trailers-only response, followed by onReceiveTrailingMetadata() with the trailing metadata.
+   * Called when initial metadata is recevied.
    * @param metadata initial metadata reference.
    */
   virtual void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) PURE;
@@ -142,8 +141,7 @@ public:
   virtual void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) PURE;
 
   /**
-   * Called when trailing metadata is recevied. This will also be called on non-Ok grpc-status
-   * stream termination.
+   * Called when trailing metadata is recevied.
    * @param metadata trailing metadata reference.
    */
   virtual void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) PURE;
