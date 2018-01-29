@@ -84,6 +84,7 @@ envoy_cc_library(
     name = "squash_filter_lib",
     srcs = ["squash_filter.cc"],
     hdrs = ["squash_filter.h"],
+    external_deps = ["envoy_filter_http_squash"],
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
@@ -96,7 +97,6 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/http:squash_cc",
     ],
 )
 
