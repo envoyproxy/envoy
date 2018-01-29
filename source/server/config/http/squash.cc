@@ -11,7 +11,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "api/filter/http/squash.pb.validate.h"
+#include "envoy/api/v2/filter/http/squash.pb.validate.h"
 
 namespace Envoy {
 namespace Server {

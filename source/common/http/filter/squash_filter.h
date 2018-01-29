@@ -12,7 +12,7 @@
 #include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"
 
-#include "api/filter/http/squash.pb.h"
+#include "envoy/api/v2/filter/http/squash.pb.h"
 
 namespace Envoy {
 namespace Http {
