@@ -448,6 +448,7 @@ public:
    * exist, or Lookup::NotSupported if key is not one of the predefined inline headers.
    */
   virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
+  virtual Lookup lookup(const LowerCaseString& key, HeaderEntry** entry) PURE;
 
   /**
    * Remove all instances of a header by key.

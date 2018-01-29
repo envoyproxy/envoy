@@ -89,6 +89,32 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
                             "[string \"...\"]:13: header map can no longer be modified");
 }
 
+// Verify that add works correctly with both inline and normal headers.
+TEST_F(LuaHeaderMapWrapperTest, Add) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:add(":path", "/new_path")
+      object:add(":authority", "authority")
+      object:add("other_header", "other_header_value")
+      object:add("other_header_2", "other_header_value_2")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl headers{{":path", "/"}, {"other_header", "hello"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  start("callMe");
+
+  EXPECT_EQ((TestHeaderMapImpl{{":path", "/new_path"},
+                               {"other_header", "hello"},
+                               {":authority", "authority"},
+                               {"other_header", "other_header_value"},
+                               {"other_header_2", "other_header_value_2"}}),
+            headers);
+}
+
 // Modify during iteration.
 TEST_F(LuaHeaderMapWrapperTest, ModifyDuringIteration) {
   const std::string SCRIPT{R"EOF(

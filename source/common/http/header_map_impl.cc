@@ -415,17 +415,10 @@ void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
   }
 }
 
-HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
-                                        const HeaderEntry** entry) const {
+HeaderMap::Lookup HeaderMapImpl::lookupHelper(const LowerCaseString& key, HeaderEntry** entry) {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
-    // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
-    // even though we don't make any modifications, we need to cast_cast in order to use the
-    // accessor.
-    //
-    // Making this work without const_cast would require managing an additional const accessor
-    // callback for each predefined inline header and add to the complexity of the code.
-    StaticLookupResponse ref_lookup_response = cb(const_cast<HeaderMapImpl&>(*this));
+    StaticLookupResponse ref_lookup_response = cb(*this);
     *entry = *ref_lookup_response.entry_;
     if (*entry) {
       return Lookup::Found;
@@ -436,6 +429,24 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
     *entry = nullptr;
     return Lookup::NotSupported;
   }
+}
+
+HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
+                                        const HeaderEntry** entry) const {
+  // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
+  // even though we don't make any modifications, we need to cast_cast in order to use the
+  // accessor.
+  //
+  // Making this work without const_cast would require managing an additional const accessor
+  // callback for each predefined inline header and add to the complexity of the code.
+  HeaderEntry* temp_entry;
+  Lookup rc = const_cast<HeaderMapImpl&>(*this).lookupHelper(key, &temp_entry);
+  *entry = temp_entry;
+  return rc;
+}
+
+HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key, HeaderEntry** entry) {
+  return lookupHelper(key, entry);
 }
 
 void HeaderMapImpl::remove(const LowerCaseString& key) {

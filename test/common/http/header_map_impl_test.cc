@@ -570,6 +570,14 @@ TEST(HeaderMapImplTest, Lookup) {
     EXPECT_EQ(HeaderMap::Lookup::NotFound, headers.lookup(Headers::get().Host, &entry));
     EXPECT_EQ(nullptr, entry);
   }
+
+  // Try the non-const version.
+  {
+    HeaderEntry* entry;
+    EXPECT_EQ(HeaderMap::Lookup::Found, headers.lookup(Headers::get().ContentLength, &entry));
+    entry->value(10);
+    EXPECT_STREQ("10", headers.ContentLength()->value().c_str());
+  }
 }
 } // namespace Http
 } // namespace Envoy
