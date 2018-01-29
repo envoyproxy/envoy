@@ -176,7 +176,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
       {config_->stats().downstream_cx_rx_bytes_total_,
        config_->stats().downstream_cx_rx_bytes_buffered_,
        config_->stats().downstream_cx_tx_bytes_total_,
-       config_->stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
+       config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
 }
 
 void TcpProxy::readDisableUpstream(bool disable) {
@@ -337,7 +337,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
        read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
        read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_total_,
        read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_,
-       &read_callbacks_->upstreamHost()->cluster().stats().bind_errors_, nullptr});
+       &read_callbacks_->upstreamHost()->cluster().stats().bind_errors_});
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
   request_info_.onUpstreamHostSelected(conn_info.host_description_);

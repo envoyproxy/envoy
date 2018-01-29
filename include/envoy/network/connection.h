@@ -86,9 +86,6 @@ public:
     Stats::Gauge& write_current_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
-    // Counter* as this is an optional counter. Socket options errors will not be tracked if this is
-    // nullptr.
-    Stats::Counter* socket_options_errors_;
   };
 
   virtual ~Connection() {}

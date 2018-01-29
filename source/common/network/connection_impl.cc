@@ -341,29 +341,16 @@ void ConnectionImpl::onHighWatermark() {
 void ConnectionImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (immediate_connection_error_) {
-    ENVOY_CONN_LOG(debug, "raising immediate connect error", *this);
-    closeSocket(ConnectionEvent::RemoteClose);
-    return;
-  }
-
-  if (bind_error_) {
-    ENVOY_CONN_LOG(debug, "raising bind error", *this);
-    // Update stats here, rather than on bind failure, to give the caller a chance to
-    // setConnectionStats.
-    if (connection_stats_ && connection_stats_->bind_errors_) {
-      connection_stats_->bind_errors_->inc();
-    }
-    closeSocket(ConnectionEvent::LocalClose);
-    return;
-  }
-
-  if (socket_options_error_) {
-    ENVOY_CONN_LOG(debug, "raising setsockopt error", *this);
-    // Update stats here, rather than on setsockopt failure, to give the caller a chance to
-    // setConnectionStats.
-    if (connection_stats_ && connection_stats_->socket_options_errors_) {
-      connection_stats_->socket_options_errors_->inc();
+  if (immediate_error_) {
+    if (bind_error_) {
+      ENVOY_CONN_LOG(debug, "raising bind error", *this);
+      // Update stats here, rather than on bind failure, to give the caller a chance to
+      // setConnectionStats.
+      if (connection_stats_ && connection_stats_->bind_errors_) {
+	connection_stats_->bind_errors_->inc();
+      }
+    } else {
+      ENVOY_CONN_LOG(debug, "raising immediate error", *this);
     }
     closeSocket(ConnectionEvent::LocalClose);
     return;
@@ -497,9 +484,10 @@ ClientConnectionImpl::ClientConnectionImpl(
     if (rc < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
                      strerror(errno));
+      bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
-      bind_error_ = true;
+      immediate_error_ = true;
 
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
@@ -509,8 +497,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     if (!options->setOptions(*socket_)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
-      socket_options_error_ = true;
-
+      immediate_error_ = true;
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
     }
@@ -530,7 +517,7 @@ void ClientConnectionImpl::connect() {
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
-      immediate_connection_error_ = true;
+      immediate_error_ = true;
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }

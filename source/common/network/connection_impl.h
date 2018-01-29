@@ -127,9 +127,8 @@ protected:
 
 protected:
   bool connecting_{false};
-  bool immediate_connection_error_{false};
+  bool immediate_error_{false};
   bool bind_error_{false};
-  bool socket_options_error_{false};
   Event::FileEventPtr file_event_;
 
 private:
