@@ -127,7 +127,7 @@ public:
 
     // Register the type by creating a new metatable, setting __index to itself, and then
     // performing the register.
-    ENVOY_LOG(info, "registering new type: {}", typeid(T).name());
+    ENVOY_LOG(debug, "registering new type: {}", typeid(T).name());
     int rc = luaL_newmetatable(state, typeid(T).name());
     ASSERT(rc == 1);
     UNREFERENCED_PARAMETER(rc);
