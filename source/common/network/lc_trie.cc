@@ -23,7 +23,7 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
         IpPrefix<Ipv6> ip_prefix;
         ip_prefix.tag_ = pair_data.first;
         ip_prefix.length_ = cidr_range.length();
-        ip_prefix.ip_ = arrayToAsblUint128(cidr_range.ip()->ipv6()->address());
+        ip_prefix.ip_ = Utility::Ip6ntohl(cidr_range.ip()->ipv6()->address());
         ipv6_prefixes.push_back(ip_prefix);
       }
     }
@@ -37,7 +37,7 @@ std::string LcTrie::getTag(Network::Address::InstanceConstSharedPtr ip_address) 
     Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
     return ipv4_trie_->getTag(ip);
   } else {
-    Ipv6 ip = arrayToAsblUint128(ip_address->ip()->ipv6()->address());
+    Ipv6 ip = Utility::Ip6ntohl(ip_address->ip()->ipv6()->address());
     return ipv6_trie_->getTag(ip);
   }
 }

@@ -99,6 +99,7 @@ envoy_cc_library(
     hdrs = ["lc_trie.h"],
     external_deps = ["abseil_int128"],
     deps = [
+        ":address_lib",
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",

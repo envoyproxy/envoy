@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
@@ -26,8 +27,10 @@ namespace LcTrie {
  * within this class with no calling pattern changes.
  *
  * The algorithm to build the LC-Trie is desribed in the paper 'IP-address lookup using LC-tries'
- * by'S. Nilsson' and 'G. Karlsson'. Refer to LcTrieInternal for implementation and algorithm
- * details.
+ * by 'S. Nilsson' and 'G. Karlsson'. The paper and reference C implementation can be found here:
+ * https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/
+ *
+ * Refer to LcTrieInternal for implementation and algorithm details.
  */
 class LcTrie {
 public:
@@ -95,30 +98,25 @@ private:
   // inet_ntop. These strings are used in the nested prefixes exception messages.
   // TODO(ccaraman): Remove once nested prefixes are supported.
   static std::string toString(const Ipv4& input) {
-    sockaddr_in address;
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(input);
-    address.sin_port = htons(0);
-    char address_string[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &address.sin_addr, address_string, INET_ADDRSTRLEN);
-    return address_string;
+    sockaddr_in addr4;
+    addr4.sin_family = AF_INET;
+    addr4.sin_addr.s_addr = htonl(input);
+    addr4.sin_port = htons(0);
+
+    Address::Ipv4Instance address(&addr4);
+    return address.ip()->addressAsString();
   }
 
   static std::string toString(const Ipv6& input) {
-    sockaddr_in6 address;
-    address.sin6_family = AF_INET6;
-    address.sin6_port = htons(0);
+    sockaddr_in6 addr6;
+    addr6.sin6_family = AF_INET6;
+    addr6.sin6_port = htons(0);
 
-    std::array<uint8_t, 16> ip6 = abslUint128ToArray(input);
-    for (size_t i = 0; i < 16; i++) {
-      address.sin6_addr.s6_addr[i] = ip6[i];
-    }
-
-    char address_string[INET6_ADDRSTRLEN];
-    const char* address_string_ptr =
-        inet_ntop(AF_INET6, &address.sin6_addr, address_string, INET6_ADDRSTRLEN);
-    ASSERT(address_string_ptr = address_string);
-    return address_string_ptr;
+    // Ipv6 stores the values in host byte order.
+    absl::uint128 ipv6 = Utility::Ip6htonl(input);
+    memcpy(&addr6.sin6_addr.s6_addr, &ipv6, sizeof(absl::uint128));
+    Address::Ipv6Instance address(addr6);
+    return address.ip()->addressAsString();
   }
 
   /**
@@ -244,7 +242,7 @@ private:
         }
       }
 
-      // In theory, the trie_ vector can have at most twice the number of  ip_prefixes entries - 1.
+      // In theory, the trie_ vector can have at most twice the number of ip_prefixes entries - 1.
       // However, due to the fill factor a buffer is added to the size of the
       // trie_. The buffer value(2000000) is reused from the reference implementation in
       // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
@@ -499,42 +497,6 @@ private:
     const double fill_factor_;
     const uint32_t root_branching_factor_;
   };
-
-  /**
-   * Converts Ipv6 address in std::array<uint8_t, 16> to absl::uint128 in host byte order.
-   * TODO (ccaraman): Remove this workaround once Ipv6Helper returns absl::uint128t.
-   * @param address supplies the IPv6 in std::array<uint8_t,16> data structure. This is the address
-   *                format returned by Address::Ipv6Instance.
-   * @return Ipv6(absl::uint128) address in host byte order.
-   */
-  static Ipv6 arrayToAsblUint128(const std::array<uint8_t, 16>& address) {
-    Ipv6 ipv6{0};
-    size_t i = 0;
-    for (; i < address.size() - 1; i++) {
-      ipv6 |= static_cast<absl::uint128>(address[i]);
-      ipv6 <<= 8;
-    }
-    ipv6 |= static_cast<absl::uint128>(address[i]);
-    return ipv6;
-  }
-
-  /**
-   * Converts Ipv6 adddress in absl::uint128 to std::array<uint8_t, 16> in network byte order.
-   * TODO (ccaraman): Remove this workaround once Ipv6Helper returns absl::uint128t.
-   * @param address supplies the Ipv6 address in Ipv6(absl::uint128).
-   * @return std::array<uint8_t, 16> address in network byte order.
-   */
-  static std::array<uint8_t, 16> abslUint128ToArray(const Ipv6& address) {
-    Ipv6 copy_address = address;
-    std::array<uint8_t, 16> ipv6;
-    size_t i = ipv6.size() - 1;
-    for (; 0 < i; i--) {
-      ipv6[i] = static_cast<uint8_t>(copy_address & 0x000000000000000000000000000000FF);
-      copy_address >>= 8;
-    }
-    ipv6[i] = static_cast<uint8_t>(copy_address & 0x000000000000000000000000000000FF);
-    return ipv6;
-  }
 
   std::unique_ptr<LcTrieInternal<Ipv4>> ipv4_trie_;
   std::unique_ptr<LcTrieInternal<Ipv6>> ipv6_trie_;
