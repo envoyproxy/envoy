@@ -96,7 +96,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // ExtAuthz::RequestCallbacks
-  void complete(CheckStatus status) override;
+  void onComplete(CheckStatus status) override;
 
   void setCheckReqGenerator(CheckRequestGenerator* crg);
 

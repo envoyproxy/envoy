@@ -73,7 +73,7 @@ void Instance::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Instance::complete(CheckStatus status) {
+void Instance::onComplete(CheckStatus status) {
   status_ = Status::Complete;
   filter_callbacks_->connection().readDisable(false);
   config_->stats().active_.dec();

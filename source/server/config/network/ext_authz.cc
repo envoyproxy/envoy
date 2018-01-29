@@ -32,11 +32,15 @@ ExtAuthzConfigFactory::createFilter(const envoy::api::v2::filter::network::ExtAu
            timeout_ms ](Network::FilterManager & filter_manager)
       ->void {
 
-    ExtAuthz::GrpcFactoryImpl client_factory(
-        grpc_service, context.clusterManager().grpcAsyncClientManager(), context.scope());
+    auto async_client_factory =
+        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
+                                                                                context.scope());
 
+    auto client = std::make_unique<GrpcClientImpl>(async_client_factory->create(),
+                                                   std::chrono::milliseconds(timeout_ms));
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new ExtAuthz::TcpFilter::Instance(
-        ext_authz_config, client_factory.create(std::chrono::milliseconds(timeout_ms)))});
+        ext_authz_config, std::move(client),
+        timeoutclient_factory.create(std::chrono::milliseconds(timeout_ms)))});
   };
 }
 

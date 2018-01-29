@@ -107,7 +107,7 @@ TEST_F(ExtAuthzFilterTest, OK) {
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(CheckStatus::OK);
+  request_callbacks_->onComplete(CheckStatus::OK);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
@@ -134,7 +134,7 @@ TEST_F(ExtAuthzFilterTest, Denied) {
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
-  request_callbacks_->complete(CheckStatus::Denied);
+  request_callbacks_->onComplete(CheckStatus::Denied);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
@@ -161,7 +161,7 @@ TEST_F(ExtAuthzFilterTest, OKWithSSLConnect) {
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(CheckStatus::OK);
+  request_callbacks_->onComplete(CheckStatus::OK);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
@@ -190,7 +190,7 @@ TEST_F(ExtAuthzFilterTest, DeniedWithSSLConnect) {
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
-  request_callbacks_->complete(CheckStatus::Denied);
+  request_callbacks_->onComplete(CheckStatus::Denied);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
@@ -213,7 +213,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(CheckStatus::Error);
+  request_callbacks_->onComplete(CheckStatus::Error);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
@@ -235,7 +235,7 @@ TEST_F(ExtAuthzFilterTest, Error) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(CheckStatus::Error);
+  request_callbacks_->onComplete(CheckStatus::Error);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
@@ -269,7 +269,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke(
-          [&](RequestCallbacks& callbacks) -> void { callbacks.complete(CheckStatus::OK); })));
+          [&](RequestCallbacks& callbacks) -> void { callbacks.onComplete(CheckStatus::OK); })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
