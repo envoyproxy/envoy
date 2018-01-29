@@ -215,8 +215,6 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
-const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
-
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::Route& route, Runtime::Loader& loader)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
@@ -233,12 +231,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
+      total_cluster_weight_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
       request_headers_parser_(HeaderParser::configure(route.route().request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(route.route().response_headers_to_add(),
                                                        route.route().response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
-      redirect_response_code_(
-          ConfigUtility::parseRedirectResponseCode(route.redirect().response_code())) {
+      direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
+      direct_response_body_(ConfigUtility::parseDirectResponseBody(route)) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -247,12 +247,18 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  if (route.has_metadata()) {
+    metadata_ = route.metadata();
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
   // from the weighted cluster (if any) are merged with and override
   // the criteria from the route.
   if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
+    ASSERT(total_cluster_weight_ > 0);
+
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
@@ -281,9 +287,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_weight != WeightedClusterEntry::MAX_CLUSTER_WEIGHT) {
+    if (total_weight != total_cluster_weight_) {
       throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
-                                       WeightedClusterEntry::MAX_CLUSTER_WEIGHT));
+                                       total_cluster_weight_));
     }
   }
 
@@ -425,9 +431,10 @@ DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route
   return ret;
 }
 
-const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
-  // A route for a request can exclusively be a route entry or a redirect entry.
-  if (isRedirect()) {
+const DirectResponseEntry* RouteEntryImplBase::directResponseEntry() const {
+  // A route for a request can exclusively be a route entry, a direct response entry,
+  // or a redirect entry.
+  if (isDirectResponse()) {
     return this;
   } else {
     return nullptr;
@@ -435,8 +442,9 @@ const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
 }
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const {
-  // A route for a request can exclusively be a route entry or a redirect entry.
-  if (isRedirect()) {
+  // A route for a request can exclusively be a route entry, a direct response entry,
+  // or a redirect entry.
+  if (isRedirect() || isDirectResponse()) {
     return nullptr;
   } else {
     return this;
@@ -448,7 +456,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
-    if (!cluster_name_.empty() || isRedirect()) {
+    if (!cluster_name_.empty() || isRedirect() || isDirectResponse()) {
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
@@ -465,7 +473,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
   }
 
-  uint64_t selected_value = random_value % WeightedClusterEntry::MAX_CLUSTER_WEIGHT;
+  uint64_t selected_value = random_value % total_cluster_weight_;
   uint64_t begin = 0UL;
   uint64_t end = 0UL;
 
@@ -474,13 +482,10 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) ||
-        (end >= WeightedClusterEntry::MAX_CLUSTER_WEIGHT)) {
-      // end > WeightedClusterEntry::MAX_CLUSTER_WEIGHT : This case can only occur
-      // with Runtimes, when the user specifies invalid weights such that
-      // sum(weights) > WeightedClusterEntry::MAX_CLUSTER_WEIGHT.
-      // In this case, terminate the search and just return the cluster
-      // whose weight cased the overflow
+    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
+      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
+      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
+      // terminate the search and just return the cluster whose weight caused the overflow.
       return cluster;
     }
     begin = end;
@@ -489,7 +494,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
-  if (isRedirect()) {
+  if (isRedirect() || isDirectResponse()) {
     return;
   }
 
@@ -577,7 +582,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
-      regex_(std::regex{route.match().regex().c_str(), std::regex::optimize}) {}
+      regex_(RegexUtil::parseRegex(route.match().regex().c_str())) {}
 
 void RegexRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
@@ -667,7 +672,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   }
 
   const std::string pattern = virtual_cluster.pattern();
-  pattern_ = std::regex{pattern, std::regex::optimize};
+  pattern_ = RegexUtil::parseRegex(pattern);
   name_ = virtual_cluster.name();
 }
 

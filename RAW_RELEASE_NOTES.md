@@ -8,6 +8,7 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added support for inline delivery of TLS certificates and private keys.
 * Added gRPC healthcheck based on [grpc.health.v1.Health](https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto) service.
 * Added Metrics Service implementation.
 * Added gRPC access logging.
@@ -35,5 +36,15 @@ final version.
   cluster must be statically defined and be of non-EDS type.
 * Added support for route matching based on URL query string parameters.
   :ref:`QueryParameterMatcher<envoy_api_msg_QueryParameterMatcher>`
+* Added support for :ref:`fixed stats tag values
+  <envoy_api_field_TagSpecifier.fixed_value>` which will be added to all metrics.
 * Added `/runtime` admin endpoint to read the current runtime values.
+* Extended the health check filter to support computation of the health check response
+  based on the percent of healthy servers is upstream clusters.
 * Added `gateway-error` retry-on policy.
+* Added support for building envoy with exported symbols
+  This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.
+* The Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
+  overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_GrpcService>`.
+* Added support for more granular weighted cluster routing by allowing the total weight to be specified in configuration.
+* Added support for custom request/response headers with mixed static and dynamic values.

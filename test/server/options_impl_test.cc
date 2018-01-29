@@ -9,6 +9,8 @@
 
 #include "server/options_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -19,7 +21,7 @@ namespace Envoy {
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
 std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
-  std::vector<std::string> words = StringUtil::split(args, ' ');
+  std::vector<std::string> words = TestUtility::split(args, ' ');
   std::vector<const char*> argv;
   for (const std::string& s : words) {
     argv.push_back(s.c_str());

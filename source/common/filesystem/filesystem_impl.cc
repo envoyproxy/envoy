@@ -1,6 +1,7 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include <dirent.h>
+#include <sys/stat.h>
 
 #include <chrono>
 #include <cstdint>
@@ -37,6 +38,14 @@ bool directoryExists(const std::string& path) {
   }
 
   return dir_exists;
+}
+
+ssize_t fileSize(const std::string& path) {
+  struct stat info;
+  if (stat(path.c_str(), &info) != 0) {
+    return -1;
+  }
+  return info.st_size;
 }
 
 std::string fileReadToEnd(const std::string& path) {

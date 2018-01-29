@@ -48,6 +48,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:rds_json_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
     ],
@@ -104,6 +105,9 @@ envoy_cc_library(
     name = "retry_state_lib",
     srcs = ["retry_state_impl.cc"],
     hdrs = ["retry_state_impl.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/event:timer_interface",
@@ -154,6 +158,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",

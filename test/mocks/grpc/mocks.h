@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -66,6 +67,24 @@ public:
                                      const Optional<std::chrono::milliseconds>& timeout));
   MOCK_METHOD2_T(start, AsyncStream*(const Protobuf::MethodDescriptor& service_method,
                                      AsyncStreamCallbacks& callbacks));
+};
+
+class MockAsyncClientFactory : public AsyncClientFactory {
+public:
+  MockAsyncClientFactory();
+  ~MockAsyncClientFactory();
+
+  MOCK_METHOD0(create, AsyncClientPtr());
+};
+
+class MockAsyncClientManager : public AsyncClientManager {
+public:
+  MockAsyncClientManager();
+  ~MockAsyncClientManager();
+
+  MOCK_METHOD2(factoryForGrpcService,
+               AsyncClientFactoryPtr(const envoy::api::v2::GrpcService& grpc_service,
+                                     Stats::Scope& scope));
 };
 
 } // namespace Grpc

@@ -33,10 +33,9 @@ void TlsContextJson::translateUpstreamTlsContext(
 
 void TlsContextJson::translateCommonTlsContext(
     const Json::Object& json_tls_context, envoy::api::v2::CommonTlsContext& common_tls_context) {
-  const std::vector<std::string> alpn_protocols =
-      StringUtil::split(json_tls_context.getString("alpn_protocols", ""), ",");
-  for (const auto& alpn_protocol : alpn_protocols) {
-    common_tls_context.add_alpn_protocols(alpn_protocol);
+  const std::string alpn_protocols_str{json_tls_context.getString("alpn_protocols", "")};
+  for (auto alpn_protocol : StringUtil::splitToken(alpn_protocols_str, ",")) {
+    common_tls_context.add_alpn_protocols(std::string{alpn_protocol});
   }
 
   common_tls_context.mutable_deprecated_v1()->set_alt_alpn_protocols(
@@ -49,6 +48,9 @@ void TlsContextJson::translateCommonTlsContext(
     validation_context->mutable_trusted_ca()->set_filename(
         json_tls_context.getString("ca_cert_file", ""));
   }
+  if (json_tls_context.hasObject("crl_file")) {
+    validation_context->mutable_crl()->set_filename(json_tls_context.getString("crl_file", ""));
+  }
   if (json_tls_context.hasObject("verify_certificate_hash")) {
     validation_context->add_verify_certificate_hash(
         json_tls_context.getString("verify_certificate_hash"));
@@ -57,15 +59,14 @@ void TlsContextJson::translateCommonTlsContext(
     validation_context->add_verify_subject_alt_name(san);
   }
 
-  const std::vector<std::string> cipher_suites =
-      StringUtil::split(json_tls_context.getString("cipher_suites", ""), ":");
-  for (const auto& cipher_suite : cipher_suites) {
-    common_tls_context.mutable_tls_params()->add_cipher_suites(cipher_suite);
+  const std::string cipher_suites_str{json_tls_context.getString("cipher_suites", "")};
+  for (auto cipher_suite : StringUtil::splitToken(cipher_suites_str, ":")) {
+    common_tls_context.mutable_tls_params()->add_cipher_suites(std::string{cipher_suite});
   }
-  const std::vector<std::string> ecdh_curves =
-      StringUtil::split(json_tls_context.getString("ecdh_curves", ""), ":");
-  for (const auto& ecdh_curve : ecdh_curves) {
-    common_tls_context.mutable_tls_params()->add_ecdh_curves(ecdh_curve);
+
+  const std::string ecdh_curves_str{json_tls_context.getString("ecdh_curves", "")};
+  for (auto ecdh_curve : StringUtil::splitToken(ecdh_curves_str, ":")) {
+    common_tls_context.mutable_tls_params()->add_ecdh_curves(std::string{ecdh_curve});
   }
 }
 

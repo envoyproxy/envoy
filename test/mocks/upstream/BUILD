@@ -45,6 +45,7 @@ envoy_cc_mock(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",

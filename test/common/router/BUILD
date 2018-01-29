@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_impl_test",
     srcs = ["config_impl_test.cc"],
     deps = [
+        "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -19,6 +20,7 @@ envoy_cc_test(
         "//source/common/router:config_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -90,6 +92,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -16,6 +16,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_interface",
     hdrs = ["connection.h"],
+    external_deps = ["abseil_int128"],
     deps = [
         ":address_interface",
         ":filter_interface",
@@ -73,6 +74,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
+    deps = ["//include/envoy/network:listen_socket_interface"],
 )
 
 envoy_cc_library(

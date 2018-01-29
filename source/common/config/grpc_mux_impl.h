@@ -5,10 +5,10 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/async_client.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
-#include "common/grpc/async_client_impl.h"
 
 #include "api/discovery.pb.h"
 
@@ -22,9 +22,6 @@ class GrpcMuxImpl : public GrpcMux,
                     Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
-  GrpcMuxImpl(const envoy::api::v2::Node& node, Upstream::ClusterManager& cluster_manager,
-              const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
-              const Protobuf::MethodDescriptor& service_method);
   GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method);
   ~GrpcMuxImpl();
@@ -62,7 +59,9 @@ private:
     ~GrpcMuxWatchImpl() override {
       if (inserted_) {
         parent_.api_state_[type_url_].watches_.erase(entry_);
-        parent_.sendDiscoveryRequest(type_url_);
+        if (!resources_.empty()) {
+          parent_.sendDiscoveryRequest(type_url_);
+        }
       }
     }
     std::vector<std::string> resources_;

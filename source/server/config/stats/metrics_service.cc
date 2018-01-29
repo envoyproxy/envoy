@@ -16,32 +16,17 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class GrpcMetricsServiceClientFactoryImpl : public Stats::Metrics::GrpcMetricsServiceClientFactory {
-public:
-  GrpcMetricsServiceClientFactoryImpl(Upstream::ClusterManager& cluster_manager,
-                                      const std::string& cluster_name)
-      : cluster_manager_(cluster_manager), cluster_name_(cluster_name) {}
-
-  // Metrics::GrpcMetricsServiceClientPtr
-  Grpc::AsyncClientPtr create() override {
-    return std::make_unique<Grpc::AsyncClientImpl>(cluster_manager_, cluster_name_);
-  };
-
-  Upstream::ClusterManager& cluster_manager_;
-  const std::string cluster_name_;
-};
-
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::api::v2::MetricsServiceConfig&>(config);
-  const std::string cluster_name = sink_config.grpc_service().envoy_grpc().cluster_name();
-  ENVOY_LOG(debug, "Metrics Service cluster name: {}", cluster_name);
+  const auto& grpc_service = sink_config.grpc_service();
+  ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   std::shared_ptr<Stats::Metrics::GrpcMetricsStreamer> grpc_metrics_streamer =
       std::make_shared<Stats::Metrics::GrpcMetricsStreamerImpl>(
-          std::make_unique<GrpcMetricsServiceClientFactoryImpl>(server.clusterManager(),
-                                                                cluster_name),
+          server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
+                                                                                 server.stats()),
           server.threadLocal(), server.localInfo());
 
   return Stats::SinkPtr(

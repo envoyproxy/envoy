@@ -43,10 +43,20 @@ HealthCheckFilterConfig::createFilter(const envoy::api::v2::filter::http::Health
                                                     std::chrono::milliseconds(cache_time_ms)));
   }
 
-  return [&context, pass_through_mode, cache_manager,
-          hc_endpoint](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
-        new HealthCheckFilter(context, pass_through_mode, cache_manager, hc_endpoint)});
+  ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;
+  if (!pass_through_mode && !proto_config.cluster_min_healthy_percentages().empty()) {
+    auto cluster_to_percentage = std::make_unique<ClusterMinHealthyPercentages>();
+    for (const auto& item : proto_config.cluster_min_healthy_percentages()) {
+      cluster_to_percentage->emplace(std::make_pair(item.first, item.second.value()));
+    }
+    cluster_min_healthy_percentages = std::move(cluster_to_percentage);
+  }
+
+  return [&context, pass_through_mode, cache_manager, hc_endpoint,
+          cluster_min_healthy_percentages](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(
+        context, pass_through_mode, cache_manager, hc_endpoint, cluster_min_healthy_percentages));
+
   };
 }
 
@@ -155,6 +165,40 @@ void HealthCheckFilter::onComplete() {
     Http::Code final_status = Http::Code::OK;
     if (cache_manager_) {
       final_status = cache_manager_->getCachedResponseCode();
+    } else if (cluster_min_healthy_percentages_ != nullptr &&
+               !cluster_min_healthy_percentages_->empty()) {
+      // Check the status of the specified upstream cluster(s) to determine the right response.
+      auto& clusterManager = context_.clusterManager();
+      for (const auto& item : *cluster_min_healthy_percentages_) {
+        const std::string& cluster_name = item.first;
+        const double min_healthy_percentage = item.second;
+        auto* cluster = clusterManager.get(cluster_name);
+        if (cluster == nullptr) {
+          // If the cluster does not exist at all, consider the service unhealthy.
+          final_status = Http::Code::ServiceUnavailable;
+          break;
+        }
+        const auto& stats = cluster->info()->stats();
+        const uint64_t membership_total = stats.membership_total_.value();
+        if (membership_total == 0) {
+          // If the cluster exists but is empty, consider the service unhealty unless
+          // the specified minimum percent healthy for the cluster happens to be zero.
+          if (min_healthy_percentage == 0.0) {
+            continue;
+          } else {
+            final_status = Http::Code::ServiceUnavailable;
+            break;
+          }
+        }
+        // In the general case, consider the service unhealthy if fewer than the
+        // specified percentage of the servers in the cluster are healthy.
+        // TODO(brian-pane) switch to purely integer-based math here, because the
+        //                  int-to-float conversions and floating point division are slow.
+        if (stats.membership_healthy_.value() < membership_total * min_healthy_percentage / 100.0) {
+          final_status = Http::Code::ServiceUnavailable;
+          break;
+        }
+      }
     }
 
     if (!Http::CodeUtility::is2xx(enumToInt(final_status))) {

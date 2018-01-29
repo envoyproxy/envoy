@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -55,7 +56,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    deps = ["//source/common/common:utility_lib"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -68,4 +75,26 @@ envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
+)
+
+envoy_cc_test(
+    name = "shared_memory_hash_set_test",
+    srcs = ["shared_memory_hash_set_test.cc"],
+    deps = [
+        "//source/common/common:hash_lib",
+        "//source/common/common:shared_memory_hash_set_lib",
+    ],
+)
+
+envoy_cc_binary(
+    name = "utility_speed_test",
+    srcs = ["utility_speed_test.cc"],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+    ],
 )

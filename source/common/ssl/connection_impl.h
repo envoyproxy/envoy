@@ -17,10 +17,7 @@ namespace Ssl {
 // TODO(lizan): Remove Ssl::ConnectionImpl entirely when factory of TransportSocket is ready.
 class ConnectionImpl : public Network::ConnectionImpl {
 public:
-  ConnectionImpl(Event::Dispatcher& dispatcher, int fd,
-                 Network::Address::InstanceConstSharedPtr remote_address,
-                 Network::Address::InstanceConstSharedPtr local_address,
-                 Network::Address::InstanceConstSharedPtr bind_to_address, bool using_original_dst,
+  ConnectionImpl(Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& socket,
                  bool connected, Context& ctx, InitialState state);
 };
 

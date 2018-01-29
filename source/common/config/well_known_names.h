@@ -48,6 +48,19 @@ private:
 };
 
 /**
+ * Well-known listener filter names.
+ */
+class ListenerFilterNameValues {
+public:
+  // Original destination listener filter
+  const std::string ORIGINAL_DST = "envoy.listener.original_dst";
+  // Proxy Protocol listener filter
+  const std::string PROXY_PROTOCOL = "envoy.listener.proxy_protocol";
+};
+
+typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
+
+/**
  * Well-known network filter names.
  */
 class NetworkFilterNameValues {

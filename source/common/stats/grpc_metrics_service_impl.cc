@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Stats {
 namespace Metrics {
 
-GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(GrpcMetricsServiceClientFactoryPtr&& factory,
+GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                                                  ThreadLocal::SlotAllocator& tls,
                                                  const LocalInfo::LocalInfo& local_info)
     : tls_slot_(tls.allocateSlot()) {
