@@ -2,10 +2,6 @@
 
 #include "common/grpc/async_client_impl.h"
 
-#ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_async_client_impl.h"
-#endif
-
 namespace Envoy {
 namespace Grpc {
 
@@ -22,43 +18,22 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   }
 }
 
-AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
-                                               ThreadLocal::Instance& tls)
-    : cm_(cm), tls_(tls) {}
-
 AsyncClientPtr AsyncClientFactoryImpl::create() {
   return std::make_unique<AsyncClientImpl>(cm_, cluster_name_);
 }
 
-GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
-    ThreadLocal::Instance& tls, Stats::Scope& scope,
-    const envoy::api::v2::GrpcService::GoogleGrpc& config)
-    : tls_(tls), scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))),
-      config_(config) {
-#ifndef ENVOY_GOOGLE_GRPC
-  UNREFERENCED_PARAMETER(tls_);
-  UNREFERENCED_PARAMETER(scope_);
-  UNREFERENCED_PARAMETER(config_);
-  throw EnvoyException("Google C++ gRPC client is not linked");
-#endif
-}
-
-AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
-#ifdef ENVOY_GOOGLE_GRPC
-  return std::make_unique<GoogleAsyncClientImpl>(tls_.dispatcher(), *scope_, config_);
-#else
-  return nullptr;
-#endif
-}
+AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
+                                               ThreadLocal::Instance& /*tls*/)
+    : cm_(cm) {}
 
 AsyncClientFactoryPtr
 AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::GrpcService& grpc_service,
-                                              Stats::Scope& scope) {
+                                              Stats::Scope& /*scope*/) {
   switch (grpc_service.target_specifier_case()) {
   case envoy::api::v2::GrpcService::kEnvoyGrpc:
     return std::make_unique<AsyncClientFactoryImpl>(cm_, grpc_service.envoy_grpc().cluster_name());
   case envoy::api::v2::GrpcService::kGoogleGrpc:
-    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, scope, grpc_service.google_grpc());
+    throw EnvoyException("Google C++ gRPC client is not implemented yet");
   default:
     NOT_REACHED;
   }
