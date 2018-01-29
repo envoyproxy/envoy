@@ -228,7 +228,7 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string SslSocket::peerCertificate() const {
+std::string SslSocket::urlEncodedPemEncodedCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -237,7 +237,7 @@ std::string SslSocket::peerCertificate() const {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr);
   RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1);
-  const uint8_t* output = nullptr;
+  const uint8_t* output;
   size_t length;
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
   std::string pem = std::string(reinterpret_cast<const char*>(output), length);

@@ -54,7 +54,7 @@ public:
   MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
   MOCK_METHOD0(uriSanPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
-  MOCK_CONST_METHOD0(peerCertificate, std::string());
+  MOCK_CONST_METHOD0(urlEncodedPemEncodedCertificate, std::string());
 };
 
 class MockClientContext : public ClientContext {

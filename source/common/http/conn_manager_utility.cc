@@ -209,7 +209,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         client_cert_details.push_back("SAN=" + connection.ssl()->uriSanPeerCertificate());
         break;
       case Http::ClientCertDetailsType::Cert:
-        const std::string peer_cert = connection.ssl()->peerCertificate();
+        const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedCertificate();
         if (!peer_cert.empty()) {
           client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
         }

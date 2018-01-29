@@ -50,10 +50,10 @@ public:
   virtual std::string uriSanPeerCertificate() PURE;
 
   /**
-   * @return std::string the PEM encoded representation of the peer certificate. Returns "" if
-   *         there is no peer certificate or encoding fails.
+   * @return std::string the URL-encoded PEM-encoded representation of the peer certificate. Returns
+   *         "" if there is no peer certificate or encoding fails.
    **/
-  virtual std::string peerCertificate() const PURE;
+  virtual std::string urlEncodedPemEncodedCertificate() const PURE;
 };
 
 } // namespace Ssl
