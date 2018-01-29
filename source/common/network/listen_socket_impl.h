@@ -79,12 +79,8 @@ public:
       fd_ = -1;
     }
   }
-  void setOptions(const OptionsSharedPtr& options) override {
-    options_ = options;
-  }
-  const ConnectionSocket::OptionsSharedPtr& options() const override {
-    return options_;
-  }
+  void setOptions(const OptionsSharedPtr& options) override { options_ = options; }
+  const ConnectionSocket::OptionsSharedPtr& options() const override { return options_; }
 
 protected:
   int fd_;

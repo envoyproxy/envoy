@@ -347,7 +347,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
       // Update stats here, rather than on bind failure, to give the caller a chance to
       // setConnectionStats.
       if (connection_stats_ && connection_stats_->bind_errors_) {
-	connection_stats_->bind_errors_->inc();
+        connection_stats_->bind_errors_->inc();
       }
     } else {
       ENVOY_CONN_LOG(debug, "raising immediate error", *this);
