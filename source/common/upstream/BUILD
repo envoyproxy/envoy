@@ -220,9 +220,6 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":load_balancer_lib",
         "//include/envoy/runtime:runtime_interface",

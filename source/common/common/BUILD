@@ -2,7 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_basic_cc_library",
     "envoy_cc_library",
+    "envoy_include_prefix",
     "envoy_package",
 )
 
@@ -11,9 +13,7 @@ envoy_package()
 envoy_cc_library(
     name = "assert_lib",
     hdrs = ["assert.h"],
-    deps = [
-        ":logger_lib",
-    ],
+    deps = [":logger_lib"],
 )
 
 envoy_cc_library(
@@ -56,29 +56,24 @@ envoy_cc_library(
     hdrs = ["enum_to_int.h"],
 )
 
-envoy_cc_library(
+# fmt_lib is automatically a dependency of all enovy_cc_library definitions.
+envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
-    external_deps = ["abseil_strings"],
+    include_prefix = envoy_include_prefix(PACKAGE_NAME),
 )
 
 envoy_cc_library(
     name = "hash_lib",
     hdrs = ["hash.h"],
-    external_deps = [
-        "abseil_strings",
-        "xxhash",
-    ],
+    external_deps = ["xxhash"],
 )
 
 envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [
-        ":fmt_lib",
-        ":utility_lib",
-    ],
+    deps = [":utility_lib"],
 )
 
 envoy_cc_library(
@@ -92,7 +87,6 @@ envoy_cc_library(
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
     deps = [
-        ":fmt_lib",
         ":macros",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -130,13 +124,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
-    deps = [
-        ":fmt_lib",
-        "//include/envoy/common:time_interface",
-    ],
+    deps = ["//include/envoy/common:time_interface"],
 )
 
 genrule(
@@ -159,7 +147,6 @@ envoy_cc_library(
     srcs = ["version.cc"],
     linkstamp = "version_linkstamp.cc",
     deps = [
-        ":fmt_lib",
         ":version_includes",
         "//source/common/common:macros",
     ],
@@ -183,9 +170,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "shared_memory_hash_set_lib",
     hdrs = ["shared_memory_hash_set.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":assert_lib",
         ":logger_lib",

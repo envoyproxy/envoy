@@ -13,7 +13,6 @@
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/assert.h"
-#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"

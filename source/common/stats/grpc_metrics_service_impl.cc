@@ -9,7 +9,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
-#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 

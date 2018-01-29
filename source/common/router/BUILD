@@ -101,9 +101,6 @@ envoy_cc_library(
     name = "retry_state_lib",
     srcs = ["retry_state_impl.cc"],
     hdrs = ["retry_state_impl.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         "//include/envoy/common:optional",
         "//include/envoy/event:timer_interface",
@@ -213,7 +210,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:optional",
         "//source/common/access_log:access_log_formatter_lib",
-        "//source/common/common:fmt_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
