@@ -51,7 +51,7 @@ public:
   virtual const std::string& routeConfigName() const PURE;
 
   /**
-   * @return const std::string& the configuration of service the RdsRouteConfigProvider is
+   * @return const std::string& the configuration of the service the RdsRouteConfigProvider is
    * issuing RDS requests to.
    */
   virtual const std::string& configSource() const PURE;
