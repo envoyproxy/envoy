@@ -5,6 +5,7 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
@@ -13,35 +14,38 @@ namespace Envoy {
 namespace Stats {
 namespace Metrics {
 
-// TODO(htuch): Convert to Grpc::GrpcClientIntegrationParamTest. Needs some fixes for Google gRPC
-// client first.
 class MetricsServiceIntegrationTest : public HttpIntegrationTest,
-                                      public testing::TestWithParam<Network::Address::IpVersion> {
+                                      public Grpc::GrpcClientIntegrationParamTest {
 public:
   MetricsServiceIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.back()->set_allow_unexpected_disconnects(true);
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      // metrics_service cluster for Envoy gRPC.
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       metrics_service_cluster->set_name("metrics_service");
       metrics_service_cluster->mutable_http2_protocol_options();
-
+      // metrics_service gRPC service definition.
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.metrics_service");
       envoy::config::metrics::v2::MetricsServiceConfig config;
-      config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("metrics_service");
+      setGrpcService(*config.mutable_grpc_service(), "metrics_service",
+                     fake_upstreams_.back()->localAddress());
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
+      // Shrink reporting period down to 1s to make test not take forever.
+      bootstrap.mutable_stats_flush_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });
 
     HttpIntegrationTest::initialize();
-    fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
   }
 
   void waitForMetricsServiceConnection() {
@@ -66,12 +70,12 @@ public:
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
     for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
-      if (metrics_family.name() == "cluster.metrics_service.membership_change" &&
+      if (metrics_family.name() == "cluster.cluster_0.membership_change" &&
           metrics_family.type() == ::io::prometheus::client::MetricType::COUNTER) {
         known_counter_exists = true;
         EXPECT_EQ(1, metrics_family.metric(0).counter().value());
       }
-      if (metrics_family.name() == "cluster.metrics_service.membership_total" &&
+      if (metrics_family.name() == "cluster.cluster_0.membership_total" &&
           metrics_family.type() == ::io::prometheus::client::MetricType::GAUGE) {
         known_gauge_exists = true;
         EXPECT_EQ(1, metrics_family.metric(0).gauge().value());
@@ -96,8 +100,8 @@ public:
   FakeStreamPtr metrics_service_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, MetricsServiceIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
@@ -111,7 +115,16 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   envoy::service::metrics::v2::StreamMetricsResponse response_msg;
   metrics_service_request_->sendGrpcMessage(response_msg);
   metrics_service_request_->finishGrpcStream(Grpc::Status::Ok);
-  test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);
+  switch (clientType()) {
+  case Grpc::ClientType::EnvoyGrpc:
+    test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);
+    break;
+  case Grpc::ClientType::GoogleGrpc:
+    test_server_->waitForCounterGe("grpc.metrics_service.streams_closed_0", 1);
+    break;
+  default:
+    NOT_REACHED;
+  }
   cleanup();
 }
 
