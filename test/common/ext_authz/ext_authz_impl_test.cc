@@ -166,5 +166,28 @@ TEST_F(ExtAuthzCheckRequestGeneratorTest, BasicHttp) {
   check_request_generator_.createHttpCheck(&callbacks_, headers, request);
 }
 
+TEST_F(ExtAuthzCheckRequestGeneratorTest, CheckAttrContextPeer) {
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                          {":path", "/bar"}};
+  envoy::service::auth::v2::CheckRequest request;
+
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
+  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
+  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
+  EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnRef(protocol_));
+
+  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
+  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));
+  check_request_generator_.createHttpCheck(&callbacks_, request_headers, request);
+
+  EXPECT_EQ("source", request.attributes().source().principal());
+  EXPECT_EQ("destination", request.attributes().destination().principal());
+  EXPECT_EQ("foo", request.attributes().source().service());
+}
+
 } // namespace ExtAuthz
 } // namespace Envoy
