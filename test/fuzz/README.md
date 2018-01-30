@@ -12,7 +12,7 @@ temporary files), network (including loopback) or multiple processes. See the
 environment](https://github.com/google/oss-fuzz/blob/master/docs/fuzzer_environment.md)
 for further details.
 
-# Corpus
+## Corpus
 
 Every fuzz test must comes with a *corpus*. A corpus is a set of files that
 provide example valid inputs. Fuzzling libraries will use this seed corpus to
