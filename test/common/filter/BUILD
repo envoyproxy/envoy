@@ -56,6 +56,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/filter:ext_authz_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/ext_authz:ext_authz_mocks",

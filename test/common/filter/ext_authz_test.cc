@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/filter/ext_authz.h"
 #include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
@@ -24,6 +25,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 using testing::WithArgs;
 using testing::_;
 
@@ -50,8 +52,7 @@ public:
     client_ = new MockClient();
     filter_.reset(new Instance(config_, ClientPtr{client_}));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
-    check_req_generator_ = new NiceMock<MockCheckRequestGen>();
-    filter_->setCheckReqGenerator(check_req_generator_);
+    addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
@@ -67,11 +68,11 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<MockCheckRequestGen>* check_req_generator_;
   ConfigSharedPtr config_;
   MockClient* client_;
   std::unique_ptr<Instance> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  Network::Address::InstanceConstSharedPtr addr_;
   RequestCallbacks* request_callbacks_{};
 };
 
@@ -94,7 +95,8 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
 TEST_F(ExtAuthzFilterTest, OK) {
   InSequence s;
 
-  EXPECT_CALL(*check_req_generator_, createTcpCheck(_, _));
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(
@@ -121,7 +123,8 @@ TEST_F(ExtAuthzFilterTest, OK) {
 TEST_F(ExtAuthzFilterTest, Denied) {
   InSequence s;
 
-  EXPECT_CALL(*check_req_generator_, createTcpCheck(_, _));
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(
@@ -146,7 +149,8 @@ TEST_F(ExtAuthzFilterTest, Denied) {
 TEST_F(ExtAuthzFilterTest, OKWithSSLConnect) {
   InSequence s;
 
-  EXPECT_CALL(*check_req_generator_, createTcpCheck(_, _));
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(
@@ -175,7 +179,8 @@ TEST_F(ExtAuthzFilterTest, OKWithSSLConnect) {
 TEST_F(ExtAuthzFilterTest, DeniedWithSSLConnect) {
   InSequence s;
 
-  EXPECT_CALL(*check_req_generator_, createTcpCheck(_, _));
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(
@@ -202,6 +207,8 @@ TEST_F(ExtAuthzFilterTest, DeniedWithSSLConnect) {
 TEST_F(ExtAuthzFilterTest, FailOpen) {
   InSequence s;
 
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
@@ -226,6 +233,8 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 TEST_F(ExtAuthzFilterTest, Error) {
   InSequence s;
 
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
@@ -249,6 +258,8 @@ TEST_F(ExtAuthzFilterTest, Error) {
 TEST_F(ExtAuthzFilterTest, Disconnect) {
   InSequence s;
 
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
@@ -266,6 +277,8 @@ TEST_F(ExtAuthzFilterTest, Disconnect) {
 TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   InSequence s;
 
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke(

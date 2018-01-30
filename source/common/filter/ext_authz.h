@@ -98,8 +98,6 @@ public:
   // ExtAuthz::RequestCallbacks
   void onComplete(CheckStatus status) override;
 
-  void setCheckReqGenerator(CheckRequestGenerator* crg);
-
 private:
   enum class Status { NotStarted, Calling, Complete };
   void callCheck();
@@ -109,7 +107,7 @@ private:
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   bool calling_check_{};
-  CheckRequestGeneratorPtr check_req_generator_{};
+  ExtAuthzCheckRequestGenerator check_req_generator_;
 };
 
 } // TcpFilter

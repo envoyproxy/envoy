@@ -18,17 +18,9 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void Instance::setCheckReqGenerator(CheckRequestGenerator* crg) {
-  ASSERT(check_req_generator_ == nullptr);
-  check_req_generator_ = CheckRequestGeneratorPtr{std::move(crg)};
-}
-
 void Instance::callCheck() {
   envoy::service::auth::v2::CheckRequest request;
-  if (check_req_generator_ == nullptr) {
-    setCheckReqGenerator(new ExtAuthzCheckRequestGenerator());
-  }
-  check_req_generator_->createTcpCheck(filter_callbacks_, request);
+  check_req_generator_.createTcpCheck(filter_callbacks_, request);
 
   status_ = Status::Calling;
   filter_callbacks_->connection().readDisable(true);
