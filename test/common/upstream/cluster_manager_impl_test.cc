@@ -45,14 +45,13 @@ class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
-        .WillByDefault(
-            Invoke([&](const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
-                       Outlier::EventLoggerSharedPtr outlier_event_logger,
-                       bool added_via_api) -> ClusterSharedPtr {
-              return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
-                                             ssl_context_manager_, runtime_, random_, dispatcher_,
-                                             local_info_, outlier_event_logger, added_via_api);
-            }));
+        .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                  bool added_via_api) -> ClusterSharedPtr {
+          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
+                                         ssl_context_manager_, runtime_, random_, dispatcher_,
+                                         local_info_, outlier_event_logger, added_via_api);
+        }));
   }
 
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host,
@@ -60,8 +59,7 @@ public:
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
-  ClusterSharedPtr clusterFromProto(const envoy::api::v2::cluster::Cluster& cluster,
-                                    ClusterManager& cm,
+  ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override {
     return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
@@ -89,7 +87,7 @@ public:
                                AccessLog::AccessLogManager& log_manager));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromProto_,
-               ClusterSharedPtr(const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
+               ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                                 bool added_via_api));
   MOCK_METHOD0(createCds_, CdsApi*());
@@ -377,10 +375,9 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
   )EOF";
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
-  envoy::api::v2::cluster::Cluster::LbSubsetConfig* subset_config =
+  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(
-      envoy::api::v2::cluster::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
   subset_config->add_subset_selectors()->add_keys("x");
 
   create(bootstrap);
@@ -404,10 +401,9 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
   )EOF";
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
-  envoy::api::v2::cluster::Cluster::LbSubsetConfig* subset_config =
+  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(
-      envoy::api::v2::cluster::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
   subset_config->add_subset_selectors()->add_keys("x");
 
   EXPECT_THROW_WITH_MESSAGE(

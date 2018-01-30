@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "envoy/service/discovery/v2/eds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
@@ -21,7 +21,7 @@ using testing::_;
 namespace Envoy {
 namespace Config {
 
-typedef FilesystemSubscriptionImpl<envoy::service::discovery::v2::ClusterLoadAssignment>
+typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
     FilesystemEdsSubscriptionImpl;
 
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
@@ -63,17 +63,17 @@ public:
     std::string file_json = "{\"versionInfo\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       file_json += "{\"@type\":\"type.googleapis.com/"
-                   "envoy.service.discovery.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
+                   "envoy.api.v2.ClusterLoadAssignment\",\"clusterName\":\"" +
                    cluster + "\"},";
     }
     file_json.pop_back();
     file_json += "]}";
-    envoy::service::discovery::v2::DiscoveryResponse response_pb;
+    envoy::api::v2::DiscoveryResponse response_pb;
     EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(RepeatedProtoEq(
-                    Config::Utility::getTypedResources<
-                        envoy::service::discovery::v2::ClusterLoadAssignment>(response_pb))))
+                    Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
+                        response_pb))))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;
@@ -94,8 +94,7 @@ public:
   const std::string path_;
   std::string version_;
   Event::DispatcherImpl dispatcher_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::service::discovery::v2::ClusterLoadAssignment>>
-      callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };

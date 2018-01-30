@@ -105,7 +105,7 @@ public:
     // validation mock.
     return nullptr;
   }
-  DrainManagerPtr createDrainManager(envoy::api::v2::listener::Listener::DrainType) override {
+  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType) override {
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }

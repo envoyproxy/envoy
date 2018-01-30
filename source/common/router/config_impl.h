@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
@@ -561,7 +562,7 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::api::v2::route::RouteConfiguration& config,
+  RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
                const ConfigImpl& global_http_config, Runtime::Loader& runtime,
                Upstream::ClusterManager& cm, bool validate_clusters);
 
@@ -591,7 +592,7 @@ private:
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const envoy::api::v2::route::RouteConfiguration& config, Runtime::Loader& runtime,
+  ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
              Upstream::ClusterManager& cm, bool validate_clusters_default);
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };

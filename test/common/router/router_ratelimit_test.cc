@@ -100,7 +100,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 class RateLimitConfiguration : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    envoy::api::v2::route::RouteConfiguration route_config;
+    envoy::api::v2::RouteConfiguration route_config;
     auto json_object_ptr = Json::Factory::loadFromString(json);
     Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
     config_.reset(new ConfigImpl(route_config, runtime_, cm_, true));

@@ -42,9 +42,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
         "@envoy_api//envoy/config/trace/v2:trace_cc",
-        "@envoy_api//envoy/service/discovery/v2:lds_cc",
     ],
 )
 
@@ -170,7 +170,7 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 
@@ -186,7 +186,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
-        "@envoy_api//envoy/service/discovery/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 
@@ -209,7 +209,7 @@ envoy_cc_library(
         "//source/common/ssl:context_config_lib",
         "//source/server/config/listener:original_dst_lib",
         "//source/server/config/listener:proxy_protocol_lib",
-        "@envoy_api//envoy/service/discovery/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 

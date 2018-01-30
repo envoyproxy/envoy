@@ -46,7 +46,7 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectSharedPtr> clusters = response_json->getObjectArray("clusters");
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::cluster::Cluster> resources;
+  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> resources;
   for (const Json::ObjectSharedPtr& cluster : clusters) {
     Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add());
   }

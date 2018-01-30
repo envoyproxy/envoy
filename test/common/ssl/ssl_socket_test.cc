@@ -117,7 +117,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   }
 }
 
-const std::string testUtilV2(const envoy::api::v2::listener::Listener& server_proto,
+const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                              const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
                              const std::string& client_session, bool expect_success,
                              const std::string& expected_protocol_version,
@@ -273,7 +273,7 @@ TEST_P(SslSocketTest, GetCertDigest) {
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::api::v2::auth::TlsCertificate* server_cert =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
@@ -1283,7 +1283,7 @@ TEST_P(SslSocketTest, SslError) {
 }
 
 TEST_P(SslSocketTest, ProtocolVersions) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::api::v2::auth::TlsCertificate* server_cert =
       filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
@@ -1365,7 +1365,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
 }
 
 TEST_P(SslSocketTest, SniCertificate) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
@@ -1440,7 +1440,7 @@ TEST_P(SslSocketTest, SniCertificate) {
 }
 
 TEST_P(SslSocketTest, SniSessionResumption) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com, *
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
@@ -1519,7 +1519,7 @@ TEST_P(SslSocketTest, SniSessionResumption) {
 }
 
 TEST_P(SslSocketTest, SniClientCertificate) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_multiple_dns_cert.pem: *.example.com
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
@@ -1594,7 +1594,7 @@ TEST_P(SslSocketTest, SniClientCertificate) {
 }
 
 TEST_P(SslSocketTest, SniALPN) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
@@ -1644,7 +1644,7 @@ TEST_P(SslSocketTest, SniALPN) {
 }
 
 TEST_P(SslSocketTest, SniCipherSuites) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
@@ -1707,7 +1707,7 @@ TEST_P(SslSocketTest, SniCipherSuites) {
 }
 
 TEST_P(SslSocketTest, SniEcdhCurves) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();
@@ -1770,7 +1770,7 @@ TEST_P(SslSocketTest, SniEcdhCurves) {
 }
 
 TEST_P(SslSocketTest, SniProtocolVersions) {
-  envoy::api::v2::listener::Listener listener;
+  envoy::api::v2::Listener listener;
 
   // san_dns_cert.pem: server1.example.com
   envoy::api::v2::listener::FilterChain* filter_chain1 = listener.add_filter_chains();

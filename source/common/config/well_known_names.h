@@ -132,9 +132,11 @@ public:
   const std::string HEALTH_CHECK = "envoy.health_check";
   // Lua filter
   const std::string LUA = "envoy.lua";
+  // Squash filter
+  const std::string SQUASH = "envoy.squash";
   // External Authorization filter
   const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
-
+  
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 

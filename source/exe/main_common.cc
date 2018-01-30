@@ -31,7 +31,7 @@ public:
         // The global drain manager only triggers on listener modification, which effectively is
         // hot restart at the global level. The per-listener drain managers decide whether to
         // to include /healthcheck/fail status.
-        new DrainManagerImpl(server, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY)};
+        new DrainManagerImpl(server, envoy::api::v2::Listener_DrainType_MODIFY_ONLY)};
   }
 
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

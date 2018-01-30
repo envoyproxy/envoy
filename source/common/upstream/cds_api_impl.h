@@ -2,11 +2,10 @@
 
 #include <functional>
 
-#include "envoy/api/v2/cluster/cluster.pb.h"
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/discovery/v2/cds.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
@@ -18,7 +17,7 @@ namespace Upstream {
  * CDS API implementation that fetches via Subscription.
  */
 class CdsApiImpl : public CdsApi,
-                   Config::SubscriptionCallbacks<envoy::api::v2::cluster::Cluster>,
+                   Config::SubscriptionCallbacks<envoy::api::v2::Cluster>,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::api::v2::ConfigSource& cds_config,
@@ -46,7 +45,7 @@ private:
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;
-  std::unique_ptr<Config::Subscription<envoy::api::v2::cluster::Cluster>> subscription_;
+  std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
 };
