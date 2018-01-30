@@ -199,8 +199,12 @@ private:
       typedef std::unordered_map<uint64_t, Http::ConnectionPool::InstancePtr> ConnPools;
 
       uint64_t key(ResourcePriority priority, Http::Protocol protocol, uint32_t hash_key) {
-        ASSERT(NumResourcePriorities == 2); // One bit needed for priority
-        ASSERT(Http::NumProtocols <= 4);    // Two bits needed for priority
+        // One bit needed for priority
+        static_assert(NumResourcePriorities == 2,
+                      "Fix shifts below to match number of bits needed for 'priority'");
+        // Two bits needed for protocol
+        static_assert(Http::NumProtocols <= 4,
+                      "Fix shifts below to match number of bits needed for 'protocol'");
         return uint64_t(hash_key) << 3 | uint64_t(protocol) << 1 | uint64_t(priority);
       }
 
