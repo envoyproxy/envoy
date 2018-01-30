@@ -57,7 +57,7 @@ public:
    */
   virtual CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) const PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
 
   /**
    * @return host specific gauges.

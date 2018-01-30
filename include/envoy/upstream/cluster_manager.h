@@ -205,7 +205,7 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

@@ -522,7 +522,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    return logical_host->createConnection(cluster_manager.thread_local_dispatcher_);
+    return logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
   } else {
     entry->second->cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};

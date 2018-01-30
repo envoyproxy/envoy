@@ -60,7 +60,7 @@ public:
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) PURE;
+                         const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
    * Create an async DNS resolver. The resolver should only be used on the thread that runs this

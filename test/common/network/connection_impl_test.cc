@@ -84,7 +84,7 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket());
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -222,8 +222,8 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
     broadcast_address.reset(new Address::Ipv6Instance("ff02::1", 0));
   }
 
-  client_connection_ = dispatcher_->createClientConnection(broadcast_address, source_address_,
-                                                           Network::Test::createRawBufferSocket());
+  client_connection_ = dispatcher_->createClientConnection(
+      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr);
   client_connection_->addConnectionCallbacks(client_callbacks_);
   client_connection_->connect();
 
@@ -704,8 +704,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_.reset(new Event::DispatcherImpl);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
-  client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_,
-                                                           Network::Test::createRawBufferSocket());
+  client_connection_ = dispatcher_->createClientConnection(
+      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -881,7 +881,7 @@ public:
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
-        Network::Test::createRawBufferSocket());
+        Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -953,8 +953,9 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
     // IPv6 reserved multicast address.
     address = Utility::resolveUrl("tcp://[ff00::]:1");
   }
-  ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
+  ClientConnectionPtr connection =
+      dispatcher.createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                        Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -968,7 +969,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher.createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);
