@@ -70,7 +70,7 @@ protected:
   /**
    * Pick the host list to use, doing zone aware routing when the hosts are sufficiently healthy.
    */
-  const std::vector<HostSharedPtr>& hostsToUse();
+  const HostVector& hostsToUse();
 
 private:
   enum class LocalityRoutingState {
@@ -98,16 +98,14 @@ private:
    * Try to select upstream hosts from the same locality.
    * @param host_set the last host set returned by chooseHostSet()
    */
-  const std::vector<HostSharedPtr>& tryChooseLocalLocalityHosts(const HostSet& host_set);
+  const HostVector& tryChooseLocalLocalityHosts(const HostSet& host_set);
 
   /**
    * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
    * Caller is responsible for allocation/de-allocation of ret.
    */
-  void
-  calculateLocalityPercentage(const std::vector<std::vector<HostSharedPtr>>& hosts_per_locality,
-                              uint64_t* ret);
+  void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.

@@ -44,7 +44,7 @@ private:
 
   struct Ring {
     Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-         const std::vector<HostSharedPtr>& hosts);
+         const HostVector& hosts);
     HostConstSharedPtr chooseHost(uint64_t hash) const;
 
     std::vector<RingEntry> ring_;

@@ -242,16 +242,15 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const Optional<std::string>& local_cluster_name);
     ~ThreadLocalClusterManagerImpl();
-    void drainConnPools(const std::vector<HostSharedPtr>& hosts);
+    void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
                                         HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
-                                        HostListsConstSharedPtr hosts_per_locality,
-                                        HostListsConstSharedPtr healthy_hosts_per_locality,
-                                        const std::vector<HostSharedPtr>& hosts_added,
-                                        const std::vector<HostSharedPtr>& hosts_removed,
-                                        ThreadLocal::Slot& tls);
+                                        HostsPerLocalityConstSharedPtr hosts_per_locality,
+                                        HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        const HostVector& hosts_added,
+                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
@@ -284,8 +283,7 @@ private:
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
-                                    const std::vector<HostSharedPtr>& hosts_added,
-                                    const std::vector<HostSharedPtr>& hosts_removed);
+                                    const HostVector& hosts_added, const HostVector& hosts_removed);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
 
   ClusterManagerFactory& factory_;

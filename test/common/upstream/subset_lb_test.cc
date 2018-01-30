@@ -96,13 +96,13 @@ public:
   }
 
   void configureHostSet(const HostURLMetadataMap& host_metadata, MockHostSet& host_set) {
-    std::vector<HostSharedPtr> hosts;
+    HostVector hosts;
     for (const auto& it : host_metadata) {
       hosts.emplace_back(makeHost(it.first, it.second));
     }
 
     host_set.hosts_ = hosts;
-    host_set.hosts_per_locality_ = std::vector<std::vector<HostSharedPtr>>({hosts});
+    host_set.hosts_per_locality_ = makeHostsPerLocality({hosts});
     host_set.healthy_hosts_ = host_set.hosts_;
     host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
   }
@@ -129,10 +129,10 @@ public:
                      const std::vector<HostURLMetadataMap>& local_host_metadata_per_locality) {
     EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
 
-    std::vector<HostSharedPtr> hosts;
-    std::vector<std::vector<HostSharedPtr>> hosts_per_locality;
+    HostVector hosts;
+    std::vector<HostVector> hosts_per_locality;
     for (const auto& host_metadata : host_metadata_per_locality) {
-      std::vector<HostSharedPtr> locality_hosts;
+      HostVector locality_hosts;
       for (const auto& host_entry : host_metadata) {
         HostSharedPtr host = makeHost(host_entry.first, host_entry.second);
         hosts.emplace_back(host);
@@ -142,22 +142,23 @@ public:
     }
 
     host_set_.hosts_ = hosts;
-    host_set_.hosts_per_locality_ = hosts_per_locality;
+    host_set_.hosts_per_locality_ = makeHostsPerLocality(std::move(hosts_per_locality));
 
     host_set_.healthy_hosts_ = host_set_.healthy_hosts_;
     host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
-    local_hosts_.reset(new std::vector<HostSharedPtr>());
-    local_hosts_per_locality_.reset(new std::vector<std::vector<HostSharedPtr>>());
+    local_hosts_.reset(new HostVector());
+    std::vector<HostVector> local_hosts_per_locality_vector;
     for (const auto& local_host_metadata : local_host_metadata_per_locality) {
-      std::vector<HostSharedPtr> local_locality_hosts;
+      HostVector local_locality_hosts;
       for (const auto& host_entry : local_host_metadata) {
         HostSharedPtr host = makeHost(host_entry.first, host_entry.second);
         local_hosts_->emplace_back(host);
         local_locality_hosts.emplace_back(host);
       }
-      local_hosts_per_locality_->emplace_back(local_locality_hosts);
+      local_hosts_per_locality_vector.emplace_back(local_locality_hosts);
     }
+    local_hosts_per_locality_ = makeHostsPerLocality(std::move(local_hosts_per_locality_vector));
 
     local_priority_set_.getOrCreateHostSet(0).updateHosts(
         local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {}, {});
@@ -189,8 +190,8 @@ public:
     return default_subset;
   }
 
-  void modifyHosts(std::vector<HostSharedPtr> add, std::vector<HostSharedPtr> remove,
-                   Optional<uint32_t> add_in_locality = {}, uint32_t priority = 0) {
+  void modifyHosts(HostVector add, HostVector remove, Optional<uint32_t> add_in_locality = {},
+                   uint32_t priority = 0) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority);
     for (const auto& host : remove) {
       auto it = std::find(host_set.hosts_.begin(), host_set.hosts_.end(), host);
@@ -199,12 +200,14 @@ public:
       }
       host_set.healthy_hosts_ = host_set.hosts_;
 
-      for (auto& locality_hosts : host_set.hosts_per_locality_) {
+      std::vector<HostVector> locality_hosts_copy = host_set.hosts_per_locality_->get();
+      for (auto& locality_hosts : locality_hosts_copy) {
         auto it = std::find(locality_hosts.begin(), locality_hosts.end(), host);
         if (it != locality_hosts.end()) {
           locality_hosts.erase(it);
         }
       }
+      host_set.hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
       host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
     }
 
@@ -217,7 +220,9 @@ public:
       host_set.healthy_hosts_ = host_set.hosts_;
 
       if (add_in_locality.valid()) {
-        host_set.hosts_per_locality_[add_in_locality.value()].emplace_back(host);
+        std::vector<HostVector> locality_hosts_copy = host_set.hosts_per_locality_->get();
+        locality_hosts_copy[add_in_locality.value()].emplace_back(host);
+        host_set.hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
         host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
       }
     }
@@ -231,20 +236,21 @@ public:
     }
   }
 
-  void modifyLocalHosts(std::vector<HostSharedPtr> add, std::vector<HostSharedPtr> remove,
-                        uint32_t add_in_locality) {
+  void modifyLocalHosts(HostVector add, HostVector remove, uint32_t add_in_locality) {
     for (const auto& host : remove) {
       auto it = std::find(local_hosts_->begin(), local_hosts_->end(), host);
       if (it != local_hosts_->end()) {
         local_hosts_->erase(it);
       }
 
-      for (auto& locality_hosts : *local_hosts_per_locality_) {
+      std::vector<HostVector> locality_hosts_copy = local_hosts_per_locality_->get();
+      for (auto& locality_hosts : locality_hosts_copy) {
         auto it = std::find(locality_hosts.begin(), locality_hosts.end(), host);
         if (it != locality_hosts.end()) {
           locality_hosts.erase(it);
         }
       }
+      local_hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
     }
 
     if (GetParam() == REMOVES_FIRST && !remove.empty()) {
@@ -255,7 +261,9 @@ public:
 
     for (const auto& host : add) {
       local_hosts_->emplace_back(host);
-      (*local_hosts_per_locality_)[add_in_locality].emplace_back(host);
+      std::vector<HostVector> locality_hosts_copy = local_hosts_per_locality_->get();
+      locality_hosts_copy[add_in_locality].emplace_back(host);
+      local_hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
     }
 
     if (GetParam() == REMOVES_FIRST) {
@@ -298,7 +306,7 @@ public:
   ClusterStats stats_;
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
-  HostListsSharedPtr local_hosts_per_locality_;
+  HostsPerLocalitySharedPtr local_hosts_per_locality_;
   std::shared_ptr<SubsetLoadBalancer> lb_;
 };
 
@@ -687,12 +695,12 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   std::vector<std::set<std::string>> subset_keys = {{"version"}};
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
 
-  std::vector<HostSharedPtr> hosts;
+  HostVector hosts;
   hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
   hosts.emplace_back(makeHost("tcp://127.0.0.1:81", {{"version", "1.0"}}));
 
   host_set_.hosts_ = hosts;
-  host_set_.hosts_per_locality_ = std::vector<std::vector<HostSharedPtr>>({hosts});
+  host_set_.hosts_per_locality_ = makeHostsPerLocality({hosts});
 
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
@@ -759,11 +767,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
@@ -802,11 +810,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_[0]},
               Optional<uint32_t>(0));
@@ -815,11 +823,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
                    0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
@@ -869,11 +877,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
@@ -923,11 +931,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {host_set_.hosts_[1]},
               Optional<uint32_t>(0));
@@ -936,11 +944,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
@@ -989,11 +997,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
@@ -1042,11 +1050,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {host_set_.hosts_[1]},
               Optional<uint32_t>(0));
@@ -1055,11 +1063,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
                    0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
 INSTANTIATE_TEST_CASE_P(UpdateOrderings, SubsetLoadBalancerTest,

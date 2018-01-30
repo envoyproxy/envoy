@@ -123,21 +123,54 @@ public:
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
+typedef std::vector<HostSharedPtr> HostVector;
+typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
+typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+
+/**
+ * Bucket hosts by locality.
+ */
+class HostsPerLocality {
+public:
+  virtual ~HostsPerLocality() {}
+
+  /**
+   * @return bool is local locality one of the locality buckets?
+   */
+  virtual bool hasLocalLocality() const PURE;
+
+  /**
+   * @return const std::vector<HostVector>& list of hosts organized per
+   *         locality. The local locality is the first entry if local() !=
+   *         nullptr.
+   */
+  virtual const std::vector<HostVector>& get() const PURE;
+
+  /**
+   * Clone object with a filter predicate.
+   * @param predicate on Host entries.
+   * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality with only
+   *         hosts according to predicate.
+   */
+  virtual std::shared_ptr<const HostsPerLocality>
+  filter(std::function<bool(const Host&)> predicate) const PURE;
+};
+
+typedef std::shared_ptr<HostsPerLocality> HostsPerLocalitySharedPtr;
+typedef std::shared_ptr<const HostsPerLocality> HostsPerLocalityConstSharedPtr;
+
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
  */
 class HostSet {
 public:
-  typedef std::shared_ptr<const std::vector<HostSharedPtr>> HostVectorConstSharedPtr;
-  typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostListsConstSharedPtr;
-
   virtual ~HostSet() {}
 
   /**
    * @return all hosts that make up the set at the current time.
    */
-  virtual const std::vector<HostSharedPtr>& hosts() const PURE;
+  virtual const HostVector& hosts() const PURE;
 
   /**
    * @return all healthy hosts contained in the set at the current time. NOTE: This set is
@@ -145,21 +178,17 @@ public:
    *         unhealthy and calling healthy() on it will return false. Code should be written to
    *         deal with this case if it matters.
    */
-  virtual const std::vector<HostSharedPtr>& healthyHosts() const PURE;
+  virtual const HostVector& healthyHosts() const PURE;
 
   /**
-   * @return hosts per locality, index 0 is dedicated to local locality hosts.
-   * If there are no hosts in local locality for upstream cluster hostsPerLocality() will @return
-   * empty vector.
-   *
-   * Note, that we sort localities in lexicographic order starting from index 1.
+   * @return hosts per locality.
    */
-  virtual const std::vector<std::vector<HostSharedPtr>>& hostsPerLocality() const PURE;
+  virtual const HostsPerLocality& hostsPerLocality() const PURE;
 
   /**
    * @return same as hostsPerLocality but only contains healthy hosts.
    */
-  virtual const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const PURE;
+  virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
 
   /**
    * Updates the hosts in a given host set.
@@ -172,10 +201,9 @@ public:
    * @param hosts_removed supplies the hosts removed since the last update.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                           HostListsConstSharedPtr hosts_per_locality,
-                           HostListsConstSharedPtr healthy_hosts_per_locality,
-                           const std::vector<HostSharedPtr>& hosts_added,
-                           const std::vector<HostSharedPtr>& hosts_removed) PURE;
+                           HostsPerLocalityConstSharedPtr hosts_per_locality,
+                           HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                           const HostVector& hosts_added, const HostVector& hosts_removed) PURE;
 
   /**
    * @return uint32_t the priority of this host set.
@@ -191,8 +219,8 @@ typedef std::unique_ptr<HostSet> HostSetPtr;
  */
 class PrioritySet {
 public:
-  typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed)>
+  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
+                             const HostVector& hosts_removed)>
       MemberUpdateCb;
 
   virtual ~PrioritySet() {}
