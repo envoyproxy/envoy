@@ -62,16 +62,13 @@ private:
 };
 
 /**
- * An interface for creating ext_authz.proto (authorization) request.
+ * For creating ext_authz.proto (authorization) request.
  * CheckRequestGenerator is used to extract attributes from the TCP/HTTP request
  * and fill out the details in the authorization protobuf that is sent to authorization
  * service.
  */
-class CheckRequestGenerator {
+class ExtAuthzCheckRequestGenerator {
 public:
-  // Destructor
-  virtual ~CheckRequestGenerator() {}
-
   /**
    * createHttpCheck is used to extract the attributes from the stream and the http headers
    * and fill them up in the CheckRequest proto message.
@@ -81,9 +78,10 @@ public:
    * @param request is the reference to the check request that will be filled up.
    *
    */
-  virtual void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                               const Envoy::Http::HeaderMap& headers,
-                               envoy::service::auth::v2::CheckRequest& request) PURE;
+  void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                       const Envoy::Http::HeaderMap& headers,
+                       envoy::service::auth::v2::CheckRequest& request);
+
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
    * in the CheckRequest proto message.
@@ -91,18 +89,6 @@ public:
    * @param request is the reference to the check request that will be filled up.
    *
    */
-  virtual void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                              envoy::service::auth::v2::CheckRequest& request) PURE;
-};
-
-typedef std::unique_ptr<CheckRequestGenerator> CheckRequestGeneratorPtr;
-
-class ExtAuthzCheckRequestGenerator : public CheckRequestGenerator {
-public:
-  // ExtAuthz::CheckRequestGenerator
-  void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                       const Envoy::Http::HeaderMap& headers,
-                       envoy::service::auth::v2::CheckRequest& request);
   void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                       envoy::service::auth::v2::CheckRequest& request);
 

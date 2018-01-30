@@ -14,6 +14,5 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/ext_authz:ext_authz_interface",
-        "//source/common/ext_authz:ext_authz_lib",
     ],
 )
