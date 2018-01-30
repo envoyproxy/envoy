@@ -173,13 +173,13 @@ void Filter::chargeUpstreamCode(Http::Code code,
 }
 
 void Filter::sendLocalReply(Http::Code code, const std::string& body,
-                            std::function<void(Http::HeaderMap& headers)> add_headers) {
+                            std::function<void(Http::HeaderMap& headers)> modify_headers) {
   // This is a customized version of send local reply that allows us to set the overloaded
   // header.
   Http::Utility::sendLocalReply(
-      [this, add_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (headers != nullptr && add_headers != nullptr) {
-          add_headers(*headers);
+      [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (headers != nullptr && modify_headers != nullptr) {
+          modify_headers(*headers);
         }
         callbacks_->encodeHeaders(std::move(headers), end_stream);
       },
@@ -220,7 +220,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
             ->void {
               const auto new_path = direct_response->newPath(request_headers);
               if (!new_path.empty()) {
-                response_headers.addCopy(Http::LowerCaseString("location"), new_path);
+                response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
               }
               direct_response->finalizeResponseHeaders(response_headers, callbacks_->requestInfo());
             });

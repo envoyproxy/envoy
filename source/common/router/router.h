@@ -314,11 +314,11 @@ private:
    * Send a locally generated (non-proxied) HTTP response.
    * @param code supplies the HTTP status code.
    * @param body supplies the response body (empty string if no body is needed).
-   * @param add_headers supplies an optional callback function that can add additional
-   *                    headers to the response.
+   * @param modify_headers supplies an optional callback function that can modify the
+   *                       response headers.
    */
   void sendLocalReply(Http::Code code, const std::string& body,
-                      std::function<void(Http::HeaderMap& headers)> add_headers = nullptr);
+                      std::function<void(Http::HeaderMap& headers)> modify_headers = nullptr);
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
