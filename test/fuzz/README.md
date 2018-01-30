@@ -15,7 +15,7 @@ for further details.
 ## Corpus
 
 Every fuzz test must comes with a *corpus*. A corpus is a set of files that
-provide example valid inputs. Fuzzling libraries will use this seed corpus to
+provide example valid inputs. Fuzzing libraries will use this seed corpus to
 drive mutations, e.g. via evolutionary fuzzing, to explore interesting parts of
 the state space.
 
