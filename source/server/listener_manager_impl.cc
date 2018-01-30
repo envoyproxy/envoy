@@ -20,7 +20,7 @@ namespace Server {
 
 std::vector<Configuration::NetworkFilterFactoryCb>
 ProdListenerComponentFactory::createNetworkFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::NetworkFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -51,7 +51,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList_(
 
 std::vector<Configuration::ListenerFilterFactoryCb>
 ProdListenerComponentFactory::createListenerFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
     Configuration::FactoryContext& context) {
   std::vector<Configuration::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {

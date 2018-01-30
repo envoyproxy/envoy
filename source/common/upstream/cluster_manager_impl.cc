@@ -163,7 +163,7 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
-ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstrap,
+ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                        ClusterManagerFactory& factory, Stats::Store& stats,
                                        ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
@@ -265,7 +265,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::api::v2::Bootstrap& bootstra
             ->create(),
         primary_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   } else {
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }
@@ -779,8 +779,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
-    const envoy::api::v2::Bootstrap& bootstrap, Stats::Store& stats, ThreadLocal::Instance& tls,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, primary_dispatcher_)};

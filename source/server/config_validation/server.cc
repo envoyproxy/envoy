@@ -1,5 +1,8 @@
 #include "server/config_validation/server.h"
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
@@ -8,9 +11,6 @@
 #include "common/singleton/manager_impl.h"
 
 #include "server/configuration_impl.h"
-
-#include "api/bootstrap.pb.h"
-#include "api/bootstrap.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -64,7 +64,7 @@ void ValidationInstance::initialize(Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
 
   Config::Utility::createTagProducer(bootstrap);

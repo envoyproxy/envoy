@@ -1,5 +1,6 @@
 #include "common/upstream/eds.h"
 
+#include "envoy/api/v2/eds.pb.validate.h"
 #include "envoy/common/exception.h"
 
 #include "common/config/metadata.h"
@@ -12,7 +13,6 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/sds_subscription.h"
 
-#include "api/eds.pb.validate.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -30,6 +30,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info);
+
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(

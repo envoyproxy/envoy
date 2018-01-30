@@ -448,11 +448,11 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       fmt::format("circuit_breakers.{}.{}.", cluster_name, priority_name);
 
   const auto& thresholds = config.circuit_breakers().thresholds();
-  const auto it =
-      std::find_if(thresholds.cbegin(), thresholds.cend(),
-                   [priority](const envoy::api::v2::CircuitBreakers::Thresholds& threshold) {
-                     return threshold.priority() == priority;
-                   });
+  const auto it = std::find_if(
+      thresholds.cbegin(), thresholds.cend(),
+      [priority](const envoy::api::v2::cluster::CircuitBreakers::Thresholds& threshold) {
+        return threshold.priority() == priority;
+      });
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
     max_pending_requests =

@@ -313,6 +313,20 @@ void FilterJson::translateGrpcJsonTranscoder(
   }
 }
 
+void FilterJson::translateSquashConfig(const Json::Object& json_config,
+                                       envoy::api::v2::filter::http::Squash& proto_config) {
+  json_config.validateSchema(Json::Schema::SQUASH_HTTP_FILTER_SCHEMA);
+
+  JSON_UTIL_SET_STRING(json_config, proto_config, cluster);
+  // convert json object to google.protobuf.Struct
+  std::string json_string = json_config.getObject("attachment_template")->asJsonString();
+  MessageUtil::loadFromJson(json_string, *proto_config.mutable_attachment_template());
+
+  JSON_UTIL_SET_DURATION(json_config, proto_config, attachment_timeout);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, attachment_poll_period);
+  JSON_UTIL_SET_DURATION(json_config, proto_config, request_timeout);
+}
+
 void FilterJson::translateRouter(const Json::Object& json_config,
                                  envoy::api::v2::filter::http::Router& proto_config) {
   json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);

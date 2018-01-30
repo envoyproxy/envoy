@@ -35,7 +35,7 @@ std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
-RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
   if (!config.has_retry_policy()) {
     return;
   }
@@ -47,7 +47,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::RouteAction& config) {
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
@@ -61,7 +61,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::CorsPolicy& config) {
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::RouteAction& config) {
+ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
   if (!config.has_request_mirror_policy()) {
     return;
   }
@@ -126,20 +126,21 @@ public:
 };
 
 HashPolicyImpl::HashPolicyImpl(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::RouteAction::HashPolicy>& hash_policies) {
+    const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+        hash_policies) {
   // TODO(htuch): Add support for cookie hash policies, #1295
   hash_impls_.reserve(hash_policies.size());
 
   for (auto& hash_policy : hash_policies) {
     switch (hash_policy.policy_specifier_case()) {
-    case envoy::api::v2::RouteAction::HashPolicy::kHeader:
+    case envoy::api::v2::route::RouteAction::HashPolicy::kHeader:
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
-    case envoy::api::v2::RouteAction::HashPolicy::kCookie:
+    case envoy::api::v2::route::RouteAction::HashPolicy::kCookie:
       hash_impls_.emplace_back(
           new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().ttl().seconds()));
       break;
-    case envoy::api::v2::RouteAction::HashPolicy::kConnectionProperties:
+    case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod());
       }
@@ -204,7 +205,7 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
   return v;
 }
 
-DecoratorImpl::DecoratorImpl(const envoy::api::v2::Decorator& decorator)
+DecoratorImpl::DecoratorImpl(const envoy::api::v2::route::Decorator& decorator)
     : operation_(decorator.operation()) {}
 
 void DecoratorImpl::apply(Tracing::Span& span) const {
@@ -215,10 +216,9 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
-const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
-
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
-                                       const envoy::api::v2::Route& route, Runtime::Loader& loader)
+                                       const envoy::api::v2::route::Route& route,
+                                       Runtime::Loader& loader)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
@@ -233,6 +233,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
+      total_cluster_weight_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
       request_headers_parser_(HeaderParser::configure(route.route().request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(route.route().response_headers_to_add(),
                                                        route.route().response_headers_to_remove())),
@@ -256,7 +258,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // single cluster, pointing back to the parent. Metadata criteria
   // from the weighted cluster (if any) are merged with and override
   // the criteria from the route.
-  if (route.route().cluster_specifier_case() == envoy::api::v2::RouteAction::kWeightedClusters) {
+  if (route.route().cluster_specifier_case() ==
+      envoy::api::v2::route::RouteAction::kWeightedClusters) {
+    ASSERT(total_cluster_weight_ > 0);
+
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
@@ -285,9 +290,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_weight != WeightedClusterEntry::MAX_CLUSTER_WEIGHT) {
+    if (total_weight != total_cluster_weight_) {
       throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
-                                       WeightedClusterEntry::MAX_CLUSTER_WEIGHT));
+                                       total_cluster_weight_));
     }
   }
 
@@ -355,7 +360,7 @@ void RouteEntryImplBase::finalizeResponseHeaders(
 }
 
 Optional<RouteEntryImplBase::RuntimeData>
-RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::RouteMatch& route_match) {
+RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
   Optional<RuntimeData> runtime;
   if (route_match.has_runtime()) {
     RuntimeData data;
@@ -404,7 +409,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
 }
 
 std::multimap<std::string, std::string>
-RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
+RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata =
@@ -421,7 +426,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::Route& route) {
   return ret;
 }
 
-DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::Route& route) {
+DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route::Route& route) {
   DecoratorConstPtr ret;
   if (route.has_decorator()) {
     ret = DecoratorConstPtr(new DecoratorImpl(route.decorator()));
@@ -471,7 +476,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
   }
 
-  uint64_t selected_value = random_value % WeightedClusterEntry::MAX_CLUSTER_WEIGHT;
+  uint64_t selected_value = random_value % total_cluster_weight_;
   uint64_t begin = 0UL;
   uint64_t end = 0UL;
 
@@ -480,13 +485,10 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) ||
-        (end >= WeightedClusterEntry::MAX_CLUSTER_WEIGHT)) {
-      // end > WeightedClusterEntry::MAX_CLUSTER_WEIGHT : This case can only occur
-      // with Runtimes, when the user specifies invalid weights such that
-      // sum(weights) > WeightedClusterEntry::MAX_CLUSTER_WEIGHT.
-      // In this case, terminate the search and just return the cluster
-      // whose weight cased the overflow
+    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
+      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
+      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
+      // terminate the search and just return the cluster whose weight caused the overflow.
       return cluster;
     }
     begin = end;
@@ -520,7 +522,7 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
-                                           const envoy::api::v2::Route& route,
+                                           const envoy::api::v2::route::Route& route,
                                            Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
 
@@ -541,7 +543,8 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers
 }
 
 PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
-                                       const envoy::api::v2::Route& route, Runtime::Loader& loader)
+                                       const envoy::api::v2::route::Route& route,
+                                       Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
 
 void PathRouteEntryImpl::finalizeRequestHeaders(
@@ -580,7 +583,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 }
 
 RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
-                                         const envoy::api::v2::Route& route,
+                                         const envoy::api::v2::route::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
       regex_(RegexUtil::parseRegex(route.match().regex().c_str())) {}
@@ -608,7 +611,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
   return nullptr;
 }
 
-VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host,
+VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
                                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
@@ -617,13 +620,13 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())) {
   switch (virtual_host.require_tls()) {
-  case envoy::api::v2::VirtualHost::NONE:
+  case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
     break;
-  case envoy::api::v2::VirtualHost::EXTERNAL_ONLY:
+  case envoy::api::v2::route::VirtualHost::EXTERNAL_ONLY:
     ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
     break;
-  case envoy::api::v2::VirtualHost::ALL:
+  case envoy::api::v2::route::VirtualHost::ALL:
     ssl_requirements_ = SslRequirements::ALL;
     break;
   default:
@@ -632,10 +635,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 
   for (const auto& route : virtual_host.routes()) {
     const bool has_prefix =
-        route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPrefix;
-    const bool has_path = route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kPath;
+        route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kPrefix;
+    const bool has_path =
+        route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kPath;
     const bool has_regex =
-        route.match().path_specifier_case() == envoy::api::v2::RouteMatch::kRegex;
+        route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex;
     if (has_prefix) {
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
     } else if (has_path) {
@@ -667,7 +671,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::VirtualHost& virtual_host
 }
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
-    const envoy::api::v2::VirtualCluster& virtual_cluster) {
+    const envoy::api::v2::route::VirtualCluster& virtual_cluster) {
   if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
     method_ = envoy::api::v2::RequestMethod_Name(virtual_cluster.method());
   }

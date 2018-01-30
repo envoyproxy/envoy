@@ -8,6 +8,11 @@ namespace Envoy {
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 /**
+ * @return the length of a static string literal, e.g. STATIC_STRLEN("foo") == 3.
+ */
+#define STATIC_STRLEN(X) (sizeof(X) - 1)
+
+/**
  * Helper macros from enum to string macros.
  */
 #define GENERATE_ENUM(X) X,

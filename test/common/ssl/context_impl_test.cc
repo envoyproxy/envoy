@@ -9,6 +9,7 @@
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -177,9 +178,9 @@ public:
     ServerContextPtr server_ctx(manager.createSslServerContext("", {}, store, cfg, true));
   }
 
-  static void loadConfigV2(envoy::api::v2::DownstreamTlsContext& cfg) {
+  static void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg) {
     // Must add a certificate for the config to be considered valid.
-    envoy::api::v2::TlsCertificate* server_cert =
+    envoy::api::v2::auth::TlsCertificate* server_cert =
         cfg.mutable_common_tls_context()->add_tls_certificates();
     server_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
@@ -244,44 +245,84 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesSuccess) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, '\0'));
   EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringSuccess) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(80, '\0'));
   EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesFailTooBig) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(81, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooBig) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(81, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesFailTooSmall) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(79, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
-  envoy::api::v2::DownstreamTlsContext cfg;
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_string(std::string(79, '\0'));
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.crl"
+  }
+  )EOF";
+
+  EXPECT_NO_THROW(loadConfigJson(json));
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLInvalid) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+                          "^Failed to load CRL from .*/not_a_crl.crl$");
+}
+
+TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "crl_file": "{{ test_rundir }}/test/common/ssl/test_data/not_a_crl.crl"
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
+                          "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
 } // namespace Ssl
