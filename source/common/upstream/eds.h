@@ -1,12 +1,11 @@
 #pragma once
 
+#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
 
 #include "common/upstream/upstream_impl.h"
-
-#include "api/base.pb.h"
-#include "api/eds.pb.h"
 
 namespace Envoy {
 namespace Upstream {

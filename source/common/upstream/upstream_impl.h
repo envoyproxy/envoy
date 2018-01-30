@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -32,8 +33,6 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
-
-#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {

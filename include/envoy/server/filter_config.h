@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
@@ -19,8 +20,6 @@
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
-
-#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Server {

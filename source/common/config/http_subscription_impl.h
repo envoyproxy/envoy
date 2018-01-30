@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -12,7 +13,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "api/base.pb.h"
 #include "google/api/annotations.pb.h"
 
 namespace Envoy {

@@ -40,7 +40,7 @@ public:
 
   AccessLog::FilterPtr filter_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig http_grpc_access_log_;
+  envoy::config::accesslog::v2::HttpGrpcAccessLogConfig http_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
   AccessLogInstanceFactory* factory_{};
 };

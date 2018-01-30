@@ -59,7 +59,11 @@ public:
   bool hasResetStream() const { return http_reset_; }
 
 private:
-  void streamError(Status::GrpcStatus grpc_status, const std::string& message);
+  void streamError(Status::GrpcStatus grpc_status, const std::string& message) {
+    callbacks_.onRemoteClose(grpc_status, message);
+    resetStream();
+  }
+
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();

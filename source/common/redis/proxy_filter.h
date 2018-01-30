@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/redis/codec.h"
@@ -12,8 +13,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-
-#include "api/filter/network/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Redis {
