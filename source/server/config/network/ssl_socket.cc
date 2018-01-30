@@ -36,13 +36,14 @@ Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSo
     TransportSocketFactoryContext& context) {
   return std::make_unique<Ssl::ServerSslSocketFactory>(
       Ssl::ServerContextConfigImpl(
-          MessageUtil::downcastAndValidate<const envoy::api::v2::DownstreamTlsContext&>(message)),
+          MessageUtil::downcastAndValidate<const envoy::api::v2::auth::DownstreamTlsContext&>(
+              message)),
       listener_name, server_names, skip_context_update, context.sslContextManager(),
       context.statsScope());
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::api::v2::DownstreamTlsContext>();
+  return std::make_unique<envoy::api::v2::auth::DownstreamTlsContext>();
 }
 
 static Registry::RegisterFactory<DownstreamSslSocketFactory, DownstreamTransportSocketConfigFactory>
