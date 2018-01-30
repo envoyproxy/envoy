@@ -228,7 +228,7 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string SslSocket::urlEncodedPemEncodedCertificate() const {
+std::string SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";

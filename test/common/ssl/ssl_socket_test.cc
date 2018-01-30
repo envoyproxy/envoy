@@ -100,7 +100,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
           }
           if (!expected_peer_cert.empty()) {
             EXPECT_EQ(expected_peer_cert,
-                      server_connection->ssl()->urlEncodedPemEncodedCertificate());
+                      server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
           }
           server_connection->close(Network::ConnectionCloseType::NoFlush);
           client_connection->close(Network::ConnectionCloseType::NoFlush);

@@ -488,7 +488,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(Return("abcdefg"));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
-  EXPECT_CALL(ssl, urlEncodedPemEncodedCertificate()).WillOnce(Return("%3D%3Dabc%0Ade%3D"));
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(Return("%3D%3Dabc%0Ade%3D"));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
@@ -546,7 +546,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_CALL(ssl, subjectPeerCertificate())
       .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
-  EXPECT_CALL(ssl, urlEncodedPemEncodedCertificate()).WillOnce(Return("abcde="));
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(Return("abcde="));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
