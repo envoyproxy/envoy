@@ -701,7 +701,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& 
   return nullptr;
 }
 
-RouteMatcher::RouteMatcher(const envoy::api::v2::route::RouteConfiguration& route_config,
+RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_config,
                            const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                            Upstream::ClusterManager& cm, bool validate_clusters) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
@@ -803,9 +803,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   return nullptr;
 }
 
-ConfigImpl::ConfigImpl(const envoy::api::v2::route::RouteConfiguration& config,
-                       Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-                       bool validate_clusters_default) {
+ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
+                       Upstream::ClusterManager& cm, bool validate_clusters_default) {
   route_matcher_.reset(new RouteMatcher(
       config, *this, runtime, cm,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));

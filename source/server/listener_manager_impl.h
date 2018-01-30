@@ -50,8 +50,7 @@ public:
 
   Network::ListenSocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
-  DrainManagerPtr
-  createDrainManager(envoy::api::v2::listener::Listener::DrainType drain_type) override;
+  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
@@ -95,8 +94,7 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::api::v2::listener::Listener& config,
-                           bool modifiable) override;
+  bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) override;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
@@ -182,7 +180,7 @@ public:
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
    */
-  ListenerImpl(const envoy::api::v2::listener::Listener& config, ListenerManagerImpl& parent,
+  ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                const std::string& name, bool modifiable, bool workers_started, uint64_t hash);
   ~ListenerImpl();
 

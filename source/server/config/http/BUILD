@@ -180,6 +180,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "squash_lib",
+    srcs = ["squash.cc"],
+    hdrs = ["squash.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/http/filter:squash_filter_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "zipkin_lib",
     srcs = ["zipkin_http_tracer.cc"],
     hdrs = ["zipkin_http_tracer.h"],

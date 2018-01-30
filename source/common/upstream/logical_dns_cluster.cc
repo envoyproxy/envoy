@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Upstream {
 
-LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::cluster::Cluster& cluster,
+LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager,
                                      Network::DnsResolverSharedPtr dns_resolver,
@@ -35,13 +35,13 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::cluster::Cluster& clu
   }
 
   switch (cluster.dns_lookup_family()) {
-  case envoy::api::v2::cluster::Cluster::V6_ONLY:
+  case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
     break;
-  case envoy::api::v2::cluster::Cluster::V4_ONLY:
+  case envoy::api::v2::Cluster::V4_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
     break;
-  case envoy::api::v2::cluster::Cluster::AUTO:
+  case envoy::api::v2::Cluster::AUTO:
     dns_lookup_family_ = Network::DnsLookupFamily::Auto;
     break;
   default:

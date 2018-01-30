@@ -50,7 +50,7 @@ envoy_cc_library(
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/service/discovery/v2:rds_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 
@@ -76,8 +76,8 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
-        "@envoy_api//envoy/service/discovery/v2:rds_cc",
     ],
 )
 

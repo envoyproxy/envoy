@@ -200,14 +200,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
-    if (cluster.type() != envoy::api::v2::cluster::Cluster::EDS) {
+    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
       loadCluster(cluster, false);
     }
   }
 
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::api::v2::cluster::Cluster::EDS) {
+    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
       loadCluster(cluster, false);
     }
   }
@@ -337,8 +337,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::addOrUpdatePrimaryCluster(
-    const envoy::api::v2::cluster::Cluster& cluster) {
+bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration.
   const std::string cluster_name = cluster.name();
@@ -403,8 +402,7 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
   return true;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::api::v2::cluster::Cluster& cluster,
-                                     bool added_via_api) {
+void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api) {
   ClusterSharedPtr new_cluster =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
 
@@ -802,7 +800,7 @@ ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostC
 }
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
-    const envoy::api::v2::cluster::Cluster& cluster, ClusterManager& cm,
+    const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, primary_dispatcher_, local_info_,

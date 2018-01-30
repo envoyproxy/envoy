@@ -91,7 +91,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
   return nullptr;
 }
 
-OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::cluster::Cluster& config,
+OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
                                        Runtime::Loader& runtime, Stats::Store& stats,
                                        Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                        Event::Dispatcher& dispatcher, bool added_via_api)

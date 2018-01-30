@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/json/json_object.h"
 
@@ -58,12 +59,12 @@ public:
       envoy::api::v2::route::QueryParameterMatcher& query_parameter_matcher);
 
   /**
-   * Translate a v1 JSON route configuration object to v2 envoy::api::v2::route::RouteConfiguration.
+   * Translate a v1 JSON route configuration object to v2 envoy::api::v2::RouteConfiguration.
    * @param json_route_config source v1 JSON route configuration object.
-   * @param route_config destination v2 envoy::api::v2::route::RouteConfiguration.
+   * @param route_config destination v2 envoy::api::v2::RouteConfiguration.
    */
   static void translateRouteConfiguration(const Json::Object& json_route_config,
-                                          envoy::api::v2::route::RouteConfiguration& route_config);
+                                          envoy::api::v2::RouteConfiguration& route_config);
 
   /**
    * Translate a v1 JSON virtual host object to v2 envoy::api::v2::route::VirtualHost.

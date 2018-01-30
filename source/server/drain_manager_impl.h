@@ -19,7 +19,7 @@ namespace Server {
  */
 class DrainManagerImpl : Logger::Loggable<Logger::Id::main>, public DrainManager {
 public:
-  DrainManagerImpl(Instance& server, envoy::api::v2::listener::Listener::DrainType drain_type);
+  DrainManagerImpl(Instance& server, envoy::api::v2::Listener::DrainType drain_type);
 
   // Server::DrainManager
   bool drainClose() const override;
@@ -31,7 +31,7 @@ private:
   void drainSequenceTick();
 
   Instance& server_;
-  const envoy::api::v2::listener::Listener::DrainType drain_type_;
+  const envoy::api::v2::Listener::DrainType drain_type_;
   Event::TimerPtr drain_tick_timer_;
   std::atomic<uint32_t> drain_time_completed_{};
   Event::TimerPtr parent_shutdown_timer_;

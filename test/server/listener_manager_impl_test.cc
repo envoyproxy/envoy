@@ -52,9 +52,9 @@ public:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(bool need_init,
-                                       envoy::api::v2::listener::Listener::DrainType drain_type =
-                                           envoy::api::v2::listener::Listener_DrainType_DEFAULT) {
+  ListenerHandle* expectListenerCreate(
+      bool need_init,
+      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
@@ -280,7 +280,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   )EOF";
 
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -317,7 +317,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   )EOF";
 
   ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, envoy::api::v2::listener::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(
                                 parseListenerFromJson(listener_foo_different_address_json), true),

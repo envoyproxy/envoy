@@ -563,7 +563,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
   setup();
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteConfiguration> route_configs;
+  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
   auto* route_config = route_configs.Add();
   route_config->set_name("foo_route_config");
   route_config->mutable_virtual_hosts()->Add();
@@ -583,7 +583,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   setup();
   init_manager_.initialize();
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteConfiguration> route_configs;
+  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
   route_configs.Add();
   route_configs.Add();
   EXPECT_CALL(init_manager_.initialized_, ready());

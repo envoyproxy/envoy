@@ -56,7 +56,7 @@ private:
     stats_.update_attempt_.inc();
     bool config_update_available = false;
     try {
-      envoy::service::discovery::v2::DiscoveryResponse message;
+      envoy::api::v2::DiscoveryResponse message;
       MessageUtil::loadFromFile(path_, message);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;

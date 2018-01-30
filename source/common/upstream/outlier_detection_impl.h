@@ -44,7 +44,7 @@ private:
 class DetectorImplFactory {
 public:
   static DetectorSharedPtr createForCluster(Cluster& cluster,
-                                            const envoy::api::v2::cluster::Cluster& cluster_config,
+                                            const envoy::api::v2::Cluster& cluster_config,
                                             Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                             EventLoggerSharedPtr event_logger);
 };
