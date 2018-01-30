@@ -217,12 +217,14 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
             "//test/fuzz:main",
         ],
     )
-    native.cc_test(
+    native.cc_binary(
         name = name + "_driverless",
         copts = envoy_copts("@envoy", test = True),
         linkopts = envoy_test_linkopts(),
         linkstatic = 1,
+        testonly = 1,
         deps = [":" + test_lib_name],
+        tags = ["manual"],
     )
 
 # Envoy C++ test targets should be specified with this function.
