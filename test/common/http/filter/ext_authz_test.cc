@@ -9,11 +9,13 @@
 #include "common/http/filter/ext_authz.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "test/mocks/ext_authz/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -28,7 +30,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SetArgReferee;
 using testing::WithArgs;
 using testing::_;
 
@@ -48,8 +49,7 @@ public:
     client_ = new Envoy::ExtAuthz::MockClient();
     filter_.reset(new Filter(config_, Envoy::ExtAuthz::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    check_req_generator_ = new NiceMock<Envoy::ExtAuthz::MockCheckRequestGen>();
-    filter_->setCheckReqGenerator(check_req_generator_);
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
 
   const std::string filter_config_ = R"EOF(
@@ -72,7 +72,8 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Envoy::ExtAuthz::MockCheckRequestGen>* check_req_generator_;
+  Network::Address::InstanceConstSharedPtr addr_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
 };
 
 TEST_F(HttpExtAuthzFilterTest, BadConfig) {
@@ -115,7 +116,9 @@ TEST_F(HttpExtAuthzFilterTest, OkResponse) {
   SetUpTest(filter_config_);
   InSequence s;
 
-  EXPECT_CALL(*check_req_generator_, createHttpCheck(_, _, _));
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;
@@ -139,6 +142,9 @@ TEST_F(HttpExtAuthzFilterTest, ImmediateOkResponse) {
   SetUpTest(filter_config_);
   InSequence s;
 
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         callbacks.onComplete(Envoy::ExtAuthz::CheckStatus::OK);
@@ -157,7 +163,9 @@ TEST_F(HttpExtAuthzFilterTest, DeniedResponse) {
   SetUpTest(filter_config_);
   InSequence s;
 
-  EXPECT_CALL(*check_req_generator_, createHttpCheck(_, _, _));
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;
@@ -194,6 +202,9 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
   SetUpTest(fail_close_config);
   InSequence s;
 
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;
@@ -212,6 +223,9 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   SetUpTest(filter_config_);
   InSequence s;
 
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;
@@ -230,6 +244,9 @@ TEST_F(HttpExtAuthzFilterTest, ResetDuringCall) {
   SetUpTest(filter_config_);
   InSequence s;
 
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;

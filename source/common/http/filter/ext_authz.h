@@ -79,8 +79,6 @@ public:
   // ExtAuthz::RequestCallbacks
   void onComplete(Envoy::ExtAuthz::CheckStatus status) override;
 
-  void setCheckReqGenerator(Envoy::ExtAuthz::CheckRequestGenerator* crg);
-
 private:
   enum class State { NotStarted, Calling, Complete, Responded };
   void initiateCall(const HeaderMap& headers);
@@ -91,7 +89,7 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  Envoy::ExtAuthz::CheckRequestGeneratorPtr check_req_generator_{};
+  Envoy::ExtAuthz::ExtAuthzCheckRequestGenerator check_req_generator_;
 };
 
 } // namespace ExtAuthz

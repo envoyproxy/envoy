@@ -27,11 +27,6 @@ static const Http::HeaderMap* getDeniedHeader() {
 
 } // namespace
 
-void Filter::setCheckReqGenerator(Envoy::ExtAuthz::CheckRequestGenerator* crg) {
-  ASSERT(check_req_generator_ == nullptr);
-  check_req_generator_ = Envoy::ExtAuthz::CheckRequestGeneratorPtr{std::move(crg)};
-}
-
 void Filter::initiateCall(const HeaderMap& headers) {
 
   Router::RouteConstSharedPtr route = callbacks_->route();
@@ -46,11 +41,8 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
   cluster_ = cluster->info();
 
-  if (check_req_generator_ == nullptr) {
-    setCheckReqGenerator(new Envoy::ExtAuthz::ExtAuthzCheckRequestGenerator());
-  }
   envoy::service::auth::v2::CheckRequest request;
-  check_req_generator_->createHttpCheck(callbacks_, headers, request);
+  check_req_generator_.createHttpCheck(callbacks_, headers, request);
 
   state_ = State::Calling;
   initiating_call_ = true;
