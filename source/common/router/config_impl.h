@@ -297,7 +297,9 @@ public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::Route& route,
                      Runtime::Loader& loader);
 
-  bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
+  bool isRedirect() const {
+    return !host_redirect_.empty() || !path_redirect_.empty() || https_redirect_;
+  }
   bool isDirectResponse() const { return direct_response_code_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
@@ -477,6 +479,7 @@ private:
   Runtime::Loader& loader_;
   const std::string host_redirect_;
   const std::string path_redirect_;
+  const bool https_redirect_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
