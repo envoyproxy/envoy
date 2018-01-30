@@ -1,7 +1,7 @@
 # Envoy fuzz testing
 
-Envoy is fuzz tested via [oss-fuzz](https://github.com/google/oss-fuzz). We
-follow the best practices described in the oss-fuzz [ideal integration
+Envoy is fuzz tested via [OSS-Fuzz](https://github.com/google/oss-fuzz). We
+follow the best practices described in the OSS-Fuzz [ideal integration
 page](https://github.com/google/oss-fuzz/blob/master/docs/ideal_integration.md).
 
 ## Test environment
@@ -19,7 +19,7 @@ provide example valid inputs. Fuzzing libraries will use this seed corpus to
 drive mutations, e.g. via evolutionary fuzzing, to explore interesting parts of
 the state space.
 
-The corpus also acts as a quick regression test for evaluation the fuzz tests
+The corpus also acts as a quick regression test for evaluating the fuzz tests
 without the help of a fuzzing library.
 
 The corpus is located in a directory underneath the fuzz test. E.g. suppose you
@@ -38,16 +38,16 @@ void Envoy::Fuzz::Runner::execute(const uint8_t* data, size_t size);
 ```
 
 It is up to your test `execute()` implementation to map this buffer of data to
-meaningful semantics, e.g. a steam of network bytes or a protobuf binary input.
+meaningful semantics, e.g. a stream of network bytes or a protobuf binary input.
 
 The fuzz test will be executed in two environments:
 
 1. Under Envoy's fuzz test driver when run in the Envoy repository with
    `bazel test //test/path/to/some_fuzz_test`. This provides a litmus test
-   indicating that our tests pass CI and basic sanitizers on the supplied
+   indicating that the test passes CI and basic sanitizers on the supplied
    corpus.
 
-2. Via fuzzing library test drivers in oss-fuzz. This is where the real fuzzing
+2. Via fuzzing library test drivers in OSS-Fuzz. This is where the real fuzzing
    takes places on a VM cluster and the seed corpus is used by fuzzers to
    explore the state space.
 
