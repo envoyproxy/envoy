@@ -63,7 +63,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
-        "@envoy_api//envoy/api/v2/filter/http:fault_cc",
+        "@envoy_api//envoy/config/filter/v2/http:fault_cc",
     ],
 )
 
@@ -96,7 +96,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/http:squash_cc",
+        "@envoy_api//envoy/config/filter/v2/http:squash_cc",
     ],
 )
 
@@ -128,6 +128,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_validator_lib",
-        "@envoy_api//envoy/api/v2/filter/http:rate_limit_cc",
+        "@envoy_api//envoy/config/filter/v2/http:rate_limit_cc",
     ],
 )

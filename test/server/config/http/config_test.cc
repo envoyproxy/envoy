@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/config/filter/v2/http/router.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"

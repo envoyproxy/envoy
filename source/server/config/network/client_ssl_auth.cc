@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/client_ssl_auth.pb.validate.h"
+#include "envoy/config/filter/v2/network/client_ssl_auth.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 

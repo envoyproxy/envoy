@@ -1,5 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/v2/network/http_connection_manager.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/resources.h"

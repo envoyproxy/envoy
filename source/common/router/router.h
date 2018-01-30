@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/config/filter/v2/http/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"

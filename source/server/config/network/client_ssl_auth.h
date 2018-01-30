@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/client_ssl_auth.pb.h"
+#include "envoy/config/filter/v2/network/client_ssl_auth.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"

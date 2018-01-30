@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/network/rate_limit.pb.h"
+#include "envoy/config/filter/v2/network/rate_limit.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"

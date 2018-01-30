@@ -1,4 +1,4 @@
-#include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/config/filter/v2/http/router.pb.h"
 
 #include "common/config/filter_json.h"
 #include "common/json/json_loader.h"

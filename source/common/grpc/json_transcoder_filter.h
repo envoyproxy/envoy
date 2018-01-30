@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/filter/http/transcoder.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/v2/http/transcoder.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"

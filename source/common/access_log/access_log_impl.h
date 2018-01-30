@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
+#include "envoy/config/filter/v2/accesslog/accesslog.pb.h"
 #include "envoy/request_info/request_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"

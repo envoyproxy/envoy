@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
+#include "envoy/config/filter/v2/network/redis_proxy.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"

@@ -1,6 +1,6 @@
 #include "server/config/access_log/file_access_log.h"
 
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
+#include "envoy/config/filter/v2/accesslog/accesslog.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

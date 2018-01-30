@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/api/v2/filter/network/mongo_proxy.pb.h"
+#include "envoy/config/filter/v2/network/mongo_proxy.pb.h"
 
 #include "server/config/network/mongo_proxy.h"
 

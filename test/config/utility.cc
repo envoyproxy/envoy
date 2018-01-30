@@ -1,6 +1,6 @@
 #include "test/config/utility.h"
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/v2/network/http_connection_manager.pb.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"

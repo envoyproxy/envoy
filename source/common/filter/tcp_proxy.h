@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.h"
+#include "envoy/config/filter/v2/network/tcp_proxy.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"

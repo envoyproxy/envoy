@@ -1,6 +1,6 @@
 #include "server/config/http/lua.h"
 
-#include "envoy/api/v2/filter/http/lua.pb.validate.h"
+#include "envoy/config/filter/v2/http/lua.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"

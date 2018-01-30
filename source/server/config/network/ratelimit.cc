@@ -3,7 +3,7 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/api/v2/filter/network/rate_limit.pb.validate.h"
+#include "envoy/config/filter/v2/network/rate_limit.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
