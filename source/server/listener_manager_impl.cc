@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
@@ -12,8 +13,6 @@
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

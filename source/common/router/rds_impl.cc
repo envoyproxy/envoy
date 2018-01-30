@@ -9,14 +9,13 @@
 #include "envoy/api/v2/route/route.pb.validate.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {

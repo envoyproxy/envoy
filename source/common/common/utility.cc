@@ -10,9 +10,10 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_split.h"
-#include "fmt/format.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

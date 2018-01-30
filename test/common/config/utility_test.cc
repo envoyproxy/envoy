@@ -1,6 +1,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
 #include "common/config/cds_json.h"
 #include "common/config/lds_json.h"
 #include "common/config/rds_json.h"
@@ -16,7 +17,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

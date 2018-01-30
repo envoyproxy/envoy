@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/common/fmt.h"
 #include "common/config/protocol_json.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -11,7 +12,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::InvokeWithoutArgs;
