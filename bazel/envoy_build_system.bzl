@@ -410,5 +410,6 @@ def envoy_select_exported_symbols(xs):
 def envoy_select_force_libcpp(xs, ys = None):
     return select({
         "@envoy//bazel:force_libcpp": xs,
+        "@bazel_tools//tools/osx:darwin": [],
         "//conditions:default": ys or [],
     })
