@@ -192,7 +192,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   }
 
   ASSERT(!transport_socket_factories_.empty());
-  ASSERT(transport_socket_factories_[0]);
+  ASSERT(transport_socket_factories_[0] != nullptr);
 
   // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
   // This doesn't work right now, because BoringSSL uses "session context" (initial SSL_CTX that

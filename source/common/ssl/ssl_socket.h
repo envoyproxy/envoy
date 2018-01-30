@@ -62,7 +62,7 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  ClientContextPtr ssl_ctx_;
+  const ClientContextPtr ssl_ctx_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory {
@@ -74,7 +74,7 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  ServerContextPtr ssl_ctx_;
+  const ServerContextPtr ssl_ctx_;
 };
 
 } // namespace Ssl

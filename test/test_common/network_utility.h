@@ -98,13 +98,13 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
                                                                      Address::SocketType type);
 
 /**
- * Create a transport socket for testing purpse.
+ * Create a transport socket for testing purposes.
  * @return TransportSocketPtr the transport socket factory to use with a connection.
  */
 TransportSocketPtr createRawBufferSocket();
 
 /**
- * Create a transport socket factory for testing purpse.
+ * Create a transport socket factory for testing purposes.
  * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster or a
  * listener.
  */
