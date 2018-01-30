@@ -127,7 +127,7 @@ protected:
 
 protected:
   bool connecting_{false};
-  bool immediate_error_{false};
+  ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
   Event::FileEventPtr file_event_;
 

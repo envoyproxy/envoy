@@ -341,7 +341,7 @@ void ConnectionImpl::onHighWatermark() {
 void ConnectionImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (immediate_error_) {
+  if (immediate_error_event_ != ConnectionEvent::Connected) {
     if (bind_error_) {
       ENVOY_CONN_LOG(debug, "raising bind error", *this);
       // Update stats here, rather than on bind failure, to give the caller a chance to
@@ -352,7 +352,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     } else {
       ENVOY_CONN_LOG(debug, "raising immediate error", *this);
     }
-    closeSocket(ConnectionEvent::LocalClose);
+    closeSocket(immediate_error_event_);
     return;
   }
 
@@ -487,7 +487,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
-      immediate_error_ = true;
+      immediate_error_event_ = ConnectionEvent::LocalClose;
 
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
@@ -497,7 +497,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     if (!options->setOptions(*socket_)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect"
-      immediate_error_ = true;
+      immediate_error_event_ = ConnectionEvent::LocalClose;
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
     }
@@ -517,7 +517,7 @@ void ClientConnectionImpl::connect() {
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       // read/write will become ready.
-      immediate_error_ = true;
+      immediate_error_event_ = ConnectionEvent::RemoteClose;
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
     }

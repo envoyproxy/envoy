@@ -210,6 +210,30 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(ConnectionImplTest, ImmediateConnectError) {
+  dispatcher_.reset(new Event::DispatcherImpl);
+
+  // Using a broadcast/multicast address as the connection destiantion address causes an
+  // immediate error return from connect().
+  Address::InstanceConstSharedPtr broadcast_address;
+  if (socket_.localAddress()->ip()->version() == Address::IpVersion::v4) {
+    broadcast_address.reset(new Address::Ipv4Instance("224.0.0.1", 0));
+  } else {
+    broadcast_address.reset(new Address::Ipv6Instance("ff02::1", 0));
+  }
+
+  client_connection_ = dispatcher_->createClientConnection(broadcast_address, source_address_,
+                                                           Network::Test::createRawBufferSocket());
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  client_connection_->connect();
+
+  // Verify that also the immediate connect errors generate a remote close event.
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_P(ConnectionImplTest, SocketOptions) {
   Network::ClientConnectionPtr upstream_connection_;
 
