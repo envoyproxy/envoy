@@ -1,3 +1,11 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
+
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -7,11 +15,6 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-#include "api/cds.pb.h"
-#include "api/discovery.pb.h"
-#include "api/eds.pb.h"
-#include "api/lds.pb.h"
-#include "api/rds.pb.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionFailure;
@@ -167,7 +170,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::api::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       setGrpcService(
           *bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services(),
           "ads_cluster", fake_upstreams_.back()->localAddress());
@@ -177,6 +180,7 @@ public:
     ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
+    envoy::service::discovery::v2::AdsDummy dummy;
   }
 
   FakeHttpConnectionPtr ads_connection_;

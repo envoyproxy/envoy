@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "client_ssl_lib",
     srcs = ["client_ssl.cc"],
     hdrs = ["client_ssl.h"],
-    external_deps = ["envoy_filter_network_client_ssl_auth"],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -30,5 +29,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
+        "@envoy_api//envoy/api/v2/filter/network:client_ssl_auth_cc",
     ],
 )

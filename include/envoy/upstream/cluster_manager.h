@@ -7,6 +7,8 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
@@ -16,9 +18,6 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
-
-#include "api/bootstrap.pb.h"
-#include "api/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -193,12 +192,11 @@ public:
   /**
    * Allocate a cluster manager from configuration proto.
    */
-  virtual ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
-                                                    Stats::Store& stats, ThreadLocal::Instance& tls,
-                                                    Runtime::Loader& runtime,
-                                                    Runtime::RandomGenerator& random,
-                                                    const LocalInfo::LocalInfo& local_info,
-                                                    AccessLog::AccessLogManager& log_manager) PURE;
+  virtual ClusterManagerPtr
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          AccessLog::AccessLogManager& log_manager) PURE;
 
   /**
    * Allocate an HTTP connection pool.

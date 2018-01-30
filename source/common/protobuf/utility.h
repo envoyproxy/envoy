@@ -10,8 +10,6 @@
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
-#include "fmt/format.h"
-
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \

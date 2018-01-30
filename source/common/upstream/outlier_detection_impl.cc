@@ -10,11 +10,10 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/protobuf/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -100,7 +99,7 @@ void DetectorHostMonitorImpl::putResult(Result result) {
   putHttpResponseCode(enumToInt(http_code));
 }
 
-DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& config)
+DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config)
     : interval_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, 10000))),
       base_ejection_time_ms_(
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, base_ejection_time, 30000))),
@@ -124,7 +123,7 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& 
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
-                           const envoy::api::v2::Cluster::OutlierDetection& config,
+                           const envoy::api::v2::cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger)
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
@@ -144,7 +143,7 @@ DetectorImpl::~DetectorImpl() {
 
 std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster,
-                     const envoy::api::v2::Cluster::OutlierDetection& config,
+                     const envoy::api::v2::cluster::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(

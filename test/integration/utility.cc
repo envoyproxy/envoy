@@ -11,6 +11,7 @@
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
@@ -21,8 +22,6 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {

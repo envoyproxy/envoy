@@ -9,6 +9,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -19,15 +20,31 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "api/base.pb.h"
-
 namespace Envoy {
 namespace Router {
 
 /**
+ * Functionality common among routing primitives, such as DirectResponseEntry and RouteEntry.
+ */
+class ResponseEntry {
+public:
+  virtual ~ResponseEntry() {}
+
+  /**
+   * Do potentially destructive header transforms on response headers prior to forwarding. For
+   * example, adding or removing headers. This should only be called ONCE immediately after
+   * obtaining the initial response headers.
+   * @param headers supplies the response headers, which may be modified during this call.
+   * @param request_info holds additional information about the request.
+   */
+  virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
+                                       const RequestInfo::RequestInfo& request_info) const PURE;
+};
+
+/**
  * A routing primitive that specifies a direct (non-proxied) HTTP response.
  */
-class DirectResponseEntry {
+class DirectResponseEntry : public ResponseEntry {
 public:
   virtual ~DirectResponseEntry() {}
 
@@ -292,7 +309,7 @@ public:
 /**
  * An individual resolved route entry.
  */
-class RouteEntry {
+class RouteEntry : public ResponseEntry {
 public:
   virtual ~RouteEntry() {}
 
@@ -321,16 +338,6 @@ public:
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
                                       const RequestInfo::RequestInfo& request_info) const PURE;
-
-  /**
-   * Do potentially destructive header transforms on response headers prior to forwarding. For
-   * adding or removing headers. This should only be called ONCE immediately after receiving an
-   * upstream's headers.
-   * @param headers supplies the response headers, which may be modified during this call.
-   * @param request_info holds additional information about the request.
-   */
-  virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
-                                       const RequestInfo::RequestInfo& request_info) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

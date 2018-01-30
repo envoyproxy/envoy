@@ -5,13 +5,12 @@
 #include "envoy/common/optional.h"
 
 #include "common/access_log/access_log_formatter.h"
+#include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/json/json_loader.h"
 #include "common/request_info/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {
@@ -28,7 +27,7 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
   return fmt::format("Invalid header configuration. Expected format "
                      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                      "UPSTREAM_METADATA{}{}",
-                     std::string(params), reason);
+                     params, reason);
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
@@ -131,8 +130,7 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else {
-    throw EnvoyException(
-        fmt::format("field '{}' not supported as custom header", std::string(field_name)));
+    throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }
 }
 

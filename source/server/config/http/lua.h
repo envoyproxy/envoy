@@ -2,11 +2,10 @@
 
 #include <string>
 
+#include "envoy/api/v2/filter/http/lua.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-
-#include "api/filter/http/lua.pb.h"
 
 namespace Envoy {
 namespace Server {

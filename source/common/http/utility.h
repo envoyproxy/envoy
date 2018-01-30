@@ -4,12 +4,11 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/protocol.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 
 #include "common/json/json_loader.h"
-
-#include "api/protocol.pb.h"
 
 namespace Envoy {
 namespace Http {
@@ -130,15 +129,6 @@ public:
   sendLocalReply(std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
                  const bool& is_reset, Code response_code, const std::string& body_text);
-
-  /**
-   * Send a redirect response.
-   * @param callbacks supplies the filter callbacks to use.
-   * @param new_path supplies the redirect target.
-   * @param response_code supplies the response code to use.
-   */
-  static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
-                           Code response_code);
 
   struct GetLastAddressFromXffInfo {
     // Last valid address pulled from the XFF header.

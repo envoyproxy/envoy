@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/fmt.h"
 #include "common/redis/command_splitter_impl.h"
 #include "common/redis/supported_commands.h"
 #include "common/stats/stats_impl.h"
@@ -11,7 +12,6 @@
 #include "test/mocks/redis/mocks.h"
 #include "test/test_common/printers.h"
 
-#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

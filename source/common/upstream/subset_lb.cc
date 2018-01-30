@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
@@ -10,8 +11,6 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/ring_hash_lb.h"
-
-#include "api/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -14,6 +14,7 @@
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -25,7 +26,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
@@ -235,11 +235,12 @@ void BaseIntegrationTest::createEnvoy() {
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
   upstream_protocol_ = protocol;
   if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
-    config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
-      RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http2_protocol_options();
-    });
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
+          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+          cluster->mutable_http2_protocol_options();
+        });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1);
   }

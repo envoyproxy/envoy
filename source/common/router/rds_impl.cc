@@ -5,16 +5,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.validate.h"
+
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
-
-#include "api/rds.pb.validate.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {
@@ -55,6 +56,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", local_info);
+
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);

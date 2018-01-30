@@ -16,6 +16,7 @@
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
 #include "common/config/tls_context_json.h"
@@ -33,8 +34,6 @@
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -448,11 +447,11 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       fmt::format("circuit_breakers.{}.{}.", cluster_name, priority_name);
 
   const auto& thresholds = config.circuit_breakers().thresholds();
-  const auto it =
-      std::find_if(thresholds.cbegin(), thresholds.cend(),
-                   [priority](const envoy::api::v2::CircuitBreakers::Thresholds& threshold) {
-                     return threshold.priority() == priority;
-                   });
+  const auto it = std::find_if(
+      thresholds.cbegin(), thresholds.cend(),
+      [priority](const envoy::api::v2::cluster::CircuitBreakers::Thresholds& threshold) {
+        return threshold.priority() == priority;
+      });
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
     max_pending_requests =

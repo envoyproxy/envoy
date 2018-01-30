@@ -48,7 +48,6 @@ envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
-    external_deps = ["envoy_filter_http_fault"],
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
@@ -64,6 +63,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
+        "@envoy_api//envoy/api/v2/filter/http:fault_cc",
     ],
 )
 
@@ -84,7 +84,6 @@ envoy_cc_library(
     name = "squash_filter_lib",
     srcs = ["squash_filter.cc"],
     hdrs = ["squash_filter.h"],
-    external_deps = ["envoy_filter_http_squash"],
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
@@ -97,6 +96,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/filter/http:squash_cc",
     ],
 )
 
@@ -117,7 +117,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ratelimit_includes",
     hdrs = ["ratelimit.h"],
-    external_deps = ["envoy_filter_http_rate_limit"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -129,5 +128,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_validator_lib",
+        "@envoy_api//envoy/api/v2/filter/http:rate_limit_cc",
     ],
 )

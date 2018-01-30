@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -13,6 +14,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/access_log/access_log_impl.h"
+#include "common/common/fmt.h"
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/date_provider_impl.h"
@@ -22,9 +24,6 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
-
-#include "api/filter/network/http_connection_manager.pb.validate.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -8,8 +9,6 @@
 #include "common/common/logger.h"
 
 #include "server/init_manager_impl.h"
-
-#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,24 +26,24 @@ public:
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Configuration::NetworkFilterFactoryCb>
-  createNetworkFilterFactoryList_(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                  Configuration::FactoryContext& context);
+  static std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList_(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      Configuration::FactoryContext& context);
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::FactoryContext& context);
 
   // Server::ListenerComponentFactory
-  std::vector<Configuration::NetworkFilterFactoryCb>
-  createNetworkFilterFactoryList(const Protobuf::RepeatedPtrField<envoy::api::v2::Filter>& filters,
-                                 Configuration::FactoryContext& context) override {
+  std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      Configuration::FactoryContext& context) override {
     return createNetworkFilterFactoryList_(filters, context);
   }
   std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::FactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }

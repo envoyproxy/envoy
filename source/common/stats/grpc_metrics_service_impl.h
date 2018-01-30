@@ -7,15 +7,14 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.validate.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-
-#include "api/metrics_service.pb.h"
-#include "api/metrics_service.pb.validate.h"
 
 namespace Envoy {
 namespace Stats {
@@ -35,7 +34,7 @@ public:
    * Send Metrics Message.
    * @param message supplies the metrics to send.
    */
-  virtual void send(envoy::api::v2::StreamMetricsMessage& message) PURE;
+  virtual void send(envoy::service::metrics::v2::StreamMetricsMessage& message) PURE;
 };
 
 typedef std::shared_ptr<GrpcMetricsStreamer> GrpcMetricsStreamerSharedPtr;
@@ -50,7 +49,7 @@ public:
                           const LocalInfo::LocalInfo& local_info);
 
   // GrpcMetricsStreamer
-  void send(envoy::api::v2::StreamMetricsMessage& message) override {
+  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override {
     tls_slot_->getTyped<ThreadLocalStreamer>().send(message);
   }
 
@@ -75,13 +74,14 @@ private:
    * Per-thread stream state.
    */
   struct ThreadLocalStream
-      : public Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::StreamMetricsResponse> {
+      : public Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse> {
     ThreadLocalStream(ThreadLocalStreamer& parent) : parent_(parent) {}
 
     // Grpc::TypedAsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
-    void onReceiveMessage(std::unique_ptr<envoy::api::v2::StreamMetricsResponse>&&) override {}
+    void onReceiveMessage(
+        std::unique_ptr<envoy::service::metrics::v2::StreamMetricsResponse>&&) override {}
     void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -96,7 +96,7 @@ private:
    */
   struct ThreadLocalStreamer : public ThreadLocal::ThreadLocalObject {
     ThreadLocalStreamer(const SharedStateSharedPtr& shared_state);
-    void send(envoy::api::v2::StreamMetricsMessage& message);
+    void send(envoy::service::metrics::v2::StreamMetricsMessage& message);
 
     Grpc::AsyncClientPtr client_;
     ThreadLocalStreamSharedPtr thread_local_stream_ = nullptr;
@@ -117,16 +117,20 @@ public:
 
   void flushCounter(const Counter& counter, uint64_t) override {
     io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+    metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
     metrics_family->set_name(counter.name());
     auto* metric = metrics_family->add_metric();
+    metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
     auto* counter_metric = metric->mutable_counter();
     counter_metric->set_value(counter.value());
   }
 
   void flushGauge(const Gauge& gauge, uint64_t value) override {
     io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+    metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
     metrics_family->set_name(gauge.name());
     auto* metric = metrics_family->add_metric();
+    metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
     auto* gauage_metric = metric->mutable_gauge();
     gauage_metric->set_value(value);
   }
@@ -145,7 +149,7 @@ public:
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
-  envoy::api::v2::StreamMetricsMessage message_;
+  envoy::service::metrics::v2::StreamMetricsMessage message_;
 };
 
 } // namespace Metrics
