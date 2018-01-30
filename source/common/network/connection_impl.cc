@@ -516,10 +516,12 @@ void ClientConnectionImpl::connect() {
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
-      // read/write will become ready.
       immediate_error_event_ = ConnectionEvent::RemoteClose;
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
+
+      // Trigger a write event. This is needed on Mac and seems harmless on Linux.
+      file_event_->activate(Event::FileReadyType::Write);
     }
   }
 
