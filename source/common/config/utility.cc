@@ -2,6 +2,8 @@
 
 #include <unordered_set>
 
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
@@ -14,8 +16,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
-
-#include "api/stats.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -164,7 +164,8 @@ std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
       fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
 }
 
-Stats::TagProducerPtr Utility::createTagProducer(const envoy::api::v2::Bootstrap& bootstrap) {
+Stats::TagProducerPtr
+Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 

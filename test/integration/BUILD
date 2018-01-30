@@ -27,13 +27,6 @@ envoy_cc_test(
     name = "ads_integration_test",
     srcs = ["ads_integration_test.cc"],
     data = ["//test/config/integration:server_ads.yaml"],
-    external_deps = [
-        "envoy_cds",
-        "envoy_discovery",
-        "envoy_eds",
-        "envoy_lds",
-        "envoy_rds",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:resources_lib",
@@ -41,6 +34,12 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/service/discovery/v2:ads_cc",
     ],
 )
 
@@ -105,10 +104,10 @@ envoy_cc_test(
     srcs = [
         "header_integration_test.cc",
     ],
-    external_deps = ["envoy_filter_network_http_connection_manager"],
     deps = [
         ":http_integration_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
     ],
 )
 
@@ -332,31 +331,28 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
-    external_deps = [
-        "envoy_bootstrap",
-        "envoy_stats",
-    ],
     deps = [
         ":integration_lib",
         "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
 )
 
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    external_deps = ["envoy_eds"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:resources_lib",
         "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
 
 envoy_cc_test(
     name = "metrics_service_integration_test",
     srcs = ["metrics_service_integration_test.cc"],
-    external_deps = ["envoy_metrics"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -364,6 +360,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/server/config/stats:metrics_service_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )
 
