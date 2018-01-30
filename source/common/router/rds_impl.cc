@@ -76,7 +76,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   if (rds.has_config_source()) {
     config_source_ = MessageUtil::getJsonStringFromMessage(rds.config_source(), true);
   } else {
-    config_source_ = "NO_CONFIG_SOURCE";
+    config_source_ = "{}";
   }
 }
 

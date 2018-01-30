@@ -181,8 +181,8 @@ public:
    * @param pretty_print whether the returned JSON should be formatted.
    * @return std::string of formatted JSON object.
    */
-  static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              const bool pretty_print = false);
+  static std::string getJsonStringFromMessage(Protobuf::Message& message,
+                                              bool pretty_print = false);
 
   /**
    * Extract JSON object from a google.protobuf.Message.
