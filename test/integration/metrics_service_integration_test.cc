@@ -67,15 +67,16 @@ public:
     bool known_gauge_exists = false;
     for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
       if (metrics_family.name() == "cluster.metrics_service.membership_change" &&
-          metrics_family.metric(0).has_counter()) {
+          metrics_family.type() == ::io::prometheus::client::MetricType::COUNTER) {
         known_counter_exists = true;
         EXPECT_EQ(1, metrics_family.metric(0).counter().value());
       }
       if (metrics_family.name() == "cluster.metrics_service.membership_total" &&
-          metrics_family.metric(0).has_gauge()) {
+          metrics_family.type() == ::io::prometheus::client::MetricType::GAUGE) {
         known_gauge_exists = true;
         EXPECT_EQ(1, metrics_family.metric(0).gauge().value());
       }
+      ASSERT(metrics_family.metric(0).has_timestamp_ms());
       if (known_counter_exists && known_gauge_exists) {
         break;
       }
