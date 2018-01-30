@@ -1,13 +1,13 @@
 #pragma once
 
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/http/rest_api_fetcher.h"
 #include "common/json/json_validator.h"
-
-#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {

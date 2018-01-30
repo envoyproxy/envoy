@@ -70,7 +70,6 @@ envoy_cc_test_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = [
-        "envoy_bootstrap",
         "abseil_strings",
     ],
     deps = [
@@ -85,6 +84,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 

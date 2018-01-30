@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
@@ -19,8 +20,6 @@
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "api/lds.pb.h"
-#include "api/trace.pb.h"
 #include "fmt/format.h"
 
 namespace Envoy {
@@ -45,7 +44,8 @@ bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter
   return true;
 }
 
-void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& server,
+void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
@@ -90,7 +90,8 @@ void MainImpl::initialize(const envoy::api::v2::Bootstrap& bootstrap, Instance& 
   initializeStatsSinks(bootstrap, server);
 }
 
-void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, Instance& server) {
+void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,
+                                 Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
   if (!configuration.has_http()) {
@@ -116,10 +117,11 @@ void MainImpl::initializeTracers(const envoy::api::v2::Tracing& configuration, I
   http_tracer_ = factory.createHttpTracer(*driver_config, server, *cluster_manager_);
 }
 
-void MainImpl::initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, Instance& server) {
+void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                                    Instance& server) {
   ENVOY_LOG(info, "loading stats sink configuration");
 
-  for (const envoy::api::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
+  for (const envoy::config::metrics::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
     ProtobufTypes::MessagePtr message =
@@ -129,7 +131,7 @@ void MainImpl::initializeStatsSinks(const envoy::api::v2::Bootstrap& bootstrap, 
   }
 }
 
-InitialImpl::InitialImpl(const envoy::api::v2::Bootstrap& bootstrap) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   const auto& admin = bootstrap.admin();
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =

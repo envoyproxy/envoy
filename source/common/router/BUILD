@@ -41,7 +41,6 @@ envoy_cc_library(
     name = "config_utility_lib",
     srcs = ["config_utility.cc"],
     hdrs = ["config_utility.h"],
-    external_deps = ["envoy_rds"],
     deps = [
         "//include/envoy/http:codes_interface",
         "//include/envoy/upstream:resource_manager_interface",
@@ -51,6 +50,7 @@ envoy_cc_library(
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 
@@ -58,10 +58,6 @@ envoy_cc_library(
     name = "rds_lib",
     srcs = ["rds_impl.cc"],
     hdrs = ["rds_impl.h"],
-    external_deps = [
-        "envoy_filter_network_http_connection_manager",
-        "envoy_rds",
-    ],
     deps = [
         ":config_lib",
         ":rds_subscription_lib",
@@ -80,6 +76,8 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
     ],
 )
 
@@ -87,9 +85,6 @@ envoy_cc_library(
     name = "rds_subscription_lib",
     srcs = ["rds_subscription.cc"],
     hdrs = ["rds_subscription.h"],
-    external_deps = [
-        "envoy_filter_network_http_connection_manager",
-    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
@@ -98,6 +93,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:json_loader_lib",
+        "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
     ],
 )
 
@@ -129,7 +125,6 @@ envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
-    external_deps = ["envoy_filter_http_router"],
     deps = [
         ":config_lib",
         ":header_parser_lib",
@@ -167,6 +162,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/request_info:request_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/api/v2/filter/http:router_cc",
     ],
 )
 

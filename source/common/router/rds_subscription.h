@@ -3,12 +3,11 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
-
-#include "api/filter/network/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {

@@ -13,7 +13,7 @@ LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::Node& node,
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.api.v2.EndpointDiscoveryService.StreamLoadStats")) {
+          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")) {
   request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
@@ -100,7 +100,7 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) 
 }
 
 void LoadStatsReporter::onReceiveMessage(
-    std::unique_ptr<envoy::api::v2::LoadStatsResponse>&& message) {
+    std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   stats_.requests_.inc();
   message_ = std::move(message);

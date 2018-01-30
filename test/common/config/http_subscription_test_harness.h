@@ -1,3 +1,4 @@
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/http/async_client.h"
 
 #include "common/common/utility.h"
@@ -13,7 +14,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
