@@ -334,7 +334,6 @@ private:
 
   void threadRoutine();
 
-  Ssl::ServerContext* ssl_ctx_{};
   Network::TransportSocketFactoryPtr transport_socket_factory_;
   Network::ListenSocketPtr socket_;
   ConditionalInitializer server_initialized_;

@@ -269,10 +269,6 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       allow_unexpected_disconnects_(false), listener_(*this) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
-
-  if (ssl_ctx_) {
-    throw EnvoyException("debug");
-  }
 }
 
 FakeUpstream::~FakeUpstream() { cleanUp(); };
