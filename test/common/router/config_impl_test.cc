@@ -246,6 +246,10 @@ TEST(RouteMatcherTest, TestRoutes) {
             config.route(genHeaders("lyft.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("root_www2",
             config.route(genHeaders("wwww.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("www2",
+            config.route(genHeaders("LYFT.COM", "/foo", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("root_www2",
+            config.route(genHeaders("wWww.LyfT.coM", "/", "GET"), 0)->routeEntry()->clusterName());
 
   // Wildcards
   EXPECT_EQ("wildcard",
@@ -2127,6 +2131,32 @@ TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl config(parseRouteConfigurationFromJson(json), runtime, cm, true),
                EnvoyException);
+}
+
+// Test to detect if hostname matches are case-insensitive
+TEST(RouteMatcherTest, TestCaseSensitiveDomainConfig) {
+  std::string config_with_case_sensitive_domains = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: [www.lyft.com]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: www2 }
+  - name: www2_staging
+    domains: [www.LYFt.cOM]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: www2_staging }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(config_with_case_sensitive_domains), runtime, cm,
+                 true),
+      EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
 }
 
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
