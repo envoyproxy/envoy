@@ -1,3 +1,5 @@
+#include "envoy/api/v2/eds.pb.h"
+
 #include "common/config/utility.h"
 #include "common/upstream/eds.h"
 
@@ -8,7 +10,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

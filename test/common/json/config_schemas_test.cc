@@ -1,13 +1,13 @@
 #include <string>
 #include <vector>
 
+#include "common/common/fmt.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

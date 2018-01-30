@@ -7,14 +7,13 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/dynamo/dynamo_request_parser.h"
 #include "common/dynamo/dynamo_utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Dynamo {

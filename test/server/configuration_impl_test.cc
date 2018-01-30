@@ -56,7 +56,7 @@ protected:
 };
 
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
-  envoy::api::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -79,7 +79,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -109,7 +109,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -151,7 +151,7 @@ TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -174,7 +174,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -210,7 +210,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -246,7 +246,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
   bootstrap.mutable_tracing()->mutable_http()->set_name("invalid");
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
@@ -267,7 +267,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Config::StatsSinkNames::get().STATSD);
@@ -293,9 +293,9 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
-  envoy::api::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
+  envoy::config::metrics::v2::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
@@ -319,7 +319,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   auto& field_map = *sink.mutable_config()->mutable_fields();

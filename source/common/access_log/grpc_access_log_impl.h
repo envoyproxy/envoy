@@ -3,13 +3,14 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
+#include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/service/accesslog/v2/als.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
-
-#include "api/filter/accesslog/accesslog.pb.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -29,7 +30,7 @@ public:
    * @param message supplies the access log to send.
    * @param log_name supplies the name of the log stream to send on.
    */
-  virtual void send(envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
+  virtual void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
                     const std::string& log_name) PURE;
 };
 
@@ -45,7 +46,7 @@ public:
                             const LocalInfo::LocalInfo& local_info);
 
   // GrpcAccessLogStreamer
-  void send(envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
+  void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
             const std::string& log_name) override {
     tls_slot_->getTyped<ThreadLocalStreamer>().send(message, log_name);
   }
@@ -71,7 +72,7 @@ private:
    * Per-thread stream state.
    */
   struct ThreadLocalStream : public Grpc::TypedAsyncStreamCallbacks<
-                                 envoy::api::v2::filter::accesslog::StreamAccessLogsResponse> {
+                                 envoy::service::accesslog::v2::StreamAccessLogsResponse> {
     ThreadLocalStream(ThreadLocalStreamer& parent, const std::string& log_name)
         : parent_(parent), log_name_(log_name) {}
 
@@ -79,7 +80,7 @@ private:
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
     void onReceiveMessage(
-        std::unique_ptr<envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>&&) override {}
+        std::unique_ptr<envoy::service::accesslog::v2::StreamAccessLogsResponse>&&) override {}
     void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -93,7 +94,7 @@ private:
    */
   struct ThreadLocalStreamer : public ThreadLocal::ThreadLocalObject {
     ThreadLocalStreamer(const SharedStateSharedPtr& shared_state);
-    void send(envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
+    void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
               const std::string& log_name);
 
     Grpc::AsyncClientPtr client_;
@@ -110,7 +111,7 @@ private:
 class HttpGrpcAccessLog : public Instance {
 public:
   HttpGrpcAccessLog(FilterPtr&& filter,
-                    const envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig& config,
+                    const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
                     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer);
 
   static void addressToAccessLogAddress(envoy::api::v2::Address& proto_address,
@@ -125,7 +126,7 @@ public:
 
 private:
   FilterPtr filter_;
-  const envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config_;
+  const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
 };
 

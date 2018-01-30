@@ -34,7 +34,7 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
 
 const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
 
-ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::CommonTlsContext& config)
+ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config)
     : alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       alt_alpn_protocols_(config.deprecated_v1().alt_alpn_protocols()),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
@@ -96,19 +96,18 @@ const std::string ContextConfigImpl::getDataSourcePath(const envoy::api::v2::Dat
   return source.specifier_case() == envoy::api::v2::DataSource::kFilename ? source.filename() : "";
 }
 
-unsigned
-ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsProtocol& version,
-                                       unsigned default_version) {
+unsigned ContextConfigImpl::tlsVersionFromProto(
+    const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
   switch (version) {
-  case envoy::api::v2::TlsParameters::TLS_AUTO:
+  case envoy::api::v2::auth::TlsParameters::TLS_AUTO:
     return default_version;
-  case envoy::api::v2::TlsParameters::TLSv1_0:
+  case envoy::api::v2::auth::TlsParameters::TLSv1_0:
     return TLS1_VERSION;
-  case envoy::api::v2::TlsParameters::TLSv1_1:
+  case envoy::api::v2::auth::TlsParameters::TLSv1_1:
     return TLS1_1_VERSION;
-  case envoy::api::v2::TlsParameters::TLSv1_2:
+  case envoy::api::v2::auth::TlsParameters::TLSv1_2:
     return TLS1_2_VERSION;
-  case envoy::api::v2::TlsParameters::TLSv1_3:
+  case envoy::api::v2::auth::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
   default:
     NOT_IMPLEMENTED;
@@ -117,7 +116,8 @@ ContextConfigImpl::tlsVersionFromProto(const envoy::api::v2::TlsParameters_TlsPr
   NOT_REACHED;
 }
 
-ClientContextConfigImpl::ClientContextConfigImpl(const envoy::api::v2::UpstreamTlsContext& config)
+ClientContextConfigImpl::ClientContextConfigImpl(
+    const envoy::api::v2::auth::UpstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
   // TODO(PiotrSikora): Support multiple TLS certificates.
   ASSERT(config.common_tls_context().tls_certificates().size() <= 1);
@@ -125,12 +125,13 @@ ClientContextConfigImpl::ClientContextConfigImpl(const envoy::api::v2::UpstreamT
 
 ClientContextConfigImpl::ClientContextConfigImpl(const Json::Object& config)
     : ClientContextConfigImpl([&config] {
-        envoy::api::v2::UpstreamTlsContext upstream_tls_context;
+        envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context;
         Config::TlsContextJson::translateUpstreamTlsContext(config, upstream_tls_context);
         return upstream_tls_context;
       }()) {}
 
-ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::DownstreamTlsContext& config)
+ServerContextConfigImpl::ServerContextConfigImpl(
+    const envoy::api::v2::auth::DownstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
@@ -138,15 +139,15 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
         std::vector<SessionTicketKey> ret;
 
         switch (config.session_ticket_keys_type_case()) {
-        case envoy::api::v2::DownstreamTlsContext::kSessionTicketKeys:
+        case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
           for (const auto& datasource : config.session_ticket_keys().keys()) {
             validateAndAppendKey(ret, readDataSource(datasource, false));
           }
           break;
-        case envoy::api::v2::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:
+        case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:
           NOT_IMPLEMENTED;
           break;
-        case envoy::api::v2::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
+        case envoy::api::v2::auth::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
           break;
         default:
           throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
@@ -163,7 +164,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(const envoy::api::v2::Downstrea
 
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config)
     : ServerContextConfigImpl([&config] {
-        envoy::api::v2::DownstreamTlsContext downstream_tls_context;
+        envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context;
         Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
         return downstream_tls_context;
       }()) {}

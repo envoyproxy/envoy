@@ -10,10 +10,9 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/mongo/codec_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Mongo {

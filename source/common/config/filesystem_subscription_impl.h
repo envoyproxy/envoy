@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -9,8 +10,6 @@
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-
-#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Config {

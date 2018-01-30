@@ -27,8 +27,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::api::v2::RateLimit parseRateLimitFromJson(const std::string& json_string) {
-  envoy::api::v2::RateLimit rate_limit;
+envoy::api::v2::route::RateLimit parseRateLimitFromJson(const std::string& json_string) {
+  envoy::api::v2::route::RateLimit rate_limit;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRateLimit(*json_object_ptr, rate_limit);
   return rate_limit;

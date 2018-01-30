@@ -4,10 +4,9 @@
 #include <mutex>
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 
 #include "server/watchdog_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

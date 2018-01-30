@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
@@ -22,7 +23,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -810,7 +810,13 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
 
 TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
-TEST_P(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
+TEST_P(ReadBufferLimitTest, SomeLimit) {
+  const uint32_t read_buffer_limit = 32 * 1024;
+  // Envoy has soft limits, so as long as the first read is <= read_buffer_limit - 1 it will do a
+  // second read. The effective chunk size is then read_buffer_limit - 1 + MaxReadSize,
+  // which is currently 16384.
+  readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
+}
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,

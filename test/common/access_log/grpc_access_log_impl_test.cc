@@ -20,8 +20,7 @@ namespace AccessLog {
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   typedef Grpc::MockAsyncStream MockAccessLogStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<
-      envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>
+  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
       AccessLogCallbacks;
 
   GrpcAccessLogStreamerImplTest() {
@@ -58,7 +57,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream1, sendMessage(_, false));
-  envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log1;
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message_log1;
   streamer_->send(message_log1, "log1");
 
   message_log1.Clear();
@@ -71,12 +70,12 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   expectStreamStart(stream2, &callbacks2);
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream2, sendMessage(_, false));
-  envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log2;
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message_log2;
   streamer_->send(message_log2, "log2");
 
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks1->onReceiveMessage(
-      std::make_unique<envoy::api::v2::filter::accesslog::StreamAccessLogsResponse>());
+      std::make_unique<envoy::service::accesslog::v2::StreamAccessLogsResponse>());
 
   // Close stream 2 and make sure we make a new one.
   callbacks2->onRemoteClose(Grpc::Status::Internal, "bad");
@@ -97,14 +96,14 @@ TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
             return nullptr;
           }));
   EXPECT_CALL(local_info_, node());
-  envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message_log1;
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message_log1;
   streamer_->send(message_log1, "log1");
 }
 
 class MockGrpcAccessLogStreamer : public GrpcAccessLogStreamer {
 public:
   // GrpcAccessLogStreamer
-  MOCK_METHOD2(send, void(envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
+  MOCK_METHOD2(send, void(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
                           const std::string& log_name));
 };
 
@@ -117,18 +116,18 @@ public:
   }
 
   void expectLog(const std::string& expected_request_msg_yaml) {
-    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
     MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
     EXPECT_CALL(*streamer_, send(_, "hello_log"))
-        .WillOnce(Invoke([expected_request_msg](
-                             envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
-                             const std::string&) {
-          EXPECT_EQ(message.DebugString(), expected_request_msg.DebugString());
-        }));
+        .WillOnce(Invoke(
+            [expected_request_msg](envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
+                                   const std::string&) {
+              EXPECT_EQ(message.DebugString(), expected_request_msg.DebugString());
+            }));
   }
 
   MockFilter* filter_{new NiceMock<MockFilter>()};
-  envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig config_;
+  envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogStreamer> streamer_{new MockGrpcAccessLogStreamer()};
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
 };
