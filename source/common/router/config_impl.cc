@@ -384,7 +384,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 }
 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
-  ASSERT(isRedirect());
+  ASSERT(isDirectResponse());
 
   const char* final_host;
   const char* final_path;
@@ -446,7 +446,7 @@ const DirectResponseEntry* RouteEntryImplBase::directResponseEntry() const {
 const RouteEntry* RouteEntryImplBase::routeEntry() const {
   // A route for a request can exclusively be a route entry, a direct response entry,
   // or a redirect entry.
-  if (isRedirect() || isDirectResponse()) {
+  if (isDirectResponse()) {
     return nullptr;
   } else {
     return this;
@@ -458,7 +458,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
-    if (!cluster_name_.empty() || isRedirect() || isDirectResponse()) {
+    if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
@@ -496,7 +496,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
-  if (isRedirect() || isDirectResponse()) {
+  if (isDirectResponse()) {
     return;
   }
 

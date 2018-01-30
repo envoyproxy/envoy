@@ -340,6 +340,14 @@ void HttpIntegrationTest::testRouterDirectResponse() {
   config_helper_.addConfigModifier(
       [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("x-additional-header");
+        header_value_option->mutable_header()->set_value("example-value");
+        header_value_option->mutable_append()->set_value(false);
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-type");
+        header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
         auto* virtual_host = route_config->add_virtual_hosts();
         virtual_host->set_name(domain);
         virtual_host->add_domains(domain);
@@ -355,6 +363,11 @@ void HttpIntegrationTest::testRouterDirectResponse() {
       lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("example-value", response->headers()
+                                    .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                    ->value()
+                                    .c_str());
+  EXPECT_STREQ("text/html", response->headers().ContentType()->value().c_str());
   EXPECT_EQ(body, response->body());
 }
 
