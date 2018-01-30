@@ -21,8 +21,8 @@ void Runner::setupEnvironment(int argc, char** argv) {
 } // namespace Fuzz
 } // namespace Envoy
 
-extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
-  Envoy::Fuzz::Runner::setupEnvironment(*argc, *argv);
+extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
+  Envoy::Fuzz::Runner::setupEnvironment(1, *argv);
   return 0;
 }
 
