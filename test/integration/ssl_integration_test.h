@@ -26,13 +26,11 @@ public:
 
   Network::ClientConnectionPtr makeSslConn() { return makeSslClientConnection(false, false); }
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
-  ServerContextPtr createUpstreamSslContext();
   void checkStats();
 
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<ContextManager> context_manager_;
-  ServerContextPtr upstream_ssl_ctx_;
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_plain_;
   Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_;
