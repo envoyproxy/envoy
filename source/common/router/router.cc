@@ -172,15 +172,15 @@ void Filter::chargeUpstreamCode(Http::Code code,
   chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
-void Filter::sendLocalReply(Http::Code code, const std::string& body, bool overloaded) {
+void Filter::sendLocalReply(Http::Code code, const std::string& body,
+                            std::function<void(Http::HeaderMap& headers)> add_headers) {
   // This is a customized version of send local reply that allows us to set the overloaded
   // header.
   Http::Utility::sendLocalReply(
-      [this, overloaded](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (overloaded) {
-          headers->insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+      [this, add_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (headers != nullptr && add_headers != nullptr) {
+          add_headers(*headers);
         }
-
         callbacks_->encodeHeaders(std::move(headers), end_stream);
       },
       [this](Buffer::Instance& data, bool end_stream) -> void {
@@ -214,21 +214,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   const auto* direct_response = route_->directResponseEntry();
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
-    Http::Utility::sendLocalReply(
-        [ this, direct_response, &request_headers = headers ](Http::HeaderMapPtr && headers,
-                                                              bool end_stream)
+    sendLocalReply(
+        direct_response->responseCode(), direct_response->responseBody(),
+        [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
             ->void {
               const auto new_path = direct_response->newPath(request_headers);
               if (!new_path.empty()) {
-                headers->addCopy(Http::LowerCaseString("location"), new_path);
+                response_headers.addCopy(Http::LowerCaseString("location"), new_path);
               }
-              direct_response->finalizeResponseHeaders(*headers, callbacks_->requestInfo());
-              callbacks_->encodeHeaders(std::move(headers), end_stream);
-            },
-        [this](Buffer::Instance& data, bool end_stream) -> void {
-          callbacks_->encodeData(data, end_stream);
-        },
-        stream_destroyed_, direct_response->responseCode(), direct_response->responseBody());
+              direct_response->finalizeResponseHeaders(response_headers, callbacks_->requestInfo());
+            });
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -263,7 +258,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode", true);
+    sendLocalReply(
+        Http::Code::ServiceUnavailable, "maintenance mode", [](Http::HeaderMap& headers) {
+          headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+        });
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -530,7 +528,11 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    sendLocalReply(code, body, dropped);
+    sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
+      if (dropped) {
+        headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+      }
+    });
   }
 }
 
