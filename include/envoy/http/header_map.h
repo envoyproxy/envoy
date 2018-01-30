@@ -411,6 +411,7 @@ public:
    * @return the header entry if it exists otherwise nullptr.
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
+  virtual HeaderEntry* get(const LowerCaseString& key) PURE;
 
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };
@@ -448,7 +449,6 @@ public:
    * exist, or Lookup::NotSupported if key is not one of the predefined inline headers.
    */
   virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
-  virtual Lookup lookup(const LowerCaseString& key, HeaderEntry** entry) PURE;
 
   /**
    * Remove all instances of a header by key.

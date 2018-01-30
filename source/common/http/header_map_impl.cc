@@ -399,6 +399,17 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
   return nullptr;
 }
 
+HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) {
+  for (HeaderEntryImpl& header : headers_) {
+    if (header.key() == key.get().c_str()) {
+      return &header;
+    }
+  }
+
+  return nullptr;
+}
+
+
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   for (const HeaderEntryImpl& header : headers_) {
     if (cb(header, context) == HeaderMap::Iterate::Break) {
@@ -415,10 +426,17 @@ void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
   }
 }
 
-HeaderMap::Lookup HeaderMapImpl::lookupHelper(const LowerCaseString& key, HeaderEntry** entry) {
+HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
+                                        const HeaderEntry** entry) const {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
-    StaticLookupResponse ref_lookup_response = cb(*this);
+    // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
+    // even though we don't make any modifications, we need to cast_cast in order to use the
+    // accessor.
+    //
+    // Making this work without const_cast would require managing an additional const accessor
+    // callback for each predefined inline header and add to the complexity of the code.
+    StaticLookupResponse ref_lookup_response = cb(const_cast<HeaderMapImpl&>(*this));
     *entry = *ref_lookup_response.entry_;
     if (*entry) {
       return Lookup::Found;
@@ -429,24 +447,6 @@ HeaderMap::Lookup HeaderMapImpl::lookupHelper(const LowerCaseString& key, Header
     *entry = nullptr;
     return Lookup::NotSupported;
   }
-}
-
-HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
-                                        const HeaderEntry** entry) const {
-  // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
-  // even though we don't make any modifications, we need to cast_cast in order to use the
-  // accessor.
-  //
-  // Making this work without const_cast would require managing an additional const accessor
-  // callback for each predefined inline header and add to the complexity of the code.
-  HeaderEntry* temp_entry;
-  Lookup rc = const_cast<HeaderMapImpl&>(*this).lookupHelper(key, &temp_entry);
-  *entry = temp_entry;
-  return rc;
-}
-
-HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key, HeaderEntry** entry) {
-  return lookupHelper(key, entry);
 }
 
 void HeaderMapImpl::remove(const LowerCaseString& key) {

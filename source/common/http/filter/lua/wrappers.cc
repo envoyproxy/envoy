@@ -33,22 +33,7 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
 
   const char* key = luaL_checkstring(state, 2);
   const char* value = luaL_checkstring(state, 3);
-  const LowerCaseString lower_case_key(key);
-
-  // We handle inline headers differently from non-inline headers. Since we only offer the add()
-  // API, users generally expect the header to either be added or overwritten. This is not how
-  // the inline headers currently work where the first version is taken to be the authoritative
-  // version and the rest dropped during external message parse. Internally, code operates on
-  // O(1) headers directly so we don't have this problem in the rest of Envoy. In the Lua case, we
-  // handle this by checking if the header in question is an O(1) header. If it is, we just set the
-  // value directly. Otherwise we add it per normal.
-  HeaderEntry* header_entry;
-  if (headers_.lookup(lower_case_key, &header_entry) == HeaderMap::Lookup::Found) {
-    header_entry->value(value, strlen(value));
-  } else {
-    headers_.addCopy(lower_case_key, value);
-  }
-
+  headers_.addCopy(LowerCaseString(key), value);
   return 0;
 }
 
@@ -78,6 +63,23 @@ int HeaderMapWrapper::luaPairs(lua_State* state) {
   iterator_.reset(HeaderMapIterator::create(state, *this), true);
   lua_pushcclosure(state, HeaderMapIterator::static_luaPairsIterator, 1);
   return 1;
+}
+
+int HeaderMapWrapper::luaReplace(lua_State* state) {
+  checkModifiable(state);
+
+  const char* key = luaL_checkstring(state, 2);
+  const char* value = luaL_checkstring(state, 3);
+  const LowerCaseString lower_key(key);
+
+  HeaderEntry* entry = headers_.get(lower_key);
+  if (entry != nullptr) {
+    entry->value(value, strlen(value));
+  } else {
+    headers_.addCopy(lower_key, value);
+  }
+
+  return 0;
 }
 
 int HeaderMapWrapper::luaRemove(lua_State* state) {
