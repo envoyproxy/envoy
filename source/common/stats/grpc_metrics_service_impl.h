@@ -117,8 +117,7 @@ public:
 
   void flushCounter(const Counter& counter, uint64_t) override {
     io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
-    io::prometheus::client::MetricType counter_type = io::prometheus::client::MetricType::COUNTER;
-    metrics_family->set_type(counter_type);
+    metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
     metrics_family->set_name(counter.name());
     auto* metric = metrics_family->add_metric();
     metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
@@ -128,8 +127,7 @@ public:
 
   void flushGauge(const Gauge& gauge, uint64_t value) override {
     io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
-    io::prometheus::client::MetricType gauge_type = io::prometheus::client::MetricType::GAUGE;
-    metrics_family->set_type(gauge_type);
+    metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
     metrics_family->set_name(gauge.name());
     auto* metric = metrics_family->add_metric();
     metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());

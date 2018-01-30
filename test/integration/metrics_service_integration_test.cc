@@ -74,6 +74,7 @@ public:
         known_gauge_exists = true;
         EXPECT_EQ(1, metrics_family.metric(0).gauge().value());
       }
+      ASSERT(metrics_family.metric(0).has_timestamp_ms());
       if (known_counter_exists && known_gauge_exists) {
         break;
       }
