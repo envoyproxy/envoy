@@ -85,6 +85,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
         UNREFERENCED_PARAMETER(end_stream);
         http_callbacks->onReset();
       }));
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Internal, ""));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
   EXPECT_EQ(grpc_stream, nullptr);
