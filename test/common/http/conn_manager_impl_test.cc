@@ -243,6 +243,7 @@ public:
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
+  bool proxy100Continue() const override { return false; }
 
   NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<Runtime::MockLoader> runtime_;
