@@ -206,9 +206,11 @@ private:
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
     void encodeTrailers(const Http::HeaderMap& trailers);
+
     void resetStream();
     void setupPerTryTimeout();
     void onPerTryTimeout();
+    void maybeEndDecode(bool end_stream);
 
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
       request_info_.onUpstreamHostSelected(host);

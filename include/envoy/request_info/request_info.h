@@ -71,33 +71,13 @@ public:
   /**
    * @return the time that the first byte of the request was received.
    */
-  virtual SystemTime startTime() const PURE;
+  virtual const SystemTime& startTime() const PURE;
 
   /**
-   * @return duration from request start to when the entire request was received from the
-   * downstream client in microseconds.
-   */
-  virtual const Optional<std::chrono::microseconds>& requestReceivedDuration() const PURE;
-
-  /**
-   * Set the duration from request start to when the entire request was received from the
-   * downstream client.
-   * @param time monotonic clock time when the response was received.
-   */
-  virtual void requestReceivedDuration(MonotonicTime time) PURE;
-
-  /**
-   * @return the duration from request start to when the first byte of the response was received
-   * from the upstream host in microseconds.
-   */
-  virtual const Optional<std::chrono::microseconds>& responseReceivedDuration() const PURE;
-
-  /**
-   * Set the duration from request start to when the first byte of the response was received
-   * from the upstream host in microseconds.
-   * @param time monotonic clock time when the first byte of the response was received.
-   */
-  virtual void responseReceivedDuration(MonotonicTime time) PURE;
+   * @return the monotonic time that the first byte of the request was received. Duration
+  calculations should be made relative to this value.
+  */
+  virtual const MonotonicTime& startTimeMonotonic() const PURE;
 
   /**
    * @return the # of body bytes received in the request.
@@ -120,14 +100,94 @@ public:
   virtual const Optional<uint32_t>& responseCode() const PURE;
 
   /**
+   * @return the monotonic clock time when the last byte of the request was received.
+   */
+  virtual const Optional<MonotonicTime>& lastDownstreamRxByteReceived() const PURE;
+
+  /**
+   * Set the monotonic clock time when the last byte of the request was received.
+   */
+  virtual void lastDownstreamRxByteReceived(MonotonicTime) PURE;
+
+  /**
+   * @return the monotonic clock time when the first byte of the request was sent upstream. There
+   * may be a considerable delta between lastDownstreamByteReceived and this value due to filters.
+   */
+  virtual const Optional<MonotonicTime>& firstUpstreamTxByteSent() const PURE;
+
+  /**
+   * Set the monotonic clock time when the first byte of the request was sent upstream.
+   */
+  virtual void firstUpstreamTxByteSent(MonotonicTime) PURE;
+
+  /**
+   * @return the monotonic clock time when the last bye of the request was sent upstream.
+   */
+  virtual const Optional<MonotonicTime>& lastUpstreamTxByteSent() const PURE;
+
+  /**
+   * Set the monotonic clock time when the last bye of the request was sent upstream.
+   */
+  virtual void lastUpstreamTxByteSent(MonotonicTime) PURE;
+
+  /**
+   * @return the monotonic clock time when the first byte of the response is received from upstream.
+   */
+  virtual const Optional<MonotonicTime>& firstUpstreamRxByteReceived() const PURE;
+
+  /**
+   * Set the monotonic clock time when the first byte of the response is received from upstream.
+   */
+  virtual void firstUpstreamRxByteReceived(MonotonicTime) PURE;
+
+  /**
+   * @return the monotonic clock time when the last byte of the response is received from upstream.
+   */
+  virtual const Optional<MonotonicTime>& lastUpstreamRxByteReceived() const PURE;
+
+  /**
+   * Set the monotonic clock time when the last byte of the response is received from upstream.
+   */
+  virtual void lastUpstreamRxByteReceived(MonotonicTime) PURE;
+
+  /**
+   * @return the monotonic clock time when the first byte of the response is sent downstream. There
+   * may be a considerable delta between lastUpstreamByteReceived and this value due to filters.
+   */
+  virtual const Optional<MonotonicTime>& firstDownstreamTxByteSent() const PURE;
+
+  /**
+   * Set the monotonic clock time when the first byte of the response is sent downstream.
+   */
+  virtual void firstDownstreamTxByteSent(MonotonicTime) PURE;
+
+  /**
+   * @return the monotonic clock time when the last byte of the response is sent downstream.
+   */
+  virtual const Optional<MonotonicTime>& lastDownstreamTxByteSent() const PURE;
+
+  /**
+   * Set the monotonic clock time when the last byte of the response is sent downstream.
+   */
+  virtual void lastDownstreamTxByteSent(MonotonicTime) PURE;
+
+  /**
+   * Sets the end time for the request. This method is called once the request has been fully
+   * completed, and should not be called again.
+   */
+  virtual void finalize(MonotonicTime) PURE;
+
+  /**
+   * After finalize has been called, returns the monotonic clock time when the request has been
+   * fully completed. The return value of this method is erroneous until after finalize has been
+   * called.
+   */
+  virtual const Optional<MonotonicTime>& finalTimeMonotonic() const PURE;
+
+  /**
    * @return the # of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;
-
-  /**
-   * @return the microseconds duration of the first byte received to the last byte sent.
-   */
-  virtual std::chrono::microseconds duration() const PURE;
 
   /**
    * @return whether response flag is set or not.

@@ -416,13 +416,9 @@ void Filter::maybeDoShadowing() {
 void Filter::onRequestComplete() {
   downstream_end_stream_ = true;
   downstream_request_complete_time_ = std::chrono::steady_clock::now();
-  callbacks_->requestInfo().requestReceivedDuration(downstream_request_complete_time_);
 
   // Possible that we got an immediate reset.
   if (upstream_request_) {
-    // Nominally how long it took to send the request.
-    upstream_request_->request_info_.requestReceivedDuration(downstream_request_complete_time_);
-
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
     maybeDoShadowing();
@@ -626,8 +622,6 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     headers->insertEnvoyUpstreamServiceTime().value(ms.count());
-    callbacks_->requestInfo().responseReceivedDuration(response_received_time);
-    upstream_request_->request_info_.responseReceivedDuration(response_received_time);
   }
 
   upstream_request_->upstream_canary_ =
@@ -818,6 +812,10 @@ void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& head
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+  // TODO(rodaine): This is actually measuring after the headers are parsed and not the first byte.
+  parent_.callbacks_->requestInfo().firstUpstreamRxByteReceived(std::chrono::steady_clock::now());
+  maybeEndDecode(end_stream);
+
   upstream_headers_ = headers.get();
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   request_info_.response_code_.value(static_cast<uint32_t>(response_code));
@@ -825,12 +823,20 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
 }
 
 void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
+  maybeEndDecode(end_stream);
   request_info_.bytes_received_ += data.length();
   parent_.onUpstreamData(data, end_stream);
 }
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+  maybeEndDecode(true);
   parent_.onUpstreamTrailers(std::move(trailers));
+}
+
+void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {
+  if (end_stream) {
+    parent_.callbacks_->requestInfo().lastUpstreamRxByteReceived(std::chrono::steady_clock::now());
+  }
 }
 
 void Filter::UpstreamRequest::encodeHeaders(bool end_stream) {
@@ -864,6 +870,9 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
     request_info_.bytes_sent_ += data.length();
     request_encoder_->encodeData(data, end_stream);
+    if (end_stream) {
+      parent_.callbacks_->requestInfo().lastUpstreamTxByteSent(std::chrono::steady_clock::now());
+    }
   }
 }
 
@@ -877,6 +886,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   } else {
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
+    parent_.callbacks_->requestInfo().lastUpstreamTxByteSent(std::chrono::steady_clock::now());
   }
 }
 
@@ -962,6 +972,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     span_->injectContext(*parent_.downstream_headers_);
   }
 
+  parent_.callbacks_->requestInfo().firstUpstreamTxByteSent(std::chrono::steady_clock::now());
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 !buffered_request_body_ && encode_complete_ && !encode_trailers_);
   calling_encode_headers_ = false;
@@ -981,6 +992,10 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
     if (encode_trailers_) {
       request_encoder.encodeTrailers(*parent_.downstream_trailers_);
+    }
+
+    if (encode_complete_) {
+      parent_.callbacks_->requestInfo().lastUpstreamTxByteSent(std::chrono::steady_clock::now());
     }
   }
 }

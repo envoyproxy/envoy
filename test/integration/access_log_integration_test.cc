@@ -73,6 +73,8 @@ public:
     log_entry->mutable_common_properties()->clear_downstream_remote_address();
     log_entry->mutable_common_properties()->clear_downstream_local_address();
     log_entry->mutable_common_properties()->clear_start_time();
+    log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());

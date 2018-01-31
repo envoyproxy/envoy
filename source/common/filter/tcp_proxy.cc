@@ -120,6 +120,8 @@ TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& clu
       upstream_callbacks_(new UpstreamCallbacks(this)) {}
 
 TcpProxy::~TcpProxy() {
+  request_info_.finalize(std::chrono::steady_clock::now());
+
   if (config_ != nullptr) {
     for (const auto& access_log : config_->accessLogs()) {
       access_log->log(nullptr, nullptr, request_info_);

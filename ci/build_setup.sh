@@ -6,7 +6,7 @@ set -e
 
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
-[ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
+[ -z "${NUM_CPUS}" ] && NUM_CPUS=`nproc`
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 

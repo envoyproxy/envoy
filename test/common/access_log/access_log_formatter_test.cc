@@ -48,36 +48,37 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   {
     RequestInfoFormatter start_time_format("START_TIME");
     SystemTime time;
-    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_CALL(request_info, startTime()).WillOnce(ReturnRef(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
               start_time_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(5000)};
-    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
+    Optional<MonotonicTime> time = request_info.startTimeMonotonic() + std::chrono::milliseconds(5);
+    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(ReturnRef(time));
     EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    Optional<std::chrono::microseconds> duration;
-    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
+    Optional<MonotonicTime> time;
+    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(ReturnRef(time));
     EXPECT_EQ("-", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(10000)};
-    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(ReturnRef(duration));
+    Optional<MonotonicTime> time =
+        request_info.startTimeMonotonic() + std::chrono::milliseconds(10);
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(ReturnRef(time));
     EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    Optional<std::chrono::microseconds> duration;
-    EXPECT_CALL(request_info, responseReceivedDuration()).WillOnce(ReturnRef(duration));
+    Optional<MonotonicTime> time;
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(ReturnRef(time));
     EXPECT_EQ("-", response_duration_format.format(header, header, request_info));
   }
 
@@ -116,9 +117,10 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter duration_format("DURATION");
-    std::chrono::microseconds time{2000};
-    EXPECT_CALL(request_info, duration()).WillOnce(Return(time));
-    EXPECT_EQ("2", duration_format.format(header, header, request_info));
+    Optional<MonotonicTime> time =
+        request_info.startTimeMonotonic() + std::chrono::milliseconds(10);
+    EXPECT_CALL(request_info, finalTimeMonotonic()).WillRepeatedly(ReturnRef(time));
+    EXPECT_EQ("10", duration_format.format(header, header, request_info));
   }
 
   {

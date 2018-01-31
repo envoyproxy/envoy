@@ -5,6 +5,8 @@
 
 #include "envoy/request_info/request_info.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace RequestInfo {
 
@@ -15,38 +17,79 @@ struct RequestInfoImpl : public RequestInfo {
 
   RequestInfoImpl(Http::Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
 
-  // RequestInfo::RequestInfo
-  SystemTime startTime() const override { return start_time_; }
+  const SystemTime& startTime() const override { return start_time_; }
 
-  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
-    return request_received_duration_;
-  }
-  void requestReceivedDuration(MonotonicTime time) override {
-    request_received_duration_ =
-        std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
+  const MonotonicTime& startTimeMonotonic() const override { return start_time_monotonic_; }
+
+  const Optional<MonotonicTime>& lastDownstreamRxByteReceived() const override {
+    return last_rx_byte_received_;
   }
 
-  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
-    return response_received_duration_;
+  void lastDownstreamRxByteReceived(MonotonicTime time) override {
+    last_rx_byte_received_.value(time);
   }
-  void responseReceivedDuration(MonotonicTime time) override {
-    response_received_duration_ =
-        std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
+
+  const Optional<MonotonicTime>& firstUpstreamTxByteSent() const override {
+    return first_upstream_tx_byte_sent_;
   }
+
+  void firstUpstreamTxByteSent(MonotonicTime time) override {
+    first_upstream_tx_byte_sent_.value(time);
+  }
+
+  const Optional<MonotonicTime>& lastUpstreamTxByteSent() const override {
+    return last_upstream_tx_byte_sent_;
+  }
+
+  void lastUpstreamTxByteSent(MonotonicTime time) override {
+    last_upstream_tx_byte_sent_.value(time);
+  }
+
+  const Optional<MonotonicTime>& firstUpstreamRxByteReceived() const override {
+    return first_upstream_rx_byte_received_;
+  }
+
+  void firstUpstreamRxByteReceived(MonotonicTime time) override {
+    first_upstream_rx_byte_received_.value(time);
+  }
+
+  const Optional<MonotonicTime>& lastUpstreamRxByteReceived() const override {
+    return last_upstream_rx_byte_received_;
+  }
+
+  void lastUpstreamRxByteReceived(MonotonicTime time) override {
+    last_upstream_rx_byte_received_.value(time);
+  }
+
+  const Optional<MonotonicTime>& firstDownstreamTxByteSent() const override {
+    return first_downstream_tx_byte_sent_;
+  }
+
+  void firstDownstreamTxByteSent(MonotonicTime time) override {
+    first_downstream_tx_byte_sent_.value(time);
+  }
+
+  const Optional<MonotonicTime>& lastDownstreamTxByteSent() const override {
+    return last_downstream_tx_byte_sent_;
+  }
+
+  void lastDownstreamTxByteSent(MonotonicTime time) override {
+    last_downstream_tx_byte_sent_.value(time);
+  }
+
+  void finalize(MonotonicTime time) override { end_time_.value(time); }
+
+  const Optional<MonotonicTime>& finalTimeMonotonic() const override { return end_time_; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
   const Optional<Http::Protocol>& protocol() const override { return protocol_; }
+
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
-
-  std::chrono::microseconds duration() const override {
-    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() -
-                                                                 start_time_monotonic_);
-  }
 
   void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
@@ -75,12 +118,19 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
-
-  Optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
-  Optional<std::chrono::microseconds> request_received_duration_;
-  Optional<std::chrono::microseconds> response_received_duration_;
+
+  Optional<MonotonicTime> last_rx_byte_received_;
+  Optional<MonotonicTime> first_upstream_tx_byte_sent_;
+  Optional<MonotonicTime> last_upstream_tx_byte_sent_;
+  Optional<MonotonicTime> first_upstream_rx_byte_received_;
+  Optional<MonotonicTime> last_upstream_rx_byte_received_;
+  Optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  Optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  Optional<MonotonicTime> end_time_;
+
+  Optional<Http::Protocol> protocol_;
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};

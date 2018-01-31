@@ -17,55 +17,69 @@ namespace Envoy {
 namespace RequestInfo {
 namespace {
 
-class RequestInfoTimingWrapper {
-public:
-  RequestInfoTimingWrapper()
-      : pre_start_(std::chrono::steady_clock::now()), request_info_(Http::Protocol::Http2),
-        post_start_(std::chrono::steady_clock::now()) {}
-
-  void checkTimingBounds(
-      const std::function<std::chrono::microseconds(RequestInfoImpl&)>& measure_duration,
-      const std::string& duration_name) {
-    MonotonicTime pre_measurement = std::chrono::steady_clock::now();
-    std::chrono::microseconds duration = measure_duration(request_info_);
-    MonotonicTime post_measurement = std::chrono::steady_clock::now();
-
-    std::chrono::microseconds lower_bound =
-        std::chrono::duration_cast<std::chrono::microseconds>(pre_measurement - post_start_);
-    EXPECT_LE(lower_bound, duration)
-        << fmt::format("Duration {} was lower than expected", duration_name);
-
-    std::chrono::microseconds upper_bound =
-        std::chrono::duration_cast<std::chrono::microseconds>(post_measurement - pre_start_);
-    EXPECT_GE(upper_bound, duration)
-        << fmt::format("Duration: {} was higher than expected", duration_name);
-  }
-
-private:
-  const MonotonicTime pre_start_;
-  RequestInfoImpl request_info_;
-  const MonotonicTime post_start_;
-};
-
 TEST(RequestInfoImplTest, TimingTest) {
-  RequestInfoTimingWrapper wrapper;
+  MonotonicTime pre_start = std::chrono::steady_clock::now();
+  RequestInfoImpl info(Http::Protocol::Http2);
+  MonotonicTime post_start = std::chrono::steady_clock::now();
 
-  wrapper.checkTimingBounds(
-      [](RequestInfoImpl& request_info) {
-        request_info.requestReceivedDuration(std::chrono::steady_clock::now());
-        return request_info.requestReceivedDuration().value();
-      },
-      "request received");
+  EXPECT_LE(pre_start, info.startTimeMonotonic()) << "Start time was lower than expected";
+  EXPECT_GE(post_start, info.startTimeMonotonic()) << "Start time was higher than expected";
 
-  wrapper.checkTimingBounds(
-      [](RequestInfoImpl& request_info) {
-        request_info.responseReceivedDuration(std::chrono::steady_clock::now());
-        return request_info.responseReceivedDuration().value();
-      },
-      "response received");
+  MonotonicTime now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.lastDownstreamRxByteReceived().valid());
+  info.lastDownstreamRxByteReceived(now);
+  Optional<MonotonicTime> timing = info.lastDownstreamRxByteReceived();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
 
-  wrapper.checkTimingBounds([](RequestInfoImpl& request_info) { return request_info.duration(); },
-                            "stream duration");
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.firstUpstreamTxByteSent().valid());
+  info.firstUpstreamTxByteSent(now);
+  timing = info.firstUpstreamTxByteSent();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
+
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.lastUpstreamTxByteSent().valid());
+  info.lastUpstreamTxByteSent(now);
+  timing = info.lastUpstreamTxByteSent();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
+
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.firstUpstreamRxByteReceived().valid());
+  info.firstUpstreamRxByteReceived(now);
+  timing = info.firstUpstreamRxByteReceived();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
+
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.lastUpstreamRxByteReceived().valid());
+  info.lastUpstreamRxByteReceived(now);
+  timing = info.lastUpstreamRxByteReceived();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
+
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.firstDownstreamTxByteSent().valid());
+  info.firstDownstreamTxByteSent(now);
+  timing = info.firstDownstreamTxByteSent();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
+
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.lastDownstreamTxByteSent().valid());
+  info.lastDownstreamTxByteSent(now);
+  timing = info.lastDownstreamTxByteSent();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
+
+  now = std::chrono::steady_clock::now();
+  EXPECT_FALSE(info.finalTimeMonotonic().valid());
+  info.finalize(now);
+  timing = info.finalTimeMonotonic();
+  EXPECT_TRUE(timing.valid());
+  EXPECT_EQ(now, timing.value());
 }
 
 TEST(RequestInfoImplTest, BytesTest) {
@@ -131,22 +145,6 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     NiceMock<Router::MockRouteEntry> route_entry;
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
-  }
-
-  {
-    RequestInfoImpl request_info;
-
-    // If no value is set, these should be not valid
-    EXPECT_FALSE(request_info.protocol().valid());
-    EXPECT_FALSE(request_info.requestReceivedDuration().valid());
-    EXPECT_FALSE(request_info.responseReceivedDuration().valid());
-
-    request_info.protocol(Http::Protocol::Http10);
-    request_info.requestReceivedDuration(std::chrono::steady_clock::now());
-    request_info.responseReceivedDuration(std::chrono::steady_clock::now());
-    EXPECT_TRUE(request_info.protocol().valid());
-    EXPECT_TRUE(request_info.requestReceivedDuration().valid());
-    EXPECT_TRUE(request_info.responseReceivedDuration().valid());
   }
 }
 

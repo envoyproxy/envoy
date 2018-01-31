@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/request_info/request_info.h"
-
 namespace Envoy {
 namespace RequestInfo {
 

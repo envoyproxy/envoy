@@ -16,10 +16,20 @@ MockRequestInfo::MockRequestInfo()
     : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
-  ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
-  ON_CALL(*this, requestReceivedDuration()).WillByDefault(ReturnRef(request_received_duration_));
-  ON_CALL(*this, responseReceivedDuration()).WillByDefault(ReturnRef(response_received_duration_));
-  ON_CALL(*this, duration()).WillByDefault(ReturnPointee(&duration_));
+  ON_CALL(*this, startTime()).WillByDefault(ReturnRef(start_time_));
+  ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnRef(start_time_monotonic_));
+  ON_CALL(*this, lastDownstreamRxByteReceived()).WillByDefault(ReturnRef(last_rx_byte_received_));
+  ON_CALL(*this, firstUpstreamTxByteSent()).WillByDefault(ReturnRef(first_upstream_tx_byte_sent_));
+  ON_CALL(*this, lastUpstreamTxByteSent()).WillByDefault(ReturnRef(last_upstream_tx_byte_sent_));
+  ON_CALL(*this, firstUpstreamRxByteReceived())
+      .WillByDefault(ReturnRef(first_upstream_rx_byte_received_));
+  ON_CALL(*this, lastUpstreamRxByteReceived())
+      .WillByDefault(ReturnRef(last_upstream_rx_byte_received_));
+  ON_CALL(*this, firstDownstreamTxByteSent())
+      .WillByDefault(ReturnRef(first_downstream_tx_byte_sent_));
+  ON_CALL(*this, lastDownstreamTxByteSent())
+      .WillByDefault(ReturnRef(last_downstream_tx_byte_sent_));
+  ON_CALL(*this, finalTimeMonotonic()).WillByDefault(ReturnRef(end_time_));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
   ON_CALL(*this, downstreamRemoteAddress()).WillByDefault(ReturnRef(downstream_remote_address_));
