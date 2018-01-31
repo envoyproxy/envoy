@@ -189,8 +189,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
 
     // Each transport socket factory owns one SslServerContext, we need to store them all in a
     // vector since Ssl::ContextManager doesn't owns SslServerContext. While
-    // transportSocketFacotry() always return the first element of transport_socket_factories_,
-    // other transport socket facotires are needed when the default Ssl::ServerContext updates
+    // transportSocketFacotry() always returns the first element of transport_socket_factories_,
+    // other transport socket factories are needed when the default Ssl::ServerContext updates
     // SSL context based on ClientHello.
     // This behavior is a workaround for initial SNI support before the full SNI based filter
     // chain match is implemented.

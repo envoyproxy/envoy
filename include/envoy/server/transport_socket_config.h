@@ -48,7 +48,7 @@ public:
 };
 
 /**
- * Implemented by each transport socket which used for upstream connections. Registered via class
+ * Implemented by each transport socket used for upstream connections. Registered via class
  * RegisterFactory.
  */
 class UpstreamTransportSocketConfigFactory : public virtual TransportSocketConfigFactory {
@@ -70,7 +70,7 @@ public:
 };
 
 /**
- * Implemented by each transport socket which used for downstream connections. Registered via class
+ * Implemented by each transport socket used for downstream connections. Registered via class
  * RegisterFactory.
  */
 class DownstreamTransportSocketConfigFactory : public virtual TransportSocketConfigFactory {

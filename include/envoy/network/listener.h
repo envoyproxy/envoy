@@ -33,7 +33,7 @@ public:
   virtual ListenSocket& socket() PURE;
 
   /**
-   * @return TransportSocketFacotry& the transport socket factory.
+   * @return TransportSocketFactory& the transport socket factory.
    */
   virtual TransportSocketFactory& transportSocketFactory() PURE;
 
