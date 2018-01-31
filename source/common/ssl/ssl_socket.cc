@@ -228,6 +228,7 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
+// TODO: Cache this result and possibly other methods in this class
 std::string SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
@@ -242,13 +243,8 @@ std::string SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
   std::string pem = std::string(reinterpret_cast<const char*>(output), length);
   // URL encoding shortcut
-  std::vector<std::pair<const absl::string_view, std::string>> replacements;
-  replacements.push_back({"\n", "%0A"});
-  replacements.push_back({" ", "%20"});
-  replacements.push_back({"+", "%2B"});
-  replacements.push_back({"/", "%2F"});
-  replacements.push_back({"=", "%3D"});
-  absl::StrReplaceAll(replacements, &pem);
+  absl::StrReplaceAll({{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}},
+                      &pem);
   return pem;
 }
 
