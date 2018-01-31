@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.validate.h"
+#include "envoy/config/filter/v2/network/tcp_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 

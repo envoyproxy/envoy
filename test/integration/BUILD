@@ -107,7 +107,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
+        "@envoy_api//envoy/config/filter/v2/network:http_connection_manager_cc",
     ],
 )
 

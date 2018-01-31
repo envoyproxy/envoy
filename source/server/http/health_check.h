@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/http/health_check.pb.h"
+#include "envoy/config/filter/v2/http/health_check.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"

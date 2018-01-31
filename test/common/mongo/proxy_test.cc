@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/fault.pb.h"
+#include "envoy/config/filter/v2/fault.pb.h"
 
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"

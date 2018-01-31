@@ -32,7 +32,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2/filter/network:rate_limit_cc",
+        "@envoy_api//envoy/config/filter/v2/network:rate_limit_cc",
     ],
 )
 
@@ -62,6 +62,6 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
         "//source/common/request_info:request_info_lib",
-        "@envoy_api//envoy/api/v2/filter/network:tcp_proxy_cc",
+        "@envoy_api//envoy/config/filter/v2/network:tcp_proxy_cc",
     ],
 )

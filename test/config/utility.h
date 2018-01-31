@@ -7,10 +7,10 @@
 
 #include "envoy/api/v2/base.pb.h"
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/protocol.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/v2/network/http_connection_manager.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/network/address_impl.h"

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/v2/network/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"

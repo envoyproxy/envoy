@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
+#include "envoy/config/filter/v2/network/redis_proxy.pb.h"
 #include "envoy/redis/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.h"
+#include "envoy/config/filter/v2/network/tcp_proxy.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"

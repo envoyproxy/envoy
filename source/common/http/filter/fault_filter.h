@@ -6,8 +6,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "envoy/api/v2/filter/http/fault.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/v2/http/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"

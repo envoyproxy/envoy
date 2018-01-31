@@ -1,6 +1,6 @@
 #include "server/config/http/grpc_json_transcoder.h"
 
-#include "envoy/api/v2/filter/http/transcoder.pb.validate.h"
+#include "envoy/config/filter/v2/http/transcoder.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"

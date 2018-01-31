@@ -3,8 +3,8 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
 #include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/config/filter/v2/accesslog/accesslog.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"

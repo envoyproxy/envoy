@@ -7,8 +7,8 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/filter/network/mongo_proxy.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/config/filter/v2/network/mongo_proxy.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/mongo/codec.h"
 #include "envoy/network/connection.h"

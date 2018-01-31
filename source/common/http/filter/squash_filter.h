@@ -4,8 +4,8 @@
 #include <regex>
 #include <string>
 
-#include "envoy/api/v2/filter/http/squash.pb.h"
 #include "envoy/common/optional.h"
+#include "envoy/config/filter/v2/http/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"

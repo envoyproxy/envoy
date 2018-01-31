@@ -5,9 +5,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/v2/network/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/init/init.h"
