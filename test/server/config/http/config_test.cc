@@ -20,6 +20,7 @@
 #include "server/config/http/lua.h"
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
+#include "server/config/http/squash.h"
 #include "server/config/http/zipkin_http_tracer.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
