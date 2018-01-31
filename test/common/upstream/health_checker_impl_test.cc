@@ -1015,6 +1015,8 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
+  connection_->runHighWatermarkCallbacks();
+  connection_->runLowWatermarkCallbacks();
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -1373,6 +1375,9 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   expectClientCreate();
   expectRequestCreate();
   health_checker_->start();
+
+  client_->runHighWatermarkCallbacks();
+  client_->runLowWatermarkCallbacks();
 
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
