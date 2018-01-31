@@ -2272,14 +2272,14 @@ virtual_hosts:
     }
     {
       Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/path", false, false);
-      EXPECT_EQ("http://redirect.lyft.com/new_path",
+          genRedirectHeaders("redirect.lyft.com", "/path", true, false);
+      EXPECT_EQ("https://redirect.lyft.com/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     {
       Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/host_path", false, false);
-      EXPECT_EQ("http://new.lyft.com/new_path",
+          genRedirectHeaders("redirect.lyft.com", "/host_path", true, false);
+      EXPECT_EQ("https://new.lyft.com/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     if (!test_v2) {
