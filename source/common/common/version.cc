@@ -2,9 +2,8 @@
 
 #include <string>
 
+#include "common/common/fmt.h"
 #include "common/common/macros.h"
-
-#include "fmt/format.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];

@@ -260,7 +260,7 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
 }
 
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster->clear_hosts();
     cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_RING_HASH);

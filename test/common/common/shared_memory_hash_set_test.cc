@@ -4,11 +4,11 @@
 #include <memory>
 #include <string>
 
+#include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/shared_memory_hash_set.h"
 
 #include "absl/strings/string_view.h"
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

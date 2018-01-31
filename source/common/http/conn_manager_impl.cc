@@ -18,6 +18,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/conn_manager_utility.h"
@@ -28,8 +29,6 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {

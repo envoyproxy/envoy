@@ -25,6 +25,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "fmt_test",
+    srcs = ["fmt_test.cc"],
+    deps = [
+        "//source/common/common:fmt_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "hash_test",
     srcs = ["hash_test.cc"],
     deps = ["//source/common/common:hash_lib"],

@@ -7,11 +7,10 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
+#include "common/common/fmt.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Tracing {

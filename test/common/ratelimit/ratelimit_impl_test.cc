@@ -120,7 +120,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
 }
 
 TEST(RateLimitGrpcFactoryTest, Create) {
-  envoy::api::v2::RateLimitServiceConfig config;
+  envoy::config::ratelimit::v2::RateLimitServiceConfig config;
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("foo");
   Grpc::MockAsyncClientManager async_client_manager;
   Stats::MockStore scope;
@@ -135,7 +135,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
 
 // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
 TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
-  envoy::api::v2::RateLimitServiceConfig config;
+  envoy::config::ratelimit::v2::RateLimitServiceConfig config;
   config.set_cluster_name("foo");
   Grpc::MockAsyncClientManager async_client_manager;
   Stats::MockStore scope;

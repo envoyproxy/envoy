@@ -1,5 +1,12 @@
 #pragma once
 
+#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -15,14 +22,6 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
-
-#include "api/base.pb.h"
-#include "api/bootstrap.pb.h"
-#include "api/cds.pb.h"
-#include "api/eds.pb.h"
-#include "api/filter/network/http_connection_manager.pb.h"
-#include "api/lds.pb.h"
-#include "api/rds.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -236,7 +235,8 @@ public:
    * @param bootstrap bootstrap proto.
    * @throws EnvoyException when the conflict of tag names is found.
    */
-  static Stats::TagProducerPtr createTagProducer(const envoy::api::v2::Bootstrap& bootstrap);
+  static Stats::TagProducerPtr
+  createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 
   /**
    * Check user supplied name in RDS/CDS/LDS for sanity.

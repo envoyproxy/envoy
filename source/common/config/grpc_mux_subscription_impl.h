@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 
@@ -8,8 +9,6 @@
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-
-#include "api/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {

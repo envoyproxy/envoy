@@ -9,9 +9,9 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/hex.h"
 
-#include "fmt/format.h"
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
