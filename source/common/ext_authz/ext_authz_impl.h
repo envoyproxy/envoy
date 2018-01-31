@@ -63,11 +63,11 @@ private:
 
 /**
  * For creating ext_authz.proto (authorization) request.
- * CheckRequestGenerator is used to extract attributes from the TCP/HTTP request
+ * CreateCheckRequest is used to extract attributes from the TCP/HTTP request
  * and fill out the details in the authorization protobuf that is sent to authorization
  * service.
  */
-class ExtAuthzCheckRequestGenerator {
+class CreateCheckRequest {
 public:
   /**
    * createHttpCheck is used to extract the attributes from the stream and the http headers
@@ -78,9 +78,9 @@ public:
    * @param request is the reference to the check request that will be filled up.
    *
    */
-  void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                       const Envoy::Http::HeaderMap& headers,
-                       envoy::service::auth::v2::CheckRequest& request);
+  static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                              const Envoy::Http::HeaderMap& headers,
+                              envoy::service::auth::v2::CheckRequest& request);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -89,23 +89,20 @@ public:
    * @param request is the reference to the check request that will be filled up.
    *
    */
-  void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                      envoy::service::auth::v2::CheckRequest& request);
+  static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
+                             envoy::service::auth::v2::CheckRequest& request);
 
 private:
-  void addressToProtobufAddress(envoy::api::v2::Address& proto_address,
-                                const Network::Address::Instance& address);
-  void setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
-                          const Network::Connection& connection, const std::string& service,
-                          const bool local);
-  void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
-                      const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                      const Envoy::Http::HeaderMap& headers);
-  void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
+  static void setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+                                 const Network::Connection& connection, const std::string& service,
+                                 const bool local);
+  static void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
                              const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                              const Envoy::Http::HeaderMap& headers);
-  const std::string getProtocolStr(const Envoy::Http::Protocol&);
-  std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
+  static void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
+                                    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                                    const Envoy::Http::HeaderMap& headers);
+  static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };
 

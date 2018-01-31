@@ -87,6 +87,16 @@ public:
   const char* c_str() const { return buffer_.ref_; }
 
   /**
+   * @return a std::string.
+   */
+  std::string getString() const {
+    if (string_length_) {
+      return std::string(buffer_.ref_, string_length_);
+    }
+    return "";
+  }
+
+  /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
    * strings are reset to zero size.
    */
