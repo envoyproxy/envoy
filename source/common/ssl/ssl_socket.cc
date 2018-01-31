@@ -228,11 +228,14 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-// TODO: Cache this result and possibly other methods in this class
-std::string SslSocket::urlEncodedPemEncodedPeerCertificate() const {
+const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
+  if (!urlEncodedPemEncodedPeerCertificate_.empty()) {
+    return urlEncodedPemEncodedPeerCertificate_;
+  }
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    return "";
+    // Guaranteed to be empty here
+    return urlEncodedPemEncodedPeerCertificate_;
   }
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
@@ -245,7 +248,8 @@ std::string SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   // URL encoding shortcut
   absl::StrReplaceAll({{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}},
                       &pem);
-  return pem;
+  urlEncodedPemEncodedPeerCertificate_ = std::move(pem);
+  return urlEncodedPemEncodedPeerCertificate_;
 }
 
 std::string SslSocket::uriSanPeerCertificate() {

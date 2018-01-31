@@ -28,7 +28,7 @@ public:
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() override;
-  std::string urlEncodedPemEncodedPeerCertificate() const override;
+  const std::string& urlEncodedPemEncodedPeerCertificate() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -53,6 +53,7 @@ private:
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
+  mutable std::string urlEncodedPemEncodedPeerCertificate_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory {
