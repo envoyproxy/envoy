@@ -479,6 +479,16 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
+  if (options) {
+    if (!options->setOptions(*socket_)) {
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+      immediate_error_event_ = ConnectionEvent::LocalClose;
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+      return;
+    }
+  }
   if (source_address != nullptr) {
     const int rc = source_address->bind(fd());
     if (rc < 0) {
@@ -489,15 +499,6 @@ ClientConnectionImpl::ClientConnectionImpl(
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
 
-      // Trigger a write event to close this connection out-of-band.
-      file_event_->activate(Event::FileReadyType::Write);
-    }
-  }
-  if (options) {
-    if (!options->setOptions(*socket_)) {
-      // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-      immediate_error_event_ = ConnectionEvent::LocalClose;
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
     }
