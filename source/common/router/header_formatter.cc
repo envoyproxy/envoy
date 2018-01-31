@@ -126,6 +126,15 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
       return RequestInfo::Utility::formatDownstreamAddressNoPort(
           *request_info.downstreamRemoteAddress());
     };
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      return request_info.downstreamLocalAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
+      return RequestInfo::Utility::formatDownstreamAddressNoPort(
+          *request_info.downstreamLocalAddress());
+    };
   } else if (field_name.find_first_of("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));

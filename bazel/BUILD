@@ -51,3 +51,8 @@ config_setting(
     name = "enable_exported_symbols",
     values = {"define": "exported_symbols=enabled"},
 )
+
+config_setting(
+    name = "force_libcpp",
+    values = {"define": "force_libcpp=enabled"},
+)

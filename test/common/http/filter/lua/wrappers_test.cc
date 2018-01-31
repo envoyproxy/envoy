@@ -69,6 +69,10 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
     function shouldFailAdd(object)
       object:add("foo")
     end
+
+    function shouldFailReplace(object)
+      object:replace("foo")
+    end
   )EOF"};
 
   InSequence s;
@@ -87,6 +91,34 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
   EXPECT_THROW_WITH_MESSAGE(start("shouldFailAdd"), Envoy::Lua::LuaException,
                             "[string \"...\"]:13: header map can no longer be modified");
+
+  setup(SCRIPT);
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
+  EXPECT_THROW_WITH_MESSAGE(start("shouldFailReplace"), Envoy::Lua::LuaException,
+                            "[string \"...\"]:17: header map can no longer be modified");
+}
+
+// Verify that replace works correctly with both inline and normal headers.
+TEST_F(LuaHeaderMapWrapperTest, Replace) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:replace(":path", "/new_path")
+      object:replace("other_header", "other_header_value")
+      object:replace("new_header", "new_header_value")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  TestHeaderMapImpl headers{{":path", "/"}, {"other_header", "hello"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  start("callMe");
+
+  EXPECT_EQ((TestHeaderMapImpl{{":path", "/new_path"},
+                               {"other_header", "other_header_value"},
+                               {"new_header", "new_header_value"}}),
+            headers);
 }
 
 // Modify during iteration.
