@@ -74,7 +74,6 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    external_deps = ["envoy_bootstrap"],
     deps = [
         ":admin_lib",
         ":api_lib",
@@ -100,5 +99,6 @@ envoy_cc_library(
         "//source/server:configuration_lib",
         "//source/server:server_lib",
         "//source/server/http:admin_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

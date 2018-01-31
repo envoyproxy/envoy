@@ -28,6 +28,7 @@ public:
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() override;
+  std::string urlEncodedPemEncodedPeerCertificate() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;

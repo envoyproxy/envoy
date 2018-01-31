@@ -1,11 +1,10 @@
 #include "common/protobuf/utility.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 

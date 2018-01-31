@@ -1,8 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/json/json_object.h"
-
-#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Config {

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/base.pb.h"
+
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/message_impl.h"
@@ -20,7 +22,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "api/base.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

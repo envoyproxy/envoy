@@ -12,8 +12,6 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 
-#include "fmt/format.h"
-
 namespace Envoy {
 namespace Stats {
 namespace Metrics {
@@ -42,7 +40,7 @@ GrpcMetricsStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
     : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
 
 void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
-    envoy::api::v2::StreamMetricsMessage& message) {
+    envoy::service::metrics::v2::StreamMetricsMessage& message) {
   if (thread_local_stream_ == nullptr) {
     thread_local_stream_ = std::make_shared<ThreadLocalStream>(*this);
   }
@@ -50,7 +48,7 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
   if (thread_local_stream_->stream_ == nullptr) {
     thread_local_stream_->stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.api.v2.MetricsService.StreamMetrics"),
+                           "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
                        *thread_local_stream_);
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = shared_state_->local_info_.node();

@@ -8,6 +8,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/fmt.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -20,8 +21,6 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)

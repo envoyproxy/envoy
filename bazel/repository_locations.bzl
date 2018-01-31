@@ -30,7 +30,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_grpc_grpc = dict(
-        commit = "f526a2164f9c1eb816eea420f7201b8dfa278a8f", # v1.8.3
+        commit = "04ecc18e3a5b8de5bb7ffa20700364ad88dc16f9", # v1.9.0-pre3
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
@@ -71,7 +71,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "5aa0208c3bf0ba35833dc4ac16c73839b032e70a",
+        commit = "8345af596d78d5da6becb0538fced3d65efbaadf",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

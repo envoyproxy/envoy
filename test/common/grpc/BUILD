@@ -87,7 +87,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto",
         "//test/test_common:environment_lib",
-    ],
+    ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
 
 envoy_cc_test(
@@ -101,12 +101,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
-)
-
-envoy_cc_test(
-    name = "google_grpc_test",
-    srcs = envoy_select_google_grpc(["google_grpc_test.cc"]),
-    external_deps = ["grpc"],
 )
 
 envoy_cc_test(

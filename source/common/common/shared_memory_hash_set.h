@@ -5,10 +5,10 @@
 #include <utility>
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/logger.h"
 
 #include "absl/strings/string_view.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 
