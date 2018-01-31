@@ -113,10 +113,11 @@ void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType:
 WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
-Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data) {
+Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool last_byte) {
   data_.append(TestUtility::bufferToString(data));
   data.drain(data.length());
-  if (!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) {
+  read_last_byte_ = last_byte;
+  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) || last_byte) {
     data_to_wait_for_.clear();
     dispatcher_.exit();
   }

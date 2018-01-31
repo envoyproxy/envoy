@@ -133,7 +133,7 @@ TEST_F(CodecClientTest, ProtocolError) {
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
-  filter_->onData(data);
+  filter_->onData(data, false);
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_protocol_error_.value());
 }
@@ -147,7 +147,7 @@ TEST_F(CodecClientTest, 408Response) {
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
-  filter_->onData(data);
+  filter_->onData(data, false);
 
   EXPECT_EQ(0U, cluster_->stats_.upstream_cx_protocol_error_.value());
 }
@@ -161,7 +161,7 @@ TEST_F(CodecClientTest, PrematureResponse) {
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
-  filter_->onData(data);
+  filter_->onData(data, false);
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_protocol_error_.value());
 }

@@ -175,7 +175,6 @@ class FakeConnectionBase : public Network::ConnectionCallbacks {
 public:
   ~FakeConnectionBase() { ASSERT(initialized_); }
   void close();
-  void halfClose();
   void readDisable(bool disable);
   // By default waitForDisconnect and waitForHalfClose assume the next event is a disconnect and
   // fails an assert if an unexpected event occurs. If a caller truly wishes to wait until
@@ -237,7 +236,7 @@ private:
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       parent_.codec_->dispatch(data);
       return Network::FilterStatus::StopIteration;
     }
@@ -262,14 +261,14 @@ public:
   }
 
   std::string waitForData(uint64_t num_bytes);
-  void write(const std::string& data);
+  void write(const std::string& data, bool last_byte = false);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeRawConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override;
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override;
 
     FakeRawConnection& parent_;
   };

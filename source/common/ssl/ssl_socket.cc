@@ -36,11 +36,12 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
-      return {action, 0};
+      return {action, 0, false};
     }
   }
 
   bool keep_reading = true;
+  bool last_byte = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   while (keep_reading) {
@@ -63,7 +64,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
-          action = PostIoAction::HalfClose;
+          last_byte = true;
           break;
         case SSL_ERROR_WANT_WRITE:
         // Renegotiation has started. We don't handle renegotiation so just fall through.
@@ -86,7 +87,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     }
   }
 
-  return {action, bytes_read};
+  return {action, bytes_read, last_byte};
 }
 
 PostIoAction SslSocket::doHandshake() {
@@ -140,11 +141,11 @@ void SslSocket::drainErrorQueue() {
   }
 }
 
-Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer) {
+Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool last_byte) {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
-      return {action, 0};
+      return {action, 0, false};
     }
   }
 
@@ -184,7 +185,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer) {
         // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
-          return {PostIoAction::Close, total_bytes_written};
+          return {PostIoAction::Close, total_bytes_written, false};
         }
 
         break;
@@ -198,10 +199,25 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer) {
     }
   }
 
-  return {PostIoAction::KeepOpen, total_bytes_written};
+  if (total_bytes_written == original_buffer_length && last_byte) {
+    shutdownSsl();
+  }
+
+  return {PostIoAction::KeepOpen, total_bytes_written, false};
 }
 
 void SslSocket::onConnected() { ASSERT(!handshake_complete_); }
+
+void SslSocket::shutdownSsl() {
+  if (!shutdown_sent_ && handshake_complete_ &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
+    int rc = SSL_shutdown(ssl_.get());
+    ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
+    UNREFERENCED_PARAMETER(rc);
+    drainErrorQueue();
+    shutdown_sent_ = true;
+  }
+}
 
 bool SslSocket::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
@@ -266,22 +282,11 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
   return result;
 }
 
-void SslSocket::halfCloseSocket() {
-  if (!shutdown_sent_ && handshake_complete_ &&
-      callbacks_->connection().state() != Network::Connection::State::Closed) {
-    int rc = SSL_shutdown(ssl_.get());
-    ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
-    UNREFERENCED_PARAMETER(rc);
-    drainErrorQueue();
-    shutdown_sent_ = true;
-  }
-}
-
 void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  halfCloseSocket();
+  shutdownSsl();
 }
 
 std::string SslSocket::protocol() const {

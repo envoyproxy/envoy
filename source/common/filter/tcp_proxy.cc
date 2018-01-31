@@ -258,8 +258,8 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   }
 }
 
-Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data) {
-  parent_->onUpstreamData(data);
+Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data, bool last_byte) {
+  parent_->onUpstreamData(data, last_byte);
   return Network::FilterStatus::StopIteration;
 }
 
@@ -372,10 +372,10 @@ void TcpProxy::onConnectTimeout() {
   initializeUpstreamConnection();
 }
 
-Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
+Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool last_byte) {
   ENVOY_CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
   request_info_.bytes_received_ += data.length();
-  upstream_connection_->write(data);
+  upstream_connection_->write(data, last_byte);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
@@ -383,9 +383,7 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
 
 void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   if (upstream_connection_) {
-    if (event == Network::ConnectionEvent::RemoteHalfClose) {
-      upstream_connection_->close(Network::ConnectionCloseType::HalfClose);
-    } else if (event == Network::ConnectionEvent::RemoteClose) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
       upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
 
       if (upstream_connection_->state() != Network::Connection::State::Closed) {
@@ -406,9 +404,9 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpProxy::onUpstreamData(Buffer::Instance& data) {
+void TcpProxy::onUpstreamData(Buffer::Instance& data, bool last_byte) {
   request_info_.bytes_sent_ += data.length();
-  read_callbacks_->connection().write(data);
+  read_callbacks_->connection().write(data, last_byte);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
@@ -430,9 +428,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     disableIdleTimer();
   }
 
-  if (event == Network::ConnectionEvent::RemoteHalfClose) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::HalfClose);
-  } else if (event == Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
     if (connecting) {
       request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);

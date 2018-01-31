@@ -34,9 +34,8 @@ public:
   std::string protocol() const override;
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
-  void halfCloseSocket() override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
-  Network::IoResult doWrite(Buffer::Instance& write_buffer) override;
+  Network::IoResult doWrite(Buffer::Instance& write_buffer, bool last_byte) override;
   void onConnected() override;
   Ssl::Connection* ssl() override { return this; }
   const Ssl::Connection* ssl() const override { return this; }
@@ -46,6 +45,7 @@ public:
 private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
+  void shutdownSsl();
   std::string getUriSanFromCertificate(X509* cert);
   std::string getSubjectFromCertificate(X509* cert) const;
 

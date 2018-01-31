@@ -34,9 +34,10 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   tcp_client->write("hello");
   fake_upstream_connection->waitForData(5);
 
-  fake_upstream_connection->halfClose();
+  fake_upstream_connection->write("", true);
   tcp_client->waitForHalfClose();
-  tcp_client->halfClose();
+  tcp_client->write("", true);
+  fake_upstream_connection->waitForHalfClose();
   fake_upstream_connection->waitForDisconnect();
 }
 
@@ -67,11 +68,10 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   fake_upstream_connection->waitForData(5);
   fake_upstream_connection->write("world");
   tcp_client->waitForData("world");
-  tcp_client->write("hello");
-  tcp_client->halfClose();
+  tcp_client->write("hello", true);
   fake_upstream_connection->waitForData(10);
   fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->halfClose();
+  fake_upstream_connection->write("", true);
   fake_upstream_connection->waitForDisconnect(true);
   tcp_client->waitForDisconnect();
 }
@@ -170,7 +170,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   // Clean up.
   ssl_client->close(Network::ConnectionCloseType::HalfClose);
   fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->halfClose();
+  fake_upstream_connection->write("", true);
   fake_upstream_connection->waitForDisconnect();
   while (!connect_callbacks.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -213,9 +213,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   fake_upstream_connection->write("hello");
   tcp_client->waitForData("hello");
 
-  fake_upstream_connection->halfClose();
+  fake_upstream_connection->write("", true);
   tcp_client->waitForHalfClose();
-  tcp_client->halfClose();
+  tcp_client->write("", true);
+  fake_upstream_connection->waitForHalfClose();
   fake_upstream_connection->waitForDisconnect();
 
   std::string log_result;

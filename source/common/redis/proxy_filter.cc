@@ -96,7 +96,7 @@ void ProxyFilter::onResponse(PendingRequest& request, RespValuePtr&& value) {
   }
 }
 
-Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
+Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
   try {
     decoder_->decode(data);
     return Network::FilterStatus::Continue;

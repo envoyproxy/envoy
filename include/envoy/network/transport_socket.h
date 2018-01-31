@@ -12,9 +12,6 @@ namespace Network {
  * Action that should occur on a connection after I/O.
  */
 enum class PostIoAction {
-  // Remote side sent a half-close.
-  HalfClose,
-
   // Connection is forcibly closed.
   Close,
 
@@ -32,6 +29,12 @@ struct IoResult {
    * Number of bytes processed by the I/O event.
    */
   uint64_t bytes_processed_;
+
+  /**
+   * True if an end-of-stream was read from a connection. This
+   * can only be true for read operations.
+   */
+  bool last_byte_read_;
 };
 
 /**
@@ -105,11 +108,6 @@ public:
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
-   * Half-closes the transport socket. For TCP, this sends a FIN.
-   */
-  virtual void halfCloseSocket() PURE;
-
-  /**
    *
    * @param buffer supplies the buffer to read to.
    * @return IoResult the result of the read action.
@@ -120,7 +118,7 @@ public:
    * @param buffer supplies the buffer to write from
    * @return IoResult the result of the write action.
    */
-  virtual IoResult doWrite(Buffer::Instance& buffer) PURE;
+  virtual IoResult doWrite(Buffer::Instance& buffer, bool last_byte) PURE;
 
   /**
    * Called when underlying transport is established.

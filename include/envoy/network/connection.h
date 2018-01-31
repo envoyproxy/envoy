@@ -22,7 +22,6 @@ namespace Network {
  * Events that occur on a connection.
  */
 enum class ConnectionEvent {
-  RemoteHalfClose,
   RemoteClose,
   LocalClose,
   Connected,
@@ -198,7 +197,10 @@ public:
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
    */
-  virtual void write(Buffer::Instance& data) PURE;
+  virtual void write(Buffer::Instance& data, bool last_byte) PURE;
+
+  // TODO: delete this and fixup all callers.
+  void write(Buffer::Instance& data) { write(data, false); }
 
   /**
    * Set a soft limit on the size of buffers for the connection.

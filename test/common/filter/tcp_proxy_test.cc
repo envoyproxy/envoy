@@ -489,8 +489,8 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 

@@ -166,18 +166,6 @@ void FakeConnectionBase::close() {
   }
 }
 
-void FakeConnectionBase::halfClose() {
-  // Make sure that a close didn't already come in and destroy the connection.
-  std::unique_lock<std::mutex> lock(lock_);
-  if (!disconnected_) {
-    connection_.dispatcher().post([this]() -> void {
-      if (!disconnected_) {
-        connection_.close(Network::ConnectionCloseType::HalfClose);
-      }
-    });
-  }
-}
-
 void FakeConnectionBase::readDisable(bool disable) {
   std::unique_lock<std::mutex> lock(lock_);
   RELEASE_ASSERT(!disconnected_);
@@ -196,9 +184,6 @@ void FakeConnectionBase::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     disconnected_ = true;
-    connection_event_.notify_one();
-  } else if (event == Network::ConnectionEvent::RemoteHalfClose) {
-    half_closed_ = true;
     connection_event_.notify_one();
   }
 }
@@ -403,17 +388,19 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   return data_;
 }
 
-void FakeRawConnection::write(const std::string& data) {
-  connection_.dispatcher().post([data, this]() -> void {
+void FakeRawConnection::write(const std::string& data, bool last_byte) {
+  connection_.dispatcher().post([data, last_byte, this]() -> void {
     Buffer::OwnedImpl to_write(data);
-    connection_.write(to_write);
+    connection_.write(to_write, last_byte);
   });
 }
 
-Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data) {
+Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
+                                                            bool last_byte) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   ENVOY_LOG(debug, "got {} bytes", data.length());
   parent_.data_.append(TestUtility::bufferToString(data));
+  parent_.half_closed_ = last_byte;
   data.drain(data.length());
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;

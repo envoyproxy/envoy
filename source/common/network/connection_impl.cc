@@ -100,25 +100,14 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
-  if (type == ConnectionCloseType::HalfClose && remote_half_closed_) {
-    // If both sides have half-closed, proceed to fully close the
-    // connection after flushing.
-    type = ConnectionCloseType::FlushWrite;
-  }
-
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  if (type == ConnectionCloseType::HalfClose) {
-    local_half_closed_ = true;
-    if (data_to_write == 0) {
-      transport_socket_->halfCloseSocket();
-    }
-  } else if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
-             !transport_socket_->canFlushClose()) {
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
+      !transport_socket_->canFlushClose()) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      transport_socket_->doWrite(*write_buffer_);
+      transport_socket_->doWrite(*write_buffer_, false);
     }
 
     closeSocket(ConnectionEvent::LocalClose);
@@ -145,8 +134,6 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd() == -1) {
     return;
   }
-
-  ASSERT(close_type != ConnectionEvent::RemoteHalfClose);
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
   transport_socket_->closeSocket(close_type);
@@ -208,7 +195,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     return;
   }
 
-  if (read_buffer_size == 0) {
+  if (read_buffer_size == 0 && !read_last_byte_) {
     return;
   }
 
@@ -276,11 +263,12 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
 }
 
-void ConnectionImpl::write(Buffer::Instance& data) {
+void ConnectionImpl::write(Buffer::Instance& data, bool last_byte) {
   // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
   //       path, so we just pass around the buffer passed to us in this function. If we ever support
   //       buffer/restart/continue on the write path this needs to get more complicated.
   current_write_buffer_ = &data;
+  current_write_last_byte_ = last_byte;
   FilterStatus status = filter_manager_.onWrite();
   current_write_buffer_ = nullptr;
 
@@ -288,8 +276,9 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     return;
   }
 
-  if (data.length() > 0) {
-    ENVOY_CONN_LOG(trace, "writing {} bytes", *this, data.length());
+  write_last_byte_ = last_byte;
+  if (data.length() > 0 || last_byte) {
+    ENVOY_CONN_LOG(trace, "writing {} bytes, last_byte {}", *this, data.length(), last_byte);
     // TODO(mattklein123): All data currently gets moved from the source buffer to the write buffer.
     // This can lead to inefficient behavior if writing a bunch of small chunks. In this case, it
     // would likely be more efficient to copy data below a certain size. VERY IMPORTANT: If this is
@@ -399,25 +388,25 @@ void ConnectionImpl::onReadReady() {
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
-  if (result.bytes_processed_ != 0) {
+
+  // If this connection doesn't have half-close semantics, translate last_byte into
+  // a connection close.
+  if ((!enable_half_close_ && result.last_byte_read_)) {
+    result.last_byte_read_ = false;
+    result.action_ = PostIoAction::Close;
+  }
+
+  read_last_byte_ |= result.last_byte_read_;
+  if (result.bytes_processed_ != 0 || result.last_byte_read_) {
     // Skip onRead if no bytes were processed. For instance, if the connection was closed without
     // producing more data.
     onRead(new_buffer_size);
   }
 
   // The read callback may have already closed the connection.
-  if (result.action_ == PostIoAction::Close ||
-      (result.action_ == PostIoAction::HalfClose && !enable_half_close_)) {
+  if (result.action_ == PostIoAction::Close || isDoubleHalfClosed()) {
     ENVOY_CONN_LOG(debug, "remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if (result.action_ == PostIoAction::HalfClose) {
-    ENVOY_CONN_LOG(debug, "remote half close", *this);
-    remote_half_closed_ = true;
-    if (!local_half_closed_) {
-      raiseEvent(ConnectionEvent::RemoteHalfClose);
-    } else if (write_buffer_->length() == 0) {
-      closeSocket(ConnectionEvent::RemoteClose);
-    }
   }
 }
 
@@ -447,11 +436,20 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  IoResult result = transport_socket_->doWrite(*write_buffer_);
+  IoResult result = transport_socket_->doWrite(*write_buffer_, write_last_byte_);
+  ASSERT(!result.last_byte_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
-  if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
+  if (result.action_ == PostIoAction::Close) {
+    // It is possible (though unlikely) for the connection to have already been closed during the
+    // write callback. This can happen if we manage to complete the SSL handshake in the write
+    // callback, raise a connected event, and close the connection.
+    closeSocket(ConnectionEvent::RemoteClose);
+  } else if ((close_with_flush_ && new_buffer_size == 0) || isDoubleHalfClosed()) {
+    ENVOY_CONN_LOG(debug, "write flush complete", *this);
+    closeSocket(ConnectionEvent::LocalClose);
+  } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
     for (BytesSentCb& cb : bytes_sent_callbacks_) {
       cb(result.bytes_processed_);
 
@@ -459,21 +457,6 @@ void ConnectionImpl::onWriteReady() {
       if (fd() == -1) {
         return;
       }
-    }
-  }
-
-  if (result.action_ == PostIoAction::Close) {
-    // It is possible (though unlikely) for the connection to have already been closed during the
-    // write callback. This can happen if we manage to complete the SSL handshake in the write
-    // callback, raise a connected event, and close the connection.
-    closeSocket(ConnectionEvent::RemoteClose);
-  } else if (new_buffer_size == 0) {
-    if (close_with_flush_ || (local_half_closed_ && remote_half_closed_)) {
-      ENVOY_CONN_LOG(debug, "write flush complete", *this);
-      closeSocket(ConnectionEvent::LocalClose);
-    } else if (local_half_closed_) {
-      ENVOY_CONN_LOG(debug, "local half close flush complete", *this);
-      transport_socket_->halfCloseSocket();
     }
   }
 }
@@ -501,6 +484,11 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
   ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
                                            connection_stats_->write_total_,
                                            connection_stats_->write_current_);
+}
+
+bool ConnectionImpl::isDoubleHalfClosed() {
+  // If the write_buffer_ is not empty, then the last_byte has not been sent to the transport yet.
+  return read_last_byte_ && write_last_byte_ && write_buffer_->length() == 0;
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

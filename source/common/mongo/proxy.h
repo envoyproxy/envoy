@@ -127,7 +127,7 @@ public:
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onData(Buffer::Instance& data, bool last_byte) override;
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
@@ -135,7 +135,7 @@ public:
   }
 
   // Network::WriteFilter
-  Network::FilterStatus onWrite(Buffer::Instance& data) override;
+  Network::FilterStatus onWrite(Buffer::Instance& data, bool last_byte) override;
 
   // Mongo::DecoderCallback
   void decodeGetMore(GetMoreMessagePtr&& message) override;

@@ -1011,7 +1011,7 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
@@ -1021,7 +1021,7 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Buffer::OwnedImpl response;
   add_uint8(response, 2);
-  read_filter_->onData(response);
+  read_filter_->onData(response, false);
 }
 
 // Tests that a successful healthcheck will disconnect the client when reuse_connection is false.
@@ -1033,7 +1033,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(1);
+  EXPECT_CALL(*connection_, write(_, _)).Times(1);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
@@ -1046,7 +1046,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
 
   Buffer::OwnedImpl response;
   add_uint8(response, 2);
-  read_filter_->onData(response);
+  read_filter_->onData(response, false);
 
   // These are the expected metric results after testing.
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
@@ -1063,7 +1063,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   expectClientCreate();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
@@ -1072,7 +1072,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
 
   Buffer::OwnedImpl response;
   add_uint8(response, 1);
-  read_filter_->onData(response);
+  read_filter_->onData(response, false);
 
   EXPECT_CALL(*connection_, close(_));
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -1081,7 +1081,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
@@ -1095,7 +1095,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
@@ -1116,7 +1116,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(1);
+  EXPECT_CALL(*connection_, write(_, _)).Times(1);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
@@ -1129,14 +1129,14 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
 
   Buffer::OwnedImpl response;
   add_uint8(response, 2);
-  read_filter_->onData(response);
+  read_filter_->onData(response, false);
 
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 
   // The healthcheck will run again.
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
@@ -1157,7 +1157,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
 
   // The healthcheck will run again, it should be failing after this attempt.
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_));
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
@@ -1184,7 +1184,7 @@ TEST_F(TcpHealthCheckerImplTest, NoData) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*connection_, write(_, _)).Times(0);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
@@ -1194,7 +1194,7 @@ TEST_F(TcpHealthCheckerImplTest, NoData) {
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*connection_, write(_, _)).Times(0);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 }
@@ -1207,7 +1207,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*connection_, write(_, _)).Times(0);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
@@ -1241,7 +1241,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*connection_, write(_, _)).Times(0);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
@@ -1271,7 +1271,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*connection_, write(_, _)).Times(0);
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 

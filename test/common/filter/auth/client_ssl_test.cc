@@ -137,8 +137,8 @@ TEST_F(ClientSslAuthFilterTest, NoSsl) {
   // Check no SSL case, mulitple iterations.
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_no_ssl").value());
@@ -181,8 +181,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   // White list case.
@@ -192,8 +192,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   // IPv6 White list case.
@@ -203,8 +203,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.update_success").value());

@@ -71,11 +71,10 @@ public:
                        Network::Address::IpVersion version, bool enable_half_close = false);
 
   void close();
-  void halfClose();
   void waitForData(const std::string& data);
   void waitForDisconnect();
   void waitForHalfClose();
-  void write(const std::string& data);
+  void write(const std::string& data, bool last_byte = false);
   const std::string& data() { return payload_reader_->data(); }
 
 private:
@@ -94,7 +93,6 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
-  bool half_closed_{};
   MockWatermarkBuffer* client_write_buffer_;
 };
 

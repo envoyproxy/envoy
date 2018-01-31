@@ -83,15 +83,17 @@ public:
   Ssl::Connection* ssl() override { return transport_socket_->ssl(); }
   const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
-  void write(Buffer::Instance& data) override;
+  void write(Buffer::Instance& data, bool last_byte) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return above_high_watermark_; }
 
   // Network::BufferSource
-  Buffer::Instance& getReadBuffer() override { return read_buffer_; }
-  Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
+  BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_last_byte_}; }
+  BufferSource::StreamBuffer getWriteBuffer() override {
+    return {*current_write_buffer_, current_write_last_byte_};
+  }
 
   // Network::TransportSocketCallbacks
   int fd() const override { return socket_->fd(); }
@@ -137,6 +139,9 @@ private:
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
 
+  // Returns true iff last byte has been both written and read.
+  bool isDoubleHalfClosed();
+
   static std::atomic<uint64_t> next_global_id_;
 
   Event::Dispatcher& dispatcher_;
@@ -148,8 +153,9 @@ private:
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   bool enable_half_close_{false};
-  bool local_half_closed_{false};
-  bool remote_half_closed_{false};
+  bool read_last_byte_{false};
+  bool write_last_byte_{false};
+  bool current_write_last_byte_{false};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};

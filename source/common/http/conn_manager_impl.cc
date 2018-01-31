@@ -192,14 +192,14 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   return **streams_.begin();
 }
 
-Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
+Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool last_byte) {
   // Send the data through WebSocket handlers if this connection is a
   // WebSocket connection. N.B. The first request from the client to Envoy
   // will still be processed as a normal HTTP/1.1 request, where Envoy will
   // detect the WebSocket upgrade and establish a connection to the
   // upstream.
   if (isWebSocketConnection()) {
-    return ws_connection_->onData(data);
+    return ws_connection_->onData(data, last_byte);
   }
 
   if (!codec_) {

@@ -91,8 +91,8 @@ public:
 
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
-    EXPECT_CALL(*read_filter_, onData(_))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
           EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
           buffer.drain(expected.length());
           dispatcher_.exit();
@@ -368,8 +368,8 @@ public:
 
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
-    EXPECT_CALL(*read_filter_, onData(_))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer) -> FilterStatus {
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
           EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
           buffer.drain(expected.length());
           dispatcher_.exit();

@@ -13,6 +13,7 @@ void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& call
 IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
+  bool last_byte = false;
   do {
     // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
     // use an ioctl() before every read to figure out how much data there is to read.
@@ -24,7 +25,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
 
     if (rc == 0) {
       // Remote close. Might need to raise data before raising close.
-      action = PostIoAction::HalfClose;
+      last_byte = true;
       break;
     } else if (rc == -1) {
       // Remote error (might be no data).
@@ -43,14 +44,20 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     }
   } while (true);
 
-  return {action, bytes_read};
+  return {action, bytes_read, last_byte};
 }
 
-IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer) {
+IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool last_byte) {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
     if (buffer.length() == 0) {
+      if (last_byte && !shutdown_) {
+        // Ignore the result. This can only fail if the connection failed. In that case, the
+        // error will be detected on the next read, and dealt with appropriately.
+        ::shutdown(callbacks_->fd(), SHUT_WR);
+        shutdown_ = true;
+      }
       action = PostIoAction::KeepOpen;
       break;
     }
@@ -70,13 +77,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer) {
     }
   } while (true);
 
-  return {action, bytes_written};
-}
-
-void RawBufferSocket::halfCloseSocket() {
-  // Ignore the result. This can only fail if the connection failed. In that case, the
-  // error will be detected on the next read, and dealt with appropriately.
-  ::shutdown(callbacks_->fd(), SHUT_WR);
+  return {action, bytes_written, false};
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }

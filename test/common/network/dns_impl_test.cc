@@ -61,7 +61,7 @@ private:
     ReadFilter(TestDnsServerQuery& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       onDataInternal(data);
       return Network::FilterStatus::StopIteration;
     }

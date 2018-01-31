@@ -137,9 +137,6 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
 }
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
-void IntegrationTcpClient::halfClose() {
-  connection_->close(Network::ConnectionCloseType::HalfClose);
-}
 
 void IntegrationTcpClient::waitForData(const std::string& data) {
   if (payload_reader_->data().find(data) == 0) {
@@ -157,28 +154,27 @@ void IntegrationTcpClient::waitForDisconnect() {
 
 void IntegrationTcpClient::waitForHalfClose() {
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(half_closed_);
+  EXPECT_TRUE(payload_reader_->readLastByte());
 }
 
-void IntegrationTcpClient::write(const std::string& data) {
+void IntegrationTcpClient::write(const std::string& data, bool last_byte) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));
-  EXPECT_CALL(*client_write_buffer_, write(_));
+  if (!data.empty()) {
+    EXPECT_CALL(*client_write_buffer_, write(_));
+  }
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
-  connection_->write(buffer);
-  while (client_write_buffer_->bytes_written() != bytes_expected) {
+  connection_->write(buffer, last_byte);
+  do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  }
+  } while (client_write_buffer_->bytes_written() != bytes_expected);
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
-    parent_.connection_->dispatcher().exit();
-  } else if (event == Network::ConnectionEvent::RemoteHalfClose) {
-    parent_.half_closed_ = true;
     parent_.connection_->dispatcher().exit();
   }
 }

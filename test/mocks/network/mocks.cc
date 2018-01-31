@@ -89,7 +89,7 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
   // The real implementation will move the buffer data into the socket.
-  ON_CALL(connection, write(_)).WillByDefault(Invoke([](Buffer::Instance& buffer) -> void {
+  ON_CALL(connection, write(_, _)).WillByDefault(Invoke([](Buffer::Instance& buffer, bool) -> void {
     buffer.drain(buffer.length());
   }));
 }
@@ -126,7 +126,7 @@ MockReadFilterCallbacks::MockReadFilterCallbacks() {
 MockReadFilterCallbacks::~MockReadFilterCallbacks() {}
 
 MockReadFilter::MockReadFilter() {
-  ON_CALL(*this, onData(_)).WillByDefault(Return(FilterStatus::StopIteration));
+  ON_CALL(*this, onData(_, _)).WillByDefault(Return(FilterStatus::StopIteration));
   EXPECT_CALL(*this, initializeReadFilterCallbacks(_))
       .WillOnce(
           Invoke([this](ReadFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
