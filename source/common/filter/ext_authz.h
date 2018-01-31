@@ -107,7 +107,6 @@ private:
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   bool calling_check_{};
-  ExtAuthzCheckRequestGenerator check_req_generator_;
 };
 
 } // TcpFilter

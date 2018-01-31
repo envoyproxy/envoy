@@ -20,7 +20,7 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 
 void Instance::callCheck() {
   envoy::service::auth::v2::CheckRequest request;
-  check_req_generator_.createTcpCheck(filter_callbacks_, request);
+  CreateCheckRequest::createTcpCheck(filter_callbacks_, request);
 
   status_ = Status::Calling;
   filter_callbacks_->connection().readDisable(true);
