@@ -64,6 +64,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
   // printouts.
   json_options.preserve_proto_field_names = true;
+  json_options.add_whitespace = true;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
