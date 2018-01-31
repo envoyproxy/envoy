@@ -55,3 +55,14 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "dynamic_opentracing_driver_impl_test",
+    srcs = [
+        "dynamic_opentracing_driver_impl_test.cc",
+    ],
+    deps = [
+        "//source/common/tracing:dynamic_opentracing_driver_lib",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)

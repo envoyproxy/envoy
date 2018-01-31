@@ -54,7 +54,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "dynamic_opentracing_tracer_lib",
+    name = "dynamic_opentracing_driver_lib",
     srcs = [
         "dynamic_opentracing_driver_impl.cc",
     ],
