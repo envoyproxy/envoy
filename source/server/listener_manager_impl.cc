@@ -167,6 +167,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
                                        address_->asString()));
     }
 
+    // If the cluster doesn't have transport socke configured, override with default transport
+    // socket implementation based on tls_context. We copy by value first then override if
+    // neccessary.
     auto transport_socket = filter_chain.transport_socket();
     if (!filter_chain.has_transport_socket()) {
       if (filter_chain.has_tls_context()) {
@@ -188,7 +191,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
         Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
 
     // Each transport socket factory owns one SslServerContext, we need to store them all in a
-    // vector since Ssl::ContextManager doesn't owns SslServerContext. While
+    // vector since Ssl::ContextManager doesn't own SslServerContext. While
     // transportSocketFacotry() always returns the first element of transport_socket_factories_,
     // other transport socket factories are needed when the default Ssl::ServerContext updates
     // SSL context based on ClientHello.
@@ -196,10 +199,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
     // chain match is implemented.
     transport_socket_factories_.emplace_back(config_factory.createTransportSocketFactory(
         name_, sni_domains, skip_context_update, *message, *this));
+    ASSERT(transport_socket_factories_.back() != nullptr);
   }
-
   ASSERT(!transport_socket_factories_.empty());
-  ASSERT(transport_socket_factories_[0] != nullptr);
 
   // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
   // This doesn't work right now, because BoringSSL uses "session context" (initial SSL_CTX that
