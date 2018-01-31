@@ -706,7 +706,8 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
                                                           runtime, cm, validate_clusters));
-    for (const std::string& domain : virtual_host_config.domains()) {
+    for (const std::string& domain_name : virtual_host_config.domains()) {
+      const std::string domain = Http::LowerCaseString(domain_name).get();
       if ("*" == domain) {
         if (default_virtual_host_) {
           throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
@@ -755,7 +756,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
 
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  const char* host = headers.Host()->value().c_str();
+  const std::string host = Http::LowerCaseString(headers.Host()->value().c_str()).get();
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
