@@ -365,6 +365,8 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
         default_runtime = "@com_google_protobuf//:protobuf",
         protoc = "@com_google_protobuf//:protoc",
         deps = deps + cc_proto_deps,
+        # Avoid generating .so, we don't need it, can interfere with builds
+        # such as OSS-Fuzz.
         linkstatic = 1,
         visibility = ["//visibility:public"],
     )
@@ -418,9 +420,9 @@ def envoy_select_exported_symbols(xs):
         "//conditions:default": [],
     })
 
-def envoy_select_force_libcpp(xs, ys = None):
+def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
-        "@envoy//bazel:force_libcpp": xs,
+        "@envoy//bazel:force_libcpp": if_libcpp,
         "@bazel_tools//tools/osx:darwin": [],
-        "//conditions:default": ys or [],
+        "//conditions:default": default or [],
     })
