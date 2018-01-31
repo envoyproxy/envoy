@@ -65,6 +65,10 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVari
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariable) {
+  testFormatting("DOWNSTREAM_LOCAL_ADDRESS", "127.0.0.2:0");
+}
+
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
@@ -256,6 +260,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%PROTOCOL%%%", {"HTTP/1.1%"}, {}},
       {"%%%PROTOCOL%%%", {"%HTTP/1.1%"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
+      {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
       {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},
