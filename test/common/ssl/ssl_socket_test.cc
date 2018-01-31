@@ -1906,8 +1906,8 @@ TEST_P(SslSocketTest, RevokedCertificate) {
     "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
   }
   )EOF";
-  testUtil(revoked_client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.fail_verify_error",
-           false, GetParam());
+  testUtil(revoked_client_ctx_json, server_ctx_json, "", "", "", "", "", "",
+           "ssl.fail_verify_error", false, GetParam());
 
   // This should succeed, since the cert isn't revoked.
   std::string successful_client_ctx_json = R"EOF(
@@ -1916,8 +1916,8 @@ TEST_P(SslSocketTest, RevokedCertificate) {
     "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key2.pem"
   }
   )EOF";
-  testUtil(successful_client_ctx_json, server_ctx_json, "", "", "", "", "", "ssl.handshake", true,
-           GetParam());
+  testUtil(successful_client_ctx_json, server_ctx_json, "", "", "", "", "", "", "ssl.handshake",
+           true, GetParam());
 }
 
 class SslReadBufferLimitTest : public SslCertsTest,
