@@ -403,7 +403,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   }
 
   if (https_redirect_) {
-    final_scheme = "https";
+    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
   } else {
     ASSERT(headers.ForwardedProto());
     final_scheme = headers.ForwardedProto()->value().c_str();
