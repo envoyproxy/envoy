@@ -194,6 +194,23 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOrigin) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
 }
 
+TEST_F(CorsFilterTest, OptionsRequestEmptyOriginList) {
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "OPTIONS"}, {"origin", "test-host"}, {"access-control-request-method", "GET"}};
+
+  cors_policy_->allow_origin_.clear();
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
 TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsTrue) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "OPTIONS"}, {"origin", "localhost"}, {"access-control-request-method", "GET"}};

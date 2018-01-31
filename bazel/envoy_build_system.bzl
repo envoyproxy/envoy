@@ -60,7 +60,9 @@ def envoy_linkopts():
             "-static-libstdc++",
             "-static-libgcc",
         ],
-    }) + envoy_select_exported_symbols(["-Wl,-E"])
+    }) + envoy_select_force_libcpp(["--stdlib=libc++"],
+                                   ["-static-libstdc++", "-static-libgcc"]) \
+    + envoy_select_exported_symbols(["-Wl,-E"])
 
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
@@ -72,8 +74,8 @@ def envoy_test_linkopts():
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
-        "//conditions:default": ["-pthread", "-latomic", "-lrt", "-ldl"],
-    })
+        "//conditions:default": ["-pthread", "-lrt", "-ldl"],
+    }) + envoy_select_force_libcpp([], ["-latomic"])
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
@@ -195,6 +197,36 @@ def envoy_cc_binary(name,
         # rewriting is robust.
         stamp = 1,
         deps = deps,
+    )
+
+# Envoy C++ fuzz test targes. These are not included in coverage runs.
+def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
+    test_lib_name = name + "_lib"
+    envoy_cc_test_library(
+        name = test_lib_name,
+        data = native.glob([corpus + "/**"]),
+        deps = deps + ["//test/fuzz:fuzz_runner_lib"],
+        **kwargs
+    )
+    native.cc_test(
+        name = name,
+        copts = envoy_copts("@envoy", test = True),
+        linkopts = envoy_test_linkopts(),
+        linkstatic = 1,
+        args = [PACKAGE_NAME + "/" + corpus],
+        deps = [
+            ":" + test_lib_name,
+            "//test/fuzz:main",
+        ],
+    )
+    native.cc_binary(
+        name = name + "_driverless",
+        copts = envoy_copts("@envoy", test = True),
+        linkopts = envoy_test_linkopts(),
+        linkstatic = 1,
+        testonly = 1,
+        deps = [":" + test_lib_name],
+        tags = ["manual"],
     )
 
 # Envoy C++ test targets should be specified with this function.
@@ -333,6 +365,9 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
         default_runtime = "@com_google_protobuf//:protobuf",
         protoc = "@com_google_protobuf//:protoc",
         deps = deps + cc_proto_deps,
+        # Avoid generating .so, we don't need it, can interfere with builds
+        # such as OSS-Fuzz.
+        linkstatic = 1,
         visibility = ["//visibility:public"],
     )
 
@@ -383,4 +418,11 @@ def envoy_select_exported_symbols(xs):
     return select({
         "@envoy//bazel:enable_exported_symbols": xs,
         "//conditions:default": [],
+    })
+
+def envoy_select_force_libcpp(if_libcpp, default = None):
+    return select({
+        "@envoy//bazel:force_libcpp": if_libcpp,
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": default or [],
     })
