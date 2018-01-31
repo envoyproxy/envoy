@@ -166,6 +166,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http_subscription_lib",
     hdrs = ["http_subscription_impl.h"],
+    external_deps = [
+        "http_api_protos",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/buffer:buffer_lib",
@@ -176,7 +179,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:base_cc",
-        "@googleapis//:http_api_protos",
     ],
 )
 
