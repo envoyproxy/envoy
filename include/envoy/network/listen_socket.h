@@ -105,10 +105,10 @@ public:
     virtual bool setOptions(ConnectionSocket& socket) const PURE;
 
     /**
-     * @return bits that can be used to separate upstream connections based on the options. Should
-     *         return zero if connections with different options can be pooled together. This is
-     *         limited to 32 bits to allow these bits to be efficiently combined into a larger hash
-     *         key used in connection pool lookups.
+     * @return bits that can be used to separate connections based on the options. Should return
+     *         zero if connections with different options can be pooled together. This is limited
+     *         to 32 bits to allow these bits to be efficiently combined into a larger hash key
+     *         used in connection pool lookups.
      */
     virtual uint32_t hashKey() const PURE;
   };

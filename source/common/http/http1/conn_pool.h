@@ -142,7 +142,7 @@ class ConnPoolImplProd : public ConnPoolImpl {
 public:
   ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr)
+                   const Network::ConnectionSocket::OptionsSharedPtr& options)
       : ConnPoolImpl(dispatcher, host, priority, options) {}
 
   // ConnPoolImpl

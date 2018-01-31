@@ -84,7 +84,7 @@ public:
 
 protected:
   int fd_;
-  OptionsSharedPtr options_{nullptr};
+  OptionsSharedPtr options_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};

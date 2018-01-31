@@ -486,7 +486,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      strerror(errno));
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
 
       // Trigger a write event to close this connection out-of-band.
@@ -496,7 +496,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (options) {
     if (!options->setOptions(*socket_)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
@@ -520,7 +520,7 @@ void ClientConnectionImpl::connect() {
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
 
-      // Trigger a write event. This is needed on Mac and seems harmless on Linux.
+      // Trigger a write event. This is needed on OSX and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);
     }
   }

@@ -604,22 +604,16 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     HostSharedPtr old_host, ConnPoolsContainer& container) {
-  std::vector<Http::ConnectionPool::Instance*> to_be_drained;
-  for (const auto& pair : container.pools_) {
-    const Http::ConnectionPool::InstancePtr& pool = pair.second;
-    container.drains_remaining_++;
-    to_be_drained.emplace_back(pool.get());
-  }
+  container.drains_remaining_ += container.pools_.size();
 
-  for (Http::ConnectionPool::Instance* pool : to_be_drained) {
-    pool->addDrainedCallback([this, old_host]() -> void {
+  for (const auto& pair : container.pools_) {
+    pair.second->addDrainedCallback([this, old_host]() -> void {
       ConnPoolsContainer& container = host_http_conn_pool_map_[old_host];
       ASSERT(container.drains_remaining_ > 0);
       container.drains_remaining_--;
       if (container.drains_remaining_ == 0) {
         for (auto& pair : container.pools_) {
-          Http::ConnectionPool::InstancePtr& pool = pair.second;
-          thread_local_dispatcher_.deferredDelete(std::move(pool));
+          thread_local_dispatcher_.deferredDelete(std::move(pair.second));
         }
         host_http_conn_pool_map_.erase(old_host);
       }
@@ -762,8 +756,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   // Inherit socket options from downstream connection, if set.
-  uint32_t hash_key = 0;
-  bool have_options = false;
+  Optional<uint32_t> hash_key;
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -772,17 +765,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options =
         context->downstreamConnection()->socketOptions();
     if (options) {
-      have_options = true;
-      hash_key = options->hashKey();
+      hash_key.value(options->hashKey());
     }
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  const auto key = container.key(priority, protocol, hash_key);
+  const auto key = container.key(priority, protocol, hash_key.valid() ? hash_key.value() : 0);
   if (!container.pools_[key]) {
     container.pools_[key] = parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+        hash_key.valid() ? context->downstreamConnection()->socketOptions() : nullptr);
   }
 
   return container.pools_[key].get();
