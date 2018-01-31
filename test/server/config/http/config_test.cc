@@ -442,6 +442,26 @@ TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
       fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
 }
 
+TEST(HttpFilterConfigTest, SquashFilterCorrectJson) {
+  std::string json_string = R"EOF(
+    {
+      "cluster" : "fake_cluster",
+      "attachment_template" : {"a":"b"},
+      "request_timeout_ms" : 1001,
+      "attachment_poll_period_ms" : 2002,
+      "attachment_timeout_ms" : 3003
+    }
+    )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockFactoryContext> context;
+  SquashFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
 TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("fake_cluster")).WillRepeatedly(Return(&cm.thread_local_cluster_));

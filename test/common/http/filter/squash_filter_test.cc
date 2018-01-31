@@ -444,25 +444,5 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
-TEST(HttpFilterConfigTest, SquashFilterCorrectJson) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "fake_cluster",
-      "attachment_template" : {"a":"b"},
-      "request_timeout_ms" : 1001,
-      "attachment_poll_period_ms" : 2002,
-      "attachment_timeout_ms" : 3003
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  SquashFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
 } // namespace Http
 } // namespace Envoy
