@@ -157,6 +157,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, san, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
   }
+  if (set_current_client_cert_details.cert()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
+  }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
     user_agent_.value(context_.localInfo().clusterName());
