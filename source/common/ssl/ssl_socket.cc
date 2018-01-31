@@ -5,6 +5,7 @@
 #include "common/common/hex.h"
 #include "common/http/headers.h"
 
+#include "absl/strings/str_replace.h"
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
 
@@ -225,6 +226,26 @@ std::string SslSocket::sha256PeerCertificateDigest() {
   X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
   return Hex::encode(computed_hash);
+}
+
+// TODO: Cache this result and possibly other methods in this class
+std::string SslSocket::urlEncodedPemEncodedPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr);
+  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1);
+  const uint8_t* output;
+  size_t length;
+  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
+  std::string pem = std::string(reinterpret_cast<const char*>(output), length);
+  // URL encoding shortcut
+  absl::StrReplaceAll({{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}},
+                      &pem);
+  return pem;
 }
 
 std::string SslSocket::uriSanPeerCertificate() {
