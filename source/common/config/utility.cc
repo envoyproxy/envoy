@@ -98,8 +98,8 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   }
 }
 
-std::chrono::milliseconds
-Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source) {
+std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
+    const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   if (!api_config_source.has_refresh_delay()) {
     throw EnvoyException("refresh_delay is required for REST API configuration sources");
   }
@@ -191,17 +191,17 @@ Utility::factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manage
     }
     // TODO(htuch): Implement multiple gRPC services.
     if (api_config_source.grpc_services().size() != 1) {
-      throw EnvoyException(fmt::format(
-          "Only singleton gRPC service lists supported in envoy::api::v2::core::ApiConfigSource: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("Only singleton gRPC service lists supported in "
+                                       "envoy::api::v2::core::ApiConfigSource: {}",
+                                       api_config_source.DebugString()));
     }
     grpc_service.MergeFrom(api_config_source.grpc_services(0));
   } else {
     // TODO(htuch): cluster_names is deprecated, remove after 1.6.0.
     if (api_config_source.cluster_names().size() != 1) {
-      throw EnvoyException(fmt::format(
-          "Only singleton cluster name lists supported in envoy::api::v2::core::ApiConfigSource: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("Only singleton cluster name lists supported in "
+                                       "envoy::api::v2::core::ApiConfigSource: {}",
+                                       api_config_source.DebugString()));
     }
     grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
   }

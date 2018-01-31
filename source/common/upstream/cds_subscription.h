@@ -22,10 +22,11 @@ class CdsSubscription : public Http::RestApiFetcher,
                         public Config::Subscription<envoy::api::v2::Cluster>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
-  CdsSubscription(Config::SubscriptionStats stats, const envoy::api::v2::core::ConfigSource& cds_config,
-                  const Optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm,
-                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                  const LocalInfo::LocalInfo& local_info);
+  CdsSubscription(Config::SubscriptionStats stats,
+                  const envoy::api::v2::core::ConfigSource& cds_config,
+                  const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                  ClusterManager& cm, Event::Dispatcher& dispatcher,
+                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
 
 private:
   // Config::Subscription

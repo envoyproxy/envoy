@@ -38,7 +38,8 @@ public:
     envoy::service::discovery::v2::AdsDummy dummy;
 
     grpc_mux_.reset(new GrpcMuxImpl(
-        envoy::api::v2::core::Node(), std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+        envoy::api::v2::core::Node(), std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   }

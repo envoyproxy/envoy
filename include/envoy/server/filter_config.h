@@ -124,7 +124,8 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the config metadata associated with this listener.
+   * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
+   * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 };

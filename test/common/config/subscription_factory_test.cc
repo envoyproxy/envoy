@@ -55,8 +55,9 @@ class SubscriptionFactoryTestApiConfigSource
 
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   envoy::api::v2::core::ConfigSource config;
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
-                            "Missing config source specifier in envoy::api::v2::core::ConfigSource");
+  EXPECT_THROW_WITH_MESSAGE(
+      subscriptionFromConfigSource(config), EnvoyException,
+      "Missing config source specifier in envoy::api::v2::core::ConfigSource");
 }
 
 TEST_F(SubscriptionFactoryTest, WrongClusterNameLength) {
@@ -195,10 +196,11 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   api_config_source->add_cluster_names("eds_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: 'eds_cluster' "
-      "does not exist, was added via api, or is an EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "envoy::api::v2::core::ConfigSource must have a statically defined "
+                            "non-EDS cluster: 'eds_cluster' "
+                            "does not exist, was added via api, or is an EDS cluster");
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
@@ -212,10 +214,11 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: 'eds_cluster' "
-      "does not exist, was added via api, or is an EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "envoy::api::v2::core::ConfigSource must have a statically defined "
+                            "non-EDS cluster: 'eds_cluster' "
+                            "does not exist, was added via api, or is an EDS cluster");
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
@@ -230,10 +233,11 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: 'eds_cluster' "
-      "does not exist, was added via api, or is an EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+                            EnvoyException,
+                            "envoy::api::v2::core::ConfigSource must have a statically defined "
+                            "non-EDS cluster: 'eds_cluster' "
+                            "does not exist, was added via api, or is an EDS cluster");
 }
 
 } // namespace Config

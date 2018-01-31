@@ -91,14 +91,14 @@ public:
   static bool isWebSocketUpgradeRequest(const HeaderMap& headers);
 
   /**
-   * @return Http2Settings An Http2Settings populated from the envoy::api::v2::core::Http2ProtocolOptions
-   *         config.
+   * @return Http2Settings An Http2Settings populated from the
+   * envoy::api::v2::core::Http2ProtocolOptions config.
    */
   static Http2Settings parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& config);
 
   /**
-   * @return Http1Settings An Http1Settings populated from the envoy::api::v2::core::Http1ProtocolOptions
-   *         config.
+   * @return Http1Settings An Http1Settings populated from the
+   * envoy::api::v2::core::Http1ProtocolOptions config.
    */
   static Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config);
 

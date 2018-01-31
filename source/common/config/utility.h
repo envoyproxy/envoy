@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/lds.pb.h"
@@ -72,7 +72,8 @@ public:
   }
 
   /**
-   * Extract refresh_delay as a std::chrono::milliseconds from envoy::api::v2::core::ApiConfigSource.
+   * Extract refresh_delay as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ApiConfigSource.
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
@@ -82,7 +83,8 @@ public:
    * @param cluster supplies the cluster name for the ApiConfigSource.
    * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
    * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to populate.
+   * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to
+   * populate.
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
                                        const std::string& api_type,

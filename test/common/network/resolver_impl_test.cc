@@ -81,7 +81,8 @@ TEST(ResolverTest, FromProtoAddressV4Compat) {
 
 class TestResolver : public Resolver {
 public:
-  InstanceConstSharedPtr resolve(const envoy::api::v2::core::SocketAddress& socket_address) override {
+  InstanceConstSharedPtr
+  resolve(const envoy::api::v2::core::SocketAddress& socket_address) override {
     const std::string logical = socket_address.address();
     const std::string physical = getPhysicalName(logical);
     const std::string port = getPort(socket_address);

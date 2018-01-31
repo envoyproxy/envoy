@@ -9,8 +9,9 @@ void BaseJson::translateRuntimeUInt32(const Json::Object& json_runtime,
   runtime.set_runtime_key(json_runtime.getString("key"));
 }
 
-void BaseJson::translateHeaderValueOption(const Json::Object& json_header_value,
-                                          envoy::api::v2::core::HeaderValueOption& header_value_option) {
+void BaseJson::translateHeaderValueOption(
+    const Json::Object& json_header_value,
+    envoy::api::v2::core::HeaderValueOption& header_value_option) {
   header_value_option.mutable_header()->set_key(json_header_value.getString("key"));
   header_value_option.mutable_header()->set_value(json_header_value.getString("value"));
 }

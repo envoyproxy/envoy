@@ -182,13 +182,14 @@ TEST_F(RdsImplTest, UnknownCluster) {
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(RouteConfigProviderUtil::create(
-                                parseHttpConnectionManagerFromJson(config_json), runtime_, cm_,
-                                store_, "foo.", init_manager_, *route_config_provider_manager_),
-                            EnvoyException,
-                            "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
-                            "cluster: 'foo_cluster' does not exist, was added via api, or is an "
-                            "EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json), runtime_,
+                                      cm_, store_, "foo.", init_manager_,
+                                      *route_config_provider_manager_),
+      EnvoyException,
+      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
+      "cluster: 'foo_cluster' does not exist, was added via api, or is an "
+      "EDS cluster");
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {

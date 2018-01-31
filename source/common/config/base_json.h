@@ -21,8 +21,9 @@ public:
    * @param json_header_value source v1 JSON header-value object.
    * @param header_value_option destination v2 envoy::api::v2::core::HeaderValueOption.
    */
-  static void translateHeaderValueOption(const Json::Object& json_header_value,
-                                         envoy::api::v2::core::HeaderValueOption& header_value_option);
+  static void
+  translateHeaderValueOption(const Json::Object& json_header_value,
+                             envoy::api::v2::core::HeaderValueOption& header_value_option);
 };
 
 } // namespace Config

@@ -9,7 +9,8 @@ namespace Config {
 class ProtocolJson {
 public:
   /**
-   * Translate v1 JSON HTTP/1.1 options and settings to v2 envoy::api::v2::core::Http1ProtocolOptions.
+   * Translate v1 JSON HTTP/1.1 options and settings to v2
+   * envoy::api::v2::core::Http1ProtocolOptions.
    * @param json_http1_setting source v1 JSON HTTP/1.1 settings object.
    * @param http1_protocol_options destination v2 envoy::api::v2::core::Http1ProtocolOptions.
    */

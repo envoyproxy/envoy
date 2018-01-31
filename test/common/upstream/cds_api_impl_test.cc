@@ -43,7 +43,8 @@ public:
     envoy::api::v2::core::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
     if (v2_rest) {
-      cds_config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+      cds_config.mutable_api_config_source()->set_api_type(
+          envoy::api::v2::core::ApiConfigSource::REST);
     }
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;

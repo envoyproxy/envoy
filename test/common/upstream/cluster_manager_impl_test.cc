@@ -66,7 +66,8 @@ public:
   }
 
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&,
-                      const Optional<envoy::api::v2::core::ConfigSource>&, ClusterManager&) override {
+                      const Optional<envoy::api::v2::core::ConfigSource>&,
+                      ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 

@@ -37,7 +37,8 @@ public:
    * @throws EnvoyException when grpc_service validation fails.
    */
   virtual AsyncClientFactoryPtr
-  factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service, Stats::Scope& scope) PURE;
+  factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
+                        Stats::Scope& scope) PURE;
 };
 
 typedef std::unique_ptr<AsyncClientManager> AsyncClientManagerPtr;

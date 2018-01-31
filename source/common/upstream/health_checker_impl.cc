@@ -29,11 +29,10 @@
 namespace Envoy {
 namespace Upstream {
 
-HealthCheckerSharedPtr HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
-                                                    Upstream::Cluster& cluster,
-                                                    Runtime::Loader& runtime,
-                                                    Runtime::RandomGenerator& random,
-                                                    Event::Dispatcher& dispatcher) {
+HealthCheckerSharedPtr
+HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
+                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher) {
   switch (hc_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,

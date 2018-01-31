@@ -307,11 +307,11 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
     ],
 )

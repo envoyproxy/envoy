@@ -19,8 +19,9 @@ namespace Envoy {
 namespace Upstream {
 
 SdsSubscription::SdsSubscription(ClusterStats& stats,
-                                 const envoy::api::v2::core::ConfigSource& eds_config, ClusterManager& cm,
-                                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
+                                 const envoy::api::v2::core::ConfigSource& eds_config,
+                                 ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                 Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, eds_config.api_config_source().cluster_names()[0], dispatcher, random,
                      Config::Utility::apiConfigSourceRefreshDelay(eds_config.api_config_source())),
       stats_(stats) {

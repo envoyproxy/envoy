@@ -25,7 +25,8 @@ public:
    * @param socket_address supplies the socket address to resolve.
    * @return InstanceConstSharedPtr appropriate Address::Instance.
    */
-  virtual InstanceConstSharedPtr resolve(const envoy::api::v2::core::SocketAddress& socket_address) PURE;
+  virtual InstanceConstSharedPtr
+  resolve(const envoy::api::v2::core::SocketAddress& socket_address) PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of

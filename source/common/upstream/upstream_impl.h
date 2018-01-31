@@ -37,8 +37,8 @@
 namespace Envoy {
 namespace Upstream {
 
-// Wrapper around envoy::api::v2::core::Locality to make it easier to compare for ordering in std::map and
-// in tests to construct literals.
+// Wrapper around envoy::api::v2::core::Locality to make it easier to compare for ordering in
+// std::map and in tests to construct literals.
 // TODO(htuch): Consider making this reference based when we have a single string implementation.
 class Locality : public std::tuple<std::string, std::string, std::string> {
 public:

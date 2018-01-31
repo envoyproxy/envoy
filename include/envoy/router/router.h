@@ -411,8 +411,8 @@ public:
   virtual bool includeVirtualHostRateLimits() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for this
-   * route.
+   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
+   * this route.
    */
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 };

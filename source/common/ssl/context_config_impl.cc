@@ -92,8 +92,10 @@ const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::core::
   }
 }
 
-const std::string ContextConfigImpl::getDataSourcePath(const envoy::api::v2::core::DataSource& source) {
-  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename ? source.filename() : "";
+const std::string
+ContextConfigImpl::getDataSourcePath(const envoy::api::v2::core::DataSource& source) {
+  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename ? source.filename()
+                                                                                : "";
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

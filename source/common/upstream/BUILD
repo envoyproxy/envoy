@@ -247,8 +247,8 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
     ],
 )
@@ -269,8 +269,8 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
         "//source/common/router:router_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
     ],
 )
