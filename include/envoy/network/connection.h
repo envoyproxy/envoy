@@ -63,9 +63,6 @@ public:
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
   NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
-  HalfClose,  // Send a half-close after flushing any pending data. If we have already received
-              // a half-close from the remote side and there is no pending data to flush, this
-              // will result in ConnectionEvent::LocalClose being raised.
 };
 
 /**

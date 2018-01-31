@@ -168,7 +168,8 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   payload_reader->set_data_to_wait_for(data_to_send_downstream);
   ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
   // Clean up.
-  ssl_client->close(Network::ConnectionCloseType::HalfClose);
+  Buffer::OwnedImpl empty_buffer;
+  ssl_client->write(empty_buffer, true);
   fake_upstream_connection->waitForHalfClose();
   fake_upstream_connection->write("", true);
   fake_upstream_connection->waitForDisconnect();
