@@ -89,7 +89,6 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  Envoy::ExtAuthz::ExtAuthzCheckRequestGenerator check_req_generator_;
 };
 
 } // namespace ExtAuthz

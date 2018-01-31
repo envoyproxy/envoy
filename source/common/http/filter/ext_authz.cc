@@ -42,7 +42,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
   cluster_ = cluster->info();
 
   envoy::service::auth::v2::CheckRequest request;
-  check_req_generator_.createHttpCheck(callbacks_, headers, request);
+  Envoy::ExtAuthz::CreateCheckRequest::createHttpCheck(callbacks_, headers, request);
 
   state_ = State::Calling;
   initiating_call_ = true;
