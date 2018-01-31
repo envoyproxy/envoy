@@ -104,6 +104,7 @@ TEST_F(LuaHeaderMapWrapperTest, Replace) {
     function callMe(object)
       object:replace(":path", "/new_path")
       object:replace("other_header", "other_header_value")
+      object:replace("new_header", "new_header_value")
     end
   )EOF"};
 
@@ -114,7 +115,9 @@ TEST_F(LuaHeaderMapWrapperTest, Replace) {
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   start("callMe");
 
-  EXPECT_EQ((TestHeaderMapImpl{{":path", "/new_path"}, {"other_header", "other_header_value"}}),
+  EXPECT_EQ((TestHeaderMapImpl{{":path", "/new_path"},
+                               {"other_header", "other_header_value"},
+                               {"new_header", "new_header_value"}}),
             headers);
 }
 
