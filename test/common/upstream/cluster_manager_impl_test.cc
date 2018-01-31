@@ -54,8 +54,9 @@ public:
         }));
   }
 
-  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host,
-                                                     ResourcePriority, Http::Protocol) override {
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr&) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
@@ -522,7 +523,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
@@ -553,7 +554,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
@@ -593,7 +594,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   create(parseBootstrapFromJson(json));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _))
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
@@ -864,8 +865,6 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
 TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
-
-  InSequence s;
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "some_cluster";
   HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
@@ -878,33 +877,39 @@ TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   Outlier::MockDetector outlier_detector;
   ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
-  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
-  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
-  EXPECT_CALL(*cluster1, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
-        // Test inline init.
-        initialize_callback();
-      }));
-
-  create(parseBootstrapFromJson(json));
-
   Http::ConnectionPool::MockInstance* cp1 = new Http::ConnectionPool::MockInstance();
-  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
-  cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
-                                           Http::Protocol::Http11, nullptr);
-  outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, false);
-
-  EXPECT_CALL(*cp1, drainConnections());
-  test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector.runCallbacks(test_host);
-
   Http::ConnectionPool::MockInstance* cp2 = new Http::ConnectionPool::MockInstance();
-  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
-  cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
-                                           Http::Protocol::Http11, nullptr);
 
+  {
+    InSequence s;
+
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+    EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+    EXPECT_CALL(*cluster1, initialize(_))
+        .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+          // Test inline init.
+          initialize_callback();
+        }));
+    create(parseBootstrapFromJson(json));
+
+    EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
+    cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                             Http::Protocol::Http11, nullptr);
+
+    outlier_detector.runCallbacks(test_host);
+    health_checker.runCallbacks(test_host, false);
+
+    EXPECT_CALL(*cp1, drainConnections());
+    test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+    outlier_detector.runCallbacks(test_host);
+
+    EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
+    cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
+                                             Http::Protocol::Http11, nullptr);
+  }
+
+  // Order of these calls is implementation dependent, so can't sequence them!
   EXPECT_CALL(*cp1, drainConnections());
   EXPECT_CALL(*cp2, drainConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);

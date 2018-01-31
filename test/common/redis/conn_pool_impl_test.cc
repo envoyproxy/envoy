@@ -68,7 +68,7 @@ public:
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = upstream_connection_;
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
-    EXPECT_CALL(*host_, createConnection_(_)).WillOnce(Return(conn_info));
+    EXPECT_CALL(*host_, createConnection_(_, _)).WillOnce(Return(conn_info));
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
@@ -364,7 +364,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
   std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
-  EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
+  EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
   ClientPtr client = factory.create(host, dispatcher, config);

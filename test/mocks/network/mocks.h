@@ -80,6 +80,7 @@ public:
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
+  MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
 };
 
 /**
@@ -117,6 +118,7 @@ public:
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
+  MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
@@ -261,6 +263,15 @@ public:
   Address::InstanceConstSharedPtr local_address_;
 };
 
+class MockSocketOptions : public Network::ConnectionSocket::Options {
+public:
+  MockSocketOptions();
+  ~MockSocketOptions();
+
+  MOCK_CONST_METHOD1(setOptions, bool(ConnectionSocket&));
+  MOCK_CONST_METHOD0(hashKey, uint32_t());
+};
+
 class MockConnectionSocket : public ConnectionSocket {
 public:
   MockConnectionSocket();
@@ -271,6 +282,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(setOptions, void(const Network::ConnectionSocket::OptionsSharedPtr&));
+  MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
 

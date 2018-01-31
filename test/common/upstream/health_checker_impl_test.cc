@@ -237,7 +237,7 @@ public:
     connection_index_.push_back(index);
     codec_index_.push_back(index);
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
           uint32_t index = connection_index_.front();
@@ -988,7 +988,7 @@ public:
 
   void expectClientCreate() {
     connection_ = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _)).WillOnce(Return(connection_));
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
     EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
   }
 
@@ -1644,7 +1644,7 @@ public:
     connection_index_.push_back(index);
     codec_index_.push_back(index);
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
           uint32_t index = connection_index_.front();

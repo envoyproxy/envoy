@@ -32,7 +32,7 @@ static void errorCallbackTest(Address::IpVersion version) {
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket());
+      Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
@@ -96,7 +96,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket());
+      Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -132,7 +132,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket());
+      Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));

@@ -83,7 +83,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                             Network::Test::createRawBufferSocket());
+                                             Network::Test::createRawBufferSocket(), nullptr);
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
@@ -91,7 +91,8 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                             client_mtls_ssl_ctx_->createTransportSocket());
+                                             client_mtls_ssl_ctx_->createTransportSocket(),
+                                             nullptr);
 }
 
 void XfccIntegrationTest::createUpstreams() {
