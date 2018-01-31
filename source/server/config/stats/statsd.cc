@@ -35,8 +35,8 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         server.clusterManager(), server.stats()));
     break;
   default:
-    throw EnvoyException(
-        fmt::format("No tcp_cluster_name or address provided for {} Stats::Sink config", name()));
+    // Verified by schema.
+    NOT_REACHED;
   }
 }
 
