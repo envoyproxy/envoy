@@ -52,4 +52,4 @@ final version.
 * lua: added headers replace() API.
 * Added support for direct responses -- i.e., sending a preconfigured HTTP response without proxying anywhere.
 * Added DOWNSTREAM_LOCAL_ADDRESS, DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT header formatters, and
-  DOWNSTREAM_LOCAL_ADDRESS access log formatter. 
+  DOWNSTREAM_LOCAL_ADDRESS access log formatter.

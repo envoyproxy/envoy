@@ -453,6 +453,19 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
+// Verify EDS clusters have EDS config.
+TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      type: EDS
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cannot create an EDS cluster without an EDS config");
+}
+
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerThreadAwareUpdate) {

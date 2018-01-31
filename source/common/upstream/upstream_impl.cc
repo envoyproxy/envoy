@@ -223,7 +223,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
-      throw EnvoyException("cannot create an sds cluster without an sds config");
+      throw EnvoyException("cannot create an EDS cluster without an EDS config");
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
