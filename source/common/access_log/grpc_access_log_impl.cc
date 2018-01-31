@@ -65,7 +65,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
       grpc_access_log_streamer_(grpc_access_log_streamer) {}
 
 void HttpGrpcAccessLog::addressToAccessLogAddress(
-    envoy::api::v2::Address& proto_address, const Network::Address::Instance& network_address) {
+    envoy::api::v2::core::Address& proto_address, const Network::Address::Instance& network_address) {
   if (network_address.type() == Network::Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(network_address.asString());
   } else {

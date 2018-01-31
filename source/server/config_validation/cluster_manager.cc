@@ -20,8 +20,8 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
 }
 
 CdsApiPtr
-ValidationClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
-                                           const Optional<envoy::api::v2::ConfigSource>& eds_config,
+ValidationClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                           const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                            ClusterManager& cm) {
   // Create the CdsApiImpl...
   ProdClusterManagerFactory::createCds(cds_config, eds_config, cm);

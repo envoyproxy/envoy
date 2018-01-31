@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/protobuf/protobuf.h"
@@ -28,7 +28,7 @@ public:
    * @return HeaderParserPtr a configured HeaderParserPtr
    */
   static HeaderParserPtr
-  configure(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add);
+  configure(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add);
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders
@@ -36,7 +36,7 @@ public:
    * @return HeaderParserPtr a configured HeaderParserPtr
    */
   static HeaderParserPtr
-  configure(const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add,
+  configure(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
             const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove);
 
   void evaluateHeaders(Http::HeaderMap& headers,

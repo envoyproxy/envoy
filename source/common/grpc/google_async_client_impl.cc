@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Grpc {
 
 GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, Stats::Scope& scope,
-                                             const envoy::api::v2::GrpcService::GoogleGrpc& config)
+                                             const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
     : dispatcher_(dispatcher), stat_prefix_(config.stat_prefix()), scope_(scope) {
   // TODO(htuch): add support for SSL, OAuth2, GCP, etc. credentials.
   std::shared_ptr<grpc::ChannelCredentials> creds = grpc::InsecureChannelCredentials();

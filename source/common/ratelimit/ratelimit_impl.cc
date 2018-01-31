@@ -76,7 +76,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
                                  Stats::Scope& scope) {
-  envoy::api::v2::GrpcService grpc_service;
+  envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.MergeFrom(config.grpc_service());
   // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
   if (config.service_specifier_case() ==

@@ -114,7 +114,7 @@ public:
                     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
                     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer);
 
-  static void addressToAccessLogAddress(envoy::api::v2::Address& proto_address,
+  static void addressToAccessLogAddress(envoy::api::v2::core::Address& proto_address,
                                         const Network::Address::Instance& network_address);
   static void responseFlagsToAccessLogResponseFlags(
       envoy::api::v2::filter::accesslog::AccessLogCommon& common_access_log,

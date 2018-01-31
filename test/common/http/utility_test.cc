@@ -87,7 +87,7 @@ TEST(HttpUtility, createSslRedirectPath) {
 namespace {
 
 Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
-  envoy::api::v2::Http2ProtocolOptions http2_protocol_options;
+  envoy::api::v2::core::Http2ProtocolOptions http2_protocol_options;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::ProtocolJson::translateHttp2ProtocolOptions(
       *json_object_ptr->getObject("http2_settings", true), http2_protocol_options);

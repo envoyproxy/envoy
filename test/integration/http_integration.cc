@@ -40,7 +40,7 @@ std::string normalizeDate(const std::string& s) {
 }
 
 void setAllowAbsoluteUrl(envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
-  envoy::api::v2::Http1ProtocolOptions options;
+  envoy::api::v2::core::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };

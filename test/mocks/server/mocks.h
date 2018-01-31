@@ -330,7 +330,7 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
-  MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::Metadata&());
+  MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;

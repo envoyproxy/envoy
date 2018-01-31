@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Config {
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::Metadata& metadata,
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key) {
   const auto filter_it = metadata.filter_metadata().find(filter);
@@ -17,7 +17,7 @@ const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::Metadata
   return fields_it->second;
 }
 
-ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::api::v2::Metadata& metadata,
+ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
                                                    const std::string& filter,
                                                    const std::string& key) {
   return (*(*metadata.mutable_filter_metadata())[filter].mutable_fields())[key];

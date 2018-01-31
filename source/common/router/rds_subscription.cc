@@ -23,7 +23,7 @@ RdsSubscription::RdsSubscription(Envoy::Config::SubscriptionStats stats,
   const auto& api_config_source = rds.config_source().api_config_source();
   UNREFERENCED_PARAMETER(api_config_source);
   // If we are building an RdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
   // TODO(htuch): Add support for multiple clusters, #1170.
   ASSERT(api_config_source.cluster_names().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());

@@ -196,7 +196,7 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
-  envoy::api::v2::Locality upstream_locality_;
+  envoy::api::v2::core::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   Event::MockTimer* response_timeout_{};

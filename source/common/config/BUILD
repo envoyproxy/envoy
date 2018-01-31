@@ -17,7 +17,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2:address_cc",
+        "@envoy_api//envoy/api/v2/core:address_cc",
     ],
 )
 
@@ -46,7 +46,7 @@ envoy_cc_library(
     hdrs = ["base_json.h"],
     deps = [
         "//include/envoy/json:json_object_interface",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -159,7 +159,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -178,7 +178,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -217,7 +217,7 @@ envoy_cc_library(
     deps = [
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -228,7 +228,7 @@ envoy_cc_library(
     deps = [
         ":json_utility_lib",
         "//include/envoy/json:json_object_interface",
-        "@envoy_api//envoy/api/v2:protocol_cc",
+        "@envoy_api//envoy/api/v2/core:protocol_cc",
     ],
 )
 
@@ -268,7 +268,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -307,7 +307,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2:lds_cc",

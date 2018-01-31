@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace {
 void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& header_value_options) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
     i.mutable_append()->set_value(false);
   }
@@ -91,9 +91,9 @@ public:
     fake_upstreams_.clear();
   }
 
-  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>* field,
+  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>* field,
                  const std::string& key, const std::string& value, bool append) {
-    envoy::api::v2::HeaderValueOption* header_value_option = field->Add();
+    envoy::api::v2::core::HeaderValueOption* header_value_option = field->Add();
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);

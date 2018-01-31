@@ -32,7 +32,7 @@ AsyncClientPtr AsyncClientFactoryImpl::create() {
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, Stats::Scope& scope,
-    const envoy::api::v2::GrpcService::GoogleGrpc& config)
+    const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
     : tls_(tls), scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))),
       config_(config) {
 #ifndef ENVOY_GOOGLE_GRPC
@@ -52,12 +52,12 @@ AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 }
 
 AsyncClientFactoryPtr
-AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::GrpcService& grpc_service,
+AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
                                               Stats::Scope& scope) {
   switch (grpc_service.target_specifier_case()) {
-  case envoy::api::v2::GrpcService::kEnvoyGrpc:
+  case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
     return std::make_unique<AsyncClientFactoryImpl>(cm_, grpc_service.envoy_grpc().cluster_name());
-  case envoy::api::v2::GrpcService::kGoogleGrpc:
+  case envoy::api::v2::core::GrpcService::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, scope, grpc_service.google_grpc());
   default:
     NOT_REACHED;

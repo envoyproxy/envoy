@@ -4,7 +4,7 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/address.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 

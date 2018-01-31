@@ -36,7 +36,7 @@ protected:
   }
 
   void resetCluster(const std::string& json_config) {
-    envoy::api::v2::ConfigSource eds_config;
+    envoy::api::v2::core::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_names("eds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
