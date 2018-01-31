@@ -22,6 +22,12 @@ public:
   virtual ~StreamEncoder() {}
 
   /**
+   * Encode 100-Continue headers.
+   * @param headers supplies the 100-Continue header map to encode.
+   */
+  virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
+
+  /**
    * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request/response.
@@ -53,6 +59,12 @@ public:
 class StreamDecoder {
 public:
   virtual ~StreamDecoder() {}
+
+  /**
+   * Called with decoded 100-Continue headers.
+   * @param headers supplies the decoded 100-Continue headers map that is moved into the callee.
+   */
+  virtual void decode100ContinueHeaders(HeaderMapPtr&& headers) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.

@@ -50,3 +50,4 @@ final version.
 * Added support for [Squash microservices debugger](https://github.com/solo-io/squash).
   :ref:`Squash <envoy_api_msg_filter.http.Squash>` allows debugging an incoming request to a microservice in the mesh.
 * Added support for direct responses -- i.e., sending a preconfigured HTTP response without proxying anywhere.
+* Added support for proxying 100-Continue responses.

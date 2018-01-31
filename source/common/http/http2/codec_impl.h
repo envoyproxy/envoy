@@ -147,6 +147,7 @@ protected:
     void submitTrailers(const HeaderMap& trailers);
 
     // Http::StreamEncoder
+    void encode100ContinueHeaders(const HeaderMap& headers) override;
     void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
