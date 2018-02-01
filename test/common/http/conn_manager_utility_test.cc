@@ -486,7 +486,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(Return("abcdefg"));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
@@ -516,7 +517,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(""));
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(Return("abcdefg"));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -543,7 +545,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(Return("abcdefg"));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   EXPECT_CALL(ssl, subjectPeerCertificate())
       .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
@@ -576,7 +579,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   NiceMock<Ssl::MockConnection> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(Return("abcdefg"));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   EXPECT_CALL(ssl, subjectPeerCertificate())
       .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return(""));

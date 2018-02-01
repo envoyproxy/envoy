@@ -35,7 +35,7 @@ public:
    * @return std::string the SHA256 digest of the peer certificate. Returns "" if there is no peer
    *         certificate which can happen in TLS (non mTLS) connections.
    */
-  virtual std::string sha256PeerCertificateDigest() PURE;
+  virtual const std::string& sha256PeerCertificateDigest() PURE;
 
   /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if

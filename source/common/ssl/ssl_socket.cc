@@ -215,27 +215,32 @@ std::string SslSocket::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
-std::string SslSocket::sha256PeerCertificateDigest() {
+const std::string& SslSocket::sha256PeerCertificateDigest() {
+  if (!cached_sha_256_peer_certificate_digest_.empty()) {
+    return cached_sha_256_peer_certificate_digest_;
+  }
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    return "";
+    ASSERT(cached_sha_256_peer_certificate_digest_.empty());
+    return cached_sha_256_peer_certificate_digest_;
   }
 
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
-  return Hex::encode(computed_hash);
+  cached_sha_256_peer_certificate_digest_ = Hex::encode(computed_hash);
+  return cached_sha_256_peer_certificate_digest_;
 }
 
 const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
-  if (!url_encoded_pem_encoded_peer_certificate_.empty()) {
-    return url_encoded_pem_encoded_peer_certificate_;
+  if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
+    return cached_url_encoded_pem_encoded_peer_certificate_;
   }
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    ASSERT(url_encoded_pem_encoded_peer_certificate_.empty());
-    return url_encoded_pem_encoded_peer_certificate_;
+    ASSERT(cached_url_encoded_pem_encoded_peer_certificate_.empty());
+    return cached_url_encoded_pem_encoded_peer_certificate_;
   }
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
@@ -244,12 +249,12 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   const uint8_t* output;
   size_t length;
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
-  url_encoded_pem_encoded_peer_certificate_ =
+  cached_url_encoded_pem_encoded_peer_certificate_ =
       std::string(reinterpret_cast<const char*>(output), length);
   // URL encoding shortcut
   absl::StrReplaceAll({{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}},
-                      &url_encoded_pem_encoded_peer_certificate_);
-  return url_encoded_pem_encoded_peer_certificate_;
+                      &cached_url_encoded_pem_encoded_peer_certificate_);
+  return cached_url_encoded_pem_encoded_peer_certificate_;
 }
 
 std::string SslSocket::uriSanPeerCertificate() {
