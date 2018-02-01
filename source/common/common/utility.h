@@ -290,13 +290,12 @@ public:
 };
 
 /**
- * Maintains sets of numeric intervals.  As new intervals are added, existing ones in the
+ * Maintains sets of numeric intervals. As new intervals are added, existing ones in the
  * set are combined so that no overlapping intervals remain in the representation.
  *
  * Value can be any type that is comparable with <.
  */
-template<typename Value>
-class IntervalSet {
+template <typename Value> class IntervalSet {
 public:
   typedef std::pair<Value, Value> Interval;
 
@@ -309,8 +308,8 @@ public:
       --right_pos;
     }
 
-    if ((left_pos == intervals_.end()) || (right_pos == intervals_.end()) || (right < left_pos->first) ||
-        (right_pos->second < left)) {
+    if ((left_pos == intervals_.end()) || (right_pos == intervals_.end()) ||
+        (right < left_pos->first) || (right_pos->second < left)) {
       // Fully disjoint. Simply insert.
       intervals_.insert(Interval(left, right));
     } else {
@@ -333,11 +332,11 @@ public:
     return out;
   }
 
- private:
+private:
   struct Compare {
     bool operator()(const Interval& a, const Interval& b) const { return a.second < b.first; }
   };
-  std::set<Interval, Compare> intervals_ ; // Intervals do not overlap or abut.
+  std::set<Interval, Compare> intervals_; // Intervals do not overlap or abut.
 };
 
 } // namespace Envoy
