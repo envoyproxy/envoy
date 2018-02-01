@@ -261,7 +261,7 @@ public:
   }
 
   std::string waitForData(uint64_t num_bytes);
-  void write(const std::string& data, bool last_byte = false);
+  void write(const std::string& data, bool end_stream = false);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

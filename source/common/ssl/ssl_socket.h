@@ -36,7 +36,7 @@ public:
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
-  Network::IoResult doWrite(Buffer::Instance& write_buffer, bool last_byte) override;
+  Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::Connection* ssl() override { return this; }
   const Ssl::Connection* ssl() const override { return this; }

@@ -42,7 +42,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   }
 
   bool keep_reading = true;
-  bool last_byte = false;
+  bool end_stream = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   while (keep_reading) {
@@ -65,7 +65,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
-          last_byte = true;
+          end_stream = true;
           break;
         case SSL_ERROR_WANT_WRITE:
         // Renegotiation has started. We don't handle renegotiation so just fall through.
@@ -88,7 +88,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     }
   }
 
-  return {action, bytes_read, last_byte};
+  return {action, bytes_read, end_stream};
 }
 
 PostIoAction SslSocket::doHandshake() {
@@ -142,7 +142,7 @@ void SslSocket::drainErrorQueue() {
   }
 }
 
-Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool last_byte) {
+Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
@@ -200,7 +200,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool last_b
     }
   }
 
-  if (total_bytes_written == original_buffer_length && last_byte) {
+  if (total_bytes_written == original_buffer_length && end_stream) {
     shutdownSsl();
   }
 

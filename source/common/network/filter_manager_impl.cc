@@ -52,8 +52,8 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
     }
 
     BufferSource::StreamBuffer read_buffer = buffer_source_.getReadBuffer();
-    if (read_buffer.buffer.length() > 0 || read_buffer.last_byte) {
-      FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.last_byte);
+    if (read_buffer.buffer.length() > 0 || read_buffer.end_stream) {
+      FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration) {
         return;
       }
@@ -69,7 +69,7 @@ void FilterManagerImpl::onRead() {
 FilterStatus FilterManagerImpl::onWrite() {
   for (const WriteFilterSharedPtr& filter : downstream_filters_) {
     BufferSource::StreamBuffer write_buffer = buffer_source_.getWriteBuffer();
-    FilterStatus status = filter->onWrite(write_buffer.buffer, write_buffer.last_byte);
+    FilterStatus status = filter->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration) {
       return status;
     }

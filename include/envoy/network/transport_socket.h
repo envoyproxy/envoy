@@ -34,7 +34,7 @@ struct IoResult {
    * True if an end-of-stream was read from a connection. This
    * can only be true for read operations.
    */
-  bool last_byte_read_;
+  bool end_stream_read_;
 };
 
 /**
@@ -118,7 +118,7 @@ public:
    * @param buffer supplies the buffer to write from
    * @return IoResult the result of the write action.
    */
-  virtual IoResult doWrite(Buffer::Instance& buffer, bool last_byte) PURE;
+  virtual IoResult doWrite(Buffer::Instance& buffer, bool end_stream) PURE;
 
   /**
    * Called when underlying transport is established.

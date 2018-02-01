@@ -195,7 +195,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     return;
   }
 
-  if (read_buffer_size == 0 && !read_last_byte_) {
+  if (read_buffer_size == 0 && !read_end_stream_) {
     return;
   }
 
@@ -263,12 +263,12 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
 }
 
-void ConnectionImpl::write(Buffer::Instance& data, bool last_byte) {
+void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
   // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
   //       path, so we just pass around the buffer passed to us in this function. If we ever support
   //       buffer/restart/continue on the write path this needs to get more complicated.
   current_write_buffer_ = &data;
-  current_write_last_byte_ = last_byte;
+  current_write_end_stream_ = end_stream;
   FilterStatus status = filter_manager_.onWrite();
   current_write_buffer_ = nullptr;
 
@@ -276,9 +276,9 @@ void ConnectionImpl::write(Buffer::Instance& data, bool last_byte) {
     return;
   }
 
-  write_last_byte_ = last_byte;
-  if (data.length() > 0 || last_byte) {
-    ENVOY_CONN_LOG(trace, "writing {} bytes, last_byte {}", *this, data.length(), last_byte);
+  write_end_stream_ = end_stream;
+  if (data.length() > 0 || end_stream) {
+    ENVOY_CONN_LOG(trace, "writing {} bytes, end_stream {}", *this, data.length(), end_stream);
     // TODO(mattklein123): All data currently gets moved from the source buffer to the write buffer.
     // This can lead to inefficient behavior if writing a bunch of small chunks. In this case, it
     // would likely be more efficient to copy data below a certain size. VERY IMPORTANT: If this is
@@ -387,15 +387,15 @@ void ConnectionImpl::onReadReady() {
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
-  // If this connection doesn't have half-close semantics, translate last_byte into
+  // If this connection doesn't have half-close semantics, translate end_stream into
   // a connection close.
-  if ((!enable_half_close_ && result.last_byte_read_)) {
-    result.last_byte_read_ = false;
+  if ((!enable_half_close_ && result.end_stream_read_)) {
+    result.end_stream_read_ = false;
     result.action_ = PostIoAction::Close;
   }
 
-  read_last_byte_ |= result.last_byte_read_;
-  if (result.bytes_processed_ != 0 || result.last_byte_read_) {
+  read_end_stream_ |= result.end_stream_read_;
+  if (result.bytes_processed_ != 0 || result.end_stream_read_) {
     // Skip onRead if no bytes were processed. For instance, if the connection was closed without
     // producing more data.
     onRead(new_buffer_size);
@@ -434,8 +434,8 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  IoResult result = transport_socket_->doWrite(*write_buffer_, write_last_byte_);
-  ASSERT(!result.last_byte_read_); // The interface guarantees that only read operations set this.
+  IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
+  ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
@@ -485,8 +485,8 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 }
 
 bool ConnectionImpl::isDoubleHalfClosed() {
-  // If the write_buffer_ is not empty, then the last_byte has not been sent to the transport yet.
-  return read_last_byte_ && write_last_byte_ && write_buffer_->length() == 0;
+  // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport yet.
+  return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

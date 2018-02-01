@@ -387,19 +387,19 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   return data_;
 }
 
-void FakeRawConnection::write(const std::string& data, bool last_byte) {
-  connection_.dispatcher().post([data, last_byte, this]() -> void {
+void FakeRawConnection::write(const std::string& data, bool end_stream) {
+  connection_.dispatcher().post([data, end_stream, this]() -> void {
     Buffer::OwnedImpl to_write(data);
-    connection_.write(to_write, last_byte);
+    connection_.write(to_write, end_stream);
   });
 }
 
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
-                                                            bool last_byte) {
+                                                            bool end_stream) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   ENVOY_LOG(debug, "got {} bytes", data.length());
   parent_.data_.append(TestUtility::bufferToString(data));
-  parent_.half_closed_ = last_byte;
+  parent_.half_closed_ = end_stream;
   data.drain(data.length());
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;

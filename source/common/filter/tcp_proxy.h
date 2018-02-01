@@ -138,7 +138,7 @@ public:
   ~TcpProxy();
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& data, bool last_byte) override;
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
@@ -164,7 +164,7 @@ public:
     void onBelowWriteBufferLowWatermark() override;
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool last_byte) override;
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
     void onBytesSent();
     void onIdleTimeout();
@@ -217,7 +217,7 @@ protected:
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
-  void onUpstreamData(Buffer::Instance& data, bool last_byte);
+  void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
   void finalizeUpstreamConnectionStats();
   void closeUpstreamConnection();

@@ -76,7 +76,7 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(state, State());
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool last_byte));
+  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
@@ -115,7 +115,7 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(state, State());
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool last_byte));
+  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
@@ -166,7 +166,7 @@ public:
   MockReadFilter();
   ~MockReadFilter();
 
-  MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool last_byte));
+  MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(onNewConnection, FilterStatus());
   MOCK_METHOD1(initializeReadFilterCallbacks, void(ReadFilterCallbacks& callbacks));
 
@@ -178,7 +178,7 @@ public:
   MockWriteFilter();
   ~MockWriteFilter();
 
-  MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool last_byte));
+  MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
 };
 
 class MockFilter : public Filter {
@@ -186,9 +186,9 @@ public:
   MockFilter();
   ~MockFilter();
 
-  MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool last_byte));
+  MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(onNewConnection, FilterStatus());
-  MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool last_byte));
+  MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(initializeReadFilterCallbacks, void(ReadFilterCallbacks& callbacks));
 
   ReadFilterCallbacks* callbacks_{};
@@ -367,7 +367,7 @@ public:
   MOCK_METHOD0(canFlushClose, bool());
   MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
-  MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool last_byte));
+  MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());

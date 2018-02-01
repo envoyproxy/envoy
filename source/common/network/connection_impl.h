@@ -83,7 +83,7 @@ public:
   Ssl::Connection* ssl() override { return transport_socket_->ssl(); }
   const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
-  void write(Buffer::Instance& data, bool last_byte) override;
+  void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool localAddressRestored() const override { return socket_->localAddressRestored(); }
@@ -93,9 +93,9 @@ public:
   }
 
   // Network::BufferSource
-  BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_last_byte_}; }
+  BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
   BufferSource::StreamBuffer getWriteBuffer() override {
-    return {*current_write_buffer_, current_write_last_byte_};
+    return {*current_write_buffer_, current_write_end_stream_};
   }
 
   // Network::TransportSocketCallbacks
@@ -156,9 +156,9 @@ private:
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   bool enable_half_close_{false};
-  bool read_last_byte_{false};
-  bool write_last_byte_{false};
-  bool current_write_last_byte_{false};
+  bool read_end_stream_{false};
+  bool write_end_stream_{false};
+  bool current_write_end_stream_{false};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};

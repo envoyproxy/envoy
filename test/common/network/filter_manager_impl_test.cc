@@ -35,13 +35,13 @@ namespace Network {
 
 class NetworkFilterManagerTest : public testing::Test, public BufferSource {
 public:
-  StreamBuffer getReadBuffer() override { return {read_buffer_, read_last_byte_}; }
-  StreamBuffer getWriteBuffer() override { return {write_buffer_, write_last_byte_}; }
+  StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
+  StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
-  bool read_last_byte_{};
-  bool write_last_byte_{};
+  bool read_end_stream_{};
+  bool write_end_stream_{};
 };
 
 class LocalMockFilter : public MockFilter {

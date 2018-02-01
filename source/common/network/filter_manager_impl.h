@@ -19,7 +19,7 @@ public:
 
   struct StreamBuffer {
     Buffer::Instance& buffer;
-    bool last_byte;
+    bool end_stream;
   };
 
   /**

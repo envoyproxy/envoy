@@ -13,7 +13,7 @@ void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& call
 IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
-  bool last_byte = false;
+  bool end_stream = false;
   do {
     // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
     // use an ioctl() before every read to figure out how much data there is to read.
@@ -25,7 +25,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
 
     if (rc == 0) {
       // Remote close. Might need to raise data before raising close.
-      last_byte = true;
+      end_stream = true;
       break;
     } else if (rc == -1) {
       // Remote error (might be no data).
@@ -44,15 +44,15 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     }
   } while (true);
 
-  return {action, bytes_read, last_byte};
+  return {action, bytes_read, end_stream};
 }
 
-IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool last_byte) {
+IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   PostIoAction action;
   uint64_t bytes_written = 0;
   do {
     if (buffer.length() == 0) {
-      if (last_byte && !shutdown_) {
+      if (end_stream && !shutdown_) {
         // Ignore the result. This can only fail if the connection failed. In that case, the
         // error will be detected on the next read, and dealt with appropriately.
         ::shutdown(callbacks_->fd(), SHUT_WR);

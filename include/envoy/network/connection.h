@@ -195,7 +195,7 @@ public:
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
    */
-  virtual void write(Buffer::Instance& data, bool last_byte) PURE;
+  virtual void write(Buffer::Instance& data, bool end_stream) PURE;
 
   // TODO: delete this and fixup all callers.
   void write(Buffer::Instance& data) { write(data, false); }

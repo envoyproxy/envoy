@@ -74,7 +74,7 @@ public:
   void waitForData(const std::string& data);
   void waitForDisconnect();
   void waitForHalfClose();
-  void write(const std::string& data, bool last_byte = false);
+  void write(const std::string& data, bool end_stream = false);
   const std::string& data() { return payload_reader_->data(); }
 
 private:

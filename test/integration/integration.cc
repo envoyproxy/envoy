@@ -157,7 +157,7 @@ void IntegrationTcpClient::waitForHalfClose() {
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
 
-void IntegrationTcpClient::write(const std::string& data, bool last_byte) {
+void IntegrationTcpClient::write(const std::string& data, bool end_stream) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));
   if (!data.empty()) {
@@ -166,7 +166,7 @@ void IntegrationTcpClient::write(const std::string& data, bool last_byte) {
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
-  connection_->write(buffer, last_byte);
+  connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   } while (client_write_buffer_->bytes_written() != bytes_expected);

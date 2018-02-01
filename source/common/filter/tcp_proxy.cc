@@ -257,8 +257,8 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   }
 }
 
-Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data, bool last_byte) {
-  parent_->onUpstreamData(data, last_byte);
+Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
+  parent_->onUpstreamData(data, end_stream);
   return Network::FilterStatus::StopIteration;
 }
 
@@ -371,10 +371,10 @@ void TcpProxy::onConnectTimeout() {
   initializeUpstreamConnection();
 }
 
-Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool last_byte) {
+Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
   request_info_.bytes_received_ += data.length();
-  upstream_connection_->write(data, last_byte);
+  upstream_connection_->write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
@@ -403,9 +403,9 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpProxy::onUpstreamData(Buffer::Instance& data, bool last_byte) {
+void TcpProxy::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   request_info_.bytes_sent_ += data.length();
-  read_callbacks_->connection().write(data, last_byte);
+  read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
