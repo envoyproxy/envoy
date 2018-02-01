@@ -140,6 +140,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   test_server_.reset();
+  fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
 }
 
