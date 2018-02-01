@@ -1,5 +1,6 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/stats/stats_impl.h"
 
 #include "server/connection_handler_impl.h"
@@ -36,7 +37,9 @@ public:
 
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocket& socket() override { return socket_; }
-    Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+    Network::TransportSocketFactory& transportSocketFactory() override {
+      return transport_socket_factory_;
+    }
     bool bindToPort() override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
@@ -48,6 +51,7 @@ public:
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
+    Network::RawBufferSocketFactory transport_socket_factory_;
     uint64_t tag_;
     bool bind_to_port_;
     const bool hand_off_restored_destination_connections_;

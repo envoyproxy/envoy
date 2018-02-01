@@ -199,6 +199,7 @@ envoy_cc_library(
         ":init_manager_lib",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",

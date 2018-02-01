@@ -98,10 +98,10 @@ public:
 
   // Router::RdsRouteConfigProvider
   std::string configAsJson() const override {
-    return MessageUtil::getJsonStringFromMessage(route_config_proto_);
+    return MessageUtil::getJsonStringFromMessage(route_config_proto_, true);
   }
   const std::string& routeConfigName() const override { return route_config_name_; }
-  const std::string& clusterName() const override { return cluster_name_; }
+  const std::string& configSource() const override { return config_source_; }
   const std::string versionInfo() const override { return subscription_->versionInfo(); }
 
   // Config::SubscriptionCallbacks
@@ -130,7 +130,7 @@ private:
   Upstream::ClusterManager& cm_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
-  std::string cluster_name_;
+  std::string config_source_;
   const std::string route_config_name_;
   bool initialized_{};
   uint64_t last_config_hash_{};

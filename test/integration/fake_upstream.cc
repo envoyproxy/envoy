@@ -14,7 +14,9 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "server/connection_handler_impl.h"
 
@@ -246,8 +248,8 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dis
 }
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type)
-    : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::UdsListenSocket(uds_path)}, type,
-                   false) {
+    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+                   Network::ListenSocketPtr{new Network::UdsListenSocket(uds_path)}, type, false) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
@@ -261,22 +263,26 @@ static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port,
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
                            Network::Address::IpVersion version, bool enable_half_close)
-    : FakeUpstream(nullptr, makeTcpListenSocket(port, version), type, enable_half_close) {
+    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+                   makeTcpListenSocket(port, version), type, enable_half_close) {
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
-FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
-                           FakeHttpConnection::Type type, Network::Address::IpVersion version)
-    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port, version), type, false) {
+FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                           uint32_t port, FakeHttpConnection::Type type,
+                           Network::Address::IpVersion version)
+    : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
+                   false) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
-FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,
-                           FakeHttpConnection::Type type, bool enable_half_close)
-    : http_type_(type), ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)),
-      api_(new Api::Impl(std::chrono::milliseconds(10000))),
+FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                           Network::ListenSocketPtr&& listen_socket, FakeHttpConnection::Type type,
+                           bool enable_half_close)
+    : http_type_(type), transport_socket_factory_(std::move(transport_socket_factory)),
+      socket_(std::move(listen_socket)), api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close),

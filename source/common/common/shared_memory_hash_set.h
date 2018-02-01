@@ -21,9 +21,6 @@ struct SharedMemoryHashSetOptions {
   std::string toString() const {
     return fmt::format("capacity={}, num_slots={}", capacity, num_slots);
   }
-  std::string version() const {
-    return fmt::format("capacity={}, num_slots={}", capacity, num_slots);
-  }
   bool operator==(const SharedMemoryHashSetOptions& that) const {
     return capacity == that.capacity && num_slots == that.num_slots;
   }
@@ -101,56 +98,37 @@ public:
     RELEASE_ASSERT(control_->size <= control_->options.capacity);
 
     // As a sanity check, make sure there are control_->size values
-    // reachable from the slots, each of which has a valid char_offset
+    // reachable from the slots, each of which has a valid
+    // char_offset.
+    //
+    // Avoid infinite loops if there is a next_cell cycle within a
+    // slot. Note that the num_values message will be emitted outside
+    // the loop.
     uint32_t num_values = 0;
     for (uint32_t slot = 0; slot < control_->options.num_slots; ++slot) {
       uint32_t next = 0; // initialized to silence compilers.
-      for (uint32_t cell_index = slots_[slot]; cell_index != Sentinal; cell_index = next) {
+      for (uint32_t cell_index = slots_[slot];
+           (cell_index != Sentinal) && (num_values <= control_->size); cell_index = next) {
         RELEASE_ASSERT(cell_index < control_->options.capacity);
         Cell& cell = getCell(cell_index);
         absl::string_view key = cell.value.key();
         RELEASE_ASSERT(computeSlot(key) == slot);
         next = cell.next_cell;
         ++num_values;
-        // Avoid infinite loops if there is a next_cell cycle within
-        // a slot. Note that the num_values message will be emitted
-        // outside the loop.
-        if (num_values > control_->size) {
-          break;
-        }
       }
     }
     RELEASE_ASSERT(num_values == control_->size);
 
     uint32_t num_free_entries = 0;
     uint32_t expected_free_entries = control_->options.capacity - control_->size;
-    for (uint32_t cell_index = control_->free_cell_index; cell_index != Sentinal;
+
+    // Don't infinite-loop with a corruption; break when we see there's a problem.
+    for (uint32_t cell_index = control_->free_cell_index;
+         (cell_index != Sentinal) && (num_free_entries <= expected_free_entries);
          cell_index = getCell(cell_index).next_cell) {
       ++num_free_entries;
-      if (num_free_entries > expected_free_entries) {
-        // Don't infinite-loop with a corruption; break when we see there's a problem.
-        break;
-      }
     }
     RELEASE_ASSERT(num_free_entries == expected_free_entries);
-  }
-
-  /**
-   * Returns a string describing the contents of the map, including the control
-   * bits and the keys in each slot.
-   */
-  std::string toString() {
-    std::string ret;
-    ret =
-        fmt::format("options={}\ncontrol={}\n", control_->options.toString(), control_->toString());
-    for (uint32_t i = 0; i < control_->options.num_slots; ++i) {
-      ret += fmt::format("slot {}:", i);
-      for (uint32_t j = slots_[i]; j != Sentinal; j = getCell(j).next_cell) {
-        ret += " " + std::string(getCell(j).value.key());
-      }
-      ret += "\n";
-    }
-    return ret;
   }
 
   /**
@@ -241,6 +219,8 @@ public:
   }
 
 private:
+  friend class SharedMemoryHashSetTest;
+
   /**
    * Initializes a hash-map on raw memory. No expectations are made about the state of the memory
    * coming in.
@@ -308,11 +288,6 @@ private:
    * Represents control-values for the hash-table.
    */
   struct Control {
-    std::string toString() const {
-      return fmt::format("{} size={} free_cell_index={}", options.toString(), size,
-                         free_cell_index);
-    }
-
     SharedMemoryHashSetOptions options; // Options established at map construction time.
     uint64_t hash_signature;            // Hash of a constant signature string.
     uint32_t num_bytes;                 // Bytes allocated on behalf of the map.

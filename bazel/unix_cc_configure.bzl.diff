@@ -1,10 +1,10 @@
 diff --git a/../../bazel/tools/cpp/unix_cc_configure.bzl b/unix_cc_configure.bzl
-index ed245fc94..dcd9f6077 100644
+index 82cfaa218..27d6bd369 100644
 --- a/../../bazel/tools/cpp/unix_cc_configure.bzl
 +++ b/unix_cc_configure.bzl
 @@ -1,3 +1,11 @@
-+# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
-+# local modifications to deal with known issues in Bazel 0.5.2:
++# This file was imported from https://github.com/bazelbuild/bazel at 3d00b2a. We apply a number of
++# local modifications to deal with known issues in Bazel 0.10.0.
 +#
 +# * https://github.com/bazelbuild/bazel/issues/2840
 +# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
@@ -14,16 +14,7 @@ index ed245fc94..dcd9f6077 100644
  # pylint: disable=g-bad-file-header
  # Copyright 2016 The Bazel Authors. All rights reserved.
  #
-@@ -16,7 +24,7 @@
- 
- 
- load(
--    "@bazel_tools//tools/cpp:lib_cc_configure.bzl",
-+    "//bazel:lib_cc_configure.bzl",
-     "escape_string",
-     "get_env_var",
-     "which",
-@@ -174,7 +182,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
+@@ -219,7 +227,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
            "-std=c++0x",
        ] + _escaped_cplus_include_paths(repository_ctx),
        "linker_flag": [
@@ -31,10 +22,10 @@ index ed245fc94..dcd9f6077 100644
            "-lm",  # Some systems expect -lm in addition to -lstdc++
            # Anticipated future default.
        ] + (
-@@ -332,8 +339,8 @@ def _coverage_feature(darwin):
+@@ -375,8 +382,8 @@ def find_cc(repository_ctx, overriden_tools):
+   if "gcc" in overriden_tools:
+     return overriden_tools["gcc"]
  
- def find_cc(repository_ctx):
-   """Find the C++ compiler. Doesn't %-escape the result."""
 -  cc_name = "gcc"
 -  cc_environ = repository_ctx.os.environ.get("CC")
 +  cc_name = "g++"
@@ -42,7 +33,7 @@ index ed245fc94..dcd9f6077 100644
    cc_paren = ""
    if cc_environ != None:
      cc_environ = cc_environ.strip()
-@@ -346,14 +353,13 @@ def find_cc(repository_ctx):
+@@ -389,7 +396,7 @@ def find_cc(repository_ctx, overriden_tools):
    cc = repository_ctx.which(cc_name)
    if cc == None:
      fail(
@@ -51,21 +42,3 @@ index ed245fc94..dcd9f6077 100644
           + " environment variable") % cc_paren)
    return cc
  
- 
- def configure_unix_toolchain(repository_ctx, cpu_value):
-   """Configure C++ toolchain on Unix platforms."""
--  repository_ctx.file("tools/cpp/empty.cc", "int main() {}")
-   darwin = cpu_value == "darwin"
-   cc = find_cc(repository_ctx)
-   tool_paths = _get_tool_paths(repository_ctx, darwin,
-@@ -391,6 +397,10 @@ def configure_unix_toolchain(repository_ctx, cpu_value):
-       "%{msvc_env_path}": "",
-       "%{msvc_env_include}": "",
-       "%{msvc_env_lib}": "",
-+      "%{crt_option}": "",
-+      "%{crt_debug_option}": "",
-+      "%{crt_library}": "",
-+      "%{crt_debug_library}": "",
-       "%{msvc_cl_path}": "",
-       "%{msvc_link_path}": "",
-       "%{msvc_lib_path}": "",
