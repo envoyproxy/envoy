@@ -9,6 +9,7 @@
 
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -306,6 +307,40 @@ TEST(RegexUtil, parseRegex) {
     EXPECT_NE(0, regex.flags() & std::regex::icase);
     EXPECT_EQ(0, regex.flags() & std::regex::optimize);
   }
+}
+
+TEST(IntervalSet, testIntervals) {
+  IntervalSet<int> interval_set;
+  auto insert_and_print = [&interval_set](int left, int right) -> std::string {
+    interval_set.insert(left, right);
+    std::string out;
+    const char* prefix = "";
+    for (const auto& interval : interval_set.toVector()) {
+      absl::StrAppend(&out, prefix, "[", interval.first, ", ", interval.second, ")");
+      prefix = ", ";
+    }
+    return out;
+  };
+  EXPECT_EQ("[7, 10)", insert_and_print(7, 10));
+  EXPECT_EQ("[-2, -1), [7, 10)", insert_and_print(-2, -1));           // disjoint left
+  EXPECT_EQ("[-2, -1), [7, 10), [22, 23)", insert_and_print(22, 23)); // disjoint right
+  EXPECT_EQ("[-2, -1), [7, 15), [22, 23)", insert_and_print(8, 15));  // right overhang
+  EXPECT_EQ("[-2, -1), [5, 15), [22, 23)", insert_and_print(5, 12));  // left overhang
+  EXPECT_EQ("[-2, -1), [2, 4), [5, 15), [22, 23)",                    // disjoint in middle
+            insert_and_print(2, 4));
+  EXPECT_EQ("[-2, -1), [2, 15), [22, 23)", insert_and_print(3, 6)); // merge two intervals
+  EXPECT_EQ("[-2, -1), [2, 15), [18, 19), [22, 23)",                // right disjoint
+            insert_and_print(18, 19));
+  EXPECT_EQ("[-2, -1), [2, 15), [16, 17), [18, 19), [22, 23)", // middle disjoint
+            insert_and_print(16, 17));
+  EXPECT_EQ("[-2, -1), [2, 15), [16, 17), [18, 20), [22, 23)", // merge [18,19) and [19,20)
+            insert_and_print(19, 20));
+  EXPECT_EQ("[-2, -1), [2, 15), [16, 17), [18, 20), [22, 23)", // fully enclosed; no effect
+            insert_and_print(3, 6));
+  EXPECT_EQ("[-2, -1), [2, 20), [22, 23)", insert_and_print(3, 20)); // merge across 3 intervals
+  EXPECT_EQ("[-2, -1), [2, 23)", insert_and_print(3, 22));           // merge all via overlap
+  EXPECT_EQ("[-2, 23)", insert_and_print(-2, 23));                   // merge all covering exact
+  EXPECT_EQ("[-3, 24)", insert_and_print(-3, 24)); // merge all with overhand on both sides
 }
 
 } // namespace Envoy

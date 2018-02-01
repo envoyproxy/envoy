@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -286,6 +287,57 @@ public:
    */
   static std::regex parseRegex(const std::string& regex,
                                std::regex::flag_type flags = std::regex::optimize);
+};
+
+/**
+ * Maintains sets of numeric intervals.  As new intervals are added, existing ones in the
+ * set are combined so that no overlapping intervals remain in the representation.
+ *
+ * Value can be any type that is comparable with <.
+ */
+template<typename Value>
+class IntervalSet {
+public:
+  typedef std::pair<Value, Value> Interval;
+
+  // Inserts a new interval into the set, merging any overlaps.
+  void insert(Value left, Value right) {
+    auto left_pos = intervals_.lower_bound(Interval(left, left));
+    // upper_bound is exclusive, and we want to be inclusive.
+    auto right_pos = intervals_.upper_bound(Interval(right, right));
+    if (!intervals_.empty()) {
+      --right_pos;
+    }
+
+    if ((left_pos == intervals_.end()) || (right_pos == intervals_.end()) || (right < left_pos->first) ||
+        (right_pos->second < left)) {
+      // Fully disjoint. Simply insert.
+      intervals_.insert(Interval(left, right));
+    } else {
+      // Both bounds overlap.
+      left = std::min(left_pos->first, left);
+      right = std::max(right_pos->second, right);
+      ++right_pos; // erase is non-inclusive on upper bound.
+      intervals_.erase(left_pos, right_pos);
+      intervals_.insert(Interval(left, right));
+    }
+  }
+
+  // Returns the interval-set as a vector.
+  std::vector<Interval> toVector() const {
+    std::vector<Interval> out;
+    out.reserve(intervals_.size());
+    for (const Interval& interval : intervals_) {
+      out.push_back(interval);
+    }
+    return out;
+  }
+
+ private:
+  struct Compare {
+    bool operator()(const Interval& a, const Interval& b) const { return a.second < b.first; }
+  };
+  std::set<Interval, Compare> intervals_ ; // Intervals do not overlap or abut.
 };
 
 } // namespace Envoy
