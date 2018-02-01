@@ -116,7 +116,7 @@ public:
 
   /**
    * @param buffer supplies the buffer to write from
-   * @param end_stream supplies whether this is the end of the stream.  If true and all
+   * @param end_stream supplies whether this is the end of the stream. If true and all
    *        data in buffer is written, the connection will be half-closed.
    * @return IoResult the result of the write action.
    */
