@@ -287,10 +287,14 @@ TEST(HeaderStringTest, All) {
   // getString
   {
     std::string static_string("HELLO");
-    HeaderString headerString(static_string);
-    std::string retString = headerString.getString();
-    EXPECT_EQ("HELLO", retString);
-    EXPECT_EQ(5U, retString.size());
+    HeaderString headerString1(static_string);
+    std::string retString1 = headerString1.getString();
+    EXPECT_EQ("HELLO", retString1);
+    EXPECT_EQ(5U, retString1.size());
+
+    HeaderString headerString2;
+    std::string retString2 = headerString2.getString();
+    EXPECT_EQ(0U, retString2.size());
   }
 }
 
