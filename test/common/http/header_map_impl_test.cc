@@ -283,6 +283,15 @@ TEST(HeaderStringTest, All) {
     EXPECT_FALSE(string.caseInsensitiveContains("keep-alive"));
     EXPECT_FALSE(string.caseInsensitiveContains(""));
   }
+
+  // getString
+  {
+    std::string static_string("HELLO");
+    HeaderString headerString(static_string);
+    std::string retString = headerString.getString();
+    EXPECT_EQ("HELLO", retString);
+    EXPECT_EQ(5U, retString.size());
+  }
 }
 
 TEST(HeaderMapImplTest, InlineInsert) {
