@@ -73,13 +73,12 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                              Ssl::Context* ssl_ctx) {
+Network::ConnectionPtr
+DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
+                                       Network::TransportSocketPtr&& transport_socket) {
   ASSERT(isThreadSafe());
-  return Network::ConnectionPtr{ssl_ctx
-                                    ? new Ssl::ConnectionImpl(*this, std::move(socket), true,
-                                                              *ssl_ctx, Ssl::InitialState::Server)
-                                    : new Network::ConnectionImpl(*this, std::move(socket), true)};
+  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
+                                                   std::move(transport_socket), true);
 }
 
 Network::ClientConnectionPtr
