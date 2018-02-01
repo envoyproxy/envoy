@@ -76,7 +76,7 @@ rm "${SRCDIR}"/test/coverage/BUILD
 [[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
 
 COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
-COVERAGE_THRESHOLD=99.0
+COVERAGE_THRESHOLD=98.0
 COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
 if test ${COVERAGE_FAILED} -eq 1; then
     echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}
