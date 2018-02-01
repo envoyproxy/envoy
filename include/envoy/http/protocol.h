@@ -11,18 +11,23 @@ namespace Http {
 enum class Protocol { Http10, Http11, Http2 };
 const size_t NumProtocols = 3;
 
-inline std::string getProtocolString(const Protocol& p) {
+static const std::string DefaultString = "";
+static const std::string Http10String = "HTTP/1.0";
+static const std::string Http11String = "HTTP/1.1";
+static const std::string Http2String = "HTTP/2";
+
+inline const std::string& getProtocolString(const Protocol& p) {
   switch (p) {
   case Protocol::Http10:
-    return std::string("Http1.0");
+    return Http10String;
   case Protocol::Http11:
-    return std::string("Http1.1");
+    return Http11String;
   case Protocol::Http2:
-    return std::string("Http2");
+    return Http2String;
   default:
     break;
   }
-  return "";
+  return DefaultString;
 }
 
 } // namespace Http
