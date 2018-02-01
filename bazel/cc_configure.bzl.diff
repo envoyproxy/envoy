@@ -1,57 +1,29 @@
 diff --git a/../../bazel/tools/cpp/cc_configure.bzl b/cc_configure.bzl
-index 9d6d29fc8..3d0c9e551 100644
+index 610f5a7d5..cd99c404d 100644
 --- a/../../bazel/tools/cpp/cc_configure.bzl
 +++ b/cc_configure.bzl
 @@ -1,3 +1,11 @@
-+# This file was imported from https://github.com/bazelbuild/bazel at 7b85122. We apply a number of
-+# local modifications to deal with known issues in Bazel 0.5.2:
++# This file was imported from https://github.com/bazelbuild/bazel at 3d00b2a. We apply a number of
++# local modifications to deal with known issues in Bazel 0.10.0.
 +#
 +# * https://github.com/bazelbuild/bazel/issues/2840
 +# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
 +#
-+# See cc_configure.bzl.diff for the changes made in this fork against bazel release 0.6.0.
++# See cc_configure.bzl.diff for the changes made in this fork.
 +
  # Copyright 2016 The Bazel Authors. All rights reserved.
  #
  # Licensed under the Apache License, Version 2.0 (the "License");
-@@ -13,5 +21,3 @@
- # limitations under the License.
- """Rules for configuring the C++ toolchain (experimental)."""
+@@ -16,7 +24,7 @@
  
--
--load("@bazel_tools//tools/cpp:windows_cc_configure.bzl", "configure_windows_toolchain")
-load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
+ load("@bazel_tools//tools/cpp:windows_cc_configure.bzl", "configure_windows_toolchain")
+ load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
 -load("@bazel_tools//tools/cpp:unix_cc_configure.bzl", "configure_unix_toolchain")
--load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_cpu_value")
 +load("//bazel:unix_cc_configure.bzl", "configure_unix_toolchain")
-+load("//bazel:lib_cc_configure.bzl", "get_cpu_value")
+ load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_cpu_value")
  
- def _impl(repository_ctx):
-+  repository_ctx.file("tools/cpp/empty.cc", "int main() {}")
-   repository_ctx.symlink(
-       Label("@bazel_tools//tools/cpp:dummy_toolchain.bzl"), "dummy_toolchain.bzl")
-   cpu_value = get_cpu_value(repository_ctx)
-   if cpu_value == "freebsd":
--    # This is defaulting to the static crosstool, we should eventually
--    # autoconfigure this platform too.  Theorically, FreeBSD should be
--    # straightforward to add but we cannot run it in a docker container so
--    # skipping until we have proper tests for FreeBSD.
--    repository_ctx.symlink(Label("@bazel_tools//tools/cpp:CROSSTOOL"), "CROSSTOOL")
--    repository_ctx.symlink(Label("@bazel_tools//tools/cpp:BUILD.static"), "BUILD")
-+    fail("freebsd support needs to be added to the Envoy Bazel cc_configure.bzl fork")
-   elif cpu_value == "x64_windows":
--    configure_windows_toolchain(repository_ctx)
-+    #configure_windows_toolchain(repository_ctx)
-+    fail("x64_windows support needs to be added to the Envoy Bazel cc_configure.bzl fork")
-   elif cpu_value == "darwin":
-     configure_osx_toolchain(repository_ctx)
-   else:
-@@ -53,15 +56,15 @@ cc_autoconf = repository_rule(
-         "BAZEL_VC",
-         "BAZEL_VS",
-         "CC",
--        "CC_CONFIGURE_DEBUG",
-         "CC_TOOLCHAIN_NAME",
+ def cc_autoconf_impl(repository_ctx, overriden_tools = dict()):
+@@ -62,6 +70,7 @@ cc_autoconf = repository_rule(
          "CPLUS_INCLUDE_PATH",
          "CUDA_COMPUTE_CAPABILITIES",
          "CUDA_PATH",
@@ -59,8 +31,3 @@ load("@bazel_tools//tools/cpp:osx_cc_configure.bzl", "configure_osx_toolchain")
          "HOMEBREW_RUBY_PATH",
          "NO_WHOLE_ARCHIVE_OPTION",
          "USE_DYNAMIC_CRT",
--        "USE_MSVC_WRAPPER",
-+        "NO_MSVC_WRAPPER",
-         "SYSTEMROOT",
-         "VS90COMNTOOLS",
-         "VS100COMNTOOLS",
