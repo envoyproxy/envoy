@@ -214,6 +214,23 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
                service_hc_respnose.EnvoyUpstreamHealthCheckedCluster()->value().c_str());
 }
 
+TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  // Goodness only knows why there would be a 100-Continue response in health
+  // checks but we can still verify Envoy handles it.
+  Http::TestHeaderMapImpl continue_respnose{{":status", "100"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(continue_respnose));
+  Http::TestHeaderMapImpl service_hc_respnose{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
+  EXPECT_STREQ("cluster_name",
+               service_hc_respnose.EnvoyUpstreamHealthCheckedCluster()->value().c_str());
+}
+
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
