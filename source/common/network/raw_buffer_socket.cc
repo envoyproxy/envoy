@@ -24,7 +24,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), rc);
 
     if (rc == 0) {
-      // Remote close. Might need to raise data before raising close.
+      // Remote close.
       end_stream = true;
       break;
     } else if (rc == -1) {

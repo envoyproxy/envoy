@@ -142,8 +142,8 @@ private:
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
 
-  // Returns true iff last byte has been both written and read.
-  bool isDoubleHalfClosed();
+  // Returns true iff end of stream has been both written and read.
+  bool bothSidesHalfClosed();
 
   static std::atomic<uint64_t> next_global_id_;
 

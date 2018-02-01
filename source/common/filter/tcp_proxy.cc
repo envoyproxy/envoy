@@ -372,7 +372,8 @@ void TcpProxy::onConnectTimeout() {
 }
 
 Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
+  ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
+                 read_callbacks_->connection(), data.length(), end_stream);
   request_info_.bytes_received_ += data.length();
   upstream_connection_->write(data, end_stream);
   ASSERT(0 == data.length());
@@ -404,6 +405,8 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 void TcpProxy::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
+                 *upstream_connection_, data.length(), end_stream);
   request_info_.bytes_sent_ += data.length();
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());

@@ -107,7 +107,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      transport_socket_->doWrite(*write_buffer_, false);
+      transport_socket_->doWrite(*write_buffer_, true);
     }
 
     closeSocket(ConnectionEvent::LocalClose);
@@ -402,7 +402,7 @@ void ConnectionImpl::onReadReady() {
   }
 
   // The read callback may have already closed the connection.
-  if (result.action_ == PostIoAction::Close || isDoubleHalfClosed()) {
+  if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
   }
@@ -444,7 +444,7 @@ void ConnectionImpl::onWriteReady() {
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if ((close_with_flush_ && new_buffer_size == 0) || isDoubleHalfClosed()) {
+  } else if ((close_with_flush_ && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
@@ -484,7 +484,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            connection_stats_->write_current_);
 }
 
-bool ConnectionImpl::isDoubleHalfClosed() {
+bool ConnectionImpl::bothSidesHalfClosed() {
   // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport yet.
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }

@@ -12,7 +12,7 @@ namespace Network {
  * Action that should occur on a connection after I/O.
  */
 enum class PostIoAction {
-  // Connection is forcibly closed.
+  // Close the connection.
   Close,
 
   // Keep the connection open.
@@ -116,6 +116,8 @@ public:
 
   /**
    * @param buffer supplies the buffer to write from
+   * @param end_stream supplies whether this is the end of the stream.  If true and all
+   *        data in buffer is written, the connection will be half-closed.
    * @return IoResult the result of the write action.
    */
   virtual IoResult doWrite(Buffer::Instance& buffer, bool end_stream) PURE;
