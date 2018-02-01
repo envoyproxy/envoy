@@ -83,6 +83,12 @@ public:
     }
   }
 
+  void loadRq(HostSharedPtr host, int num_rq, Result result) {
+    for (int i = 0; i < num_rq; i++) {
+      host->outlierDetector().putResult(result);
+    }
+  }
+
   NiceMock<MockCluster> cluster_;
   std::vector<HostSharedPtr>& hosts_ = cluster_.prioritySet().getMockHostSet(0)->hosts_;
   std::vector<HostSharedPtr>& failover_hosts_ = cluster_.prioritySet().getMockHostSet(1)->hosts_;
@@ -141,7 +147,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  loadRq(hosts_[0], 4, 500);
+  loadRq(hosts_[0], 4, Result::REQUEST_FAILED);
   EXPECT_CALL(time_source_, currentTime())
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(hosts_[0]));
@@ -820,6 +826,17 @@ TEST(OutlierUtility, SRThreshold) {
   Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(52.0, ejection_pair.ejection_threshold_);
   EXPECT_EQ(90.0, ejection_pair.success_rate_average_);
+}
+
+TEST(DetectorHostMonitorImpl, resultToHttpCode) {
+  EXPECT_EQ(Http::Code::OK, DetectorHostMonitorImpl::resultToHttpCode(Result::SUCCESS));
+  EXPECT_EQ(Http::Code::GatewayTimeout, DetectorHostMonitorImpl::resultToHttpCode(Result::TIMEOUT));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            DetectorHostMonitorImpl::resultToHttpCode(Result::CONNECT_FAILED));
+  EXPECT_EQ(Http::Code::InternalServerError,
+            DetectorHostMonitorImpl::resultToHttpCode(Result::REQUEST_FAILED));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            DetectorHostMonitorImpl::resultToHttpCode(Result::SERVER_FAILURE));
 }
 
 } // namespace Outlier

@@ -71,15 +71,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
-
-  // In V2 we use a Subscription model where the fetch can happen via gRPC, REST, or
-  // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),
-  // then there is no actual RDS server, and hence no RDS cluster name.
-  if (rds.has_config_source() && rds.config_source().has_api_config_source()) {
-    cluster_name_ = rds.config_source().api_config_source().cluster_names()[0];
-  } else {
-    cluster_name_ = "NOT_USING_CLUSTER";
-  }
+  config_source_ = MessageUtil::getJsonStringFromMessage(rds.config_source(), true);
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
@@ -249,7 +241,7 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutesLoop(
     response.add("{\n");
     response.add(fmt::format("\"version_info\": \"{}\",\n", provider->versionInfo()));
     response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider->routeConfigName()));
-    response.add(fmt::format("\"cluster_name\": \"{}\",\n", provider->clusterName()));
+    response.add(fmt::format("\"config_source\": {},\n", provider->configSource()));
     response.add("\"route_table_dump\": ");
     response.add(fmt::format("{}\n", provider->configAsJson()));
     response.add("}\n");

@@ -98,8 +98,8 @@ public:
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection =
-              dispatcher_->createServerConnection(std::move(socket), nullptr);
+          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+              std::move(socket), Network::Test::createRawBufferSocket());
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
     EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -193,8 +193,8 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -257,8 +257,8 @@ TEST_P(ConnectionImplTest, SocketOptions) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         socket->setOptions(options);
-        Network::ConnectionPtr new_connection =
-            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -305,8 +305,8 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         socket->setOptions(options);
-        Network::ConnectionPtr new_connection =
-            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -369,8 +369,8 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   MockConnectionStats server_connection_stats;
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
@@ -884,8 +884,8 @@ public:
     read_filter_.reset(new NiceMock<MockReadFilter>());
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection =
-              dispatcher_->createServerConnection(std::move(socket), nullptr);
+          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+              std::move(socket), Network::Test::createRawBufferSocket());
           new_connection->setBufferLimits(read_buffer_limit);
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));

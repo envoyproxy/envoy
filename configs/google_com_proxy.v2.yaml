@@ -28,6 +28,8 @@ static_resources:
   - name: service_google
     connect_timeout: 0.25s
     type: LOGICAL_DNS
+    # Uncomment the following line if your environment doesn't have v6 network access or Envoy may try to talk to a v6 endpoint which will result in a 503 error.
+    # dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
     tls_context: { sni: www.google.com }

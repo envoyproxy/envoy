@@ -80,7 +80,8 @@ protected:
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
-  // sets downstream_protocol_ and alters the client protocol in the config_helper_
+  // Sets downstream_protocol_ and alters the HTTP connection manager codec type in the
+  // config_helper_.
   void setDownstreamProtocol(Http::CodecClient::Type type);
 
   // Sends |request_headers| and |request_body_size| bytes of body upstream.

@@ -51,10 +51,10 @@ public:
   virtual const std::string& routeConfigName() const PURE;
 
   /**
-   * @return const std::string& the name of the cluster the RdsRouteConfigProvider is issuing RDS
-   * requests to.
+   * @return const std::string& the configuration of the service the RdsRouteConfigProvider is
+   * issuing RDS requests to.
    */
-  virtual const std::string& clusterName() const PURE;
+  virtual const std::string& configSource() const PURE;
 };
 
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;
