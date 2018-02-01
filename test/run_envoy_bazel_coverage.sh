@@ -73,6 +73,8 @@ time "${GCOVR}" --gcov-exclude="${GCOVR_EXCLUDE_REGEX}" \
 # run.
 rm "${SRCDIR}"/test/coverage/BUILD
 
+[[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
+
 COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
 COVERAGE_THRESHOLD=98.0
 COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)

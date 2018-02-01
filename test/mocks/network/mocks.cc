@@ -171,6 +171,9 @@ MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(
 
 MockListenSocket::~MockListenSocket() {}
 
+MockSocketOptions::MockSocketOptions() {}
+MockSocketOptions::~MockSocketOptions() {}
+
 MockConnectionSocket::MockConnectionSocket() : local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
 }

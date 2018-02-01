@@ -2453,6 +2453,9 @@ virtual_hosts:
     domains: ["www1.lyft.com"]
     routes:
       - match: { prefix: "/" }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        decorator:
+          operation: hello
         route:
           weighted_clusters:
             clusters:
@@ -2527,12 +2530,24 @@ virtual_hosts:
   // Make sure weighted cluster entries call through to the parent when needed.
   {
     Http::TestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
-    const RouteEntry* route = config.route(headers, 115)->routeEntry();
-    EXPECT_EQ(nullptr, route->hashPolicy());
-    EXPECT_TRUE(route->opaqueConfig().empty());
-    EXPECT_FALSE(route->autoHostRewrite());
-    EXPECT_FALSE(route->useWebSocket());
-    EXPECT_TRUE(route->includeVirtualHostRateLimits());
+    auto route = config.route(headers, 115);
+    const RouteEntry* route_entry = route->routeEntry();
+    EXPECT_EQ(nullptr, route_entry->hashPolicy());
+    EXPECT_TRUE(route_entry->opaqueConfig().empty());
+    EXPECT_FALSE(route_entry->autoHostRewrite());
+    EXPECT_FALSE(route_entry->useWebSocket());
+    EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
+    EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
+    EXPECT_EQ(nullptr, route_entry->corsPolicy());
+    EXPECT_EQ("test_value",
+              Envoy::Config::Metadata::metadataValue(route_entry->metadata(), "com.bar.foo", "baz")
+                  .string_value());
+    EXPECT_EQ("hello", route->decorator()->getOperation());
+
+    Http::TestHeaderMapImpl response_headers;
+    RequestInfo::MockRequestInfo request_info;
+    route_entry->finalizeResponseHeaders(response_headers, request_info);
+    EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
   }
 
   // Weighted Cluster with no runtime, total weight = 10000

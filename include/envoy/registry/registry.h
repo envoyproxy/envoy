@@ -5,6 +5,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 
 namespace Envoy {
@@ -69,9 +70,7 @@ private:
    */
   static void removeFactoryForTest(const std::string& name) {
     auto result = factories().erase(name);
-    if (result == 0) {
-      throw EnvoyException(fmt::format("No registration for name: '{}'", name));
-    }
+    RELEASE_ASSERT(result == 1);
   }
 
   /**
