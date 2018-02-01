@@ -22,9 +22,10 @@ do
   else
     if [ "$REMOTE_SHA" = $DUMMY_SHA ]
     then
-      # New branch. Verify last 15 commits, since verification of the entire
-      # history would take too much time.
-      RANGE="$LOCAL_SHA~15..$LOCAL_SHA"
+      # New branch. Verify the last commit, since this is very likely where the new code is
+      # (though there is no way to know for sure). In the extremely uncommon case in which someone
+      # pushes more than 1 new commit to a branch, CI will enforce full checking.
+      RANGE="$LOCAL_SHA~1..$LOCAL_SHA"
     else
       # Updating branch. Verify new commits.
       RANGE="$REMOTE_SHA..$LOCAL_SHA"

@@ -571,5 +571,24 @@ TEST(HeaderMapImplTest, Lookup) {
     EXPECT_EQ(nullptr, entry);
   }
 }
+
+TEST(HeaderMapImplTest, Get) {
+  {
+    const TestHeaderMapImpl headers{{":path", "/"}, {"hello", "world"}};
+    EXPECT_STREQ("/", headers.get(LowerCaseString(":path"))->value().c_str());
+    EXPECT_STREQ("world", headers.get(LowerCaseString("hello"))->value().c_str());
+    EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
+  }
+
+  {
+    TestHeaderMapImpl headers{{":path", "/"}, {"hello", "world"}};
+    headers.get(LowerCaseString(":path"))->value(std::string("/new_path"));
+    EXPECT_STREQ("/new_path", headers.get(LowerCaseString(":path"))->value().c_str());
+    headers.get(LowerCaseString("hello"))->value(std::string("world2"));
+    EXPECT_STREQ("world2", headers.get(LowerCaseString("hello"))->value().c_str());
+    EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

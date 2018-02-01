@@ -54,8 +54,9 @@ public:
         }));
   }
 
-  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host,
-                                                     ResourcePriority, Http::Protocol) override {
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr&) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
@@ -70,20 +71,19 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr clusterManagerFromProto(const envoy::api::v2::Bootstrap& bootstrap,
-                                            Stats::Store& stats, ThreadLocal::Instance& tls,
-                                            Runtime::Loader& runtime,
-                                            Runtime::RandomGenerator& random,
-                                            const LocalInfo::LocalInfo& local_info,
-                                            AccessLog::AccessLogManager& log_manager) override {
+  ClusterManagerPtr
+  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                          Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                          AccessLog::AccessLogManager& log_manager) override {
     return ClusterManagerPtr{
         clusterManagerFromProto_(bootstrap, stats, tls, runtime, random, local_info, log_manager)};
   }
 
   MOCK_METHOD7(clusterManagerFromProto_,
-               ClusterManager*(const envoy::api::v2::Bootstrap& bootstrap, Stats::Store& stats,
-                               ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                               Runtime::RandomGenerator& random,
+               ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                               Stats::Store& stats, ThreadLocal::Instance& tls,
+                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                const LocalInfo::LocalInfo& local_info,
                                AccessLog::AccessLogManager& log_manager));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
@@ -106,7 +106,7 @@ public:
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  void create(const envoy::api::v2::Bootstrap& bootstrap) {
+  void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_));
@@ -117,15 +117,15 @@ public:
   AccessLog::MockAccessLogManager log_manager_;
 };
 
-envoy::api::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
-  envoy::api::v2::Bootstrap bootstrap;
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap);
   return bootstrap;
 }
 
-envoy::api::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::Bootstrap bootstrap;
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
   MessageUtil::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
@@ -375,7 +375,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
   envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
@@ -401,7 +401,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
   }
   )EOF";
 
-  envoy::api::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromJson(json);
   envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
       bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
   subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
@@ -452,6 +452,19 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
           use_std_hash: true
   )EOF";
   create(parseBootstrapFromV2Yaml(yaml));
+}
+
+// Verify EDS clusters have EDS config.
+TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      type: EDS
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cannot create an EDS cluster without an EDS config");
 }
 
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
@@ -510,7 +523,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
@@ -541,7 +554,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
@@ -581,7 +594,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   create(parseBootstrapFromJson(json));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
-  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _))
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
   auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr);
   EXPECT_EQ(connection, conn_data.connection_.get());
@@ -852,8 +865,6 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
 TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
-
-  InSequence s;
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   cluster1->info_->name_ = "some_cluster";
   HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
@@ -866,33 +877,39 @@ TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   Outlier::MockDetector outlier_detector;
   ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
-  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
-  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
-  EXPECT_CALL(*cluster1, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
-        // Test inline init.
-        initialize_callback();
-      }));
-
-  create(parseBootstrapFromJson(json));
-
   Http::ConnectionPool::MockInstance* cp1 = new Http::ConnectionPool::MockInstance();
-  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
-  cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
-                                           Http::Protocol::Http11, nullptr);
-  outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, false);
-
-  EXPECT_CALL(*cp1, drainConnections());
-  test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  outlier_detector.runCallbacks(test_host);
-
   Http::ConnectionPool::MockInstance* cp2 = new Http::ConnectionPool::MockInstance();
-  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
-  cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
-                                           Http::Protocol::Http11, nullptr);
 
+  {
+    InSequence s;
+
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+    EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+    EXPECT_CALL(*cluster1, initialize(_))
+        .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+          // Test inline init.
+          initialize_callback();
+        }));
+    create(parseBootstrapFromJson(json));
+
+    EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp1));
+    cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
+                                             Http::Protocol::Http11, nullptr);
+
+    outlier_detector.runCallbacks(test_host);
+    health_checker.runCallbacks(test_host, false);
+
+    EXPECT_CALL(*cp1, drainConnections());
+    test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+    outlier_detector.runCallbacks(test_host);
+
+    EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp2));
+    cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::High,
+                                             Http::Protocol::Http11, nullptr);
+  }
+
+  // Order of these calls is implementation dependent, so can't sequence them!
   EXPECT_CALL(*cp1, drainConnections());
   EXPECT_CALL(*cp2, drainConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);

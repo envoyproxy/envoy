@@ -14,11 +14,11 @@
 #include "envoy/server/options.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

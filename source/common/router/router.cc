@@ -172,15 +172,15 @@ void Filter::chargeUpstreamCode(Http::Code code,
   chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
-void Filter::sendLocalReply(Http::Code code, const std::string& body, bool overloaded) {
+void Filter::sendLocalReply(Http::Code code, const std::string& body,
+                            std::function<void(Http::HeaderMap& headers)> modify_headers) {
   // This is a customized version of send local reply that allows us to set the overloaded
   // header.
   Http::Utility::sendLocalReply(
-      [this, overloaded](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (overloaded) {
-          headers->insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+      [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (headers != nullptr && modify_headers != nullptr) {
+          modify_headers(*headers);
         }
-
         callbacks_->encodeHeaders(std::move(headers), end_stream);
       },
       [this](Buffer::Instance& data, bool end_stream) -> void {
@@ -211,18 +211,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Determine if there is a direct response for the request.
-  if (route_->directResponseEntry()) {
-    auto response_code = route_->directResponseEntry()->responseCode();
-    if (response_code >= Http::Code::MultipleChoices && response_code < Http::Code::BadRequest) {
-      config_.stats_.rq_redirect_.inc();
-      Http::Utility::sendRedirect(*callbacks_, route_->directResponseEntry()->newPath(headers),
-                                  response_code);
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+  const auto* direct_response = route_->directResponseEntry();
+  if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
-    sendLocalReply(route_->directResponseEntry()->responseCode(),
-                   route_->directResponseEntry()->responseBody(), false);
-    // TODO(brian-pane) support sending response_headers_to_add.
+    sendLocalReply(
+        direct_response->responseCode(), direct_response->responseBody(),
+        [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
+            ->void {
+              const auto new_path = direct_response->newPath(request_headers);
+              if (!new_path.empty()) {
+                response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+              }
+              direct_response->finalizeResponseHeaders(response_headers, callbacks_->requestInfo());
+            });
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -257,7 +258,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode", true);
+    sendLocalReply(
+        Http::Code::ServiceUnavailable, "maintenance mode", [](Http::HeaderMap& headers) {
+          headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+        });
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -332,7 +336,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
-  sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", false);
+  sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream");
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -524,7 +528,11 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    sendLocalReply(code, body, dropped);
+    sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
+      if (dropped) {
+        headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+      }
+    });
   }
 }
 

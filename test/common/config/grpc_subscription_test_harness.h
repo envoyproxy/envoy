@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/eds.pb.h"
+
 #include "common/common/hash.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
@@ -11,7 +13,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

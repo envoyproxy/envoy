@@ -1,5 +1,6 @@
 #include <string>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
@@ -20,15 +21,15 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Router {
 
-static envoy::api::v2::Route parseRouteFromJson(const std::string& json_string) {
-  envoy::api::v2::Route route;
+static envoy::api::v2::route::Route parseRouteFromJson(const std::string& json_string) {
+  envoy::api::v2::route::Route route;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::RdsJson::translateRoute(*json_object_ptr, route);
   return route;
 }
 
-static envoy::api::v2::Route parseRouteFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::Route route;
+static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
+  envoy::api::v2::route::Route route;
   MessageUtil::loadFromYaml(yaml, route);
   return route;
 }
@@ -61,6 +62,14 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
+}
+
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressVariable) {
+  testFormatting("DOWNSTREAM_LOCAL_ADDRESS", "127.0.0.2:0");
+}
+
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithoutPortVariable) {
+  testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -251,6 +260,8 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%PROTOCOL%%%", {"HTTP/1.1%"}, {}},
       {"%%%PROTOCOL%%%", {"%HTTP/1.1%"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
+      {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
+      {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
       {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%]", {"value]"}, {}},
@@ -589,7 +600,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   )EOF";
 
   // Disable append mode.
-  envoy::api::v2::RouteAction route_action = parseRouteFromJson(json).route();
+  envoy::api::v2::route::RouteAction route_action = parseRouteFromJson(json).route();
   route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
 

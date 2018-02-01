@@ -3,9 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "common/common/fmt.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace RateLimit {

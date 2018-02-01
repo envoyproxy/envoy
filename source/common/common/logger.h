@@ -9,6 +9,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"
 
+#include "common/common/fmt.h"
 #include "common/common/macros.h"
 
 #include "spdlog/spdlog.h"

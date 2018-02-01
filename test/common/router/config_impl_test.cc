@@ -246,6 +246,10 @@ TEST(RouteMatcherTest, TestRoutes) {
             config.route(genHeaders("lyft.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("root_www2",
             config.route(genHeaders("wwww.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("www2",
+            config.route(genHeaders("LYFT.COM", "/foo", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("root_www2",
+            config.route(genHeaders("wWww.LyfT.coM", "/", "GET"), 0)->routeEntry()->clusterName());
 
   // Wildcards
   EXPECT_EQ("wildcard",
@@ -1231,7 +1235,7 @@ public:
     route_config_ = parseRouteConfigurationFromJson(json);
   }
 
-  envoy::api::v2::RouteAction_HashPolicy* firstRouteHashPolicy() {
+  envoy::api::v2::route::RouteAction_HashPolicy* firstRouteHashPolicy() {
     auto hash_policies = route_config_.mutable_virtual_hosts(0)
                              ->mutable_routes(0)
                              ->mutable_route()
@@ -1490,7 +1494,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
   NiceMock<Upstream::MockClusterManager> cm;
   {
     auto hash_policy = firstRouteHashPolicy();
-    EXPECT_EQ(envoy::api::v2::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+    EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
     EXPECT_THROW(config(), EnvoyException);
   }
@@ -1499,7 +1503,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
     route->add_hash_policy()->mutable_header()->set_header_name("foo_header");
     route->add_hash_policy()->mutable_connection_properties()->set_source_ip(true);
     auto hash_policy = route->add_hash_policy();
-    EXPECT_EQ(envoy::api::v2::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+    EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
     EXPECT_THROW(config(), EnvoyException);
   }
@@ -2129,6 +2133,32 @@ TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
                EnvoyException);
 }
 
+// Test to detect if hostname matches are case-insensitive
+TEST(RouteMatcherTest, TestCaseSensitiveDomainConfig) {
+  std::string config_with_case_sensitive_domains = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: [www.lyft.com]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: www2 }
+  - name: www2_staging
+    domains: [www.LYFt.cOM]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: www2_staging }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(config_with_case_sensitive_domains), runtime, cm,
+                 true),
+      EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
+}
+
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
                                                   bool ssl, bool internal) {
   Http::TestHeaderMapImpl headers{
@@ -2423,6 +2453,9 @@ virtual_hosts:
     domains: ["www1.lyft.com"]
     routes:
       - match: { prefix: "/" }
+        metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+        decorator:
+          operation: hello
         route:
           weighted_clusters:
             clusters:
@@ -2497,12 +2530,24 @@ virtual_hosts:
   // Make sure weighted cluster entries call through to the parent when needed.
   {
     Http::TestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
-    const RouteEntry* route = config.route(headers, 115)->routeEntry();
-    EXPECT_EQ(nullptr, route->hashPolicy());
-    EXPECT_TRUE(route->opaqueConfig().empty());
-    EXPECT_FALSE(route->autoHostRewrite());
-    EXPECT_FALSE(route->useWebSocket());
-    EXPECT_TRUE(route->includeVirtualHostRateLimits());
+    auto route = config.route(headers, 115);
+    const RouteEntry* route_entry = route->routeEntry();
+    EXPECT_EQ(nullptr, route_entry->hashPolicy());
+    EXPECT_TRUE(route_entry->opaqueConfig().empty());
+    EXPECT_FALSE(route_entry->autoHostRewrite());
+    EXPECT_FALSE(route_entry->useWebSocket());
+    EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
+    EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
+    EXPECT_EQ(nullptr, route_entry->corsPolicy());
+    EXPECT_EQ("test_value",
+              Envoy::Config::Metadata::metadataValue(route_entry->metadata(), "com.bar.foo", "baz")
+                  .string_value());
+    EXPECT_EQ("hello", route->decorator()->getOperation());
+
+    Http::TestHeaderMapImpl response_headers;
+    RequestInfo::MockRequestInfo request_info;
+    route_entry->finalizeResponseHeaders(response_headers, request_info);
+    EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
   }
 
   // Weighted Cluster with no runtime, total weight = 10000
@@ -3590,15 +3635,17 @@ TEST(RouteEntryMetadataMatchTest, ParsesMetadata) {
 }
 
 TEST(ConfigUtility, ParseResponseCode) {
-  const std::vector<std::pair<envoy::api::v2::RedirectAction::RedirectResponseCode, Http::Code>>
-      test_set = {std::make_pair(envoy::api::v2::RedirectAction::MOVED_PERMANENTLY,
-                                 Http::Code::MovedPermanently),
-                  std::make_pair(envoy::api::v2::RedirectAction::FOUND, Http::Code::Found),
-                  std::make_pair(envoy::api::v2::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
-                  std::make_pair(envoy::api::v2::RedirectAction::TEMPORARY_REDIRECT,
-                                 Http::Code::TemporaryRedirect),
-                  std::make_pair(envoy::api::v2::RedirectAction::PERMANENT_REDIRECT,
-                                 Http::Code::PermanentRedirect)};
+  const std::vector<
+      std::pair<envoy::api::v2::route::RedirectAction::RedirectResponseCode, Http::Code>>
+      test_set = {
+          std::make_pair(envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY,
+                         Http::Code::MovedPermanently),
+          std::make_pair(envoy::api::v2::route::RedirectAction::FOUND, Http::Code::Found),
+          std::make_pair(envoy::api::v2::route::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
+          std::make_pair(envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT,
+                         Http::Code::TemporaryRedirect),
+          std::make_pair(envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT,
+                         Http::Code::PermanentRedirect)};
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
   }
@@ -3629,6 +3676,52 @@ virtual_hosts:
     EXPECT_EQ(Http::Code::TemporaryRedirect,
               config.route(headers, 0)->directResponseEntry()->responseCode());
   }
+}
+
+// Test the parsing of direct response configurations within routes.
+TEST(RouteConfigurationV2, DirectResponse) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/"}
+        direct_response: { status: 200, body: { inline_string: "content" } }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  const auto* direct_response =
+      config.route(genHeaders("example.com", "/", "GET"), 0)->directResponseEntry();
+  EXPECT_NE(nullptr, direct_response);
+  EXPECT_EQ(Http::Code::OK, direct_response->responseCode());
+  EXPECT_STREQ("content", direct_response->responseBody().c_str());
+}
+
+// Test the parsing of a direct response configuration where the response body is too large.
+TEST(RouteConfigurationV2, DirectResponseTooLarge) {
+  std::string response_body(4097, 'A');
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/"}
+        direct_response:
+          status: 200
+          body:
+            inline_string: )EOF" +
+                     response_body + "\n";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigImpl invalid_config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true),
+      EnvoyException, "response body size is 4097 bytes; maximum is 4096");
 }
 
 TEST(RouteConfigurationV2, Metadata) {

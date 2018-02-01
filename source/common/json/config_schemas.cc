@@ -952,6 +952,38 @@ const std::string Json::Schema::LUA_HTTP_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::SQUASH_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "cluster": {
+        "type" : "string"
+      },
+      "attachment_template": {
+        "type" : "object"
+      },
+      "attachment_timeout_ms": {
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "attachment_poll_period_ms": {
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "request_timeout_ms": {
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required": ["cluster", "attachment_template"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",

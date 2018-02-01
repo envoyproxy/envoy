@@ -65,6 +65,23 @@ int HeaderMapWrapper::luaPairs(lua_State* state) {
   return 1;
 }
 
+int HeaderMapWrapper::luaReplace(lua_State* state) {
+  checkModifiable(state);
+
+  const char* key = luaL_checkstring(state, 2);
+  const char* value = luaL_checkstring(state, 3);
+  const LowerCaseString lower_key(key);
+
+  HeaderEntry* entry = headers_.get(lower_key);
+  if (entry != nullptr) {
+    entry->value(value, strlen(value));
+  } else {
+    headers_.addCopy(lower_key, value);
+  }
+
+  return 0;
+}
+
 int HeaderMapWrapper::luaRemove(lua_State* state) {
   checkModifiable(state);
 

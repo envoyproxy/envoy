@@ -23,6 +23,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/html/utility.h"
@@ -37,7 +38,6 @@
 #include "common/upstream/host_utility.h"
 
 #include "absl/strings/str_replace.h"
-#include "fmt/format.h"
 
 // TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
 #include "rapidjson/document.h"

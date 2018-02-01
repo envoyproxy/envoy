@@ -126,6 +126,10 @@ public:
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_active_.value());
+
+    // NOP currently.
+    filter_->onAboveWriteBufferHighWatermark();
+    filter_->onBelowWriteBufferLowWatermark();
   }
 
   ~RedisProxyFilterTest() {

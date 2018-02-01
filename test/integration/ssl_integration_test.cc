@@ -67,12 +67,13 @@ Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool al
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
         san ? client_ssl_ctx_alpn_san_->createTransportSocket()
-            : client_ssl_ctx_alpn_->createTransportSocket());
+            : client_ssl_ctx_alpn_->createTransportSocket(),
+        nullptr);
   } else {
-    return dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        san ? client_ssl_ctx_san_->createTransportSocket()
-            : client_ssl_ctx_plain_->createTransportSocket());
+    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                               san ? client_ssl_ctx_san_->createTransportSocket()
+                                                   : client_ssl_ctx_plain_->createTransportSocket(),
+                                               nullptr);
   }
 }
 
@@ -178,7 +179,7 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 TEST_P(SslIntegrationTest, AltAlpn) {
   // Write the runtime file to turn alt_alpn on.
   TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
-  config_helper_.addConfigModifier([&](envoy::api::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     // Configure the runtime directory.
     bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime"));
   });

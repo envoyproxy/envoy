@@ -2,13 +2,12 @@
 
 #include <functional>
 
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/init.h"
 #include "envoy/server/listener_manager.h"
 
 #include "common/common/logger.h"
-
-#include "api/lds.pb.h"
 
 namespace Envoy {
 namespace Server {

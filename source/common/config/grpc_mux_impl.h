@@ -2,15 +2,15 @@
 
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
-
-#include "api/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {

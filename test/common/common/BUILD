@@ -3,11 +3,19 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
 
 envoy_package()
+
+envoy_cc_fuzz_test(
+    name = "base64_fuzz_test",
+    srcs = ["base64_fuzz_test.cc"],
+    corpus = "base64_corpus",
+    deps = ["//source/common/common:base64_lib"],
+)
 
 envoy_cc_test(
     name = "base64_test",
@@ -22,6 +30,15 @@ envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
     deps = ["//source/common/common:cleanup_lib"],
+)
+
+envoy_cc_test(
+    name = "fmt_test",
+    srcs = ["fmt_test.cc"],
+    deps = [
+        "//source/common/common:fmt_lib",
+        "//source/common/common:logger_lib",
+    ],
 )
 
 envoy_cc_test(

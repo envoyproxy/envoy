@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "common/protobuf/protobuf.h"
+#include "envoy/api/v2/cds.pb.h"
 
-#include "api/cds.pb.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Upstream {

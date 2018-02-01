@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/base.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
@@ -18,8 +19,6 @@
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
-
-#include "api/base.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -49,13 +48,16 @@ public:
   /**
    * Create a connection for this host.
    * @param dispatcher supplies the owning dispatcher.
+   * @param options supplies the socket options that will be set on the new connection.
    * @return the connection data which includes the raw network connection as well as the *real*
    *         host that backs it. The reason why a 2nd host is returned is that some hosts are
    *         logical and wrap multiple real network destinations. In this case, a different host
    *         will be returned along with the connection vs. the host the method was called on.
    *         If it matters, callers should not assume that the returned host will be the same.
    */
-  virtual CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const PURE;
+  virtual CreateConnectionData
+  createConnection(Event::Dispatcher& dispatcher,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
 
   /**
    * @return host specific gauges.
@@ -295,8 +297,8 @@ public:
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.ClusterStats for the definition of upstream_rq_dropped. These are
- * latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
+ * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
 // clang-format off
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER)                                                     \

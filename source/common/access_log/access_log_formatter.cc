@@ -5,10 +5,9 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/request_info/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -235,6 +234,11 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return request_info.downstreamLocalAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
+      return RequestInfo::Utility::formatDownstreamAddressNoPort(
+          *request_info.downstreamLocalAddress());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {

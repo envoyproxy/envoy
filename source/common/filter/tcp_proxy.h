@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/filter/network/tcp_proxy.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -21,8 +22,6 @@
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
-
-#include "api/filter/network/tcp_proxy.pb.h"
 
 namespace Envoy {
 namespace Filter {

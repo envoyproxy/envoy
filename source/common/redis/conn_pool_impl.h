@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
 #include "envoy/redis/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -16,8 +17,6 @@
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/redis/codec_impl.h"
-
-#include "api/filter/network/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Redis {

@@ -52,12 +52,15 @@ public:
    * Create a client connection.
    * @param address supplies the address to connect to.
    * @param source_address supplies an address to bind to or nullptr if no bind is necessary.
+   * @param options the socket options to be set on the underlying socket before anything is sent
+   *        on the socket.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
   virtual Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket) PURE;
+                         Network::TransportSocketPtr&& transport_socket,
+                         const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
    * Create an async DNS resolver. The resolver should only be used on the thread that runs this

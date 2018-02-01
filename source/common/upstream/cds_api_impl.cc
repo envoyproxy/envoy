@@ -2,14 +2,15 @@
 
 #include <string>
 
+#include "envoy/api/v2/cds.pb.validate.h"
+#include "envoy/api/v2/cluster/outlier_detection.pb.validate.h"
+
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/cds_subscription.h"
-
-#include "api/cds.pb.validate.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -29,6 +30,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::ConfigSource& cds_config,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
+
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info.node(), dispatcher, cm, random, *scope_,

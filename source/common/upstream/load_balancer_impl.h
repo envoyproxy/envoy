@@ -4,11 +4,10 @@
 #include <set>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
-
-#include "api/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
