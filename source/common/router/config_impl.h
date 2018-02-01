@@ -412,7 +412,7 @@ private:
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
-    const Decorator* decorator() const override { return nullptr; }
+    const Decorator* decorator() const override { return parent_->decorator(); }
 
   private:
     const RouteEntryImplBase* parent_;

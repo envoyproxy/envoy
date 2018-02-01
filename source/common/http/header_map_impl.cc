@@ -399,6 +399,16 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
   return nullptr;
 }
 
+HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) {
+  for (HeaderEntryImpl& header : headers_) {
+    if (header.key() == key.get().c_str()) {
+      return &header;
+    }
+  }
+
+  return nullptr;
+}
+
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
   for (const HeaderEntryImpl& header : headers_) {
     if (cb(header, context) == HeaderMap::Iterate::Break) {
