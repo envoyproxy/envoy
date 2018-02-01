@@ -58,12 +58,16 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
-std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message) {
+std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,
+                                                  const bool pretty_print) {
   Protobuf::util::JsonPrintOptions json_options;
   // By default, proto field names are converted to camelCase when the message is converted to JSON.
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
   // printouts.
   json_options.preserve_proto_field_names = true;
+  if (pretty_print) {
+    json_options.add_whitespace = true;
+  }
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
