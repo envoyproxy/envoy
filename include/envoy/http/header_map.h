@@ -89,12 +89,7 @@ public:
   /**
    * @return a std::string.
    */
-  std::string getString() const {
-    if (string_length_) {
-      return std::string(buffer_.ref_, string_length_);
-    }
-    return "";
-  }
+  std::string getString() const { return std::string(buffer_.ref_, string_length_); }
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
