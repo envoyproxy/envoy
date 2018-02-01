@@ -141,6 +141,8 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     request_info.host_ = nullptr;
     request_info.start_time_ = SystemTime(1h);
     request_info.duration_ = 2ms;
+    request_info.downstream_local_address_ =
+        std::make_shared<Network::Address::PipeInstance>("/foo");
     expectLog(R"EOF(
 http_logs:
   log_entry:
@@ -150,9 +152,8 @@ http_logs:
           address: "127.0.0.1"
           port_value: 0
       downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
+        pipe:
+          path: "/foo"
       start_time:
         seconds: 3600
       time_to_last_downstream_tx_byte:

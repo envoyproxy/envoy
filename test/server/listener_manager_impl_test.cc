@@ -1221,7 +1221,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     listener_filters:
     - name: "envoy.listener.original_dst"
       config: {}
-  )EOF", // "
+  )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
@@ -1295,7 +1295,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     listener_filters:
     - name: "test.listener.original_dst"
       config: {}
-  )EOF", // "
+  )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());

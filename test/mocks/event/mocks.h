@@ -38,9 +38,10 @@ public:
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket) override {
+                         Network::TransportSocketPtr&& transport_socket,
+                         const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     return Network::ClientConnectionPtr{
-        createClientConnection_(address, source_address, transport_socket)};
+        createClientConnection_(address, source_address, transport_socket, options)};
   }
 
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
@@ -77,10 +78,12 @@ public:
   MOCK_METHOD2(createServerConnection_,
                Network::Connection*(Network::ConnectionSocket* socket,
                                     Network::TransportSocket* transport_socket));
-  MOCK_METHOD3(createClientConnection_,
-               Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
-                                          Network::Address::InstanceConstSharedPtr source_address,
-                                          Network::TransportSocketPtr& transport_socket));
+  MOCK_METHOD4(
+      createClientConnection_,
+      Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
+                                 Network::Address::InstanceConstSharedPtr source_address,
+                                 Network::TransportSocketPtr& transport_socket,
+                                 const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_METHOD1(createDnsResolver,
                Network::DnsResolverSharedPtr(
                    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));

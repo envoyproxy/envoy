@@ -52,15 +52,19 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
 }
 } // namespace
 
-Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
+Host::CreateConnectionData
+HostImpl::createConnection(Event::Dispatcher& dispatcher,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstanceConstSharedPtr address) {
+                           Network::Address::InstanceConstSharedPtr address,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket());
+      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
+      options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -226,7 +230,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
-      throw EnvoyException("cannot create an sds cluster without an sds config");
+      throw EnvoyException("cannot create an EDS cluster without an EDS config");
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.

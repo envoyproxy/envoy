@@ -125,6 +125,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
 
   Ipv4Instance address(&addr4);
   EXPECT_EQ("1.2.3.4:6502", address.asString());
+  EXPECT_EQ("1.2.3.4:6502", address.logicalName());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("1.2.3.4", address.ip()->addressAsString());
   EXPECT_EQ(6502U, address.ip()->port());

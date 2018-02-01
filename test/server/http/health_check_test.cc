@@ -93,7 +93,10 @@ TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
 
   Http::TestHeaderMapImpl service_response{{":status", "200"}};
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_response, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_response, false));
+  Buffer::OwnedImpl body;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(body, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(service_response));
   EXPECT_STREQ("true", service_response.EnvoyImmediateHealthCheckFail()->value().c_str());
 }
 

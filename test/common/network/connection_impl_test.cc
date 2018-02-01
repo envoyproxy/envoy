@@ -84,7 +84,7 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket());
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -206,6 +206,128 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, ImmediateConnectError) {
+  dispatcher_.reset(new Event::DispatcherImpl);
+
+  // Using a broadcast/multicast address as the connection destiantion address causes an
+  // immediate error return from connect().
+  Address::InstanceConstSharedPtr broadcast_address;
+  if (socket_.localAddress()->ip()->version() == Address::IpVersion::v4) {
+    broadcast_address.reset(new Address::Ipv4Instance("224.0.0.1", 0));
+  } else {
+    broadcast_address.reset(new Address::Ipv6Instance("ff02::1", 0));
+  }
+
+  client_connection_ = dispatcher_->createClientConnection(
+      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr);
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  client_connection_->connect();
+
+  // Verify that also the immediate connect errors generate a remote close event.
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, SocketOptions) {
+  Network::ClientConnectionPtr upstream_connection_;
+
+  setUpBasicConnection();
+
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection_->write(buffer);
+  client_connection_->connect();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        client_connection_->close(ConnectionCloseType::NoFlush);
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  read_filter_.reset(new NiceMock<MockReadFilter>());
+
+  auto options = std::make_shared<MockSocketOptions>();
+
+  EXPECT_CALL(*options, setOptions(_)).WillOnce(Return(true));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        socket->setOptions(options);
+        Network::ConnectionPtr new_connection =
+            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+
+        upstream_connection_ = dispatcher_->createClientConnection(
+            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            server_connection_->socketOptions());
+      }));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        upstream_connection_->close(ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
+  Network::ClientConnectionPtr upstream_connection_;
+  StrictMock<Network::MockConnectionCallbacks> upstream_callbacks_;
+
+  setUpBasicConnection();
+
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection_->write(buffer);
+  client_connection_->connect();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        client_connection_->close(ConnectionCloseType::NoFlush);
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  read_filter_.reset(new NiceMock<MockReadFilter>());
+
+  auto options = std::make_shared<MockSocketOptions>();
+
+  EXPECT_CALL(*options, setOptions(_)).WillOnce(Return(false));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        socket->setOptions(options);
+        Network::ConnectionPtr new_connection =
+            dispatcher_->createServerConnection(std::move(socket), nullptr);
+        listener_callbacks_.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection_ = std::move(conn);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+
+        upstream_connection_ = dispatcher_->createClientConnection(
+            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            server_connection_->socketOptions());
+        upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
+      }));
+
+  EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        upstream_connection_->close(ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -578,8 +700,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_.reset(new Event::DispatcherImpl);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
-  client_connection_ = dispatcher_->createClientConnection(socket_.localAddress(), source_address_,
-                                                           Network::Test::createRawBufferSocket());
+  client_connection_ = dispatcher_->createClientConnection(
+      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -755,7 +877,7 @@ public:
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
-        Network::Test::createRawBufferSocket());
+        Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -833,8 +955,9 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
     // IPv6 reserved multicast address.
     address = Utility::resolveUrl("tcp://[ff00::]:1");
   }
-  ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
+  ClientConnectionPtr connection =
+      dispatcher.createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                        Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -848,7 +971,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher.createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket());
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);
