@@ -754,7 +754,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
         server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
         Buffer::OwnedImpl data("hello");
-        server_connection->write(data);
+        server_connection->write(data, false);
         server_connection->close(Network::ConnectionCloseType::FlushWrite);
       }));
 
@@ -1302,7 +1302,7 @@ TEST_P(SslSocketTest, SslError) {
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
-  client_connection->write(bad_data);
+  client_connection->write(bad_data, false);
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -1971,8 +1971,8 @@ public:
     uint32_t filter_seen = 0;
 
     EXPECT_CALL(*read_filter_, onNewConnection());
-    EXPECT_CALL(*read_filter_, onData(_))
-        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Network::FilterStatus {
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
           EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
@@ -2000,7 +2000,7 @@ public:
         data.commit(iovecs, 2);
       }
 
-      client_connection_->write(data);
+      client_connection_->write(data, false);
     }
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -2050,7 +2050,7 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_CALL(*read_filter_, onNewConnection());
-    EXPECT_CALL(*read_filter_, onData(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(*read_filter_, onData(_, _)).Times(testing::AnyNumber());
 
     std::string data_to_write(bytes_to_write, 'a');
     Buffer::OwnedImpl buffer_to_write(data_to_write);
@@ -2062,7 +2062,7 @@ public:
       client_write_buffer->baseDrain(n);
       dispatcher_->exit();
     }));
-    client_connection_->write(buffer_to_write);
+    client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);
 

@@ -269,7 +269,7 @@ TEST_P(CodecNetworkTest, SendData) {
 
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n";
   Buffer::OwnedImpl data(full_data);
-  upstream_connection_->write(data);
+  upstream_connection_->write(data, false);
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     EXPECT_EQ(full_data, TestUtility::bufferToString(data));
     dispatcher_->exit();
@@ -288,7 +288,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   // Send some header data.
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n";
   Buffer::OwnedImpl data(full_data);
-  upstream_connection_->write(data);
+  upstream_connection_->write(data, false);
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
@@ -320,7 +320,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
   client_connection_->readDisable(true);
   const std::string full_data = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
   Buffer::OwnedImpl data(full_data);
-  upstream_connection_->write(data);
+  upstream_connection_->write(data, false);
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

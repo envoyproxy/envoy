@@ -76,24 +76,24 @@ TEST_F(NetworkFilterManagerTest, All) {
   read_filter->callbacks_->continueReading();
 
   read_buffer_.add("hello");
-  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello")))
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), _))
       .WillOnce(Return(FilterStatus::StopIteration));
   manager.onRead();
 
   read_buffer_.add("world");
-  EXPECT_CALL(*filter, onData(BufferStringEqual("helloworld")))
+  EXPECT_CALL(*filter, onData(BufferStringEqual("helloworld"), _))
       .WillOnce(Return(FilterStatus::Continue));
   read_filter->callbacks_->continueReading();
 
   write_buffer_.add("foo");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo")))
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), _))
       .WillOnce(Return(FilterStatus::StopIteration));
   manager.onWrite();
 
   write_buffer_.add("bar");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar")))
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), _))
       .WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar")))
+  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), _))
       .WillOnce(Return(FilterStatus::Continue));
   manager.onWrite();
 }
@@ -165,7 +165,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connection, write(BufferEqual(&buffer)));
+  EXPECT_CALL(*upstream_connection, write(BufferEqual(&buffer), _));
   read_buffer_.add("hello");
   manager.onRead();
 }

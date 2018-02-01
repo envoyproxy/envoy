@@ -86,7 +86,7 @@ public:
 
   void write(const std::string& s) {
     Buffer::OwnedImpl buf(s);
-    conn_->write(buf);
+    conn_->write(buf, false);
   }
 
   void expectData(std::string expected) {
@@ -363,7 +363,7 @@ public:
 
   void write(const std::string& s) {
     Buffer::OwnedImpl buf(s);
-    conn_->write(buf);
+    conn_->write(buf, false);
   }
 
   void expectData(std::string expected) {

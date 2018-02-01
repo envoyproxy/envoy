@@ -496,8 +496,8 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -592,14 +592,14 @@ TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(*upstream_connections_.at(0), readDisable(true));
   filter_callbacks_.connection_.runHighWatermarkCallbacks();
@@ -614,14 +614,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -631,14 +631,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
@@ -648,8 +648,8 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
@@ -681,7 +681,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   Buffer::OwnedImpl buffer("hello");
-  filter_->onData(buffer);
+  filter_->onData(buffer, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*connect_timers_.at(0), disableTimer());
@@ -727,11 +727,11 @@ TEST_F(TcpProxyTest, IdleTimeout) {
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  filter_->onData(buffer);
+  filter_->onData(buffer, false);
 
   buffer.add("hello2");
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  upstream_read_filter_->onData(buffer);
+  upstream_read_filter_->onData(buffer, false);
 
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
@@ -807,9 +807,9 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
 
   raiseEventUpstreamConnected(0);
   Buffer::OwnedImpl buffer("a");
-  filter_->onData(buffer);
+  filter_->onData(buffer, false);
   Buffer::OwnedImpl response("bb");
-  upstream_read_filter_->onData(response);
+  upstream_read_filter_->onData(response, false);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);

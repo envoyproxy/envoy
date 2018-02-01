@@ -177,7 +177,7 @@ public:
     // Kick off the incoming data. |fake_input| is not sent, but instead kicks
     // off sending the headers and |data| queued up in setUpEncoderAndDecoder().
     Buffer::OwnedImpl fake_input("asdf");
-    conn_manager_->onData(fake_input);
+    conn_manager_->onData(fake_input, false);
   }
 
   void expectOnDestroy() {
@@ -216,7 +216,7 @@ public:
         }));
 
     Buffer::OwnedImpl fake_input("1234");
-    conn_manager_->onData(fake_input);
+    conn_manager_->onData(fake_input, false);
   }
 
   // Http::ConnectionManagerConfig
@@ -340,7 +340,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 
   // Kick off the incoming data. Use extra data which should cause a redispatch.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
@@ -375,7 +375,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   EXPECT_CALL(*filter, onDestroy());
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
@@ -438,7 +438,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
   EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
@@ -502,7 +502,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecoratorOverrideOp) {
@@ -566,7 +566,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorator) {
@@ -632,7 +632,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecoratorOverrideOp) {
@@ -692,7 +692,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
@@ -736,7 +736,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
@@ -775,7 +775,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
@@ -825,7 +825,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Force dtor of active stream to be called so that we can capture tracing HC stat.
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -854,7 +854,7 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
@@ -879,7 +879,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_ws_on_non_ws_route_.value());
 }
@@ -904,7 +904,7 @@ TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_total_.value());
@@ -982,7 +982,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   connect_timer->callback_();
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1030,7 +1030,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
       }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // expectOnUpstreamInitFailure("504");
   upstream_connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1076,7 +1076,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
   upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
 
   // rewritten authority header when auto_host_rewrite is true
@@ -1115,7 +1115,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   }));
 
   Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "300"}}};
   Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
@@ -1151,7 +1151,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
 
   Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
@@ -1189,7 +1189,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   }));
 
   Buffer::OwnedImpl fake_input("hello");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Start the response
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -1206,7 +1206,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
     decoder->decodeData(data, true);
   }));
 
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Since we started the response before the request was complete, we will still close the
   // connection since we already sent a connection: close header. We won't "reset" the stream
@@ -1230,7 +1230,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamDisconnect) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Now raise a remote disconnection, we should see the filter get reset called.
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
@@ -1254,7 +1254,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
@@ -1304,7 +1304,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*idle_timer, enableTimer(_));
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -1345,7 +1345,7 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Mimic a decoder filter that trapped data and now sends on the headers.
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
@@ -1387,7 +1387,7 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Continue iteration and stop and buffer on the 2nd filter.
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
@@ -1423,7 +1423,7 @@ TEST_F(HttpConnectionManagerImplTest, ZeroByteDataFiltering) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Continue headers only of filter 1.
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
@@ -1481,7 +1481,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -1554,7 +1554,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
@@ -1608,7 +1608,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -1673,7 +1673,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
@@ -1776,7 +1776,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
   // Make sure codec_ is created.
   EXPECT_CALL(*codec_, dispatch(_));
   Buffer::OwnedImpl fake_input("");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Mark the connection manger as backed up before the stream is created.
   ASSERT_EQ(decoder_filters_.size(), 0);
@@ -1917,7 +1917,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
@@ -1999,7 +1999,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -2065,7 +2065,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input);
+  conn_manager_->onData(fake_input, false);
 
   // Mimic a decoder filter that trapped data and now sends it on, since the data was buffered
   // by the first filter, we expect to get it in 1 decodeData() call.

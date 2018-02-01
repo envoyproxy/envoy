@@ -173,7 +173,7 @@ private:
             }
           }
         }
-        parent_.connection_->write(write_buffer_);
+        parent_.connection_->write(write_buffer_, false);
 
         // Reset query state, time for the next one.
         buffer_.drain(size_);
