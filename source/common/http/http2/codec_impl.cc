@@ -387,9 +387,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     case NGHTTP2_HCAT_REQUEST: {
       if (stream->headers_->Status() && stream->headers_->Status()->value() == "100") {
-        if (stream->remote_end_stream_) {
-          throw CodecProtocolException("Unexpected end stream with 100-Continue headers.");
-        }
+        ASSERT(!stream->remote_end_stream_);
         stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
       } else {
         stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
@@ -411,9 +409,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           // This can only happen in the client case in a response, when we received a 1xx to
           // start out with. In this case, raise as headers. nghttp2 message checking guarantees
           // proper flow here.
-          if (stream->headers_->Status() && stream->headers_->Status()->value() == "100") {
-            throw CodecProtocolException("Unexpected 100-continue in header continuation");
-          }
+          ASSERT(!stream->headers_->Status() || stream->headers_->Status()->value() != "100");
           stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
         }
       }
