@@ -59,9 +59,9 @@ protected:
     std::string ret;
     static const uint32_t sentinal = SharedMemoryHashSet<TestValueClass>::Sentinal;
     std::string control_string =
-        fmt::format("{} size={} free_cell_index={}", hs.control_->options.version(),
+        fmt::format("{} size={} free_cell_index={}", hs.control_->options.toString(),
                     hs.control_->size, hs.control_->free_cell_index);
-    ret = fmt::format("options={}\ncontrol={}\n", hs.control_->options.version(), control_string);
+    ret = fmt::format("options={}\ncontrol={}\n", hs.control_->options.toString(), control_string);
     for (uint32_t i = 0; i < hs.control_->options.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
       for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell) {
