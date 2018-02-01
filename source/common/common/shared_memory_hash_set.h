@@ -18,7 +18,7 @@ namespace Envoy {
  * an existing memory segment.
  */
 struct SharedMemoryHashSetOptions {
-  std::string version() const {
+  std::string toString() const {
     return fmt::format("capacity={}, num_slots={}", capacity, num_slots);
   }
   bool operator==(const SharedMemoryHashSetOptions& that) const {
