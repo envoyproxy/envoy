@@ -35,8 +35,6 @@ public:
       return timer_;
     }));
 
-    envoy::service::discovery::v2::AdsDummy dummy;
-
     grpc_mux_.reset(new GrpcMuxImpl(
         envoy::api::v2::core::Node(), std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
         dispatcher_,
