@@ -84,7 +84,7 @@ void ProxyFilter::onResponse(PendingRequest& request, RespValuePtr&& value) {
   }
 
   if (encoder_buffer_.length() > 0) {
-    callbacks_->connection().write(encoder_buffer_);
+    callbacks_->connection().write(encoder_buffer_, false);
   }
 
   // Check for drain close only if there are no pending responses.
@@ -105,7 +105,7 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
     error.type(RespType::Error);
     error.asString() = "downstream protocol error";
     encoder_->encode(error, encoder_buffer_);
-    callbacks_->connection().write(encoder_buffer_);
+    callbacks_->connection().write(encoder_buffer_, false);
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }

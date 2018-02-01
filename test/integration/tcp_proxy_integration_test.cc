@@ -154,7 +154,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
 
   // Ship some data upstream.
   Buffer::OwnedImpl buffer(data_to_send_upstream);
-  ssl_client->write(buffer);
+  ssl_client->write(buffer, false);
   while (client_write_buffer->bytes_drained() != data_to_send_upstream.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

@@ -134,7 +134,7 @@ void ConnectionImpl::flushOutput() {
     reserved_current_ = nullptr;
   }
 
-  connection().write(output_buffer_);
+  connection().write(output_buffer_, false);
   ASSERT(0UL == output_buffer_.length());
 }
 
@@ -480,7 +480,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
         0 == StringUtil::caseInsensitiveCompare(headers->Expect()->value().c_str(),
                                                 Headers::get().ExpectValues._100Continue.c_str())) {
       Buffer::OwnedImpl continue_response("HTTP/1.1 100 Continue\r\n\r\n");
-      connection_.write(continue_response);
+      connection_.write(continue_response, false);
       headers->removeExpect();
     }
 
@@ -568,7 +568,7 @@ void ServerConnectionImpl::sendProtocolError() {
         fmt::format("HTTP/1.1 {} {}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
                     std::to_string(enumToInt(error_code_)), CodeUtility::toString(error_code_)));
 
-    connection_.write(bad_request_response);
+    connection_.write(bad_request_response, false);
   }
 }
 

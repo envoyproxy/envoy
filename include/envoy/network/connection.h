@@ -197,9 +197,6 @@ public:
    */
   virtual void write(Buffer::Instance& data, bool end_stream) PURE;
 
-  // TODO: delete this and fixup all callers.
-  void write(Buffer::Instance& data) { write(data, false); }
-
   /**
    * Set a soft limit on the size of buffers for the connection.
    * For the read buffer, this limits the bytes read prior to flushing to further stages in the
