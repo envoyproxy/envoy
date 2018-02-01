@@ -75,7 +75,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-void DetectorHostMonitorImpl::putResult(Result result) {
+Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
@@ -96,7 +96,11 @@ void DetectorHostMonitorImpl::putResult(Result result) {
     break;
   }
 
-  putHttpResponseCode(enumToInt(http_code));
+  return http_code;
+}
+
+void DetectorHostMonitorImpl::putResult(Result result) {
+  putHttpResponseCode(enumToInt(resultToHttpCode(result)));
 }
 
 DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config)
