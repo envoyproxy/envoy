@@ -64,6 +64,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()) {}
 
+const std::unique_ptr<const Http::HeaderMap> ConnectionManagerImpl::CONTINUE_HEADER{
+    new Http::HeaderMapImpl{
+        {Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}}};
+
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   stats_.named_.downstream_cx_total_.inc();
@@ -395,7 +399,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
   access_log_handlers_.push_back(handler);
 }
 
-void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
+void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
   request_info_.response_code_.value(response_code);
 
@@ -454,9 +458,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
-    continue_headers_ =
-        HeaderMapPtr{new HeaderMapImpl{{Headers::get().Status, std::to_string(100)}}};
-    response_encoder_->encode100ContinueHeaders(*continue_headers_);
+    chargeStats(*CONTINUE_HEADER);
+    response_encoder_->encode100ContinueHeaders(*CONTINUE_HEADER);
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(

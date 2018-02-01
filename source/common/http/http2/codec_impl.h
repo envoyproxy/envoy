@@ -254,8 +254,6 @@ private:
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
 
-  static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
-
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;

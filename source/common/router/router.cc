@@ -580,9 +580,10 @@ void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
   downstream_response_started_ = true;
-  // We will double count response codes for 100-Continue.
-  upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(100);
-  // Don't send retries after 100-Continue has been sent on.
+  // Don't send retries after 100-Continue has been sent on. Arguably we could attempt to do a
+  // retry, assume the next upstream would also send an 100-Continue and swallow the second one
+  // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
+  // the complexity until someone asks for it.
   retry_state_.reset();
 
   callbacks_->encode100ContinueHeaders(std::move(headers));

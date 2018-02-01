@@ -125,7 +125,7 @@ private:
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
-  bool proxy_100_continue_;
+  const bool proxy_100_continue_;
 };
 
 } // namespace Configuration
