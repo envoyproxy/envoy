@@ -2249,6 +2249,10 @@ virtual_hosts:
         redirect: { https_redirect: true }
       - match: { path: /host_path }
         redirect: { host_redirect: new.lyft.com, path_redirect: /new_path }
+      - match: { path: /host_https }
+        redirect: { host_redirect: new.lyft.com, https_redirect: true }
+      - match: { path: /path_https }
+        redirect: { path_redirect: /new_path, https_redirect: true }
       - match: { path: /host_path_https }
         redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
   - name: direct
@@ -2349,6 +2353,18 @@ virtual_hosts:
       Http::TestHeaderMapImpl headers =
           genRedirectHeaders("redirect.lyft.com", "/https", false, false);
       EXPECT_EQ("https://redirect.lyft.com/https",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/host_https", false, false);
+      EXPECT_EQ("https://new.lyft.com/host_https",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/path_https", false, false);
+      EXPECT_EQ("https://redirect.lyft.com/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     {
