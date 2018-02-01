@@ -30,11 +30,8 @@ const std::string&
 AccessLogFormatUtils::protocolToString(const Optional<Http::Protocol>& protocol) {
   if (protocol.valid()) {
     return Http::getProtocolString(protocol.value());
-  } else {
-    return UnspecifiedValueString;
   }
-
-  NOT_REACHED;
+  return UnspecifiedValueString;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {

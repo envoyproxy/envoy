@@ -82,4 +82,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "protocol_interface",
     hdrs = ["protocol.h"],
+    deps = [
+        "//source/common/singleton:const_singleton",
+    ],
 )

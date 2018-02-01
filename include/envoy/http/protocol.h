@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+#include "common/singleton/const_singleton.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -11,23 +13,30 @@ namespace Http {
 enum class Protocol { Http10, Http11, Http2 };
 const size_t NumProtocols = 3;
 
-static const std::string DefaultString = "";
-static const std::string Http10String = "HTTP/1.0";
-static const std::string Http11String = "HTTP/1.1";
-static const std::string Http2String = "HTTP/2";
+class ProtocolVal {
+public:
+  struct {
+    const std::string Http10String{"HTTP/1.0"};
+    const std::string Http11String{"HTTP/1.1"};
+    const std::string Http2String{"HTTP/2"};
+  } ProtocolStrings;
+};
 
-inline const std::string& getProtocolString(const Protocol& p) {
+typedef ConstSingleton<ProtocolVal> ProtocolValues;
+
+inline const std::string& getProtocolString(const Protocol p) {
   switch (p) {
   case Protocol::Http10:
-    return Http10String;
+    return ProtocolValues::get().ProtocolStrings.Http10String;
   case Protocol::Http11:
-    return Http11String;
+    return ProtocolValues::get().ProtocolStrings.Http11String;
   case Protocol::Http2:
-    return Http2String;
-  default:
-    break;
+    return ProtocolValues::get().ProtocolStrings.Http2String;
   }
-  return DefaultString;
+
+  // equivalet of NOT_REACHED,
+  // which we cannot use here as that causes a circular dependency.
+  abort();
 }
 
 } // namespace Http
