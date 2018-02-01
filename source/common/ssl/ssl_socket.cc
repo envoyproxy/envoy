@@ -229,13 +229,13 @@ std::string SslSocket::sha256PeerCertificateDigest() {
 }
 
 const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
-  if (!urlEncodedPemEncodedPeerCertificate_.empty()) {
-    return urlEncodedPemEncodedPeerCertificate_;
+  if (!url_encoded_pem_encoded_peer_certificate_.empty()) {
+    return url_encoded_pem_encoded_peer_certificate_;
   }
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    // Guaranteed to be empty here
-    return urlEncodedPemEncodedPeerCertificate_;
+    ASSERT(url_encoded_pem_encoded_peer_certificate_.empty());
+    return url_encoded_pem_encoded_peer_certificate_;
   }
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
@@ -244,12 +244,12 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   const uint8_t* output;
   size_t length;
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
-  std::string pem = std::string(reinterpret_cast<const char*>(output), length);
+  url_encoded_pem_encoded_peer_certificate_ =
+      std::string(reinterpret_cast<const char*>(output), length);
   // URL encoding shortcut
   absl::StrReplaceAll({{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}},
-                      &pem);
-  urlEncodedPemEncodedPeerCertificate_ = std::move(pem);
-  return urlEncodedPemEncodedPeerCertificate_;
+                      &url_encoded_pem_encoded_peer_certificate_);
+  return url_encoded_pem_encoded_peer_certificate_;
 }
 
 std::string SslSocket::uriSanPeerCertificate() {

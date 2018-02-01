@@ -53,7 +53,7 @@ private:
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
-  mutable std::string urlEncodedPemEncodedPeerCertificate_;
+  mutable std::string url_encoded_pem_encoded_peer_certificate_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory {
