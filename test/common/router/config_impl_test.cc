@@ -2201,16 +2201,16 @@ TEST(RouteMatcherTest, DirectResponse) {
       "domains": ["redirect.lyft.com"],
       "routes": [
         {
-          "prefix": "/host_path",
-          "host_redirect": "new.lyft.com",
-          "path_redirect": "/new_path"
-        },
-        {
-          "prefix": "/host",
+          "path": "/host",
           "host_redirect": "new.lyft.com"
         },
         {
-          "prefix": "/path",
+          "path": "/path",
+          "path_redirect": "/new_path"
+        },
+        {
+          "path": "/host_path",
+          "host_redirect": "new.lyft.com",
           "path_redirect": "/new_path"
         }
       ]
@@ -2241,16 +2241,16 @@ virtual_hosts:
   - name: redirect
     domains: [redirect.lyft.com]
     routes:
-      - match: { prefix: /host_path_https }
-        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
-      - match: { prefix: /host_path }
-        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path }
-      - match: { prefix: /host }
+      - match: { path: /host }
         redirect: { host_redirect: new.lyft.com }
-      - match: { prefix: /path }
+      - match: { path: /path }
         redirect: { path_redirect: /new_path }
-      - match: { prefix: /https }
+      - match: { path: /https }
         redirect: { https_redirect: true }
+      - match: { path: /host_path }
+        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
   - name: direct
     domains: [direct.example.com]
     routes:
