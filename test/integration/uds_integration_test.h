@@ -22,10 +22,8 @@ public:
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        abstract_namespace_ ? "@/my/udstest"
-                            : TestEnvironment::unixDomainSocketPath("udstest.1.sock"),
-        FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(getSocketName(), FakeHttpConnection::Type::HTTP1));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -34,12 +32,15 @@ public:
             auto* cluster = static_resources->mutable_clusters(i);
             for (int j = 0; j < cluster->hosts_size(); ++j) {
               cluster->mutable_hosts(j)->clear_socket_address();
-              cluster->mutable_hosts(j)->mutable_pipe()->set_path(
-                  abstract_namespace_ ? "@/my/udstest"
-                                      : TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
+              cluster->mutable_hosts(j)->mutable_pipe()->set_path(getSocketName());
             }
           }
         });
+  }
+
+  std::string getSocketName() {
+    return abstract_namespace_ ? "@/my/udstest"
+                               : TestEnvironment::unixDomainSocketPath("udstest.1.sock");
   }
 
 protected:

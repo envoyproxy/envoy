@@ -348,7 +348,11 @@ TEST(AddressFromSockAddr, Pipe) {
   StringUtil::strlcpy(&sun.sun_path[1], "/some/abstract/path", sizeof sun.sun_path);
   sun.sun_path[0] = '\0';
   ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen("/some/abstract/path");
+#if defined(__linux__)
   EXPECT_EQ("@/some/abstract/path", addressFromSockAddr(ss, ss_len)->asString());
+#else
+  EXPECT_THROW(addressFromSockAddr(ss, ss_len), EnvoyException);
+#endif
 }
 
 } // namespace Address

@@ -255,9 +255,10 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
     address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
   address_ = *address;
-  friendly_name_ = abstract_namespace_
-                       ? "@" + std::string(address_.sun_path + 1, address_length_ - 1)
-                       : address_.sun_path;
+  friendly_name_ =
+      abstract_namespace_
+          ? fmt::format("@{}", absl::string_view(address_.sun_path + 1, address_length_ - 1))
+          : address_.sun_path;
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
