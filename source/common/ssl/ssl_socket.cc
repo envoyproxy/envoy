@@ -211,8 +211,8 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
 void SslSocket::onConnected() { ASSERT(!handshake_complete_); }
 
 void SslSocket::shutdownSsl() {
-  if (!shutdown_sent_ && handshake_complete_ &&
-      callbacks_->connection().state() != Network::Connection::State::Closed) {
+  ASSERT(handshake_complete_);
+  if (!shutdown_sent_ && callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(ssl_.get());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     UNREFERENCED_PARAMETER(rc);
@@ -317,7 +317,9 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  shutdownSsl();
+  if (handshake_complete_) {
+    shutdownSsl();
+  }
 }
 
 std::string SslSocket::protocol() const {
