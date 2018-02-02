@@ -80,6 +80,9 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
               write(BufferStringEqual("envoy.test_counter:1|c\nenvoy.test_gauge:2|g\n")));
   sink_->endFlush();
 
+  connection_->runHighWatermarkCallbacks();
+  connection_->runLowWatermarkCallbacks();
+
   // Test a disconnect. We should connect again.
   connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 

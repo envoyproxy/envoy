@@ -20,6 +20,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":filter_interface",
+        ":listen_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/ssl:connection_interface",

@@ -1,5 +1,6 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
+#include "common/http/message_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -124,6 +125,19 @@ TEST(GrpcCommonTest, GrpcToHttpStatus) {
   }
 }
 
+TEST(GrpcCommonTest, HttpToGrpcStatus) {
+  const std::vector<std::pair<uint64_t, Status::GrpcStatus>> test_set = {
+      {400, Status::GrpcStatus::Internal},         {401, Status::GrpcStatus::Unauthenticated},
+      {403, Status::GrpcStatus::PermissionDenied}, {404, Status::GrpcStatus::Unimplemented},
+      {429, Status::GrpcStatus::Unavailable},      {502, Status::GrpcStatus::Unavailable},
+      {503, Status::GrpcStatus::Unavailable},      {504, Status::GrpcStatus::Unavailable},
+      {500, Status::GrpcStatus::Unknown},
+  };
+  for (const auto& test_case : test_set) {
+    EXPECT_EQ(test_case.second, Common::httpToGrpcStatus(test_case.first));
+  }
+}
+
 TEST(GrpcCommonTest, HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
@@ -157,6 +171,57 @@ TEST(GrpcCommonTest, IsGrpcResponseHeader) {
                                                {"content-type", "application/json"}};
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, true));
   EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
+}
+
+TEST(GrpcCommonTest, ValidateResponse) {
+  {
+    Http::ResponseMessageImpl response(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+    EXPECT_NO_THROW(Common::validateResponse(response));
+  }
+  {
+    Http::ResponseMessageImpl response(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
+                              "non-200 response code");
+  }
+  {
+    Http::ResponseMessageImpl response(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "100"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
+                              "bad grpc-status trailer");
+  }
+  {
+    Http::ResponseMessageImpl response(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "4"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
+  }
+  {
+    Http::ResponseMessageImpl response(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+    response.trailers(Http::HeaderMapPtr{
+        new Http::TestHeaderMapImpl{{"grpc-status", "4"}, {"grpc-message", "custom error"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
+  }
+  {
+    Http::ResponseMessageImpl response(Http::HeaderMapPtr{
+        new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
+                              "bad grpc-status header");
+  }
+  {
+    Http::ResponseMessageImpl response(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "4"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
+  }
+  {
+    Http::ResponseMessageImpl response(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{
+        {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
+  }
 }
 
 } // namespace Grpc

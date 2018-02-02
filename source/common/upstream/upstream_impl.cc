@@ -16,6 +16,7 @@
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
 #include "common/config/tls_context_json.h"
@@ -34,8 +35,6 @@
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
 
-#include "fmt/format.h"
-
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -53,15 +52,19 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
 }
 } // namespace
 
-Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
+Host::CreateConnectionData
+HostImpl::createConnection(Event::Dispatcher& dispatcher,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstanceConstSharedPtr address) {
+                           Network::Address::InstanceConstSharedPtr address,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket());
+      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
+      options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -115,6 +118,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()) {
 
+  // If the cluster doesn't have transport socke configured, override with default transport
+  // socket implementation based on tls_context. We copy by value first then override if
+  // neccessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
@@ -224,7 +230,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
-      throw EnvoyException("cannot create an sds cluster without an sds config");
+      throw EnvoyException("cannot create an EDS cluster without an EDS config");
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.

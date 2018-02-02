@@ -341,20 +341,18 @@ void ConnectionImpl::onHighWatermark() {
 void ConnectionImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (immediate_connection_error_) {
-    ENVOY_CONN_LOG(debug, "raising immediate connect error", *this);
-    closeSocket(ConnectionEvent::RemoteClose);
-    return;
-  }
-
-  if (bind_error_) {
-    ENVOY_CONN_LOG(debug, "raising bind error", *this);
-    // Update stats here, rather than on bind failure, to give the caller a chance to
-    // setConnectionStats.
-    if (connection_stats_ && connection_stats_->bind_errors_) {
-      connection_stats_->bind_errors_->inc();
+  if (immediate_error_event_ != ConnectionEvent::Connected) {
+    if (bind_error_) {
+      ENVOY_CONN_LOG(debug, "raising bind error", *this);
+      // Update stats here, rather than on bind failure, to give the caller a chance to
+      // setConnectionStats.
+      if (connection_stats_ && connection_stats_->bind_errors_) {
+        connection_stats_->bind_errors_->inc();
+      }
+    } else {
+      ENVOY_CONN_LOG(debug, "raising immediate error", *this);
     }
-    closeSocket(ConnectionEvent::LocalClose);
+    closeSocket(immediate_error_event_);
     return;
   }
 
@@ -477,17 +475,29 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
-    Network::TransportSocketPtr&& transport_socket)
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
+  if (options) {
+    if (!options->setOptions(*socket_)) {
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+      immediate_error_event_ = ConnectionEvent::LocalClose;
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+      return;
+    }
+  }
   if (source_address != nullptr) {
     const int rc = source_address->bind(fd());
     if (rc < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
                      strerror(errno));
-      // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect"
       bind_error_ = true;
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+      immediate_error_event_ = ConnectionEvent::LocalClose;
 
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
@@ -507,10 +517,12 @@ void ClientConnectionImpl::connect() {
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
-      // read/write will become ready.
-      immediate_connection_error_ = true;
+      immediate_error_event_ = ConnectionEvent::RemoteClose;
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
+
+      // Trigger a write event. This is needed on OSX and seems harmless on Linux.
+      file_event_->activate(Event::FileReadyType::Write);
     }
   }
 

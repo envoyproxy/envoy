@@ -14,8 +14,7 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-
-#include "fmt/format.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Filter {

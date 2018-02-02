@@ -1,14 +1,13 @@
 #include "common/tracing/zipkin/zipkin_tracer_impl.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Zipkin {

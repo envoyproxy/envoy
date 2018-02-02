@@ -12,8 +12,6 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 
-#include "fmt/format.h"
-
 namespace Envoy {
 namespace Stats {
 namespace Metrics {

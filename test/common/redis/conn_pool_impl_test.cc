@@ -68,7 +68,7 @@ public:
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = upstream_connection_;
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
-    EXPECT_CALL(*host_, createConnection_(_)).WillOnce(Return(conn_info));
+    EXPECT_CALL(*host_, createConnection_(_, _)).WillOnce(Return(conn_info));
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
@@ -77,6 +77,10 @@ public:
     client_ = ClientImpl::create(host_, dispatcher_, EncoderPtr{encoder_}, *this, *config_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
+
+    // NOP currently.
+    upstream_connection_->runHighWatermarkCallbacks();
+    upstream_connection_->runLowWatermarkCallbacks();
   }
 
   void onConnected() {
@@ -360,7 +364,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
   std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
-  EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
+  EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
   ClientPtr client = factory.create(host, dispatcher, config);
@@ -397,6 +401,8 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         EXPECT_EQ(context->computeHashKey().value(), std::hash<std::string>()("foo"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
       }));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
@@ -474,6 +480,8 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
   conn_pool_->makeRequest("foo", value, callbacks);
 
   EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
+  client->runHighWatermarkCallbacks();
+  client->runLowWatermarkCallbacks();
   client->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   tls_.shutdownThread();

@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/network:raw_buffer_socket_lib",
         "//source/common/profiler:profiler_lib",
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",

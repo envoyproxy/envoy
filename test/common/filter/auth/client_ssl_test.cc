@@ -87,6 +87,10 @@ public:
     filter_callbacks_.connection_.callbacks_.clear();
     instance_.reset(new Instance(config_));
     instance_->initializeReadFilterCallbacks(filter_callbacks_);
+
+    // NOP currently.
+    instance_->onAboveWriteBufferHighWatermark();
+    instance_->onBelowWriteBufferLowWatermark();
   }
 
   void setupRequest() {

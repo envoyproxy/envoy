@@ -3,6 +3,7 @@
 #include "envoy/api/v2/eds.pb.validate.h"
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
 #include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
@@ -12,8 +13,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/sds_subscription.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {

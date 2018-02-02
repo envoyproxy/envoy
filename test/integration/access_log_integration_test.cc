@@ -149,8 +149,16 @@ http_logs:
   envoy::service::accesslog::v2::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
-  test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
-
+  switch (clientType()) {
+  case Grpc::ClientType::EnvoyGrpc:
+    test_server_->waitForGaugeEq("cluster.accesslog.upstream_rq_active", 0);
+    break;
+  case Grpc::ClientType::GoogleGrpc:
+    test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
+    break;
+  default:
+    NOT_REACHED;
+  }
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
