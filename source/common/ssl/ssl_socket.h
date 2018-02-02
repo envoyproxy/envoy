@@ -24,7 +24,7 @@ public:
   // Ssl::Connection
   bool peerCertificatePresented() const override;
   std::string uriSanLocalCertificate() override;
-  const std::string& sha256PeerCertificateDigest() override;
+  const std::string& sha256PeerCertificateDigest() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() override;
@@ -53,7 +53,7 @@ private:
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
-  std::string cached_sha_256_peer_certificate_digest_;
+  mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
 };
 
