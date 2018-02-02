@@ -17,7 +17,7 @@ class ProxyProtocolConfigFactory : public NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                       FactoryContext& context) override {
+                                                       ListenerFactoryContext& context) override {
     Filter::Listener::ProxyProtocol::ConfigSharedPtr config(
         new Filter::Listener::ProxyProtocol::Config(context.scope()));
     return [config](Network::ListenerFilterManager& filter_manager) -> void {

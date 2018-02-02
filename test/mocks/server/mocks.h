@@ -81,7 +81,7 @@ public:
   MOCK_METHOD5(addHandler, bool(const std::string& prefix, const std::string& help_text,
                                 HandlerCb callback, bool removable, bool mutates_server_state));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
-  MOCK_METHOD0(socket, Network::ListenSocket&());
+  MOCK_METHOD0(socket, Network::Socket&());
 };
 
 class MockDrainManager : public DrainManager {
@@ -153,10 +153,10 @@ public:
   MOCK_METHOD2(createListenerFilterFactoryList,
                std::vector<Configuration::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
-                   Configuration::FactoryContext& context));
+                   Configuration::ListenerFactoryContext& context));
   MOCK_METHOD2(createListenSocket,
-               Network::ListenSocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
-                                              bool bind_to_port));
+               Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
+                                        bool bind_to_port));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
 
@@ -355,6 +355,14 @@ public:
 
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
+};
+
+class MockListenerFactoryContext : public MockFactoryContext {
+public:
+  MockListenerFactoryContext();
+  ~MockListenerFactoryContext();
+
+  MOCK_METHOD1(setListenSocketOptions, void(const Network::Socket::OptionsSharedPtr&));
 };
 
 } // namespace Configuration

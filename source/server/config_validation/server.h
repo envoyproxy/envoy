@@ -96,11 +96,11 @@ public:
   }
   std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-      Configuration::FactoryContext& context) override {
+      Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
-  Network::ListenSocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                                    bool) override {
+  Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
+                                              bool) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
