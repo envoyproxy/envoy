@@ -272,7 +272,14 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     bool ok = listen_socket_options_->setOptions(*socket_);
-    ENVOY_LOG(debug, "{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+    const std::string message =
+        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+    if (!ok) {
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
+    }
   }
 }
 

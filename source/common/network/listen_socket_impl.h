@@ -14,10 +14,6 @@ namespace Envoy {
 namespace Network {
 
 class SocketImpl : public virtual Socket {
-protected:
-  SocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address)
-      : fd_(fd), local_address_(local_address) {}
-
 public:
   ~SocketImpl() { close(); }
 
@@ -34,6 +30,9 @@ public:
   const OptionsSharedPtr& options() const override { return options_; }
 
 protected:
+  SocketImpl(int fd, const Address::InstanceConstSharedPtr& local_address)
+      : fd_(fd), local_address_(local_address) {}
+
   int fd_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
