@@ -1339,6 +1339,57 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   EXPECT_NE(fd, -1);
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) {
+  class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
+  public:
+    OriginalDstTestConfigFactory() : options_(std::make_shared<Network::MockSocketOptions>()) {}
+
+    // NamedListenerFilterConfigFactory
+    Configuration::ListenerFilterFactoryCb
+    createFilterFactoryFromProto(const Protobuf::Message&,
+                                 Configuration::ListenerFactoryContext& context) override {
+      EXPECT_CALL(*options_, setOptions(_)).WillOnce(Return(false));
+      context.setListenSocketOptions(options_);
+      return [](Network::ListenerFilterManager& filter_manager) -> void {
+        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
+      };
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    }
+
+    std::string name() override { return "testfail.listener.original_dst"; }
+
+    std::shared_ptr<Network::MockSocketOptions> options_;
+  };
+
+  /**
+   * Static registration for the original dst filter. @see RegisterFactory.
+   */
+  static Registry::RegisterFactory<OriginalDstTestConfigFactory,
+                                   Configuration::NamedListenerFilterConfigFactory>
+      registered_;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: "socketOptionFailListener"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "testfail.listener.original_dst"
+      config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, true));
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException,
+                            "socketOptionFailListener: Setting socket options failed");
+  EXPECT_EQ(0U, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
