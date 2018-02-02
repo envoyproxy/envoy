@@ -23,9 +23,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb
-HealthCheckFilterConfig::createFilter(const envoy::api::v2::filter::http::HealthCheck& proto_config,
-                                      const std::string&, FactoryContext& context) {
+HttpFilterFactoryCb HealthCheckFilterConfig::createFilter(
+    const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
+    const std::string&, FactoryContext& context) {
   ASSERT(proto_config.has_pass_through_mode());
   ASSERT(!proto_config.endpoint().empty());
 
@@ -66,7 +66,7 @@ HealthCheckFilterConfig::createFilter(const envoy::api::v2::filter::http::Health
 HttpFilterFactoryCb HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                                  const std::string& stats_prefix,
                                                                  FactoryContext& context) {
-  envoy::api::v2::filter::http::HealthCheck proto_config;
+  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
   Config::FilterJson::translateHealthCheckFilter(json_config, proto_config);
   return createFilter(proto_config, stats_prefix, context);
 }
@@ -75,8 +75,9 @@ HttpFilterFactoryCb
 HealthCheckFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                       const std::string& stats_prefix,
                                                       FactoryContext& context) {
-  return createFilter(dynamic_cast<const envoy::api::v2::filter::http::HealthCheck&>(proto_config),
-                      stats_prefix, context);
+  return createFilter(
+      dynamic_cast<const envoy::config::filter::http::health_check::v2::HealthCheck&>(proto_config),
+      stats_prefix, context);
 }
 
 /**

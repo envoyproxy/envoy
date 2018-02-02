@@ -144,7 +144,7 @@ TEST(UtilityTest, ObjNameLength) {
     err_prefix = "Invalid route_config name";
     std::string json = R"EOF({ "route_config_name": ")EOF" + name + R"EOF(", "cluster": "foo"})EOF";
     auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::network::Rds rds;
+    envoy::config::filter::network::http_connection_manager::v2::Rds rds;
     EXPECT_THROW_WITH_MESSAGE(Config::Utility::translateRdsConfig(*json_object_ptr, rds),
                               EnvoyException, err_prefix + err_suffix);
   }

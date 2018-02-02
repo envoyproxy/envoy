@@ -42,8 +42,10 @@ public:
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
   void testRequestAndResponseWithXfccHeader(std::string privous_xfcc, std::string expected_xfcc);
-  envoy::api::v2::filter::network::HttpConnectionManager::ForwardClientCertDetails fcc_;
-  envoy::api::v2::filter::network::HttpConnectionManager::SetCurrentClientCertDetails sccd_;
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      ForwardClientCertDetails fcc_;
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SetCurrentClientCertDetails sccd_;
   bool tls_ = true;
 
 private:

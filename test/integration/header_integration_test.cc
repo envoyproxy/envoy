@@ -1,5 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
@@ -156,7 +156,8 @@ public:
 
   void initializeFilter(HeaderMode mode, bool include_route_config_headers) {
     config_helper_.addConfigModifier(
-        [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                hcm) {
           // Overwrite default config with our own.
           MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
 

@@ -31,9 +31,10 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::api::v2::filter::network::HttpConnectionManager
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
 parseHttpConnectionManagerFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::network::HttpConnectionManager http_connection_manager;
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+      http_connection_manager;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Envoy::Config::FilterJson::translateHttpConnectionManager(*json_object_ptr,
                                                             http_connection_manager);
@@ -525,7 +526,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  envoy::api::v2::filter::network::Rds rds_;
+  envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   Server::Admin::HandlerCb handler_callback_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
@@ -556,7 +557,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
     )EOF";
 
   Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
-  envoy::api::v2::filter::network::Rds rds2;
+  envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
   Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;

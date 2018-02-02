@@ -124,8 +124,9 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
                            *cds_config.mutable_api_config_source());
 }
 
-void Utility::translateRdsConfig(const Json::Object& json_rds,
-                                 envoy::api::v2::filter::network::Rds& rds) {
+void Utility::translateRdsConfig(
+    const Json::Object& json_rds,
+    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
 
   const std::string name = json_rds.getString("route_config_name", "");

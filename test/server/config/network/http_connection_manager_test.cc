@@ -21,9 +21,10 @@ namespace Server {
 namespace Configuration {
 namespace {
 
-envoy::api::v2::filter::network::HttpConnectionManager
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
 parseHttpConnectionManagerFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::network::HttpConnectionManager http_connection_manager;
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+      http_connection_manager;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateHttpConnectionManager(*json_object_ptr, http_connection_manager);
   return http_connection_manager;

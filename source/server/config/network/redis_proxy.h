@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -23,14 +23,15 @@ public:
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::network::RedisProxy()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::config::filter::network::redis_proxy::v2::RedisProxy()};
   }
 
   std::string name() override { return Config::NetworkFilterNames::get().REDIS_PROXY; }
 
 private:
   NetworkFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::network::RedisProxy& proto_config,
+  createFilter(const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
                FactoryContext& context);
 };
 

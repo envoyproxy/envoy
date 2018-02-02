@@ -3,8 +3,8 @@
 #include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
 #include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
@@ -117,7 +117,7 @@ public:
   static void addressToAccessLogAddress(envoy::api::v2::core::Address& proto_address,
                                         const Network::Address::Instance& network_address);
   static void responseFlagsToAccessLogResponseFlags(
-      envoy::api::v2::filter::accesslog::AccessLogCommon& common_access_log,
+      envoy::config::filter::accesslog::v2::AccessLogCommon& common_access_log,
       const RequestInfo::RequestInfo& request_info);
 
   // AccessLog::Instance

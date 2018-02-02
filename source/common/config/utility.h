@@ -3,10 +3,10 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -151,12 +151,14 @@ public:
                                  envoy::api::v2::core::ConfigSource& cds_config);
 
   /**
-   * Convert a v1 RDS JSON config to v2 RDS envoy::api::v2::filter::network::Rds.
+   * Convert a v1 RDS JSON config to v2 RDS
+   * envoy::config::filter::network::http_connection_manager::v2::Rds.
    * @param json_rds source v1 RDS JSON config.
-   * @param rds destination v2 RDS envoy::api::v2::filter::network::Rds.
+   * @param rds destination v2 RDS envoy::config::filter::network::http_connection_manager::v2::Rds.
    */
-  static void translateRdsConfig(const Json::Object& json_rds,
-                                 envoy::api::v2::filter::network::Rds& rds);
+  static void
+  translateRdsConfig(const Json::Object& json_rds,
+                     envoy::config::filter::network::http_connection_manager::v2::Rds& rds);
 
   /**
    * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::core::ConfigSource.

@@ -19,7 +19,7 @@ namespace Filter {
 namespace Auth {
 namespace ClientSsl {
 
-Config::Config(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+Config::Config(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
                Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(
@@ -38,10 +38,11 @@ Config::Config(const envoy::api::v2::filter::network::ClientSSLAuth& config,
       [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
 }
 
-ConfigSharedPtr Config::create(const envoy::api::v2::filter::network::ClientSSLAuth& config,
-                               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-                               Event::Dispatcher& dispatcher, Stats::Scope& scope,
-                               Runtime::RandomGenerator& random) {
+ConfigSharedPtr
+Config::create(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
+               Event::Dispatcher& dispatcher, Stats::Scope& scope,
+               Runtime::RandomGenerator& random) {
   ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, scope, random));
   new_config->initialize();
   return new_config;

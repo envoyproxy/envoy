@@ -50,7 +50,7 @@ TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-  envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
   EXPECT_THROW(Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config),
                Json::Exception);
 }
@@ -74,7 +74,7 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+    envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
     Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
@@ -127,7 +127,7 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-  envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
   Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(Config::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),

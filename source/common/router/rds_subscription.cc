@@ -10,11 +10,11 @@
 namespace Envoy {
 namespace Router {
 
-RdsSubscription::RdsSubscription(Envoy::Config::SubscriptionStats stats,
-                                 const envoy::api::v2::filter::network::Rds& rds,
-                                 Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                 Runtime::RandomGenerator& random,
-                                 const LocalInfo::LocalInfo& local_info)
+RdsSubscription::RdsSubscription(
+    Envoy::Config::SubscriptionStats stats,
+    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+    Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info)
     : RestApiFetcher(cm, rds.config_source().api_config_source().cluster_names()[0], dispatcher,
                      random,
                      Envoy::Config::Utility::apiConfigSourceRefreshDelay(

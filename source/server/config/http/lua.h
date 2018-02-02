@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/http/lua.pb.h"
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -25,13 +25,13 @@ public:
                                                    FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::Lua()};
+    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::lua::v2::Lua()};
   }
 
   std::string name() override { return Config::HttpFilterNames::get().LUA; }
 
 private:
-  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Lua& proto_config,
+  HttpFilterFactoryCb createFilter(const envoy::config::filter::http::lua::v2::Lua& proto_config,
                                    const std::string&, FactoryContext& context);
 };
 
