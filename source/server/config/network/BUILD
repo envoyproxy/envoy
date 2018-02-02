@@ -138,9 +138,11 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/common:assert_lib",
         "//source/common/config:well_known_names",
-        "//source/common/network:raw_buffer_socket_lib",
-        "//source/common/ssl:connection_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:ssl_socket_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

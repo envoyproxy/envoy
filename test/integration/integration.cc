@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
@@ -153,7 +154,7 @@ void IntegrationTcpClient::waitForDisconnect() {
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));
-  EXPECT_CALL(*client_write_buffer_, write(_));
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 

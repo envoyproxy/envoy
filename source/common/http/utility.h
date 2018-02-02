@@ -144,6 +144,13 @@ public:
    *         @see GetLastAddressFromXffInfo for more information.
    */
   static GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers);
+
+  /**
+   * Get the string for the given http protocol.
+   * @param protocol for which to return the string representation.
+   * @return string representation of the protocol.
+   */
+  static const std::string& getProtocolString(const Protocol p);
 };
 
 } // namespace Http

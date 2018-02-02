@@ -18,7 +18,6 @@
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
-#include "common/ssl/connection_impl.h"
 
 #include "event2/event.h"
 

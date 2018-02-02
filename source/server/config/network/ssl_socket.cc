@@ -4,7 +4,6 @@
 #include "envoy/api/v2/auth/cert.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/network/raw_buffer_socket.h"
 #include "common/protobuf/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/ssl_socket.h"
