@@ -19,13 +19,7 @@ class UdsIntegrationTest
 public:
   UdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
-        abstract_namespace_(std::get<1>(GetParam())) {
-#if !defined(__linux__)
-    if (abstract_namespace_) {
-      EXPECT_THROW("Abstract AF_UNIX sockets are only supported on linux.", EnvoyException);
-    }
-#endif
-  }
+        abstract_namespace_(std::get<1>(GetParam())) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
@@ -48,7 +42,7 @@ public:
         });
   }
 
-private:
+protected:
   const bool abstract_namespace_;
 };
 } // namespace Envoy
