@@ -210,12 +210,9 @@ void ConnectionImpl::readDisable(bool disable) {
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
   // we are not gaurenteed to get notified, so even if the remote has closed, we may not know
-  // until we try to write. Further note that currently we don't correctly handle half closed
-  // TCP connections in the sense that we assume that a remote FIN means the remote intends a
+  // until we try to write. Further note that currently we optionally don't correctly handle half
+  // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
-  //
-  // TODO(mattklein123): Potentially support half-closed TCP connections. It's unclear if this is
-  // required for any scenarios in which Envoy will be used (I don't know of any).
   if (disable) {
     if (!read_enabled_) {
       ++read_disable_count_;
@@ -223,7 +220,10 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(read_enabled_);
     read_enabled_ = false;
-    if (detect_early_close_) {
+
+    // If half-close semantics are enabled, we never want early close notifications; we
+    // always want to read all avaiable data, even if the other side has closed.
+    if (detect_early_close_ && !enable_half_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
       file_event_->setEnabled(Event::FileReadyType::Write);
