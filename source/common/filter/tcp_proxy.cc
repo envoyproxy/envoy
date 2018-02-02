@@ -564,7 +564,7 @@ void TcpProxyDrainer::onEvent(Network::ConnectionEvent event) {
 void TcpProxyDrainer::onData(Buffer::Instance& data, bool) {
   if (data.length() > 0) {
     // There is no downstream connection to send any data to, but the upstream
-    // sent some data.  Try to behave similar to what the kernel would do
+    // sent some data. Try to behave similar to what the kernel would do
     // when it receives data on a connection where the application has closed
     // the socket or ::shutdown(fd, SHUT_RD), and close/reset the connection.
     cancelDrain();
