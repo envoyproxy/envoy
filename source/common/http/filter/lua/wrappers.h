@@ -42,6 +42,7 @@ public:
     return {{"add", static_luaAdd},
             {"get", static_luaGet},
             {"remove", static_luaRemove},
+            {"replace", static_luaReplace},
             {"__pairs", static_luaPairs}};
   }
 
@@ -73,6 +74,14 @@ private:
    * @return nothing.
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaRemove);
+
+  /**
+   * Replace a header in the map. If the header does not exist, it will be added.
+   * @param 1 (string): header name.
+   * @param 2 (string): header value.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaReplace);
 
   void checkModifiable(lua_State* state);
 

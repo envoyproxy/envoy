@@ -76,6 +76,10 @@ public:
                                       drain_decision_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
+
+    // NOP currently.
+    filter_->onAboveWriteBufferHighWatermark();
+    filter_->onBelowWriteBufferLowWatermark();
   }
 
   void setupDelayFault(bool enable_fault) {

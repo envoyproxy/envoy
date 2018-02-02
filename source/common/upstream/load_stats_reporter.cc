@@ -50,7 +50,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      for (auto& hosts : host_set->hostsPerLocality()) {
+      for (auto& hosts : host_set->hostsPerLocality().get()) {
         ASSERT(hosts.size() > 0);
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;

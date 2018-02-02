@@ -178,7 +178,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   manager_->addOrUpdateListener(parseListenerFromJson(json), true);
-  EXPECT_NE(nullptr, manager_->listeners().back().get().defaultSslContext());
+  EXPECT_TRUE(
+      manager_->listeners().back().get().transportSocketFactory().implementsSecureTransport());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
@@ -1220,7 +1221,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     listener_filters:
     - name: "envoy.listener.original_dst"
       config: {}
-  )EOF", // "
+  )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());
@@ -1294,7 +1295,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     listener_filters:
     - name: "test.listener.original_dst"
       config: {}
-  )EOF", // "
+  )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.random_, uuid());

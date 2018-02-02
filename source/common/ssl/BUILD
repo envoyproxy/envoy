@@ -9,17 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "connection_lib",
-    srcs = ["connection_impl.cc"],
-    hdrs = ["connection_impl.h"],
-    deps = [
-        ":context_lib",
-        ":ssl_socket_lib",
-        "//source/common/network:connection_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "ssl_socket_lib",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],

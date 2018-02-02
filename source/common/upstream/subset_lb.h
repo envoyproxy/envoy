@@ -38,8 +38,8 @@ private:
     HostSubsetImpl(const HostSet& original_host_set)
         : HostSetImpl(original_host_set.priority()), original_host_set_(original_host_set) {}
 
-    void update(const std::vector<HostSharedPtr>& hosts_added,
-                const std::vector<HostSharedPtr>& hosts_removed, HostPredicate predicate);
+    void update(const HostVector& hosts_added, const HostVector& hosts_removed,
+                HostPredicate predicate);
 
     void triggerCallbacks() { HostSetImpl::runUpdateCallbacks({}, {}); }
     bool empty() { return hosts().empty(); }
@@ -53,8 +53,8 @@ private:
   public:
     PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
 
-    void update(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                const std::vector<HostSharedPtr>& hosts_removed, HostPredicate predicate);
+    void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed,
+                HostPredicate predicate);
 
     bool empty() { return empty_; }
 
@@ -106,13 +106,11 @@ private:
   };
 
   // Called by HostSet::MemberUpdateCb
-  void update(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-              const std::vector<HostSharedPtr>& hosts_removed);
+  void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
-  void updateFallbackSubset(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                            const std::vector<HostSharedPtr>& hosts_removed);
-  void processSubsets(const std::vector<HostSharedPtr>& hosts_added,
-                      const std::vector<HostSharedPtr>& hosts_removed,
+  void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
+                            const HostVector& hosts_removed);
+  void processSubsets(const HostVector& hosts_added, const HostVector& hosts_removed,
                       std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);

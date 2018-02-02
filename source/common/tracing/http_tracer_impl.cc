@@ -4,6 +4,7 @@
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
@@ -12,8 +13,6 @@
 #include "common/http/utility.h"
 #include "common/request_info/utility.h"
 #include "common/runtime/uuid_util.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Tracing {

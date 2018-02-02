@@ -79,6 +79,7 @@ public:
                listener_scope_.createScope("listener.admin.")) {
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
+    EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
   }
 
   std::string address_out_path_;

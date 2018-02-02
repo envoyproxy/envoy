@@ -400,7 +400,14 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<StreamHandleWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
+  if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
+    ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
+  }
+
   response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
+  if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
+    ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
+  }
 }
 
 void Filter::onDestroy() {

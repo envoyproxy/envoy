@@ -461,6 +461,7 @@ public:
 
     EXPECT_EQ(Optional<uint64_t>(), filter_->computeHashKey());
     EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
+    EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
   }
 
   void setup(uint32_t connections) { setup(connections, defaultConfig()); }

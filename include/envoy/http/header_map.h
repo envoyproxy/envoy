@@ -89,12 +89,7 @@ public:
   /**
    * @return a std::string.
    */
-  std::string getString() const {
-    if (string_length_) {
-      return std::string(buffer_.ref_, string_length_);
-    }
-    return "";
-  }
+  std::string getString() const { return std::string(buffer_.ref_, string_length_); }
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
@@ -421,6 +416,7 @@ public:
    * @return the header entry if it exists otherwise nullptr.
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
+  virtual HeaderEntry* get(const LowerCaseString& key) PURE;
 
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };

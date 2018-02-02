@@ -130,15 +130,6 @@ public:
                  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
                  const bool& is_reset, Code response_code, const std::string& body_text);
 
-  /**
-   * Send a redirect response.
-   * @param callbacks supplies the filter callbacks to use.
-   * @param new_path supplies the redirect target.
-   * @param response_code supplies the response code to use.
-   */
-  static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
-                           Code response_code);
-
   struct GetLastAddressFromXffInfo {
     // Last valid address pulled from the XFF header.
     Network::Address::InstanceConstSharedPtr address_;
@@ -153,6 +144,13 @@ public:
    *         @see GetLastAddressFromXffInfo for more information.
    */
   static GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers);
+
+  /**
+   * Get the string for the given http protocol.
+   * @param protocol for which to return the string representation.
+   * @return string representation of the protocol.
+   */
+  static const std::string& getProtocolString(const Protocol p);
 };
 
 } // namespace Http

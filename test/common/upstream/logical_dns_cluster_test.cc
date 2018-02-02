@@ -35,8 +35,9 @@ public:
                                          ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
                                          false));
     cluster_->prioritySet().addMemberUpdateCb(
-        [&](uint32_t, const std::vector<HostSharedPtr>&,
-            const std::vector<HostSharedPtr>&) -> void { membership_updated_.ready(); });
+        [&](uint32_t, const HostVector&, const HostVector&) -> void {
+          membership_updated_.ready();
+        });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
@@ -171,18 +172,19 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
   EXPECT_EQ(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
   HostSharedPtr logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
 
   EXPECT_CALL(dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-  logical_host->createConnection(dispatcher_);
+  logical_host->createConnection(dispatcher_, nullptr);
   logical_host->outlierDetector().putHttpResponseCode(200);
 
   expectResolve(Network::DnsLookupFamily::V4Only);
@@ -195,9 +197,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_CALL(dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-  Host::CreateConnectionData data = logical_host->createConnection(dispatcher_);
+  Host::CreateConnectionData data = logical_host->createConnection(dispatcher_, nullptr);
   EXPECT_FALSE(data.host_description_->canary());
   EXPECT_EQ(&cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->cluster(),
             &data.host_description_->cluster());
@@ -208,6 +210,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ("", data.host_description_->locality().zone());
   EXPECT_EQ("", data.host_description_->locality().sub_zone());
   EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
+  EXPECT_EQ(&envoy::api::v2::Metadata::default_instance(), &data.host_description_->metadata());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
   data.host_description_->healthChecker().setUnhealthy();
 
@@ -221,9 +224,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_CALL(dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-  logical_host->createConnection(dispatcher_);
+  logical_host->createConnection(dispatcher_, nullptr);
 
   expectResolve(Network::DnsLookupFamily::V4Only);
   resolve_timer_->callback_();
@@ -235,9 +238,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_CALL(dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _))
+                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-  logical_host->createConnection(dispatcher_);
+  logical_host->createConnection(dispatcher_, nullptr);
 
   // Make sure we cancel.
   EXPECT_CALL(active_dns_query_, cancel());

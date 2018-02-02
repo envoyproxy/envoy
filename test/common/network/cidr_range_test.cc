@@ -5,12 +5,12 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 // We are adding things into the std namespace.

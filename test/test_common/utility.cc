@@ -15,6 +15,7 @@
 #include "envoy/http/codec.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -24,7 +25,6 @@
 #include "test/test_common/printers.h"
 
 #include "absl/strings/string_view.h"
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);

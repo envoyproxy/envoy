@@ -72,8 +72,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
   cluster_.prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
-             const std::vector<HostSharedPtr>& hosts_removed) -> void {
+      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
       });
 }
@@ -120,7 +119,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval() const {
   return std::chrono::milliseconds(final_ms);
 }
 
-void HealthCheckerImplBase::addHosts(const std::vector<HostSharedPtr>& hosts) {
+void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
     active_sessions_[host] = makeSession(host);
     host->setHealthChecker(
@@ -129,8 +128,8 @@ void HealthCheckerImplBase::addHosts(const std::vector<HostSharedPtr>& hosts) {
   }
 }
 
-void HealthCheckerImplBase::onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
-                                                  const std::vector<HostSharedPtr>& hosts_removed) {
+void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
+                                                  const HostVector& hosts_removed) {
   addHosts(hosts_added);
   for (const HostSharedPtr& host : hosts_removed) {
     auto session_iter = active_sessions_.find(host);
@@ -322,7 +321,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    Upstream::Host::CreateConnectionData conn = host_->createConnection(parent_.dispatcher_);
+    Upstream::Host::CreateConnectionData conn =
+        host_->createConnection(parent_.dispatcher_, nullptr);
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
@@ -496,7 +496,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ = host_->createConnection(parent_.dispatcher_).connection_;
+    client_ = host_->createConnection(parent_.dispatcher_, nullptr).connection_;
     session_callbacks_.reset(new TcpSessionCallbacks(*this));
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
@@ -709,7 +709,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::Conne
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    Upstream::Host::CreateConnectionData conn = host_->createConnection(parent_.dispatcher_);
+    Upstream::Host::CreateConnectionData conn =
+        host_->createConnection(parent_.dispatcher_, nullptr);
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);

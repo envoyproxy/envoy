@@ -181,7 +181,7 @@ public:
     dispatcher_.reset(new Event::DispatcherImpl);
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket());
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
@@ -190,8 +190,8 @@ public:
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection =
-              dispatcher_->createServerConnection(std::move(socket), nullptr);
+          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+              std::move(socket), Network::Test::createRawBufferSocket());
           listener_callbacks_.onNewConnection(std::move(new_connection));
         }));
 
