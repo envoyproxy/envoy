@@ -7,6 +7,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/http/utility.h"
 #include "common/request_info/utility.h"
 
 namespace Envoy {
@@ -25,26 +26,12 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
 }
 
-static const std::string Http10String = "HTTP/1.0";
-static const std::string Http11String = "HTTP/1.1";
-static const std::string Http2String = "HTTP/2";
-
 const std::string&
 AccessLogFormatUtils::protocolToString(const Optional<Http::Protocol>& protocol) {
   if (protocol.valid()) {
-    switch (protocol.value()) {
-    case Http::Protocol::Http10:
-      return Http10String;
-    case Http::Protocol::Http11:
-      return Http11String;
-    case Http::Protocol::Http2:
-      return Http2String;
-    }
-  } else {
-    return UnspecifiedValueString;
+    return Http::Utility::getProtocolString(protocol.value());
   }
-
-  NOT_REACHED;
+  return UnspecifiedValueString;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {

@@ -71,7 +71,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
   EXPECT_DEATH(ConnectionImpl(dispatcher,
-                              std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr), false),
+                              std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
+                              Network::Test::createRawBufferSocket(), false),
                ".*assert failure: fd\\(\\) != -1.*");
 }
 
