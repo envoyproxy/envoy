@@ -195,6 +195,15 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     return;
   }
 
+  if (read_end_stream_) {
+    if (read_end_stream_raised_) {
+      // No further data can be delivered after end_stream
+      ASSERT(read_buffer_size == 0);
+      return;
+    }
+    read_end_stream_raised_ = true;
+  }
+
   filter_manager_.onRead();
 }
 
@@ -269,6 +278,14 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
 }
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+  if (write_end_stream_) {
+    // It is an API violation to write more data after writing end_stream,
+    // but a duplicate end_stream with no data is ok.
+    ASSERT(data.length() == 0 && end_stream);
+
+    return;
+  }
+
   // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
   //       path, so we just pass around the buffer passed to us in this function. If we ever support
   //       buffer/restart/continue on the write path this needs to get more complicated.

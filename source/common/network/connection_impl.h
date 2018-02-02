@@ -153,6 +153,7 @@ private:
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   bool enable_half_close_{false};
+  bool read_end_stream_raised_{false};
   bool read_end_stream_{false};
   bool write_end_stream_{false};
   bool current_write_end_stream_{false};
