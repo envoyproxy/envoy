@@ -48,7 +48,7 @@ public:
    * indexes for the tags in stat_name and adds them to remove_characters. Returns true if a
    * tag-match was found. The characters removed from the name may be different from the values put
    * into the tag vector for readability purposes. Note: The extraction process is expected to be
-   * run iteratively, aggregating the character intervales to be removed the name after all the tag
+   * run iteratively, aggregating the character intervals to be removed the name after all the tag
    * extractions are complete. This approach simplifies the tag searching process because without
    * mutations, the tag extraction will be order independent, apart from the order of the tag array.
    * @param stat_name name from which the tag will be extracted if found to exist.
