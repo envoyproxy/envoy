@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -63,18 +64,6 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
     : filter_(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {}
-
-void HttpGrpcAccessLog::addressToAccessLogAddress(
-    envoy::api::v2::Address& proto_address, const Network::Address::Instance& network_address) {
-  if (network_address.type() == Network::Address::Type::Pipe) {
-    proto_address.mutable_pipe()->set_path(network_address.asString());
-  } else {
-    ASSERT(network_address.type() == Network::Address::Type::Ip);
-    auto* socket_address = proto_address.mutable_socket_address();
-    socket_address->set_address(network_address.ip()->addressAsString());
-    socket_address->set_port_value(network_address.ip()->port());
-  }
-}
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::api::v2::filter::accesslog::AccessLogCommon& common_access_log,
@@ -161,10 +150,12 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // TODO(mattklein123): Populate time_to_first_downstream_tx_byte field.
   // TODO(mattklein123): Populate metadata field and wire up to filters.
   auto* common_properties = log_entry->mutable_common_properties();
-  addressToAccessLogAddress(*common_properties->mutable_downstream_remote_address(),
-                            *request_info.downstreamRemoteAddress());
-  addressToAccessLogAddress(*common_properties->mutable_downstream_local_address(),
-                            *request_info.downstreamLocalAddress());
+  Network::Utility::addressToProtobufAddress(
+      *request_info.downstreamRemoteAddress(),
+      *common_properties->mutable_downstream_remote_address());
+  Network::Utility::addressToProtobufAddress(
+      *request_info.downstreamLocalAddress(),
+      *common_properties->mutable_downstream_local_address());
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::MicrosecondsToTimestamp(
           std::chrono::duration_cast<std::chrono::microseconds>(
@@ -183,13 +174,14 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
       Protobuf::util::TimeUtil::MicrosecondsToDuration(request_info.duration().count()));
   if (request_info.upstreamHost() != nullptr) {
-    addressToAccessLogAddress(*common_properties->mutable_upstream_remote_address(),
-                              *request_info.upstreamHost()->address());
+    Network::Utility::addressToProtobufAddress(
+        *request_info.upstreamHost()->address(),
+        *common_properties->mutable_upstream_remote_address());
     common_properties->set_upstream_cluster(request_info.upstreamHost()->cluster().name());
   }
   if (request_info.upstreamLocalAddress() != nullptr) {
-    addressToAccessLogAddress(*common_properties->mutable_upstream_local_address(),
-                              *request_info.upstreamLocalAddress());
+    Network::Utility::addressToProtobufAddress(
+        *request_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, request_info);
 
