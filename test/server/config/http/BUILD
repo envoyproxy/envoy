@@ -48,7 +48,7 @@ envoy_cc_test(
     name = "dynamic_opentracing_config_test",
     srcs = ["dynamic_opentracing_config_test.cc"],
     data = [
-        "@io_opentracing_cpp//mocktracer",
+        "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
     deps = [
         "//source/server/config/http:dynamic_opentracing_lib",
