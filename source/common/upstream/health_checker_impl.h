@@ -143,13 +143,12 @@ private:
     std::weak_ptr<Host> host_;
   };
 
-  void addHosts(const std::vector<HostSharedPtr>& hosts);
+  void addHosts(const HostVector& hosts);
   void decHealthy();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
   std::chrono::milliseconds interval() const;
-  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed);
+  void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, bool changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);

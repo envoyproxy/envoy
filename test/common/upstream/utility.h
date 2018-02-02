@@ -92,6 +92,10 @@ inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSha
                               envoy::api::v2::core::Locality().default_instance())};
 }
 
+inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts) {
+  return std::make_shared<HostsPerLocalityImpl>(std::move(locality_hosts), !locality_hosts.empty());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

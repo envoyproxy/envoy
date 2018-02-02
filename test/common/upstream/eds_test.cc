@@ -267,14 +267,14 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
 
   {
     auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
-    EXPECT_EQ(2, hosts_per_locality.size());
-    EXPECT_EQ(1, hosts_per_locality[0].size());
-    EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(hosts_per_locality[0][0]->locality()));
-    EXPECT_EQ(2, hosts_per_locality[1].size());
+    EXPECT_EQ(2, hosts_per_locality.get().size());
+    EXPECT_EQ(1, hosts_per_locality.get()[0].size());
+    EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(hosts_per_locality.get()[0][0]->locality()));
+    EXPECT_EQ(2, hosts_per_locality.get()[1].size());
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-              Locality(hosts_per_locality[1][0]->locality()));
+              Locality(hosts_per_locality.get()[1][0]->locality()));
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-              Locality(hosts_per_locality[1][1]->locality()));
+              Locality(hosts_per_locality.get()[1][1]->locality()));
   }
 
   add_hosts_to_locality("oceania", "koala", "eucalyptus", 3);
@@ -284,18 +284,18 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
 
   {
     auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
-    EXPECT_EQ(4, hosts_per_locality.size());
-    EXPECT_EQ(1, hosts_per_locality[0].size());
-    EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(hosts_per_locality[0][0]->locality()));
-    EXPECT_EQ(5, hosts_per_locality[1].size());
+    EXPECT_EQ(4, hosts_per_locality.get().size());
+    EXPECT_EQ(1, hosts_per_locality.get()[0].size());
+    EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(hosts_per_locality.get()[0][0]->locality()));
+    EXPECT_EQ(5, hosts_per_locality.get()[1].size());
     EXPECT_EQ(Locality("general", "koala", "ingsoc"),
-              Locality(hosts_per_locality[1][0]->locality()));
-    EXPECT_EQ(3, hosts_per_locality[2].size());
+              Locality(hosts_per_locality.get()[1][0]->locality()));
+    EXPECT_EQ(3, hosts_per_locality.get()[2].size());
     EXPECT_EQ(Locality("oceania", "koala", "eucalyptus"),
-              Locality(hosts_per_locality[2][0]->locality()));
-    EXPECT_EQ(2, hosts_per_locality[3].size());
+              Locality(hosts_per_locality.get()[2][0]->locality()));
+    EXPECT_EQ(2, hosts_per_locality.get()[3].size());
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-              Locality(hosts_per_locality[3][0]->locality()));
+              Locality(hosts_per_locality.get()[3][0]->locality()));
   }
 }
 
@@ -435,20 +435,21 @@ TEST_F(EdsTest, PriorityAndLocality) {
   {
     auto& first_hosts_per_locality =
         cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
-    EXPECT_EQ(2, first_hosts_per_locality.size());
-    EXPECT_EQ(1, first_hosts_per_locality[0].size());
-    EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(first_hosts_per_locality[0][0]->locality()));
-    EXPECT_EQ(2, first_hosts_per_locality[1].size());
+    EXPECT_EQ(2, first_hosts_per_locality.get().size());
+    EXPECT_EQ(1, first_hosts_per_locality.get()[0].size());
+    EXPECT_EQ(Locality("", "us-east-1a", ""),
+              Locality(first_hosts_per_locality.get()[0][0]->locality()));
+    EXPECT_EQ(2, first_hosts_per_locality.get()[1].size());
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-              Locality(first_hosts_per_locality[1][0]->locality()));
+              Locality(first_hosts_per_locality.get()[1][0]->locality()));
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-              Locality(first_hosts_per_locality[1][1]->locality()));
+              Locality(first_hosts_per_locality.get()[1][1]->locality()));
 
     auto& second_hosts_per_locality =
         cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality();
-    ASSERT_EQ(2, second_hosts_per_locality.size());
-    EXPECT_EQ(8, second_hosts_per_locality[0].size());
-    EXPECT_EQ(2, second_hosts_per_locality[1].size());
+    ASSERT_EQ(2, second_hosts_per_locality.get().size());
+    EXPECT_EQ(8, second_hosts_per_locality.get()[0].size());
+    EXPECT_EQ(2, second_hosts_per_locality.get()[1].size());
   }
 
   // Add one more locality to both priority 0 and priority 1.
@@ -460,27 +461,29 @@ TEST_F(EdsTest, PriorityAndLocality) {
   {
     auto& first_hosts_per_locality =
         cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
-    EXPECT_EQ(3, first_hosts_per_locality.size());
-    EXPECT_EQ(1, first_hosts_per_locality[0].size());
-    EXPECT_EQ(Locality("", "us-east-1a", ""), Locality(first_hosts_per_locality[0][0]->locality()));
-    EXPECT_EQ(3, first_hosts_per_locality[1].size());
+    EXPECT_EQ(3, first_hosts_per_locality.get().size());
+    EXPECT_EQ(1, first_hosts_per_locality.get()[0].size());
+    EXPECT_EQ(Locality("", "us-east-1a", ""),
+              Locality(first_hosts_per_locality.get()[0][0]->locality()));
+    EXPECT_EQ(3, first_hosts_per_locality.get()[1].size());
     EXPECT_EQ(Locality("oceania", "koala", "eucalyptus"),
-              Locality(first_hosts_per_locality[1][0]->locality()));
-    EXPECT_EQ(2, first_hosts_per_locality[2].size());
+              Locality(first_hosts_per_locality.get()[1][0]->locality()));
+    EXPECT_EQ(2, first_hosts_per_locality.get()[2].size());
     EXPECT_EQ(Locality("oceania", "koala", "ingsoc"),
-              Locality(first_hosts_per_locality[2][0]->locality()));
+              Locality(first_hosts_per_locality.get()[2][0]->locality()));
 
     auto& second_hosts_per_locality =
         cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality();
-    EXPECT_EQ(3, second_hosts_per_locality.size());
-    EXPECT_EQ(8, second_hosts_per_locality[0].size());
+    EXPECT_EQ(3, second_hosts_per_locality.get().size());
+    EXPECT_EQ(8, second_hosts_per_locality.get()[0].size());
     EXPECT_EQ(Locality("", "us-east-1a", ""),
-              Locality(second_hosts_per_locality[0][0]->locality()));
-    EXPECT_EQ(2, second_hosts_per_locality[1].size());
-    EXPECT_EQ(Locality("foo", "bar", "eep"), Locality(second_hosts_per_locality[1][0]->locality()));
-    EXPECT_EQ(5, second_hosts_per_locality[2].size());
+              Locality(second_hosts_per_locality.get()[0][0]->locality()));
+    EXPECT_EQ(2, second_hosts_per_locality.get()[1].size());
+    EXPECT_EQ(Locality("foo", "bar", "eep"),
+              Locality(second_hosts_per_locality.get()[1][0]->locality()));
+    EXPECT_EQ(5, second_hosts_per_locality.get()[2].size());
     EXPECT_EQ(Locality("general", "koala", "ingsoc"),
-              Locality(second_hosts_per_locality[2][0]->locality()));
+              Locality(second_hosts_per_locality.get()[2][0]->locality()));
   }
 }
 

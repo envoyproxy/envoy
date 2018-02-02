@@ -317,13 +317,13 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 
   // Now setup for cross-thread updates.
-  cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                       const std::vector<HostSharedPtr>& hosts_removed) {
-        // This fires when a cluster is about to have an updated member set. We need to send this
-        // out to all of the thread local configurations.
-        postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
-      });
+  cluster.prioritySet().addMemberUpdateCb([&cluster, this](uint32_t priority,
+                                                           const HostVector& hosts_added,
+                                                           const HostVector& hosts_removed) {
+    // This fires when a cluster is about to have an updated member set. We need to send this
+    // out to all of the thread local configurations.
+    postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+  });
 
   // Finally, if the cluster has any hosts, post updates cross-thread so the per-thread load
   // balancers are ready.
@@ -331,8 +331,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     if (host_set->hosts().empty()) {
       continue;
     }
-    postThreadLocalClusterUpdate(cluster, host_set->priority(), host_set->hosts(),
-                                 std::vector<HostSharedPtr>{});
+    postThreadLocalClusterUpdate(cluster, host_set->priority(), host_set->hosts(), HostVector{});
   }
 }
 
@@ -479,19 +478,17 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   return entry->second->connPool(priority, protocol, context);
 }
 
-void ClusterManagerImpl::postThreadLocalClusterUpdate(
-    const Cluster& primary_cluster, uint32_t priority,
-    const std::vector<HostSharedPtr>& hosts_added,
-    const std::vector<HostSharedPtr>& hosts_removed) {
+void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& primary_cluster,
+                                                      uint32_t priority,
+                                                      const HostVector& hosts_added,
+                                                      const HostVector& hosts_removed) {
   const auto& host_set = primary_cluster.prioritySet().hostSetsPerPriority()[priority];
 
-  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(host_set->hosts()));
-  HostVectorConstSharedPtr healthy_hosts_copy(
-      new std::vector<HostSharedPtr>(host_set->healthyHosts()));
-  HostListsConstSharedPtr hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(host_set->hostsPerLocality()));
-  HostListsConstSharedPtr healthy_hosts_per_locality_copy(
-      new std::vector<std::vector<HostSharedPtr>>(host_set->healthyHostsPerLocality()));
+  HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+  HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
+  HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
+      host_set->healthyHostsPerLocality().clone();
 
   tls_->runOnAllThreads([
     this, name = primary_cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
@@ -591,8 +588,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   thread_local_clusters_.clear();
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
-    const std::vector<HostSharedPtr>& hosts) {
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
     auto container = host_http_conn_pool_map_.find(host);
     if (container != host_http_conn_pool_map_.end()) {
@@ -629,10 +625,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
-    HostVectorConstSharedPtr healthy_hosts, HostListsConstSharedPtr hosts_per_locality,
-    HostListsConstSharedPtr healthy_hosts_per_locality,
-    const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
-    ThreadLocal::Slot& tls) {
+    HostVectorConstSharedPtr healthy_hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality, const HostVector& hosts_added,
+    const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
 
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
@@ -723,13 +718,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
   }
 
-  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                         const std::vector<HostSharedPtr>& hosts_removed) -> void {
-    // We need to go through and purge any connection pools for hosts that got deleted.
-    // Even if two hosts actually point to the same address this will be safe, since if a
-    // host is readded it will be a different physical HostSharedPtr.
-    parent_.drainConnPools(hosts_removed);
-  });
+  priority_set_.addMemberUpdateCb(
+      [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+        // We need to go through and purge any connection pools for hosts that got deleted.
+        // Even if two hosts actually point to the same address this will be safe, since if a
+        // host is readded it will be a different physical HostSharedPtr.
+        parent_.drainConnPools(hosts_removed);
+      });
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {

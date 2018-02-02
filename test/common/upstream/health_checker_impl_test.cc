@@ -728,7 +728,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
@@ -1103,7 +1103,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
@@ -1254,8 +1254,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
 
   // Remove before the cross thread event comes in.
   EXPECT_CALL(*connection_, close(_));
-  std::vector<HostSharedPtr> old_hosts =
-      std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
+  HostVector old_hosts = std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
   post_cb();
 
@@ -2088,7 +2087,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
