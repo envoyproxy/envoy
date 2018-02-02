@@ -225,9 +225,6 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":exception_lib",
         ":header_map_lib",

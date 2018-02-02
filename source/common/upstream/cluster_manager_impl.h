@@ -46,10 +46,10 @@ public:
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                           AccessLog::AccessLogManager& log_manager) override;
-  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                     HostConstSharedPtr host,
-                                                     ResourcePriority priority,
-                                                     Http::Protocol protocol) override;
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, Http::Protocol protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
@@ -196,13 +196,16 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::array<Http::ConnectionPool::InstancePtr,
-                         NumResourcePriorities * Http::NumProtocols>
-          ConnPools;
+      typedef std::unordered_map<uint64_t, Http::ConnectionPool::InstancePtr> ConnPools;
 
-      size_t index(ResourcePriority priority, Http::Protocol protocol) {
-        ASSERT(NumResourcePriorities == 2); // One bit needed for priority
-        return enumToInt(protocol) << 1 | enumToInt(priority);
+      uint64_t key(ResourcePriority priority, Http::Protocol protocol, uint32_t hash_key) {
+        // One bit needed for priority
+        static_assert(NumResourcePriorities == 2,
+                      "Fix shifts below to match number of bits needed for 'priority'");
+        // Two bits needed for protocol
+        static_assert(Http::NumProtocols <= 4,
+                      "Fix shifts below to match number of bits needed for 'protocol'");
+        return uint64_t(hash_key) << 3 | uint64_t(protocol) << 1 | uint64_t(priority);
       }
 
       ConnPools pools_;
@@ -239,16 +242,15 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const Optional<std::string>& local_cluster_name);
     ~ThreadLocalClusterManagerImpl();
-    void drainConnPools(const std::vector<HostSharedPtr>& hosts);
+    void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
                                         HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
-                                        HostListsConstSharedPtr hosts_per_locality,
-                                        HostListsConstSharedPtr healthy_hosts_per_locality,
-                                        const std::vector<HostSharedPtr>& hosts_added,
-                                        const std::vector<HostSharedPtr>& hosts_removed,
-                                        ThreadLocal::Slot& tls);
+                                        HostsPerLocalityConstSharedPtr hosts_per_locality,
+                                        HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        const HostVector& hosts_added,
+                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
@@ -281,8 +283,7 @@ private:
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
-                                    const std::vector<HostSharedPtr>& hosts_added,
-                                    const std::vector<HostSharedPtr>& hosts_removed);
+                                    const HostVector& hosts_added, const HostVector& hosts_removed);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
 
   ClusterManagerFactory& factory_;

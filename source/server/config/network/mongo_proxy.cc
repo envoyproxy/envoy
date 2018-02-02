@@ -6,10 +6,9 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "common/common/fmt.h"
 #include "common/config/filter_json.h"
 #include "common/mongo/proxy.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Server {

@@ -5,9 +5,8 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Redis {

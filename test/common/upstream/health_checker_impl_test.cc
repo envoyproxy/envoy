@@ -237,7 +237,7 @@ public:
     connection_index_.push_back(index);
     codec_index_.push_back(index);
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
           uint32_t index = connection_index_.front();
@@ -728,7 +728,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
@@ -988,7 +988,7 @@ public:
 
   void expectClientCreate() {
     connection_ = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _)).WillOnce(Return(connection_));
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
     EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
   }
 
@@ -1015,6 +1015,8 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
+  connection_->runHighWatermarkCallbacks();
+  connection_->runLowWatermarkCallbacks();
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -1101,7 +1103,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
@@ -1252,8 +1254,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
 
   // Remove before the cross thread event comes in.
   EXPECT_CALL(*connection_, close(_));
-  std::vector<HostSharedPtr> old_hosts =
-      std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
+  HostVector old_hosts = std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
   post_cb();
 
@@ -1373,6 +1374,9 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   expectClientCreate();
   expectRequestCreate();
   health_checker_->start();
+
+  client_->runHighWatermarkCallbacks();
+  client_->runLowWatermarkCallbacks();
 
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -1639,7 +1643,7 @@ public:
     connection_index_.push_back(index);
     codec_index_.push_back(index);
 
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _))
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
         .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
           uint32_t index = connection_index_.front();
@@ -2083,7 +2087,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);

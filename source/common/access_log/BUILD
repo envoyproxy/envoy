@@ -17,6 +17,7 @@ envoy_cc_library(
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/http:utility_lib",
         "//source/common/request_info:utility_lib",
     ],
 )
@@ -65,6 +66,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
+        "//source/common/network:utility_lib",
         "@envoy_api//envoy/api/v2/filter/accesslog:accesslog_cc",
         "@envoy_api//envoy/config/accesslog/v2:als_cc",
         "@envoy_api//envoy/service/accesslog/v2:als_cc",

@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -18,7 +19,6 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
@@ -236,15 +236,6 @@ void Utility::sendLocalReply(
   }
 }
 
-void Utility::sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path,
-                           Code response_code) {
-  HeaderMapPtr response_headers{
-      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))},
-                        {Headers::get().Location, new_path}}};
-
-  callbacks.encodeHeaders(std::move(response_headers), true);
-}
-
 Utility::GetLastAddressFromXffInfo
 Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
   const auto xff_header = request_headers.ForwardedFor();
@@ -270,6 +261,19 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
   } catch (const EnvoyException&) {
     return {nullptr, false};
   }
+}
+
+const std::string& Utility::getProtocolString(const Protocol protocol) {
+  switch (protocol) {
+  case Protocol::Http10:
+    return Headers::get().ProtocolStrings.Http10String;
+  case Protocol::Http11:
+    return Headers::get().ProtocolStrings.Http11String;
+  case Protocol::Http2:
+    return Headers::get().ProtocolStrings.Http2String;
+  }
+
+  NOT_REACHED;
 }
 
 } // namespace Http

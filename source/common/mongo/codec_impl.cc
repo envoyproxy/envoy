@@ -10,9 +10,8 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/mongo/bson_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Mongo {

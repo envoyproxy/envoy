@@ -25,7 +25,7 @@
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "fmt/format.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Network {
@@ -369,6 +369,18 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
     data >>= 8;
   }
   return result;
+}
+
+void Utility::addressToProtobufAddress(const Address::Instance& address,
+                                       envoy::api::v2::Address& proto_address) {
+  if (address.type() == Address::Type::Pipe) {
+    proto_address.mutable_pipe()->set_path(address.asString());
+  } else {
+    ASSERT(address.type() == Address::Type::Ip);
+    auto* socket_address = proto_address.mutable_socket_address();
+    socket_address->set_address(address.ip()->addressAsString());
+    socket_address->set_port_value(address.ip()->port());
+  }
 }
 
 } // namespace Network

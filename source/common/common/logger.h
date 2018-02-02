@@ -9,6 +9,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"
 
+#include "common/common/fmt.h"
 #include "common/common/macros.h"
 
 #include "spdlog/spdlog.h"
@@ -39,7 +40,8 @@ namespace Logger {
   FUNCTION(runtime)              \
   FUNCTION(testing)              \
   FUNCTION(tracing)              \
-  FUNCTION(upstream)
+  FUNCTION(upstream)             \
+  FUNCTION(grpc)
 
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)

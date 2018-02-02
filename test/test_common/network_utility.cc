@@ -7,14 +7,13 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/network/address_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Network {
@@ -164,6 +163,9 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
 
+TransportSocketFactoryPtr createRawBufferSocketFactory() {
+  return std::make_unique<RawBufferSocketFactory>();
+};
 } // namespace Test
 } // namespace Network
 } // namespace Envoy

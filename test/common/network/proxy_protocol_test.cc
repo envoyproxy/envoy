@@ -7,6 +7,7 @@
 #include "common/filter/listener/proxy_protocol.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 
@@ -44,14 +45,16 @@ public:
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
                                                Network::Address::InstanceConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket());
+                                               Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
   // Listener
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
-  Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+  Network::TransportSocketFactory& transportSocketFactory() override {
+    return transport_socket_factory_;
+  }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -123,6 +126,7 @@ public:
 
   Event::DispatcherImpl dispatcher_;
   TcpListenSocket socket_;
+  Network::RawBufferSocketFactory transport_socket_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
@@ -322,7 +326,7 @@ public:
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(local_dst_address_,
                                                Network::Address::InstanceConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket());
+                                               Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -338,7 +342,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocket& socket() override { return socket_; }
-  Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+  TransportSocketFactory& transportSocketFactory() override { return transport_socket_factory_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -390,6 +394,7 @@ public:
 
   Event::DispatcherImpl dispatcher_;
   TcpListenSocket socket_;
+  Network::RawBufferSocketFactory transport_socket_factory_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;

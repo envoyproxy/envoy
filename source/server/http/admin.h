@@ -21,6 +21,7 @@
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
+#include "common/network/raw_buffer_socket.h"
 
 #include "server/config/network/http_connection_manager.h"
 
@@ -174,7 +175,9 @@ private:
     // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocket& socket() override { return parent_.mutable_socket(); }
-    Ssl::ServerContext* defaultSslContext() override { return nullptr; }
+    Network::TransportSocketFactory& transportSocketFactory() override {
+      return parent_.transport_socket_factory_;
+    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -192,6 +195,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Network::ListenSocketPtr socket_;
+  Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;

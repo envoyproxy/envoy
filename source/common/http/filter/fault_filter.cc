@@ -12,14 +12,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {

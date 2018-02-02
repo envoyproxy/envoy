@@ -4,12 +4,12 @@
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/host_description.h"
 
+#include "common/common/fmt.h"
 #include "common/request_info/request_info_impl.h"
 
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
-#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

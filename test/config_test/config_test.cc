@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -13,7 +14,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

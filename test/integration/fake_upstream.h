@@ -282,8 +282,8 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::Filt
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version);
-  FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type,
-               Network::Address::IpVersion version);
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
+               FakeHttpConnection::Type type, Network::Address::IpVersion version);
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }
@@ -307,8 +307,8 @@ protected:
   void cleanUp();
 
 private:
-  FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
-               FakeHttpConnection::Type type);
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               Network::ListenSocketPtr&& connection, FakeHttpConnection::Type type);
 
   class FakeListener : public Network::ListenerConfig {
   public:
@@ -318,7 +318,9 @@ private:
     // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocket& socket() override { return *parent_.socket_; }
-    Ssl::ServerContext* defaultSslContext() override { return parent_.ssl_ctx_; }
+    Network::TransportSocketFactory& transportSocketFactory() override {
+      return *parent_.transport_socket_factory_;
+    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -332,7 +334,7 @@ private:
 
   void threadRoutine();
 
-  Ssl::ServerContext* ssl_ctx_{};
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
   Network::ListenSocketPtr socket_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the

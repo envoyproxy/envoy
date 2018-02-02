@@ -12,9 +12,6 @@ envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",

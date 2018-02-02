@@ -220,9 +220,6 @@ envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":load_balancer_lib",
         "//include/envoy/runtime:runtime_interface",
@@ -321,8 +318,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/common/ssl:connection_lib",
-        "//source/common/ssl:context_config_lib",
         "@envoy_api//envoy/api/v2:base_cc",
     ],
 )

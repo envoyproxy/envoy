@@ -8,8 +8,6 @@
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 
-#include "fmt/format.h"
-
 namespace Envoy {
 namespace RateLimit {
 

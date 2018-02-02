@@ -52,6 +52,7 @@ typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedP
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
+  void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
   std::string newPath(const Http::HeaderMap& headers) const override;
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
@@ -297,7 +298,6 @@ public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Runtime::Loader& loader);
 
-  bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
   bool isDirectResponse() const { return direct_response_code_.valid(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
@@ -412,7 +412,7 @@ private:
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
-    const Decorator* decorator() const override { return nullptr; }
+    const Decorator* decorator() const override { return parent_->decorator(); }
 
   private:
     const RouteEntryImplBase* parent_;
@@ -477,6 +477,7 @@ private:
   Runtime::Loader& loader_;
   const std::string host_redirect_;
   const std::string path_redirect_;
+  const bool https_redirect_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
