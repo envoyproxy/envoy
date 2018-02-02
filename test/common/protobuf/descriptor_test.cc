@@ -16,7 +16,7 @@
 namespace Envoy {
 
 // This test verifies that critical descriptors have not changed name. It includes both gRPC
-// services as well as types that are referenced in Any messages. IF THIS TEST BREAKS YOu
+// services as well as types that are referenced in Any messages. IF THIS TEST BREAKS YOU
 // HAVE DONE SOMETHING BAD. Consult with the larger dev team on how to handle.
 TEST(ProtoDescriptorTest, BackCompat) {
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
