@@ -19,13 +19,19 @@ class UdsIntegrationTest
 public:
   UdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
-        abstract_namespace_(std::get<1>(GetParam())) {}
+        abstract_namespace_(std::get<1>(GetParam())) {
+#if !defined(__linux__)
+    if (abstract_namespace_) {
+      EXPECT_THROW("Abstract AF_UNIX sockets are only supported on linux.", EnvoyException);
+    }
+#endif
+  }
 
   void createUpstreams() override {
-    const std::string socket_name = abstract_namespace_
-                                        ? "@/udstest.1.sock"
-                                        : TestEnvironment::unixDomainSocketPath("udstest.1.sock");
-    fake_upstreams_.emplace_back(new FakeUpstream(socket_name, FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        abstract_namespace_ ? "@/my/udstest"
+                            : TestEnvironment::unixDomainSocketPath("udstest.1.sock"),
+        FakeHttpConnection::Type::HTTP1));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -34,7 +40,9 @@ public:
             auto* cluster = static_resources->mutable_clusters(i);
             for (int j = 0; j < cluster->hosts_size(); ++j) {
               cluster->mutable_hosts(j)->clear_socket_address();
-              cluster->mutable_hosts(j)->mutable_pipe()->set_path(socket_name);
+              cluster->mutable_hosts(j)->mutable_pipe()->set_path(
+                  abstract_namespace_ ? "@/my/udstest"
+                                      : TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
             }
           }
         });

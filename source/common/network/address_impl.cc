@@ -247,7 +247,7 @@ int Ipv6Instance::socket(SocketType type) const {
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
     : InstanceBase(Type::Pipe) {
   if (address->sun_path[0] == '\0') {
-#ifndef linux
+#if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     RELEASE_ASSERT(ss_len >= offsetof(struct sockaddr_un, sun_path) + 1);
@@ -266,7 +266,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
   StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
   friendly_name_ = address_.sun_path;
   if (address_.sun_path[0] == '@') {
-#ifndef linux
+#if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     abstract_namespace_ = true;
