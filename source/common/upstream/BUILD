@@ -318,8 +318,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/common/ssl:connection_lib",
-        "//source/common/ssl:context_config_lib",
         "@envoy_api//envoy/api/v2:base_cc",
     ],
 )
