@@ -116,6 +116,7 @@ public:
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  const Config& routeConfig() const override;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -608,11 +609,14 @@ public:
     return internal_only_headers_;
   }
 
+  const std::string& name() const override { return name_; }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
+  const std::string name_;
 };
 
 /**
@@ -627,8 +631,11 @@ public:
     return internal_only_headers_;
   }
 
+  const std::string& name() const override { return name_; }
+
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
+  const std::string name_;
 };
 
 } // namespace Router

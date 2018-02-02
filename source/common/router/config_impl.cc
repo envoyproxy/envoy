@@ -687,6 +687,8 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   name_ = virtual_cluster.name();
 }
 
+const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
+
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
   // We do a longest wildcard suffix match against the host that's passed in.
   // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com)
@@ -811,7 +813,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 }
 
 ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-                       Upstream::ClusterManager& cm, bool validate_clusters_default) {
+                       Upstream::ClusterManager& cm, bool validate_clusters_default)
+    : name_(config.name()) {
   route_matcher_.reset(new RouteMatcher(
       config, *this, runtime, cm,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));
