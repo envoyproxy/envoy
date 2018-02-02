@@ -42,16 +42,18 @@ public:
    * Create a server connection.
    * @param socket supplies an open file descriptor and connection metadata to use for the
    *        connection. Takes ownership of the socket.
-   * @param ssl_ctx supplies the SSL context to use, if not nullptr.
+   * @param transport_socket supplies a transport socket to be used by the connection.
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                        Ssl::Context* ssl_ctx) PURE;
+  virtual Network::ConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket) PURE;
 
   /**
    * Create a client connection.
    * @param address supplies the address to connect to.
    * @param source_address supplies an address to bind to or nullptr if no bind is necessary.
+   * @param transport_socket supplies a transport socket to be used by the connection.
    * @param options the socket options to be set on the underlying socket before anything is sent
    *        on the socket.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.

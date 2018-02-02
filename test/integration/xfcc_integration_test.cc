@@ -30,7 +30,6 @@ void XfccIntegrationTest::TearDown() {
   client_mtls_ssl_ctx_.reset();
   client_tls_ssl_ctx_.reset();
   fake_upstreams_.clear();
-  upstream_ssl_ctx_.reset();
   context_manager_.reset();
   runtime_.reset();
 }
@@ -64,7 +63,7 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
       new Ssl::ClientSslSocketFactory(cfg, *context_manager_, *client_stats_store)};
 }
 
-Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
+Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
   std::string json = R"EOF(
 {
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcert.pem",
@@ -74,8 +73,10 @@ Ssl::ServerContextPtr XfccIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   Ssl::ServerContextConfigImpl cfg(*loader);
-  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return context_manager_->createSslServerContext("", {}, *upstream_stats_store, cfg, true);
+  static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+  return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
+                                                       std::vector<std::string>{}, true,
+                                                       *context_manager_, *upstream_stats_store);
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
@@ -96,9 +97,8 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1, version_));
+      new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_));
 }
 
 void XfccIntegrationTest::initialize() {

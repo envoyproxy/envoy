@@ -178,7 +178,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, true));
   manager_->addOrUpdateListener(parseListenerFromJson(json), true);
-  EXPECT_NE(nullptr, manager_->listeners().back().get().defaultSslContext());
+  EXPECT_TRUE(
+      manager_->listeners().back().get().transportSocketFactory().implementsSecureTransport());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {

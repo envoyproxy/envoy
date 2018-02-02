@@ -1,6 +1,7 @@
 #include "server/listener_manager_impl.h"
 
 #include "envoy/registry/registry.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -9,7 +10,6 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/context_config_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
@@ -166,16 +166,41 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
                                        "is currently not supported",
                                        address_->asString()));
     }
-    if (filter_chain.has_tls_context()) {
-      Ssl::ServerContextConfigImpl context_config(filter_chain.tls_context());
-      tls_contexts_.emplace_back(parent_.server_.sslContextManager().createSslServerContext(
-          name_, sni_domains, *listener_scope_, context_config, skip_context_update));
-      has_tls++;
-      if (filter_chain.tls_context().has_session_ticket_keys()) {
-        has_stk++;
+
+    // If the cluster doesn't have transport socke configured, override with default transport
+    // socket implementation based on tls_context. We copy by value first then override if
+    // neccessary.
+    auto transport_socket = filter_chain.transport_socket();
+    if (!filter_chain.has_transport_socket()) {
+      if (filter_chain.has_tls_context()) {
+        transport_socket.set_name(Config::TransportSocketNames::get().SSL);
+        MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+
+        has_tls++;
+        if (filter_chain.tls_context().has_session_ticket_keys()) {
+          has_stk++;
+        }
+      } else {
+        transport_socket.set_name(Config::TransportSocketNames::get().RAW_BUFFER);
       }
     }
+
+    auto& config_factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
+    ProtobufTypes::MessagePtr message =
+        Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+
+    // Each transport socket factory owns one SslServerContext, we need to store them all in a
+    // vector since Ssl::ContextManager doesn't own SslServerContext. While transportSocketFacotry()
+    // always returns the first element of transport_socket_factories_, other transport socket
+    // factories are needed when the default Ssl::ServerContext updates SSL context based on
+    // ClientHello. This behavior is a workaround for initial SNI support before the full SNI based
+    // filter chain match is implemented.
+    transport_socket_factories_.emplace_back(config_factory.createTransportSocketFactory(
+        name_, sni_domains, skip_context_update, *message, *this));
+    ASSERT(transport_socket_factories_.back() != nullptr);
   }
+  ASSERT(!transport_socket_factories_.empty());
 
   // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
   // This doesn't work right now, because BoringSSL uses "session context" (initial SSL_CTX that

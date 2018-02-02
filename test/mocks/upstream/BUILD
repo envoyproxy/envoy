@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/network:raw_buffer_socket_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",

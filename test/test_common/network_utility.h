@@ -97,7 +97,18 @@ bool supportsIpVersion(const Address::IpVersion version);
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
                                                                      Address::SocketType type);
 
+/**
+ * Create a transport socket for testing purposes.
+ * @return TransportSocketPtr the transport socket factory to use with a connection.
+ */
 TransportSocketPtr createRawBufferSocket();
+
+/**
+ * Create a transport socket factory for testing purposes.
+ * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster or a
+ * listener.
+ */
+TransportSocketFactoryPtr createRawBufferSocketFactory();
 
 } // namespace Test
 } // namespace Network

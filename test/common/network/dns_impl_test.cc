@@ -201,8 +201,8 @@ public:
   TestDnsServer(Event::DispatcherImpl& dispatcher) : dispatcher_(dispatcher) {}
 
   void onAccept(ConnectionSocketPtr&& socket, bool) override {
-    Network::ConnectionPtr new_connection =
-        dispatcher_.createServerConnection(std::move(socket), nullptr);
+    Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
+        std::move(socket), Network::Test::createRawBufferSocket());
     onNewConnection(std::move(new_connection));
   }
 

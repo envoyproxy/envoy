@@ -198,6 +198,24 @@ TEST(NetworkUtility, AnyAddress) {
   }
 }
 
+TEST(NetworkUtility, AddressToProtobufAddress) {
+  {
+    envoy::api::v2::Address proto_address;
+    Address::Ipv4Instance address("127.0.0.1");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_EQ(true, proto_address.has_socket_address());
+    EXPECT_EQ("127.0.0.1", proto_address.socket_address().address());
+    EXPECT_EQ(0, proto_address.socket_address().port_value());
+  }
+  {
+    envoy::api::v2::Address proto_address;
+    Address::PipeInstance address("/hello");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_EQ(true, proto_address.has_pipe());
+    EXPECT_EQ("/hello", proto_address.pipe().path());
+  }
+}
+
 TEST(PortRangeListTest, Errors) {
   {
     std::string port_range_str = "a1";

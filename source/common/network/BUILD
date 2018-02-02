@@ -185,6 +185,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:address_cc",
         "@envoy_api//envoy/api/v2:base_cc",
     ],
 )

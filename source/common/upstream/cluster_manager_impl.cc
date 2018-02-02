@@ -232,8 +232,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       break;
     }
     default:
-      throw EnvoyException(
-          "Missing config source specifier in envoy::api::v2::ConfigSource for SDS config");
+      // Validated by schema.
+      NOT_REACHED;
     }
   }
 
