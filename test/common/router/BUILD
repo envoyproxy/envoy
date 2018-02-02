@@ -20,6 +20,7 @@ envoy_cc_test(
         "//source/common/router:config_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -60,7 +61,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
-    external_deps = ["envoy_rds"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
@@ -71,6 +71,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 
@@ -91,6 +92,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -98,7 +100,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
-    external_deps = ["envoy_filter_http_router"],
     deps = [
         "//include/envoy/common:optional",
         "//source/common/buffer:buffer_lib",
@@ -120,6 +121,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/filter/http:router_cc",
     ],
 )
 

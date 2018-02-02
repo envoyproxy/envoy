@@ -1,3 +1,7 @@
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/service/discovery/v2/ads.pb.h"
+
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
@@ -7,8 +11,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "api/discovery.pb.h"
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -32,10 +34,13 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
+
+    envoy::service::discovery::v2::AdsDummy dummy;
+
     grpc_mux_.reset(new GrpcMuxImpl(
         envoy::api::v2::Node(), std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   }
 
   void expectSendMessage(const std::string& type_url,

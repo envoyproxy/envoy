@@ -47,6 +47,14 @@ TEST(FileSystemImpl, directoryExists) {
   EXPECT_FALSE(Filesystem::directoryExists("/dev/blahblah"));
 }
 
+TEST(FileSystemImpl, fileSize) {
+  EXPECT_EQ(0, Filesystem::fileSize("/dev/null"));
+  EXPECT_EQ(-1, Filesystem::fileSize("/dev/blahblahblah"));
+  const std::string data = "test string\ntest";
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
+  EXPECT_EQ(data.length(), Filesystem::fileSize(file_path));
+}
+
 TEST(FileSystemImpl, fileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);

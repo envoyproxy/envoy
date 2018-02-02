@@ -194,8 +194,7 @@ if __name__ == "__main__":
   if os.path.isfile(target_path):
     checkFormat("./" + target_path)
   else:
-    os.chdir(target_path)
-    os.path.walk(".", checkFormatVisitor, None)
+    os.path.walk(target_path, checkFormatVisitor, None)
 
   if found_error:
     print "ERROR: check format failed. run 'tools/check_format.py fix'"

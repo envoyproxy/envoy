@@ -1,5 +1,7 @@
 #include "server/config/access_log/grpc_access_log.h"
 
+#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
+#include "envoy/config/accesslog/v2/als.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -8,8 +10,6 @@
 #include "common/config/well_known_names.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
-
-#include "api/filter/accesslog/accesslog.pb.validate.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,7 +21,7 @@ SINGLETON_MANAGER_REGISTRATION(grpc_access_log_streamer);
 AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter, FactoryContext& context) {
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig&>(config);
+      const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(config);
   std::shared_ptr<AccessLog::GrpcAccessLogStreamer> grpc_access_log_streamer =
       context.singletonManager().getTyped<AccessLog::GrpcAccessLogStreamer>(
           SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_log_streamer),
@@ -37,8 +37,7 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{
-      new envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig()};
+  return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::HttpGrpcAccessLogConfig()};
 }
 
 std::string HttpGrpcAccessLogFactory::name() const {

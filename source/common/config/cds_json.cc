@@ -57,9 +57,9 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
   }
 }
 
-void CdsJson::translateThresholds(const Json::Object& json_thresholds,
-                                  const envoy::api::v2::RoutingPriority& priority,
-                                  envoy::api::v2::CircuitBreakers::Thresholds& thresholds) {
+void CdsJson::translateThresholds(
+    const Json::Object& json_thresholds, const envoy::api::v2::RoutingPriority& priority,
+    envoy::api::v2::cluster::CircuitBreakers::Thresholds& thresholds) {
   thresholds.set_priority(priority);
   JSON_UTIL_SET_INTEGER(json_thresholds, thresholds, max_connections);
   JSON_UTIL_SET_INTEGER(json_thresholds, thresholds, max_pending_requests);
@@ -68,7 +68,7 @@ void CdsJson::translateThresholds(const Json::Object& json_thresholds,
 }
 
 void CdsJson::translateCircuitBreakers(const Json::Object& json_circuit_breakers,
-                                       envoy::api::v2::CircuitBreakers& circuit_breakers) {
+                                       envoy::api::v2::cluster::CircuitBreakers& circuit_breakers) {
   translateThresholds(*json_circuit_breakers.getObject("default", true),
                       envoy::api::v2::RoutingPriority::DEFAULT,
                       *circuit_breakers.mutable_thresholds()->Add());
@@ -79,7 +79,7 @@ void CdsJson::translateCircuitBreakers(const Json::Object& json_circuit_breakers
 
 void CdsJson::translateOutlierDetection(
     const Json::Object& json_outlier_detection,
-    envoy::api::v2::Cluster::OutlierDetection& outlier_detection) {
+    envoy::api::v2::cluster::OutlierDetection& outlier_detection) {
   JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, interval);
   JSON_UTIL_SET_DURATION(json_outlier_detection, outlier_detection, base_ejection_time);
   JSON_UTIL_SET_INTEGER(json_outlier_detection, outlier_detection, consecutive_5xx);

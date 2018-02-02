@@ -10,11 +10,10 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
-
-#include "fmt/format.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"

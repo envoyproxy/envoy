@@ -10,12 +10,12 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
-
-#include "api/cds.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -117,6 +117,7 @@ public:
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
+  static Http::Code resultToHttpCode(Result result);
 
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
@@ -171,7 +172,7 @@ struct DetectionStats {
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const envoy::api::v2::Cluster::OutlierDetection& config);
+  DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config);
 
   uint64_t intervalMs() { return interval_ms_; }
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
@@ -207,7 +208,7 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::api::v2::Cluster::OutlierDetection& config,
+  create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, MonotonicTimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
@@ -223,7 +224,7 @@ public:
   double successRateEjectionThreshold() const override { return success_rate_ejection_threshold_; }
 
 private:
-  DetectorImpl(const Cluster& cluster, const envoy::api::v2::Cluster::OutlierDetection& config,
+  DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger);
 

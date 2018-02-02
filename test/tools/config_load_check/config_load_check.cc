@@ -3,9 +3,10 @@
 #include <stdexcept>
 #include <string>
 
+#include "common/common/fmt.h"
+
 #include "test/config_test/config_test.h"
 
-#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 int main(int argc, char* argv[]) {

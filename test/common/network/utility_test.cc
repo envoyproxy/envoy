@@ -198,6 +198,24 @@ TEST(NetworkUtility, AnyAddress) {
   }
 }
 
+TEST(NetworkUtility, AddressToProtobufAddress) {
+  {
+    envoy::api::v2::Address proto_address;
+    Address::Ipv4Instance address("127.0.0.1");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_EQ(true, proto_address.has_socket_address());
+    EXPECT_EQ("127.0.0.1", proto_address.socket_address().address());
+    EXPECT_EQ(0, proto_address.socket_address().port_value());
+  }
+  {
+    envoy::api::v2::Address proto_address;
+    Address::PipeInstance address("/hello");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_EQ(true, proto_address.has_pipe());
+    EXPECT_EQ("/hello", proto_address.pipe().path());
+  }
+}
+
 TEST(PortRangeListTest, Errors) {
   {
     std::string port_range_str = "a1";
@@ -270,6 +288,47 @@ TEST(PortRangeListTest, Normal) {
     EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2), port_range_list));
     EXPECT_FALSE(Utility::portInRangeList(makeFromPort(200), port_range_list));
     EXPECT_FALSE(Utility::portInRangeList(makeFromPort(20000), port_range_list));
+  }
+}
+
+// TODO(ccaraman): Support big-endian. These tests operate under the assumption that the machine
+// byte order is little-endian.
+TEST(AbslUint128, TestByteOrder) {
+  {
+    Address::Ipv6Instance address("::1");
+    uint64_t high = 0x100000000000000;
+    EXPECT_EQ(absl::MakeUint128(high, 0), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::MakeUint128(high, 0),
+              Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+
+    EXPECT_EQ(absl::uint128(1), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+  }
+  {
+    Address::Ipv6Instance address("1::");
+    EXPECT_EQ(absl::uint128(256), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::uint128(256),
+              Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+
+    uint64_t high = 0x001000000000000;
+    EXPECT_EQ(absl::MakeUint128(high, 0), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+  }
+  {
+    Address::Ipv6Instance address("2001:abcd:ef01:2345:6789:abcd:ef01:234");
+    uint64_t low = 0x452301EFCDAB0120;
+    uint64_t high = 0x340201EFCDAB8967;
+    EXPECT_EQ(absl::MakeUint128(high, low), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::MakeUint128(high, low),
+              Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
+  }
+  {
+    Address::Ipv6Instance address("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+    EXPECT_EQ(absl::Uint128Max(), address.ip()->ipv6()->address());
+    EXPECT_EQ(absl::Uint128Max(), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
+  }
+  {
+    TestRandomGenerator rand;
+    absl::uint128 random_number = absl::MakeUint128(rand.random(), rand.random());
+    EXPECT_EQ(random_number, Utility::Ip6htonl(Utility::Ip6ntohl(random_number)));
   }
 }
 

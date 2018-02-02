@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/server/config/http:lua_lib",
         "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
+        "//source/server/config/http:squash_lib",
         "//source/server/config/http:zipkin_lib",
         "//source/server/http:health_check_lib",
         "//test/mocks/access_log:access_log_mocks",

@@ -7,9 +7,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 std::string Hex::encode(const uint8_t* data, size_t length) {

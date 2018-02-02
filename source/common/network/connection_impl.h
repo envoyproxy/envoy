@@ -47,9 +47,6 @@ class ConnectionImpl : public virtual Connection,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  // TODO(lizan): Remove the old style constructor when factory is ready.
-  ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket, bool connected);
-
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, bool connected);
 
@@ -87,6 +84,9 @@ public:
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return above_high_watermark_; }
+  const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
+    return socket_->options();
+  }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
@@ -124,7 +124,7 @@ protected:
 
 protected:
   bool connecting_{false};
-  bool immediate_connection_error_{false};
+  ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
   Event::FileEventPtr file_event_;
 
@@ -164,7 +164,8 @@ public:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
-                       Network::TransportSocketPtr&& transport_socket);
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Network::ClientConnection
   void connect() override;

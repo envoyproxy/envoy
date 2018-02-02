@@ -156,7 +156,8 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
             }
           },
           "cipher_suites" : {"type" : "string", "minLength" : 1},
-          "ecdh_curves" : {"type" : "string", "minLength" : 1}
+          "ecdh_curves" : {"type" : "string", "minLength" : 1},
+          "crl_file" : {"type" : "string"}
         },
         "required": ["cert_chain_file", "private_key_file"],
         "additionalProperties": false
@@ -947,6 +948,38 @@ const std::string Json::Schema::LUA_HTTP_FILTER_SCHEMA(R"EOF(
       "inline_code" : {"type" : "string"}
     },
     "required" : ["inline_code"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::SQUASH_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "cluster": {
+        "type" : "string"
+      },
+      "attachment_template": {
+        "type" : "object"
+      },
+      "attachment_timeout_ms": {
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "attachment_poll_period_ms": {
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "request_timeout_ms": {
+        "type" : "number",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required": ["cluster", "attachment_template"],
     "additionalProperties" : false
   }
   )EOF");

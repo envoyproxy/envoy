@@ -97,6 +97,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "lc_trie_test",
+    srcs = ["lc_trie_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
     deps = [

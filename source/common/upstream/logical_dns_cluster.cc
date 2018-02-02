@@ -5,13 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -123,11 +122,13 @@ void LogicalDnsCluster::startResolve() {
       });
 }
 
-Upstream::Host::CreateConnectionData
-LogicalDnsCluster::LogicalHost::createConnection(Event::Dispatcher& dispatcher) const {
+Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConnection(
+    Event::Dispatcher& dispatcher,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
   PerThreadCurrentHostData& data = parent_.tls_->getTyped<PerThreadCurrentHostData>();
   ASSERT(data.current_resolved_address_);
-  return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_),
+  return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
+                                     options),
           HostDescriptionConstSharedPtr{
               new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
 }

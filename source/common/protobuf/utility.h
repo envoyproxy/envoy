@@ -10,8 +10,6 @@
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
-#include "fmt/format.h"
-
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
@@ -178,9 +176,11 @@ public:
   /**
    * Extract JSON as string from a google.protobuf.Message.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
-   * @return std::string of JSON object.
+   * @param pretty_print whether the returned JSON should be formatted.
+   * @return std::string of formatted JSON object.
    */
-  static std::string getJsonStringFromMessage(const Protobuf::Message& message);
+  static std::string getJsonStringFromMessage(const Protobuf::Message& message,
+                                              bool pretty_print = false);
 
   /**
    * Extract JSON object from a google.protobuf.Message.

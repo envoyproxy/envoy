@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include "envoy/api/v2/eds.pb.h"
+
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/event/dispatcher_impl.h"
@@ -9,7 +11,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "api/eds.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -32,8 +33,7 @@ GrpcAccessLogStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
     : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
 
 void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
-    envoy::api::v2::filter::accesslog::StreamAccessLogsMessage& message,
-    const std::string& log_name) {
+    envoy::service::accesslog::v2::StreamAccessLogsMessage& message, const std::string& log_name) {
   auto stream_it = stream_map_.find(log_name);
   if (stream_it == stream_map_.end()) {
     stream_it = stream_map_.emplace(log_name, ThreadLocalStream(*this, log_name)).first;
@@ -43,7 +43,7 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
   if (stream_entry.stream_ == nullptr) {
     stream_entry.stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.api.v2.filter.accesslog.AccessLogService.StreamAccessLogs"),
+                           "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
                        stream_entry);
 
     auto* identifier = message.mutable_identifier();
@@ -60,22 +60,10 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
 }
 
 HttpGrpcAccessLog::HttpGrpcAccessLog(
-    FilterPtr&& filter, const envoy::api::v2::filter::accesslog::HttpGrpcAccessLogConfig& config,
+    FilterPtr&& filter, const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
     : filter_(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {}
-
-void HttpGrpcAccessLog::addressToAccessLogAddress(
-    envoy::api::v2::Address& proto_address, const Network::Address::Instance& network_address) {
-  if (network_address.type() == Network::Address::Type::Pipe) {
-    proto_address.mutable_pipe()->set_path(network_address.asString());
-  } else {
-    ASSERT(network_address.type() == Network::Address::Type::Ip);
-    auto* socket_address = proto_address.mutable_socket_address();
-    socket_address->set_address(network_address.ip()->addressAsString());
-    socket_address->set_port_value(network_address.ip()->port());
-  }
-}
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::api::v2::filter::accesslog::AccessLogCommon& common_access_log,
@@ -150,7 +138,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  envoy::api::v2::filter::accesslog::StreamAccessLogsMessage message;
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message;
   auto* log_entry = message.mutable_http_logs()->add_log_entry();
 
   // Common log properties.
@@ -162,10 +150,12 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // TODO(mattklein123): Populate time_to_first_downstream_tx_byte field.
   // TODO(mattklein123): Populate metadata field and wire up to filters.
   auto* common_properties = log_entry->mutable_common_properties();
-  addressToAccessLogAddress(*common_properties->mutable_downstream_remote_address(),
-                            *request_info.downstreamRemoteAddress());
-  addressToAccessLogAddress(*common_properties->mutable_downstream_local_address(),
-                            *request_info.downstreamLocalAddress());
+  Network::Utility::addressToProtobufAddress(
+      *request_info.downstreamRemoteAddress(),
+      *common_properties->mutable_downstream_remote_address());
+  Network::Utility::addressToProtobufAddress(
+      *request_info.downstreamLocalAddress(),
+      *common_properties->mutable_downstream_local_address());
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::MicrosecondsToTimestamp(
           std::chrono::duration_cast<std::chrono::microseconds>(
@@ -184,13 +174,14 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
       Protobuf::util::TimeUtil::MicrosecondsToDuration(request_info.duration().count()));
   if (request_info.upstreamHost() != nullptr) {
-    addressToAccessLogAddress(*common_properties->mutable_upstream_remote_address(),
-                              *request_info.upstreamHost()->address());
+    Network::Utility::addressToProtobufAddress(
+        *request_info.upstreamHost()->address(),
+        *common_properties->mutable_upstream_remote_address());
     common_properties->set_upstream_cluster(request_info.upstreamHost()->cluster().name());
   }
   if (request_info.upstreamLocalAddress() != nullptr) {
-    addressToAccessLogAddress(*common_properties->mutable_upstream_local_address(),
-                              *request_info.upstreamLocalAddress());
+    Network::Utility::addressToProtobufAddress(
+        *request_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, request_info);
 

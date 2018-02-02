@@ -1,6 +1,7 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include <dirent.h>
+#include <sys/stat.h>
 
 #include <chrono>
 #include <cstdint>
@@ -17,9 +18,8 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/thread.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -37,6 +37,14 @@ bool directoryExists(const std::string& path) {
   }
 
   return dir_exists;
+}
+
+ssize_t fileSize(const std::string& path) {
+  struct stat info;
+  if (stat(path.c_str(), &info) != 0) {
+    return -1;
+  }
+  return info.st_size;
 }
 
 std::string fileReadToEnd(const std::string& path) {

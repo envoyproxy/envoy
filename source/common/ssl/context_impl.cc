@@ -9,9 +9,9 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/common/hex.h"
 
-#include "fmt/format.h"
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
@@ -66,16 +66,18 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
       throw EnvoyException(
           fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
     }
+
+    X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
-        X509_STORE_add_cert(SSL_CTX_get_cert_store(ctx_.get()), item->x509);
+        X509_STORE_add_cert(store, item->x509);
         if (ca_cert_ == nullptr) {
           X509_up_ref(item->x509);
           ca_cert_.reset(item->x509);
         }
       }
       if (item->crl) {
-        X509_STORE_add_crl(SSL_CTX_get_cert_store(ctx_.get()), item->crl);
+        X509_STORE_add_crl(store, item->crl);
       }
     }
     if (ca_cert_ == nullptr) {
@@ -83,6 +85,30 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
     }
     verify_mode = SSL_VERIFY_PEER;
+  }
+
+  if (!config.certificateRevocationList().empty()) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.certificateRevocationList().data()),
+                        config.certificateRevocationList().size()));
+    RELEASE_ASSERT(bio != nullptr);
+
+    // Based on BoringSSL's X509_load_cert_crl_file().
+    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+    if (list == nullptr) {
+      throw EnvoyException(
+          fmt::format("Failed to load CRL from {}", config.certificateRevocationListPath()));
+    }
+
+    X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
+    for (const X509_INFO* item : list.get()) {
+      if (item->crl) {
+        X509_STORE_add_crl(store, item->crl);
+      }
+    }
+
+    X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
   }
 
   if (!config.verifySubjectAltNameList().empty()) {
@@ -378,15 +404,6 @@ std::string ContextImpl::getSerialNumber(const X509* cert) {
   }
   return "";
 }
-
-bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
-  X509* cert = nullptr;
-  std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(cert_file.c_str(), "r"), &fclose);
-  if (!fp.get() || !PEM_read_X509(fp.get(), &cert, nullptr, nullptr)) {
-    throw EnvoyException(fmt::format("Failed to load certificate '{}'", cert_file.c_str()));
-  }
-  return bssl::UniquePtr<X509>(cert);
-};
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      const ClientContextConfig& config)

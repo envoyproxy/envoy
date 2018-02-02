@@ -283,6 +283,19 @@ TEST(HeaderStringTest, All) {
     EXPECT_FALSE(string.caseInsensitiveContains("keep-alive"));
     EXPECT_FALSE(string.caseInsensitiveContains(""));
   }
+
+  // getString
+  {
+    std::string static_string("HELLO");
+    HeaderString headerString1(static_string);
+    std::string retString1 = headerString1.getString();
+    EXPECT_EQ("HELLO", retString1);
+    EXPECT_EQ(5U, retString1.size());
+
+    HeaderString headerString2;
+    std::string retString2 = headerString2.getString();
+    EXPECT_EQ(0U, retString2.size());
+  }
 }
 
 TEST(HeaderMapImplTest, InlineInsert) {
@@ -571,5 +584,24 @@ TEST(HeaderMapImplTest, Lookup) {
     EXPECT_EQ(nullptr, entry);
   }
 }
+
+TEST(HeaderMapImplTest, Get) {
+  {
+    const TestHeaderMapImpl headers{{":path", "/"}, {"hello", "world"}};
+    EXPECT_STREQ("/", headers.get(LowerCaseString(":path"))->value().c_str());
+    EXPECT_STREQ("world", headers.get(LowerCaseString("hello"))->value().c_str());
+    EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
+  }
+
+  {
+    TestHeaderMapImpl headers{{":path", "/"}, {"hello", "world"}};
+    headers.get(LowerCaseString(":path"))->value(std::string("/new_path"));
+    EXPECT_STREQ("/new_path", headers.get(LowerCaseString(":path"))->value().c_str());
+    headers.get(LowerCaseString("hello"))->value(std::string("world2"));
+    EXPECT_STREQ("world2", headers.get(LowerCaseString("hello"))->value().c_str());
+    EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

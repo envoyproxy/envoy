@@ -12,29 +12,25 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/context.h"
+#include "envoy/ssl/context_manager.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
 #include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
-#include "common/network/raw_buffer_socket.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/connection_impl.h"
-#include "common/ssl/context_config_impl.h"
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -53,15 +49,19 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
 }
 } // namespace
 
-Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
+Host::CreateConnectionData
+HostImpl::createConnection(Event::Dispatcher& dispatcher,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstanceConstSharedPtr address) {
+                           Network::Address::InstanceConstSharedPtr address,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket());
+      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
+      options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -115,6 +115,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()) {
 
+  // If the cluster doesn't have transport socke configured, override with default transport
+  // socket implementation based on tls_context. We copy by value first then override if
+  // neccessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
@@ -224,7 +227,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
-      throw EnvoyException("cannot create an sds cluster without an sds config");
+      throw EnvoyException("cannot create an EDS cluster without an EDS config");
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
@@ -448,11 +451,11 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       fmt::format("circuit_breakers.{}.{}.", cluster_name, priority_name);
 
   const auto& thresholds = config.circuit_breakers().thresholds();
-  const auto it =
-      std::find_if(thresholds.cbegin(), thresholds.cend(),
-                   [priority](const envoy::api::v2::CircuitBreakers::Thresholds& threshold) {
-                     return threshold.priority() == priority;
-                   });
+  const auto it = std::find_if(
+      thresholds.cbegin(), thresholds.cend(),
+      [priority](const envoy::api::v2::cluster::CircuitBreakers::Thresholds& threshold) {
+        return threshold.priority() == priority;
+      });
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
     max_pending_requests =

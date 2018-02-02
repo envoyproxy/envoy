@@ -85,6 +85,7 @@ public:
   const LowerCaseString XB3Sampled{"x-b3-sampled"};
   const LowerCaseString XB3Flags{"x-b3-flags"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
+  const LowerCaseString XSquashDebug{"x-squash-debug"};
 
   struct {
     const std::string Close{"close"};
@@ -176,6 +177,12 @@ public:
   struct {
     const std::string True{"true"};
   } CORSValues;
+
+  struct {
+    const std::string Http10String{"HTTP/1.0"};
+    const std::string Http11String{"HTTP/1.1"};
+    const std::string Http2String{"HTTP/2"};
+  } ProtocolStrings;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;

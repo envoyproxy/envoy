@@ -413,6 +413,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   SpanPtr span_ptr = null_tracer.startSpan(config, request_headers, request_info);
   EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
 
+  span_ptr->setOperation("foo");
   span_ptr->setTag("foo", "bar");
   span_ptr->injectContext(request_headers);
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", std::chrono::system_clock::now()));

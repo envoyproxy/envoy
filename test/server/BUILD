@@ -114,6 +114,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 
@@ -128,6 +129,8 @@ envoy_cc_test(
         "//source/server:listener_manager_lib",
         "//source/server/config/listener:original_dst_lib",
         "//source/server/config/network:http_connection_manager_lib",
+        "//source/server/config/network:raw_buffer_socket_lib",
+        "//source/server/config/network:ssl_socket_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],

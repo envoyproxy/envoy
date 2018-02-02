@@ -5,16 +5,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.validate.h"
+
 #include "common/common/assert.h"
+#include "common/common/fmt.h"
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/rds_subscription.h"
-
-#include "api/rds.pb.validate.h"
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Router {
@@ -55,6 +56,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", local_info);
+
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
@@ -69,15 +71,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
-
-  // In V2 we use a Subscription model where the fetch can happen via gRPC, REST, or
-  // local filesystem. If the subscription happens via local filesystem (e.g xds_integration_test),
-  // then there is no actual RDS server, and hence no RDS cluster name.
-  if (rds.has_config_source() && rds.config_source().has_api_config_source()) {
-    cluster_name_ = rds.config_source().api_config_source().cluster_names()[0];
-  } else {
-    cluster_name_ = "NOT_USING_CLUSTER";
-  }
+  config_source_ = MessageUtil::getJsonStringFromMessage(rds.config_source(), true);
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
@@ -247,7 +241,7 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutesLoop(
     response.add("{\n");
     response.add(fmt::format("\"version_info\": \"{}\",\n", provider->versionInfo()));
     response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider->routeConfigName()));
-    response.add(fmt::format("\"cluster_name\": \"{}\",\n", provider->clusterName()));
+    response.add(fmt::format("\"config_source\": {},\n", provider->configSource()));
     response.add("\"route_table_dump\": ");
     response.add(fmt::format("{}\n", provider->configAsJson()));
     response.add("}\n");

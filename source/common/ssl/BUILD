@@ -9,17 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "connection_lib",
-    srcs = ["connection_impl.cc"],
-    hdrs = ["connection_impl.h"],
-    deps = [
-        ":context_lib",
-        ":ssl_socket_lib",
-        "//source/common/network:connection_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "ssl_socket_lib",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
@@ -40,7 +29,6 @@ envoy_cc_library(
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
     external_deps = [
-        "envoy_sds",
         "ssl",
     ],
     deps = [
@@ -49,6 +37,7 @@ envoy_cc_library(
         "//source/common/config:tls_context_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 
