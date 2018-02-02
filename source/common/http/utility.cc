@@ -272,5 +272,18 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
   }
 }
 
+const std::string& Utility::getProtocolString(const Protocol p) {
+  switch (p) {
+  case Protocol::Http10:
+    return Headers::get().ProtocolStrings.Http10String;
+  case Protocol::Http11:
+    return Headers::get().ProtocolStrings.Http11String;
+  case Protocol::Http2:
+    return Headers::get().ProtocolStrings.Http2String;
+  }
+
+  NOT_REACHED;
+}
+
 } // namespace Http
 } // namespace Envoy

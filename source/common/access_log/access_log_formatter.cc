@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/http/utility.h"
 #include "common/request_info/utility.h"
 
 #include "fmt/format.h"
@@ -29,7 +30,7 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
 const std::string&
 AccessLogFormatUtils::protocolToString(const Optional<Http::Protocol>& protocol) {
   if (protocol.valid()) {
-    return Http::getProtocolString(protocol.value());
+    return Http::Utility::getProtocolString(protocol.value());
   }
   return UnspecifiedValueString;
 }
