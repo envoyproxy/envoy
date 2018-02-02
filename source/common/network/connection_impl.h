@@ -47,9 +47,6 @@ class ConnectionImpl : public virtual Connection,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  // TODO(lizan): Remove the old style constructor when factory is ready.
-  ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket, bool connected);
-
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, bool connected);
 
