@@ -68,13 +68,31 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(128U, new_weight)); }
 
+HostsPerLocalityConstSharedPtr
+HostsPerLocalityImpl::filter(std::function<bool(const Host&)> predicate) const {
+  auto* filtered_clone = new HostsPerLocalityImpl();
+  HostsPerLocalityConstSharedPtr shared_filtered_clone{filtered_clone};
+
+  filtered_clone->local_ = local_;
+  for (const auto& hosts_locality : hosts_per_locality_) {
+    HostVector current_locality_hosts;
+    for (const auto& host : hosts_locality) {
+      if (predicate(*host)) {
+        current_locality_hosts.emplace_back(host);
+      }
+    }
+    filtered_clone->hosts_per_locality_.push_back(std::move(current_locality_hosts));
+  }
+
+  return shared_filtered_clone;
+}
+
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       HostSetImplPtr host_set = createHostSet(i);
-      host_set->addMemberUpdateCb([this](uint32_t priority,
-                                         const std::vector<HostSharedPtr>& hosts_added,
-                                         const std::vector<HostSharedPtr>& hosts_removed) {
+      host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                         const HostVector& hosts_removed) {
         runUpdateCallbacks(priority, hosts_added, hosts_removed);
       });
       host_sets_.push_back(std::move(host_set));
@@ -167,9 +185,6 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   }
 }
 
-const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
-    new std::vector<std::vector<HostSharedPtr>>()};
-
 ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                          Stats::Store& stats, ThreadLocal::Instance& tls,
                                          Network::DnsResolverSharedPtr dns_resolver,
@@ -259,26 +274,25 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
-  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>& hosts_added,
-                                         const std::vector<HostSharedPtr>& hosts_removed) {
-    if (!hosts_added.empty() || !hosts_removed.empty()) {
-      info_->stats().membership_change_.inc();
-    }
+  priority_set_.addMemberUpdateCb(
+      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
+        if (!hosts_added.empty() || !hosts_removed.empty()) {
+          info_->stats().membership_change_.inc();
+        }
 
-    uint32_t healthy_hosts = 0;
-    uint32_t hosts = 0;
-    for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
-      hosts += host_set->hosts().size();
-      healthy_hosts += host_set->healthyHosts().size();
-    }
-    info_->stats().membership_total_.set(hosts);
-    info_->stats().membership_healthy_.set(healthy_hosts);
-  });
+        uint32_t healthy_hosts = 0;
+        uint32_t hosts = 0;
+        for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
+          hosts += host_set->hosts().size();
+          healthy_hosts += host_set->healthyHosts().size();
+        }
+        info_->stats().membership_total_.set(hosts);
+        info_->stats().membership_healthy_.set(healthy_hosts);
+      });
 }
 
-HostVectorConstSharedPtr
-ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) {
-  HostVectorSharedPtr healthy_list(new std::vector<HostSharedPtr>());
+HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector& hosts) {
+  HostVectorSharedPtr healthy_list(new HostVector());
   for (const auto& host : hosts) {
     if (host->healthy()) {
       healthy_list->emplace_back(host);
@@ -288,21 +302,9 @@ ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) 
   return healthy_list;
 }
 
-HostListsConstSharedPtr
-ClusterImplBase::createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts) {
-  HostListsSharedPtr healthy_list(new std::vector<std::vector<HostSharedPtr>>());
-
-  for (const auto& hosts_zone : hosts) {
-    std::vector<HostSharedPtr> current_zone_hosts;
-    for (const auto& host : hosts_zone) {
-      if (host->healthy()) {
-        current_zone_hosts.emplace_back(host);
-      }
-    }
-    healthy_list->push_back(std::move(current_zone_hosts));
-  }
-
-  return healthy_list;
+HostsPerLocalityConstSharedPtr
+ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts) {
+  return hosts.filter([](const Host& host) { return host.healthy(); });
 }
 
 bool ClusterInfoImpl::maintenanceMode() const {
@@ -408,9 +410,8 @@ void ClusterImplBase::reloadHealthyHosts() {
   }
 
   for (auto& host_set : prioritySet().hostSetsPerPriority()) {
-    HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(host_set->hosts()));
-    HostListsConstSharedPtr hosts_per_locality_copy(
-        new std::vector<std::vector<HostSharedPtr>>(host_set->hostsPerLocality()));
+    HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
                           hosts_per_locality_copy,
                           createHealthyHostLists(host_set->hostsPerLocality()), {}, {});
@@ -473,7 +474,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
                       added_via_api),
-      initial_hosts_(new std::vector<HostSharedPtr>()) {
+      initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(
@@ -496,17 +497,17 @@ void StaticClusterImpl::startPreInit() {
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
-                             empty_host_lists_, empty_host_lists_, *initial_hosts_, {});
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             *initial_hosts_, {});
   initial_hosts_ = nullptr;
 
   onPreInitComplete();
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
-                                                   std::vector<HostSharedPtr>& current_hosts,
-                                                   std::vector<HostSharedPtr>& hosts_added,
-                                                   std::vector<HostSharedPtr>& hosts_removed,
-                                                   bool depend_on_hc) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
+                                                   HostVector& current_hosts,
+                                                   HostVector& hosts_added,
+                                                   HostVector& hosts_removed, bool depend_on_hc) {
   uint64_t max_host_weight = 1;
 
   // Go through and see if the list we have is different from what we just got. If it is, we
@@ -515,7 +516,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedP
   // duplicates here. It's possible for DNS to return the same address multiple times, and a bad
   // SDS implementation could do the same thing.
   std::unordered_set<std::string> host_addresses;
-  std::vector<HostSharedPtr> final_hosts;
+  HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (host_addresses.count(host->address()->asString())) {
       continue;
@@ -624,10 +625,10 @@ void StrictDnsClusterImpl::startPreInit() {
   }
 }
 
-void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
-                                          const std::vector<HostSharedPtr>& hosts_removed) {
+void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
+                                          const HostVector& hosts_removed) {
   // At this point we know that we are different so make a new host list and notify.
-  HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
+  HostVectorSharedPtr new_hosts(new HostVector());
   for (const ResolveTargetPtr& target : resolve_targets_) {
     for (const HostSharedPtr& host : target->hosts_) {
       new_hosts->emplace_back(host);
@@ -637,8 +638,9 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostSharedPtr>& host
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
-                             empty_host_lists_, hosts_added, hosts_removed);
+  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             hosts_added, hosts_removed);
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
@@ -665,7 +667,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
-        std::vector<HostSharedPtr> new_hosts;
+        HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
@@ -677,8 +679,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                                               envoy::api::v2::Locality().default_instance()));
         }
 
-        std::vector<HostSharedPtr> hosts_added;
-        std::vector<HostSharedPtr> hosts_removed;
+        HostVector hosts_added;
+        HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, false)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed);

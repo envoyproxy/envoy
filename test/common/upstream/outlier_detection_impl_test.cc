@@ -65,13 +65,13 @@ public:
   }
 
   void addHosts(std::vector<std::string> urls, bool primary = true) {
-    std::vector<HostSharedPtr>& hosts = primary ? hosts_ : failover_hosts_;
+    HostVector& hosts = primary ? hosts_ : failover_hosts_;
     for (auto& url : urls) {
       hosts.emplace_back(makeTestHost(cluster_.info_, url));
     }
   }
 
-  void loadRq(std::vector<HostSharedPtr>& hosts, int num_rq, int http_code) {
+  void loadRq(HostVector& hosts, int num_rq, int http_code) {
     for (uint64_t i = 0; i < hosts.size(); i++) {
       loadRq(hosts[i], num_rq, http_code);
     }
@@ -90,8 +90,8 @@ public:
   }
 
   NiceMock<MockCluster> cluster_;
-  std::vector<HostSharedPtr>& hosts_ = cluster_.prioritySet().getMockHostSet(0)->hosts_;
-  std::vector<HostSharedPtr>& failover_hosts_ = cluster_.prioritySet().getMockHostSet(1)->hosts_;
+  HostVector& hosts_ = cluster_.prioritySet().getMockHostSet(0)->hosts_;
+  HostVector& failover_hosts_ = cluster_.prioritySet().getMockHostSet(1)->hosts_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* interval_timer_ = new Event::MockTimer(&dispatcher_);
@@ -561,7 +561,7 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
-  std::vector<HostSharedPtr> old_hosts = std::move(hosts_);
+  HostVector old_hosts = std::move(hosts_);
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -657,7 +657,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   loadRq(hosts_[0], 1, 500);
 
   // Remove before the cross thread event comes in.
-  std::vector<HostSharedPtr> old_hosts = std::move(hosts_);
+  HostVector old_hosts = std::move(hosts_);
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
   post_cb();
 

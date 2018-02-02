@@ -122,6 +122,7 @@ envoy_cc_test(
     name = "load_balancer_simulation_test",
     srcs = ["load_balancer_simulation_test.cc"],
     deps = [
+        ":utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:load_balancer_lib",
