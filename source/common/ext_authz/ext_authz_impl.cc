@@ -141,7 +141,7 @@ void CreateCheckRequest::setHttpRequest(
   }
 
   // Fill in the headers
-  auto mhdrs = httpreq.mutable_headers();
+  auto mutable_headers = httpreq.mutable_headers();
   headers.iterate(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
         Envoy::Protobuf::Map<::std::string, ::std::string>* mutable_headers =
@@ -149,7 +149,7 @@ void CreateCheckRequest::setHttpRequest(
         (*mutable_headers)[e.key().getString()] = e.value().getString();
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },
-      mhdrs);
+      mutable_headers);
 }
 
 void CreateCheckRequest::setAttrContextRequest(
