@@ -207,7 +207,7 @@ public:
    * @param proto_address is the protobuf address to which the address instance is copied into.
    */
   static void addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::api::v2::Address& proto_address);
+                                       envoy::api::v2::core::Address& proto_address);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);

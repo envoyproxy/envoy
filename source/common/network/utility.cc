@@ -372,7 +372,7 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::api::v2::Address& proto_address) {
+                                       envoy::api::v2::core::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
   } else {
