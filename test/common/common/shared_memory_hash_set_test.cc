@@ -50,6 +50,28 @@ protected:
     memset(memory_.get(), 0, mem_size);
   }
 
+  /**
+   * Returns a string describing the contents of the map, including the control
+   * bits and the keys in each slot.
+   */
+  template <class TestValueClass>
+  std::string hashSetToString(SharedMemoryHashSet<TestValueClass>& hs) {
+    std::string ret;
+    static const uint32_t sentinal = SharedMemoryHashSet<TestValueClass>::Sentinal;
+    std::string control_string =
+        fmt::format("{} size={} free_cell_index={}", hs.control_->options.toString(),
+                    hs.control_->size, hs.control_->free_cell_index);
+    ret = fmt::format("options={}\ncontrol={}\n", hs.control_->options.toString(), control_string);
+    for (uint32_t i = 0; i < hs.control_->options.num_slots; ++i) {
+      ret += fmt::format("slot {}:", i);
+      for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell) {
+        ret += " " + std::string(hs.getCell(j).value.key());
+      }
+      ret += "\n";
+    }
+    return ret;
+  }
+
   SharedMemoryHashSetOptions options_;
   std::unique_ptr<uint8_t[]> memory_;
 };
@@ -102,7 +124,7 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
     SharedMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get());
     EXPECT_EQ(1, hash_set2.size());
     EXPECT_EQ(nullptr, hash_set2.get("no such key"));
-    EXPECT_EQ(6789, hash_set2.get("good key")->number) << hash_set2.toString();
+    EXPECT_EQ(6789, hash_set2.get("good key")->number) << hashSetToString<TestValue>(hash_set2);
     EXPECT_FALSE(hash_set2.remove("no such key"));
     hash_set2.sanityCheck();
     EXPECT_TRUE(hash_set2.remove("good key"));

@@ -405,15 +405,6 @@ std::string ContextImpl::getSerialNumber(const X509* cert) {
   return "";
 }
 
-bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
-  X509* cert = nullptr;
-  std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(cert_file.c_str(), "r"), &fclose);
-  if (!fp.get() || !PEM_read_X509(fp.get(), &cert, nullptr, nullptr)) {
-    throw EnvoyException(fmt::format("Failed to load certificate '{}'", cert_file.c_str()));
-  }
-  return bssl::UniquePtr<X509>(cert);
-};
-
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      const ClientContextConfig& config)
     : ContextImpl(parent, scope, config) {

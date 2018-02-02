@@ -199,12 +199,13 @@ public:
                           AccessLog::AccessLogManager& log_manager) PURE;
 
   /**
-   * Allocate an HTTP connection pool.
+   * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
+   * 'protocol', and 'options->hashKey()', if any.
    */
-  virtual Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                             HostConstSharedPtr host,
-                                                             ResourcePriority priority,
-                                                             Http::Protocol protocol) PURE;
+  virtual Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, Http::Protocol protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

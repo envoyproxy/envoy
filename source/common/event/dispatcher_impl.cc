@@ -73,22 +73,22 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                              Ssl::Context* ssl_ctx) {
+Network::ConnectionPtr
+DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
+                                       Network::TransportSocketPtr&& transport_socket) {
   ASSERT(isThreadSafe());
-  return Network::ConnectionPtr{ssl_ctx
-                                    ? new Ssl::ConnectionImpl(*this, std::move(socket), true,
-                                                              *ssl_ctx, Ssl::InitialState::Server)
-                                    : new Network::ConnectionImpl(*this, std::move(socket), true)};
+  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
+                                                   std::move(transport_socket), true);
 }
 
 Network::ClientConnectionPtr
 DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address,
                                        Network::Address::InstanceConstSharedPtr source_address,
-                                       Network::TransportSocketPtr&& transport_socket) {
+                                       Network::TransportSocketPtr&& transport_socket,
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
-                                                         std::move(transport_socket));
+                                                         std::move(transport_socket), options);
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

@@ -9,6 +9,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
@@ -216,6 +217,11 @@ public:
    * @return boolean telling if the connection is currently above the high watermark.
    */
   virtual bool aboveHighWatermark() const PURE;
+
+  /**
+   * Get the socket options set on this connection.
+   */
+  virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

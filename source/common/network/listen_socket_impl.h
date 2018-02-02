@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
@@ -78,9 +79,12 @@ public:
       fd_ = -1;
     }
   }
+  void setOptions(const OptionsSharedPtr& options) override { options_ = options; }
+  const ConnectionSocket::OptionsSharedPtr& options() const override { return options_; }
 
 protected:
   int fd_;
+  OptionsSharedPtr options_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};

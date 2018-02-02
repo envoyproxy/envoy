@@ -229,7 +229,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       runtime_(loadRuntimeData(route.match())), loader_(loader),
       host_redirect_(route.redirect().host_redirect()),
-      path_redirect_(route.redirect().path_redirect()), retry_policy_(route.route()),
+      path_redirect_(route.redirect().path_redirect()),
+      https_redirect_(route.redirect().https_redirect()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -388,6 +389,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
 
   const char* final_host;
   const char* final_path;
+  const char* final_scheme;
   if (!host_redirect_.empty()) {
     final_host = host_redirect_.c_str();
   } else {
@@ -402,9 +404,14 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_path = headers.Path()->value().c_str();
   }
 
-  ASSERT(headers.ForwardedProto());
-  return fmt::format("{}://{}{}", headers.ForwardedProto()->value().c_str(), final_host,
-                     final_path);
+  if (https_redirect_) {
+    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
+  } else {
+    ASSERT(headers.ForwardedProto());
+    final_scheme = headers.ForwardedProto()->value().c_str();
+  }
+
+  return fmt::format("{}://{}{}", final_scheme, final_host, final_path);
 }
 
 std::multimap<std::string, std::string>

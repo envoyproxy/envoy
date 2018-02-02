@@ -63,7 +63,19 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  ClientContextPtr ssl_ctx_;
+  const ClientContextPtr ssl_ctx_;
+};
+
+class ServerSslSocketFactory : public Network::TransportSocketFactory {
+public:
+  ServerSslSocketFactory(const ServerContextConfig& config, const std::string& listener_name,
+                         const std::vector<std::string>& server_names, bool skip_context_update,
+                         Ssl::ContextManager& manager, Stats::Scope& stats_scope);
+  Network::TransportSocketPtr createTransportSocket() const override;
+  bool implementsSecureTransport() const override;
+
+private:
+  const ServerContextPtr ssl_ctx_;
 };
 
 } // namespace Ssl

@@ -16,14 +16,26 @@ class RawBufferSocketFactory : public virtual TransportSocketConfigFactory {
 public:
   virtual ~RawBufferSocketFactory() {}
   std::string name() const override { return Config::TransportSocketNames::get().RAW_BUFFER; }
-  Network::TransportSocketFactoryPtr
-  createTransportSocketFactory(const Protobuf::Message& config,
-                               TransportSocketFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
 class UpstreamRawBufferSocketFactory : public UpstreamTransportSocketConfigFactory,
-                                       public RawBufferSocketFactory {};
+                                       public RawBufferSocketFactory {
+public:
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               TransportSocketFactoryContext& context) override;
+};
+
+class DownstreamRawBufferSocketFactory : public DownstreamTransportSocketConfigFactory,
+                                         public RawBufferSocketFactory {
+public:
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const std::string& listener_name,
+                               const std::vector<std::string>& server_names,
+                               bool skip_context_update, const Protobuf::Message& config,
+                               TransportSocketFactoryContext& context) override;
+};
 
 } // namespace Configuration
 } // namespace Server

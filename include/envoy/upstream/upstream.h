@@ -48,13 +48,16 @@ public:
   /**
    * Create a connection for this host.
    * @param dispatcher supplies the owning dispatcher.
+   * @param options supplies the socket options that will be set on the new connection.
    * @return the connection data which includes the raw network connection as well as the *real*
    *         host that backs it. The reason why a 2nd host is returned is that some hosts are
    *         logical and wrap multiple real network destinations. In this case, a different host
    *         will be returned along with the connection vs. the host the method was called on.
    *         If it matters, callers should not assume that the returned host will be the same.
    */
-  virtual CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const PURE;
+  virtual CreateConnectionData
+  createConnection(Event::Dispatcher& dispatcher,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
 
   /**
    * @return host specific gauges.

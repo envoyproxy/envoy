@@ -4,6 +4,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 
 #include "common/common/logger.h"
@@ -168,6 +169,7 @@ class ListenerImpl : public Network::ListenerConfig,
                      public Configuration::FactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainFactory,
+                     public Configuration::TransportSocketFactoryContext,
                      Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -214,8 +216,8 @@ public:
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
-  Ssl::ServerContext* defaultSslContext() override {
-    return tls_contexts_.empty() ? nullptr : tls_contexts_[0].get();
+  Network::TransportSocketFactory& transportSocketFactory() override {
+    return *transport_socket_factories_[0];
   }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
@@ -252,6 +254,10 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
 
+  // Configuration::TransportSocketFactoryContext
+  Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
+  Stats::Scope& statsScope() const override { return *listener_scope_; }
+
 private:
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -259,6 +265,7 @@ private:
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   std::vector<Ssl::ServerContextPtr> tls_contexts_;
+  std::vector<Network::TransportSocketFactoryPtr> transport_socket_factories_;
   const bool bind_to_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;

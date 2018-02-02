@@ -32,13 +32,13 @@ static void errorCallbackTest(Address::IpVersion version) {
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket());
+      Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
@@ -96,7 +96,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket());
+      Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -104,8 +104,8 @@ TEST_P(ListenerImplTest, UseActualDst) {
   EXPECT_CALL(listener_callbacks2, onAccept_(_, _)).Times(0);
   EXPECT_CALL(listener_callbacks1, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks1.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
@@ -132,15 +132,15 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket());
+      Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
 
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection =
-            dispatcher.createServerConnection(std::move(socket), nullptr);
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))

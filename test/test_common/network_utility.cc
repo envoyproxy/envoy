@@ -163,6 +163,9 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
 
+TransportSocketFactoryPtr createRawBufferSocketFactory() {
+  return std::make_unique<RawBufferSocketFactory>();
+};
 } // namespace Test
 } // namespace Network
 } // namespace Envoy

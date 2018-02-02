@@ -5,10 +5,9 @@
 namespace Envoy {
 namespace Event {
 
-Network::ClientConnectionPtr
-ValidationDispatcher::createClientConnection(Network::Address::InstanceConstSharedPtr,
-                                             Network::Address::InstanceConstSharedPtr,
-                                             Network::TransportSocketPtr&&) {
+Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
+    Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+    Network::TransportSocketPtr&&, const Network::ConnectionSocket::OptionsSharedPtr&) {
   NOT_IMPLEMENTED;
 }
 

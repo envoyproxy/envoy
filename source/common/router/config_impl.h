@@ -412,7 +412,7 @@ private:
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
-    const Decorator* decorator() const override { return nullptr; }
+    const Decorator* decorator() const override { return parent_->decorator(); }
 
   private:
     const RouteEntryImplBase* parent_;
@@ -477,6 +477,7 @@ private:
   Runtime::Loader& loader_;
   const std::string host_redirect_;
   const std::string path_redirect_;
+  const bool https_redirect_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;

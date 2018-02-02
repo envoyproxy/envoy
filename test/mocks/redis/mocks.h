@@ -50,6 +50,18 @@ public:
     }
   }
 
+  void runHighWatermarkCallbacks() {
+    for (auto* callback : callbacks_) {
+      callback->onAboveWriteBufferHighWatermark();
+    }
+  }
+
+  void runLowWatermarkCallbacks() {
+    for (auto* callback : callbacks_) {
+      callback->onBelowWriteBufferLowWatermark();
+    }
+  }
+
   MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
   MOCK_METHOD0(close, void());
   MOCK_METHOD2(makeRequest, PoolRequest*(const RespValue& request, PoolCallbacks& callbacks));
