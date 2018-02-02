@@ -251,8 +251,7 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
   absl::string_view pem(reinterpret_cast<const char*>(output), length);
   cached_url_encoded_pem_encoded_peer_certificate_ = absl::StrReplaceAll(
-      pem,
-      {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+      pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
   RELEASE_ASSERT(cached_url_encoded_pem_encoded_peer_certificate_.size() >= length);
   return cached_url_encoded_pem_encoded_peer_certificate_;
 }
