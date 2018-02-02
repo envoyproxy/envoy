@@ -272,8 +272,8 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
   }
 }
 
-const std::string& Utility::getProtocolString(const Protocol p) {
-  switch (p) {
+const std::string& Utility::getProtocolString(const Protocol protocol) {
+  switch (protocol) {
   case Protocol::Http10:
     return Headers::get().ProtocolStrings.Http10String;
   case Protocol::Http11:
