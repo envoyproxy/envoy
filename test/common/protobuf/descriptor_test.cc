@@ -19,6 +19,10 @@ namespace Envoy {
 // services as well as types that are referenced in Any messages. IF THIS TEST BREAKS YOU
 // HAVE DONE SOMETHING BAD. Consult with the larger dev team on how to handle.
 TEST(ProtoDescriptorTest, BackCompat) {
+  // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
+  envoy::service::discovery::v2::AdsDummy dummy;
+  envoy::service::ratelimit::v2::RateLimitRequest rls_dummy;
+
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
