@@ -135,14 +135,15 @@ public:
   virtual ~HostsPerLocality() {}
 
   /**
-   * @return bool is local locality one of the locality buckets?
+   * @return bool is local locality one of the locality buckets? If so, the
+   *         local locality will be the first in the get() vector.
    */
   virtual bool hasLocalLocality() const PURE;
 
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
-   *         locality. The local locality is the first entry if local() !=
-   *         nullptr.
+   *         locality. The local locality is the first entry if local() is
+   *         true.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 
@@ -154,6 +155,14 @@ public:
    */
   virtual std::shared_ptr<const HostsPerLocality>
   filter(std::function<bool(const Host&)> predicate) const PURE;
+
+  /**
+   * Clone object.
+   * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality.
+   */
+  std::shared_ptr<const HostsPerLocality> clone() const {
+    return filter([](const Host&) { return true; });
+  }
 };
 
 typedef std::shared_ptr<HostsPerLocality> HostsPerLocalitySharedPtr;

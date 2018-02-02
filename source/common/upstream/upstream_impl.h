@@ -168,14 +168,7 @@ private:
 
 class HostsPerLocalityImpl : public HostsPerLocality {
 public:
-  HostsPerLocalityImpl() : HostsPerLocalityImpl(false) {}
-
-  HostsPerLocalityImpl(bool has_local_locality)
-      : HostsPerLocalityImpl(has_local_locality ? std::vector<HostVector>({{}})
-                                                : std::vector<HostVector>()) {}
-
-  HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts)
-      : HostsPerLocalityImpl(std::move(locality_hosts), !locality_hosts.empty()) {}
+  HostsPerLocalityImpl() : HostsPerLocalityImpl({}, false) {}
 
   HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
       : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {

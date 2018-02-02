@@ -411,8 +411,7 @@ void ClusterImplBase::reloadHealthyHosts() {
 
   for (auto& host_set : prioritySet().hostSetsPerPriority()) {
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
-    HostsPerLocalityConstSharedPtr hosts_per_locality_copy =
-        host_set->hostsPerLocality().filter([](const Host&) { return true; });
+    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
                           hosts_per_locality_copy,
                           createHealthyHostLists(host_set->hostsPerLocality()), {}, {});

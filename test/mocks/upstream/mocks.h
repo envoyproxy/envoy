@@ -55,8 +55,8 @@ public:
 
   HostVector hosts_;
   HostVector healthy_hosts_;
-  HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl(true)};
-  HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl(true)};
+  HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
+  HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
 };

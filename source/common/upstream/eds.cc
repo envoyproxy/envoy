@@ -127,7 +127,8 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, HostVector& new_h
       }
     }
 
-    auto per_locality_shared = std::make_shared<HostsPerLocalityImpl>(std::move(per_locality));
+    auto per_locality_shared =
+        std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), !per_locality.empty());
 
     host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
                          per_locality_shared, createHealthyHostLists(*per_locality_shared),

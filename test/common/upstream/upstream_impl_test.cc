@@ -746,19 +746,6 @@ TEST(HostsPerLocalityImpl, Cons) {
     EXPECT_EQ(0, hosts_per_locality.get().size());
   }
 
-  {
-    const HostsPerLocalityImpl hosts_per_locality(false);
-    EXPECT_FALSE(hosts_per_locality.hasLocalLocality());
-    EXPECT_EQ(0, hosts_per_locality.get().size());
-  }
-
-  {
-    const HostsPerLocalityImpl hosts_per_locality(true);
-    EXPECT_TRUE(hosts_per_locality.hasLocalLocality());
-    EXPECT_EQ(1, hosts_per_locality.get().size());
-    EXPECT_TRUE(hosts_per_locality.get()[0].empty());
-  }
-
   MockCluster cluster;
   HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -766,7 +753,7 @@ TEST(HostsPerLocalityImpl, Cons) {
   {
     std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
     const auto locality_hosts_copy = locality_hosts;
-    const HostsPerLocalityImpl hosts_per_locality(std::move(locality_hosts));
+    const HostsPerLocalityImpl hosts_per_locality(std::move(locality_hosts), true);
     EXPECT_TRUE(hosts_per_locality.hasLocalLocality());
     EXPECT_EQ(locality_hosts_copy, hosts_per_locality.get());
   }

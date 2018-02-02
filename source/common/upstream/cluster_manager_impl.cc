@@ -486,10 +486,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& primary_clu
 
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
-  HostsPerLocalityConstSharedPtr hosts_per_locality_copy =
-      host_set->hostsPerLocality().filter([](const Host&) { return true; });
+  HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
-      host_set->healthyHostsPerLocality().filter([](const Host&) { return true; });
+      host_set->healthyHostsPerLocality().clone();
 
   tls_->runOnAllThreads([
     this, name = primary_cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,

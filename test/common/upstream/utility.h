@@ -91,7 +91,7 @@ inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSha
 }
 
 inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts) {
-  return std::make_shared<HostsPerLocalityImpl>(std::move(locality_hosts));
+  return std::make_shared<HostsPerLocalityImpl>(std::move(locality_hosts), !locality_hosts.empty());
 }
 
 } // namespace
