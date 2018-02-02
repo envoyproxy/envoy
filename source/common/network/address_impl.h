@@ -214,7 +214,7 @@ private:
   sockaddr_un address_;
   // For abstract namespaces.
   bool abstract_namespace_{false};
-  int address_length_{0};
+  uint32_t address_length_{0};
 };
 
 } // namespace Address

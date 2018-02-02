@@ -7,7 +7,8 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, UdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                         testing::Bool()));
 
 TEST_P(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
