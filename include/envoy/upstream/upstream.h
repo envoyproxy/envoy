@@ -142,8 +142,8 @@ public:
 
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
-   *         locality. The local locality is the first entry if local() is
-   *         true.
+   *         locality. The local locality is the first entry if
+   *         hasLocalLocality() is true.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 
