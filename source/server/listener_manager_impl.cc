@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
@@ -105,6 +106,85 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
+// Socket::Option implementation for API-defined listener socket options.
+// This same object can be extended to handle additional listener socket options.
+class ListenerSocketOption : public Network::Socket::Option, Logger::Loggable<Logger::Id::config> {
+public:
+  ListenerSocketOption(const envoy::api::v2::Listener& config)
+      : os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+    if (config.has_transparent()) {
+      transparent_ = config.transparent().value();
+    }
+  }
+
+  // Network::Socket::Option
+  bool setOption(Network::Socket& socket, Network::Socket::SocketState state) const override {
+    // IP_TRANSPARENT has an effect on bind() (allowing bind() to non-local addresses), but
+    // also after bind(), controlling whether new connections with non-local addresses are
+    // redirected to the listening socket or not, so we need to set it in either case, as
+    // it is possible to, e.g., set it on a listener and then change the listener configuration
+    // to not set it.
+    // This has the side effect of setting the option twice after the socket is first created,
+    // both before and after bind().
+    UNREFERENCED_PARAMETER(state);
+
+    // Only set the socket option if optional "transparent" was included in config.
+    if (transparent_) {
+      const auto* ip = socket.localAddress()->ip();
+      if (ip == nullptr) {
+        return false; // Not applicable on non-IP sockets.
+      }
+
+      int error = 0;
+
+      if (ip->version() == Network::Address::IpVersion::v4) {
+#if defined(SOL_IP) && defined(IP_TRANSPARENT)
+        int option = transparent_.value();
+        if (os_sys_calls_.setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option,
+                                     sizeof(option)) != 0) {
+          error = errno;
+        }
+#else
+        error = ENOTSUP;
+#endif
+      } else if (ip->version() == Network::Address::IpVersion::v6) {
+      // Some systems have IPV6_TRANSPARENT option, use it if available.
+      // Otherwise try with IP_TRANSPARENT also for IPv6, as many systems allow it.
+#if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
+        int option = transparent_.value();
+        if (os_sys_calls_.setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option,
+                                     sizeof(option)) != 0) {
+          error = errno;
+        }
+#elif defined(SOL_IP) && defined(IP_TRANSPARENT)
+        int option = transparent_.value();
+        if (os_sys_calls_.setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option,
+                                     sizeof(option)) != 0) {
+          error = errno;
+        }
+#else
+        error = ENOTSUP;
+#endif
+      } else {
+        NOT_REACHED;
+      }
+
+      if (error != 0) {
+        ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}",
+                  transparent_.value(), strerror(error));
+        return false;
+      }
+    }
+
+    return true;
+  }
+  void hashKey(std::vector<uint8_t>&) const override {} // Not used for listener sockets.
+
+private:
+  absl::optional<bool> transparent_;
+  Api::OsSysCalls& os_sys_calls_;
+};
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
@@ -125,6 +205,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
+
+  // Add listen socket options from the config.
+  if (config.has_transparent()) {
+    addListenSocketOption(std::make_unique<ListenerSocketOption>(config));
+  }
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =

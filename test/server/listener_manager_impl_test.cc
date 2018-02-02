@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
 #include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
@@ -12,6 +13,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1386,6 +1388,51 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
                             EnvoyException,
                             "MockListenerComponentFactory: Setting socket options failed");
   EXPECT_EQ(0U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListener) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: "TransparentListener"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains:
+    - filters:
+    transparent: true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           bool) -> Network::SocketSharedPtr {
+        EXPECT_NE(options.get(), nullptr);
+        EXPECT_EQ(options->size(), 1);
+        return listener_factory_.socket_;
+      }));
+#if defined(SOL_IP) && defined(IP_TRANSPARENT)
+  int fd;
+
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_IP, IP_TRANSPARENT, _, sizeof(int)))
+      .WillOnce(Invoke([&](int sockfd, int, int, const void*, socklen_t) -> int {
+        fd = sockfd;
+        return 0;
+      }));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  int val = 0;
+  socklen_t val_len = sizeof(val);
+  EXPECT_EQ(os_sys_calls.getsockopt(fd, SOL_IP, IP_TRANSPARENT, &val, &val_len), 0);
+  EXPECT_EQ(val_len, sizeof(val));
+  EXPECT_EQ(val, 1);
+#else
+  // MockListenerSocket is not a real socket, so this always fails in testing.
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                            EnvoyException, "TransparentListener: Setting socket options failed");
+  EXPECT_EQ(0U, manager_->listeners().size());
+#endif
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
