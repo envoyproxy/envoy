@@ -158,6 +158,8 @@ void IntegrationTcpClient::waitForHalfClose() {
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
 
+void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
+
 void IntegrationTcpClient::write(const std::string& data, bool end_stream) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));

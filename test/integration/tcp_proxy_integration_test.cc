@@ -108,6 +108,44 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
+// Test that a downstream flush works correctly (all data is flushed)
+TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
+  // Use a very large size to make sure it is larger than the kernel socket read buffer.
+  const uint32_t size = 50 * 1024 * 1024;
+  config_helper_.setBufferLimits(size / 4, size / 4);
+  initialize();
+
+  std::string data(size, 'a');
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  tcp_client->readDisable(true);
+  tcp_client->write("", true);
+
+  // This ensures that readDisable(true) has been run on it's thread
+  // before tcp_client starts writing.
+  fake_upstream_connection->waitForHalfClose();
+
+  fake_upstream_connection->write(data, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
+                ->value(),
+            0);
+  tcp_client->readDisable(false);
+  tcp_client->waitForData(data);
+  tcp_client->waitForHalfClose();
+  fake_upstream_connection->waitForHalfClose();
+
+  uint32_t upstream_pauses =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
+          ->value();
+  uint32_t upstream_resumes =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
+          ->value();
+  EXPECT_GE(upstream_pauses, upstream_resumes);
+  EXPECT_GT(upstream_resumes, 0);
+}
+
 // Test that an upstream flush works correctly (all data is flushed)
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
