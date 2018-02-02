@@ -173,6 +173,12 @@ void FakeConnectionBase::readDisable(bool disable) {
   connection_.dispatcher().post([this, disable]() -> void { connection_.readDisable(disable); });
 }
 
+void FakeConnectionBase::enableHalfClose(bool enable) {
+  std::unique_lock<std::mutex> lock(lock_);
+  RELEASE_ASSERT(!disconnected_);
+  connection_.dispatcher().post([this, enable]() -> void { connection_.enableHalfClose(enable); });
+}
+
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
   std::unique_lock<std::mutex> lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder));

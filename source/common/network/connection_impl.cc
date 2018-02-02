@@ -111,7 +111,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     ASSERT(type == ConnectionCloseType::FlushWrite);
     close_with_flush_ = true;
     read_enabled_ = false;
-    file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+    file_event_->setEnabled(Event::FileReadyType::Write |
+                            (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
   }
 }
 
@@ -195,6 +196,15 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   }
 
   filter_manager_.onRead();
+}
+
+void ConnectionImpl::enableHalfClose(bool enabled) {
+  // This code doesn't correctly ensure that EV_CLOSE isn't set if reading is disabled
+  // when enabling half-close. This could be fixed, but isn't needed right now, so just
+  // ASSERT that it doesn't happen.
+  ASSERT(!enabled || read_enabled_);
+
+  enable_half_close_ = enabled;
 }
 
 void ConnectionImpl::readDisable(bool disable) {

@@ -254,6 +254,7 @@ public:
                   Stats::TimespanPtr&& connected_timespan);
 
   void onEvent(Network::ConnectionEvent event);
+  void onData(Buffer::Instance& data, bool end_stream);
   void onIdleTimeout();
   void onBytesSent();
   void cancelDrain();

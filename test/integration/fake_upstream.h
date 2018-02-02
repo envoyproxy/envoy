@@ -192,7 +192,7 @@ public:
     connection_wrapper_->set_parented();
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
-  void enableHalfClose(bool enabled) { connection_.enableHalfClose(enabled); }
+  void enableHalfClose(bool enabled);
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)

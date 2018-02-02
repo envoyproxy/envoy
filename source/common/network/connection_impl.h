@@ -61,7 +61,7 @@ public:
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void addBytesSentCallback(BytesSentCb cb) override;
-  void enableHalfClose(bool enabled) override { enable_half_close_ = enabled; }
+  void enableHalfClose(bool enabled) override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;

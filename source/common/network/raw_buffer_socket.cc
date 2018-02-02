@@ -1,5 +1,6 @@
 #include "common/network/raw_buffer_socket.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/http/headers.h"
 
@@ -50,6 +51,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   PostIoAction action;
   uint64_t bytes_written = 0;
+  ASSERT(!shutdown_ || buffer.length() == 0);
   do {
     if (buffer.length() == 0) {
       if (end_stream && !shutdown_) {

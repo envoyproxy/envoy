@@ -119,13 +119,19 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   fake_upstream_connection->readDisable(true);
-  tcp_client->write(data);
-  tcp_client->close();
+  fake_upstream_connection->write("", true);
+
+  // This ensures that fake_upstream_connection->readDisable has been run on it's thread
+  // before tcp_client starts writing.
+  tcp_client->waitForHalfClose();
+
+  tcp_client->write(data, true);
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   fake_upstream_connection->readDisable(false);
   fake_upstream_connection->waitForData(data.size());
   fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForHalfClose();
 
   EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
   EXPECT_EQ(test_server_->gauge("tcp.tcp_stats.upstream_flush_active")->value(), 0);
@@ -142,13 +148,20 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   fake_upstream_connection->readDisable(true);
-  tcp_client->write(data);
-  tcp_client->close();
+  fake_upstream_connection->write("", true);
+
+  // This ensures that fake_upstream_connection->readDisable has been run on it's thread
+  // before tcp_client starts writing.
+  tcp_client->waitForHalfClose();
+
+  tcp_client->write(data, true);
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   test_server_.reset();
   fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
+
+  // Success criteria is that no ASSERTs fire and there are no leaks.
 }
 
 // Test proxying data in both directions with envoy doing TCP and TLS
