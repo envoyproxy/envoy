@@ -177,6 +177,12 @@ public:
   struct {
     const std::string True{"true"};
   } CORSValues;
+
+  struct {
+    const std::string Http10String{"HTTP/1.0"};
+    const std::string Http11String{"HTTP/1.1"};
+    const std::string Http2String{"HTTP/2"};
+  } ProtocolStrings;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;
