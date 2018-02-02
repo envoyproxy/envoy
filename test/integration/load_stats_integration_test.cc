@@ -121,7 +121,7 @@ public:
       auto* locality = bootstrap.mutable_node()->mutable_locality();
       locality->set_region("some_region");
       locality->set_zone("zone_name");
-      locality->set_sub_zone("winter");
+      locality->set_sub_zone(sub_zone_);
       // Switch predefined cluster_0 to EDS filesystem sourcing.
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster_0->mutable_hosts()->Clear();
@@ -301,6 +301,7 @@ public:
 
   static constexpr uint32_t upstream_endpoints_ = 5;
 
+  std::string sub_zone_{"winter"};
   FakeHttpConnectionPtr fake_loadstats_connection_;
   FakeStreamPtr loadstats_stream_;
   FakeUpstream* load_report_upstream_{};
@@ -400,6 +401,39 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(6, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  cleanupLoadStatsConnection();
+}
+
+// Validate the load reports for requests when all endpoints are non-local.
+TEST_P(LoadStatsIntegrationTest, NoLocalLocality) {
+  sub_zone_ = "summer";
+  initialize();
+
+  waitForLoadStatsStream();
+  waitForLoadStatsRequest({});
+  loadstats_stream_->startGrpcStream();
+
+  // Simple 50%/50% split between dragon/winter localities. Also include an
+  // unknown cluster to exercise the handling of this case.
+  requestLoadStatsResponse({"cluster_0", "cluster_1"});
+
+  updateClusterLoadAssignment({0}, {1}, {3}, {});
+
+  for (uint32_t i = 0; i < 4; ++i) {
+    sendAndReceiveUpstream(i % 2);
+  }
+
+  // Verify we do not get empty stats for non-zero priorities. Note that the
+  // order of locality stats is different to the Success case, where winter is
+  // the local locality (and hence first in the list as per
+  // HostsPerLocality::get()).
+  waitForLoadStatsRequest({localityStats("dragon", 2, 0, 0), localityStats("winter", 2, 0, 0)});
+
+  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  // On slow machines, more than one load stats response may be pushed while we are simulating load.
+  EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   cleanupLoadStatsConnection();
