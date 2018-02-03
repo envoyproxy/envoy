@@ -257,6 +257,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // Now setup ADS if needed, this might rely on a primary cluster and the
   // thread local cluster manager.
   if (bootstrap.dynamic_resources().has_ads_config()) {
+    // Hack to force linking of the ADS service: https://github.com/google/protobuf/issues/4221
+    envoy::service::discovery::v2::AdsDummy ads_dummy;
+
     ads_mux_.reset(new Config::GrpcMuxImpl(
         bootstrap.node(),
         Config::Utility::factoryForApiConfigSource(
@@ -354,24 +357,21 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster
   auto& primary_cluster_entry = primary_clusters_.at(cluster_name);
   ENVOY_LOG(info, "add/update cluster {}", cluster_name);
   tls_->runOnAllThreads(
-      [
-        this, new_cluster = primary_cluster_entry.cluster_->info(),
-        thread_aware_lb_factory = primary_cluster_entry.loadBalancerFactory()
-      ]()
-          ->void {
-            ThreadLocalClusterManagerImpl& cluster_manager =
-                tls_->getTyped<ThreadLocalClusterManagerImpl>();
+      [this, new_cluster = primary_cluster_entry.cluster_->info(),
+       thread_aware_lb_factory = primary_cluster_entry.loadBalancerFactory()]() -> void {
+        ThreadLocalClusterManagerImpl& cluster_manager =
+            tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
-            if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
-              ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
-            } else {
-              ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
-            }
+        if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+          ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+        } else {
+          ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+        }
 
-            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
-                new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
-                                                                thread_aware_lb_factory));
-          });
+        cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
+            new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
+                                                            thread_aware_lb_factory));
+      });
 
   init_helper_.addCluster(*primary_cluster_entry.cluster_);
   return true;
@@ -490,16 +490,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& primary_clu
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
 
-  tls_->runOnAllThreads([
-    this, name = primary_cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-    hosts_per_locality_copy, healthy_hosts_per_locality_copy, hosts_added, hosts_removed
-  ]()
-                            ->void {
-                              ThreadLocalClusterManagerImpl::updateClusterMembership(
-                                  name, priority, hosts_copy, healthy_hosts_copy,
-                                  hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-                                  hosts_added, hosts_removed, *tls_);
-                            });
+  tls_->runOnAllThreads([this, name = primary_cluster.info()->name(), priority, hosts_copy,
+                         healthy_hosts_copy, hosts_per_locality_copy,
+                         healthy_hosts_per_locality_copy, hosts_added, hosts_removed]() -> void {
+    ThreadLocalClusterManagerImpl::updateClusterMembership(
+        name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+        healthy_hosts_per_locality_copy, hosts_added, hosts_removed, *tls_);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
