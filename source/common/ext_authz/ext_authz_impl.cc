@@ -11,6 +11,7 @@
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -137,7 +138,8 @@ void CreateCheckRequest::setHttpRequest(
 
   // Set protocol
   if (sdfc->requestInfo().protocol().valid()) {
-    httpreq.set_protocol(Envoy::Http::getProtocolString(sdfc->requestInfo().protocol().value()));
+    httpreq.set_protocol(
+        Envoy::Http::Utility::getProtocolString(sdfc->requestInfo().protocol().value()));
   }
 
   // Fill in the headers

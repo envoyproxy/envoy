@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
