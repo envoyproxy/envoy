@@ -43,8 +43,8 @@ public:
 
   Http::Code runCallback(const std::string& path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response);
-  const Network::ListenSocket& socket() override { return *socket_; }
-  Network::ListenSocket& mutable_socket() { return *socket_; }
+  const Network::Socket& socket() override { return *socket_; }
+  Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
@@ -174,7 +174,7 @@ private:
 
     // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocket& socket() override { return parent_.mutable_socket(); }
+    Network::Socket& socket() override { return parent_.mutable_socket(); }
     Network::TransportSocketFactory& transportSocketFactory() override {
       return parent_.transport_socket_factory_;
     }
@@ -194,7 +194,7 @@ private:
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
-  Network::ListenSocketPtr socket_;
+  Network::SocketPtr socket_;
   Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

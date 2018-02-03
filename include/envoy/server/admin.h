@@ -62,9 +62,9 @@ public:
 
   /**
    * Obtain socket the admin endpoint is bound to.
-   * @return Network::ListenSocket& socket reference.
+   * @return Network::Socket& socket reference.
    */
-  virtual const Network::ListenSocket& socket() PURE;
+  virtual const Network::Socket& socket() PURE;
 };
 
 } // namespace Server

@@ -9,7 +9,7 @@ bool ValidationAdmin::addHandler(const std::string&, const std::string&, Handler
 
 bool ValidationAdmin::removeHandler(const std::string&) { return false; };
 
-const Network::ListenSocket& ValidationAdmin::socket() { NOT_IMPLEMENTED; };
+const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED; };
 
 } // namespace Server
 } // namespace Envoy

@@ -251,24 +251,27 @@ public:
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
 };
 
-class MockListenSocket : public ListenSocket {
+class MockListenSocket : public Socket {
 public:
   MockListenSocket();
   ~MockListenSocket();
 
-  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
-  MOCK_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
+  MOCK_METHOD1(setOptions, void(const Socket::OptionsSharedPtr& options));
+  MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
   Address::InstanceConstSharedPtr local_address_;
+  OptionsSharedPtr options_;
 };
 
-class MockSocketOptions : public Network::ConnectionSocket::Options {
+class MockSocketOptions : public Socket::Options {
 public:
   MockSocketOptions();
   ~MockSocketOptions();
 
-  MOCK_CONST_METHOD1(setOptions, bool(ConnectionSocket&));
+  MOCK_CONST_METHOD1(setOptions, bool(Socket&));
   MOCK_CONST_METHOD0(hashKey, uint32_t());
 };
 
@@ -296,7 +299,7 @@ public:
   ~MockListenerConfig();
 
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
-  MOCK_METHOD0(socket, ListenSocket&());
+  MOCK_METHOD0(socket, Socket&());
   MOCK_METHOD0(transportSocketFactory, TransportSocketFactory&());
   MOCK_METHOD0(bindToPort, bool());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
