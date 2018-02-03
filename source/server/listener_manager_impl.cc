@@ -51,7 +51,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList_(
 std::vector<Configuration::ListenerFilterFactoryCb>
 ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-    Configuration::FactoryContext& context) {
+    Configuration::ListenerFactoryContext& context) {
   std::vector<Configuration::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
@@ -72,7 +72,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   return ret;
 }
 
-Network::ListenSocketSharedPtr
+Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                                  bool bind_to_port) {
   // For each listener config we share a single TcpListenSocket among all threaded listeners.
@@ -266,9 +266,21 @@ Init::Manager& ListenerImpl::initManager() {
   }
 }
 
-void ListenerImpl::setSocket(const Network::ListenSocketSharedPtr& socket) {
+void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   ASSERT(!socket_);
   socket_ = socket;
+  // Server config validation sets nullptr sockets.
+  if (socket_ && listen_socket_options_) {
+    bool ok = listen_socket_options_->setOptions(*socket_);
+    const std::string message =
+        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+    if (!ok) {
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
+    }
+  }
 }
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
@@ -368,7 +380,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     // to see if there is a listener that has a socket bound to the address we are configured for.
     // This is an edge case, but may happen if a listener is removed and then added back with a same
     // or different name and intended to listen on the same address. This should work and not fail.
-    Network::ListenSocketSharedPtr draining_listener_socket;
+    Network::SocketSharedPtr draining_listener_socket;
     auto existing_draining_listener = std::find_if(
         draining_listeners_.cbegin(), draining_listeners_.cend(),
         [&new_listener](const DrainingListener& listener) {

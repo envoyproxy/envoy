@@ -100,7 +100,7 @@ public:
    *        another listener after restoring the destination address of a new connection.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createListener(Network::ListenSocket& socket,
+  virtual Network::ListenerPtr createListener(Network::Socket& socket,
                                               Network::ListenerCallbacks& cb, bool bind_to_port,
                                               bool hand_off_restored_destination_connections) PURE;
 
