@@ -17,6 +17,7 @@ GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClie
 
 GrpcMuxImpl::~GrpcMuxImpl() {
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
+  // TODO(kuat): Remove explicit proto descriptor import.
   envoy::service::discovery::v2::AdsDummy dummy;
 
   for (const auto& api_state : api_state_) {
