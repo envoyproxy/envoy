@@ -290,17 +290,14 @@ TEST(PipeInstanceTest, Basic) {
 }
 
 TEST(PipeInstanceTest, AbstractNamespace) {
-  std::unique_ptr<PipeInstance> address;
 #if defined(__linux__)
-  address = std::make_unique<PipeInstance>("@/foo");
+  PipeInstance address("@/foo");
+  EXPECT_EQ("@/foo", address.asString());
+  EXPECT_EQ(Type::Pipe, address.type());
+  EXPECT_EQ(nullptr, address.ip());
 #else
-  EXPECT_THROW(address = std::make_unique<PipeInstance>("@/foo"), EnvoyException);
-  return;
+  EXPECT_THROW(PipeInstance address("@/foo"), EnvoyException);
 #endif
-  ASSERT_NE(address, nullptr);
-  EXPECT_EQ("@/foo", address->asString());
-  EXPECT_EQ(Type::Pipe, address->type());
-  EXPECT_EQ(nullptr, address->ip());
 }
 
 TEST(AddressFromSockAddr, IPv4) {
