@@ -257,6 +257,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // Now setup ADS if needed, this might rely on a primary cluster and the
   // thread local cluster manager.
   if (bootstrap.dynamic_resources().has_ads_config()) {
+    // Hack to force linking of the ADS service: https://github.com/google/protobuf/issues/4221
+    envoy::service::discovery::v2::AdsDummy ads_dummy;
+    
     ads_mux_.reset(new Config::GrpcMuxImpl(
         bootstrap.node(),
         Config::Utility::factoryForApiConfigSource(
