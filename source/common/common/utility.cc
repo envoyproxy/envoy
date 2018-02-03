@@ -111,22 +111,20 @@ bool StringUtil::findToken(absl::string_view source, absl::string_view delimiter
   return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
 }
 
-absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter,
-                                        bool trim_whitespace) {
+absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
   const absl::string_view::size_type pos = source.find(delimiter);
   if (pos != absl::string_view::npos) {
     source.remove_suffix(source.size() - pos);
   }
-  return trim_whitespace ? rtrim(source) : source;
+  return source;
 }
 
-absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_view delimiter,
-                                       bool trim_whitespace) {
+absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_view delimiter) {
   const absl::string_view::size_type pos = source.find(delimiter);
   if (pos != absl::string_view::npos) {
     source.remove_prefix(pos + delimiter.size());
   }
-  return trim_whitespace ? ltrim(source) : source;
+  return source;
 }
 
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,

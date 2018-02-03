@@ -207,22 +207,22 @@ TEST(StringUtil, StringViewTrim) {
 
 TEST(StringUtil, StringViewCropRight) {
   EXPECT_EQ("hello", StringUtil::cropRight("hello; world\t\f\v\n\r", ";"));
-  EXPECT_EQ("foo", StringUtil::cropRight("foo ; ; ; ; ; ; ", ";", true));
+  EXPECT_EQ("foo ", StringUtil::cropRight("foo ; ; ; ; ; ; ", ";"));
   EXPECT_EQ("", StringUtil::cropRight(";hello world\t\f\v\n\r", ";"));
   EXPECT_EQ(" hel", StringUtil::cropRight(" hello alo\t\f\v\n\r", "lo"));
   EXPECT_EQ("\t\f\v\n\rhe 1", StringUtil::cropRight("\t\f\v\n\rhe 12\t\f\v\n\r", "2"));
   EXPECT_EQ("hello", StringUtil::cropRight("hello alo\t\f\v\n\r", " a"));
-  EXPECT_EQ("hello ", StringUtil::cropRight("hello alo\t\f\v\n\r", "a", false));
+  EXPECT_EQ("hello ", StringUtil::cropRight("hello alo\t\f\v\n\r", "a"));
   EXPECT_EQ("abcd", StringUtil::cropRight("abcd", ";"));
 }
 
 TEST(StringUtil, StringViewCropLeft) {
-  EXPECT_EQ("world\t\f\v\n\r", StringUtil::cropLeft("hello; world\t\f\v\n\r", ";"));
+  EXPECT_EQ(" world\t\f\v\n\r", StringUtil::cropLeft("hello; world\t\f\v\n\r", ";"));
   EXPECT_EQ("hello world ", StringUtil::cropLeft(";hello world ", ";"));
-  EXPECT_EQ("alo", StringUtil::cropLeft("\t\f\v\n\rhello\t\f\v\n\ralo", "lo"));
+  EXPECT_EQ("\t\f\v\n\ralo", StringUtil::cropLeft("\t\f\v\n\rhello\t\f\v\n\ralo", "lo"));
   EXPECT_EQ("2\t\f\v\n\r", StringUtil::cropLeft("\t\f\v\n\rhe 12\t\f\v\n\r", "1"));
-  EXPECT_EQ("lo\t\f\v\n\r", StringUtil::cropLeft("hello alo\t\f\v\n\r", " a", false));
-  EXPECT_EQ("; ; ; ; ", StringUtil::cropLeft("foo ; ; ; ; ; ", ";", true));
+  EXPECT_EQ("lo\t\f\v\n\r", StringUtil::cropLeft("hello alo\t\f\v\n\r", " a"));
+  EXPECT_EQ(" ; ; ; ; ", StringUtil::cropLeft("foo ; ; ; ; ; ", ";"));
   EXPECT_EQ("abcd", StringUtil::cropLeft("abcd", ";"));
   EXPECT_EQ("", StringUtil::cropLeft("abcd", "abcd"));
 }

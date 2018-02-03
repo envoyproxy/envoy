@@ -16,11 +16,6 @@
 namespace Envoy {
 namespace Http {
 
-using ZlibCompressionLevelEnum = Compressor::ZlibCompressorImpl::CompressionLevel;
-using ZlibCompressionStrategyEnum = Compressor::ZlibCompressorImpl::CompressionStrategy;
-using GzipV2CompressionLevelEnum = envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum;
-using GzipV2CompressionStrategyEnum = envoy::api::v2::filter::http::Gzip_CompressionStrategy;
-
 /**
  * Configuration for the gzip filter.
  */
@@ -28,8 +23,12 @@ class GzipFilterConfig {
 public:
   GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip);
 
-  ZlibCompressionLevelEnum compressionLevel() const { return compression_level_; }
-  ZlibCompressionStrategyEnum compressionStrategy() const { return compression_strategy_; }
+  Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
+    return compression_level_;
+  }
+  Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategy() const {
+    return compression_strategy_;
+  }
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
   uint64_t memoryLevel() const { return memory_level_; }
@@ -37,10 +36,10 @@ public:
   uint64_t windowBits() const { return window_bits_; }
 
 private:
-  static ZlibCompressionLevelEnum
-  compressionLevelEnum(GzipV2CompressionLevelEnum compression_level);
-  static ZlibCompressionStrategyEnum
-  compressionStrategyEnum(GzipV2CompressionStrategyEnum compression_strategy);
+  static Compressor::ZlibCompressorImpl::CompressionLevel
+  compressionLevelEnum(envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum compression_level);
+  static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
+      envoy::api::v2::filter::http::Gzip_CompressionStrategy compression_strategy);
   static std::unordered_set<std::string>
   contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
@@ -48,15 +47,14 @@ private:
   static uint64_t memoryLevelUint(Protobuf::uint32 level);
   static uint64_t windowBitsUint(Protobuf::uint32 window_bits);
 
-  ZlibCompressionLevelEnum compression_level_;
-  ZlibCompressionStrategyEnum compression_strategy_;
+  Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
+  Compressor::ZlibCompressorImpl::CompressionStrategy compression_strategy_;
 
   int32_t content_length_;
   int32_t memory_level_;
   int32_t window_bits_;
 
   std::unordered_set<std::string> content_type_values_;
-
   bool disable_on_etag_header_;
 };
 
@@ -110,11 +108,8 @@ private:
   void insertVaryHeader(HeaderMap& headers);
 
   bool skip_compression_;
-
   Buffer::OwnedImpl compressed_data_;
-
   Compressor::ZlibCompressorImpl compressor_;
-
   GzipFilterConfigSharedPtr config_;
 
   StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
