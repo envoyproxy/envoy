@@ -61,7 +61,7 @@ TEST_P(ListenerImplDeathTest, ErrorCallback) {
 
 class TestListenerImpl : public ListenerImpl {
 public:
-  TestListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket, ListenerCallbacks& cb,
+  TestListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
                    bool bind_to_port, bool hand_off_restored_destination_connections)
       : ListenerImpl(dispatcher, socket, cb, bind_to_port,
                      hand_off_restored_destination_connections) {}

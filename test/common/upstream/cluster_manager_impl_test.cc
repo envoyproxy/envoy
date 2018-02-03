@@ -742,8 +742,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
   foo->prioritySet().addMemberUpdateCb(
-      [&membership_updated](uint32_t, const std::vector<HostSharedPtr>&,
-                            const std::vector<HostSharedPtr>&) -> void {
+      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
         membership_updated.ready();
       });
 

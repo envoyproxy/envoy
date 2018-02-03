@@ -35,7 +35,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-std::list<std::string> hostListToAddresses(const std::vector<HostSharedPtr>& hosts) {
+std::list<std::string> hostListToAddresses(const HostVector& hosts) {
   std::list<std::string> addresses;
   for (const HostSharedPtr& host : hosts) {
     addresses.push_back(host->address()->asString());
@@ -242,9 +242,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   ReadyWatcher membership_updated;
   cluster.prioritySet().addMemberUpdateCb(
-      [&](uint32_t, const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&) -> void {
-        membership_updated.ready();
-      });
+      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
 
@@ -291,8 +289,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(0UL,
+            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
@@ -563,8 +562,9 @@ TEST(StaticClusterImplTest, UrlConfig) {
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(0UL,
+            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy();
 }
 
@@ -664,8 +664,8 @@ TEST(PrioritySet, Extend) {
 
   uint32_t changes = 0;
   uint32_t last_priority = 0;
-  priority_set.addMemberUpdateCb([&](uint32_t priority, const std::vector<HostSharedPtr>&,
-                                     const std::vector<HostSharedPtr>&) -> void { // fIXME
+  priority_set.addMemberUpdateCb([&](uint32_t priority, const HostVector&,
+                                     const HostVector&) -> void { // fIXME
     last_priority = priority;
     ++changes;
   });
@@ -688,11 +688,10 @@ TEST(PrioritySet, Extend) {
 
   // Now add hosts for priority 1, and ensure they're added and subscribers are notified.
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-  HostVectorSharedPtr hosts(
-      new std::vector<HostSharedPtr>({makeTestHost(info, "tcp://127.0.0.1:80")}));
-  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>({}));
-  std::vector<HostSharedPtr> hosts_added{hosts->front()};
-  std::vector<HostSharedPtr> hosts_removed{};
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{hosts->front()};
+  HostVector hosts_removed{};
 
   priority_set.hostSetsPerPriority()[1]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, hosts_added, hosts_removed);
@@ -731,6 +730,69 @@ TEST(ClusterMetadataTest, Metadata) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
+}
+
+// Validate empty singleton for HostsPerLocalityImpl.
+TEST(HostsPerLocalityImpl, Empty) {
+  EXPECT_FALSE(HostsPerLocalityImpl::empty()->hasLocalLocality());
+  EXPECT_EQ(0, HostsPerLocalityImpl::empty()->get().size());
+}
+
+// Validate HostsPerLocalityImpl constructors.
+TEST(HostsPerLocalityImpl, Cons) {
+  {
+    const HostsPerLocalityImpl hosts_per_locality;
+    EXPECT_FALSE(hosts_per_locality.hasLocalLocality());
+    EXPECT_EQ(0, hosts_per_locality.get().size());
+  }
+
+  MockCluster cluster;
+  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+
+  {
+    std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
+    const auto locality_hosts_copy = locality_hosts;
+    const HostsPerLocalityImpl hosts_per_locality(std::move(locality_hosts), true);
+    EXPECT_TRUE(hosts_per_locality.hasLocalLocality());
+    EXPECT_EQ(locality_hosts_copy, hosts_per_locality.get());
+  }
+
+  {
+    std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
+    const auto locality_hosts_copy = locality_hosts;
+    const HostsPerLocalityImpl hosts_per_locality(std::move(locality_hosts), false);
+    EXPECT_FALSE(hosts_per_locality.hasLocalLocality());
+    EXPECT_EQ(locality_hosts_copy, hosts_per_locality.get());
+  }
+}
+
+TEST(HostsPerLocalityImpl, Filter) {
+  MockCluster cluster;
+  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+
+  {
+    std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
+    const auto filtered =
+        HostsPerLocalityImpl(std::move(locality_hosts), false).filter([&host_0](const Host& host) {
+          return &host == host_0.get();
+        });
+    EXPECT_FALSE(filtered->hasLocalLocality());
+    const std::vector<HostVector> expected_locality_hosts = {{host_0}, {}};
+    EXPECT_EQ(expected_locality_hosts, filtered->get());
+  }
+
+  {
+    std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
+    auto filtered =
+        HostsPerLocalityImpl(std::move(locality_hosts), true).filter([&host_1](const Host& host) {
+          return &host == host_1.get();
+        });
+    EXPECT_TRUE(filtered->hasLocalLocality());
+    const std::vector<HostVector> expected_locality_hosts = {{}, {host_1}};
+    EXPECT_EQ(expected_locality_hosts, filtered->get());
+  }
 }
 
 } // namespace

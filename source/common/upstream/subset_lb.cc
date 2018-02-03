@@ -32,11 +32,10 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   }
 
   // Configure future updates.
-  priority_set.addMemberUpdateCb([this](uint32_t priority,
-                                        const std::vector<HostSharedPtr>& hosts_added,
-                                        const std::vector<HostSharedPtr>& hosts_removed) {
-    update(priority, hosts_added, hosts_removed);
-  });
+  priority_set.addMemberUpdateCb(
+      [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+        update(priority, hosts_added, hosts_removed);
+      });
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
@@ -120,9 +119,8 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
   return nullptr;
 }
 
-void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority,
-                                              const std::vector<HostSharedPtr>& hosts_added,
-                                              const std::vector<HostSharedPtr>& hosts_removed) {
+void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed) {
   if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
     return;
   }
@@ -150,12 +148,11 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority,
 // unique LbSubsetEntryPtr found, it invokes cb with the LbSubsetEntryPtr, a HostPredicate that
 // selects hosts in the subset, and a flag indicating whether any hosts are being added.
 void SubsetLoadBalancer::processSubsets(
-    const std::vector<HostSharedPtr>& hosts_added, const std::vector<HostSharedPtr>& hosts_removed,
+    const HostVector& hosts_added, const HostVector& hosts_removed,
     std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> cb) {
   std::unordered_set<LbSubsetEntryPtr> subsets_modified;
 
-  std::pair<const std::vector<HostSharedPtr>&, bool> steps[] = {{hosts_added, true},
-                                                                {hosts_removed, false}};
+  std::pair<const HostVector&, bool> steps[] = {{hosts_added, true}, {hosts_removed, false}};
   for (const auto& step : steps) {
     const auto& hosts = step.first;
     const bool adding_hosts = step.second;
@@ -186,8 +183,8 @@ void SubsetLoadBalancer::processSubsets(
 
 // Given the addition and/or removal of hosts, update all subsets for this priority level, creating
 // new subsets as necessary.
-void SubsetLoadBalancer::update(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                                const std::vector<HostSharedPtr>& hosts_removed) {
+void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added,
+                                const HostVector& hosts_removed) {
   updateFallbackSubset(priority, hosts_added, hosts_removed);
 
   processSubsets(hosts_added, hosts_removed,
@@ -368,17 +365,17 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 // Given hosts_added and hosts_removed, update the underlying HostSet. The hosts_added Hosts must
 // be filtered to match hosts that belong in this subset. The hosts_removed Hosts are ignored if
 // they are not currently a member of this subset.
-void SubsetLoadBalancer::HostSubsetImpl::update(const std::vector<HostSharedPtr>& hosts_added,
-                                                const std::vector<HostSharedPtr>& hosts_removed,
+void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
+                                                const HostVector& hosts_removed,
                                                 std::function<bool(const Host&)> predicate) {
-  std::vector<HostSharedPtr> filtered_added;
+  HostVector filtered_added;
   for (const auto host : hosts_added) {
     if (predicate(*host)) {
       filtered_added.emplace_back(host);
     }
   }
 
-  std::vector<HostSharedPtr> filtered_removed;
+  HostVector filtered_removed;
   for (const auto host : hosts_removed) {
     if (predicate(*host)) {
       filtered_removed.emplace_back(host);
@@ -389,10 +386,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const std::vector<HostSharedPtr>
     return;
   }
 
-  HostVectorSharedPtr hosts(new std::vector<HostSharedPtr>());
-  HostVectorSharedPtr healthy_hosts(new std::vector<HostSharedPtr>());
-  HostListsSharedPtr hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>());
-  HostListsSharedPtr healthy_hosts_per_locality(new std::vector<std::vector<HostSharedPtr>>());
+  HostVectorSharedPtr hosts(new HostVector());
+  HostVectorSharedPtr healthy_hosts(new HostVector());
 
   for (const auto host : original_host_set_.hosts()) {
     if (predicate(*host)) {
@@ -403,21 +398,11 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const std::vector<HostSharedPtr>
     }
   }
 
-  for (const auto locality_hosts : original_host_set_.hostsPerLocality()) {
-    std::vector<HostSharedPtr> curr_locality_hosts;
-    std::vector<HostSharedPtr> curr_locality_healthy_hosts;
-    for (const auto locality_host : locality_hosts) {
-      if (predicate(*locality_host)) {
-        curr_locality_hosts.emplace_back(locality_host);
-        if (locality_host->healthy()) {
-          curr_locality_healthy_hosts.emplace_back(locality_host);
-        }
-      }
-    }
-
-    hosts_per_locality->emplace_back(curr_locality_hosts);
-    healthy_hosts_per_locality->emplace_back(curr_locality_healthy_hosts);
-  }
+  HostsPerLocalityConstSharedPtr hosts_per_locality =
+      original_host_set_.hostsPerLocality().filter(predicate);
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
+      original_host_set_.hostsPerLocality().filter(
+          [&predicate](const Host& host) { return predicate(host) && host.healthy(); });
 
   HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
                            filtered_added, filtered_removed);
@@ -430,8 +415,8 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t pr
 }
 
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
-                                                    const std::vector<HostSharedPtr>& hosts_added,
-                                                    const std::vector<HostSharedPtr>& hosts_removed,
+                                                    const HostVector& hosts_added,
+                                                    const HostVector& hosts_removed,
                                                     std::function<bool(const Host&)> predicate) {
   HostSubsetImpl* host_subset = getOrCreateHostSubset(priority);
   host_subset->update(hosts_added, hosts_removed, predicate);

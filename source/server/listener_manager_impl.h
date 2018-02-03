@@ -35,7 +35,7 @@ public:
    */
   static std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-      Configuration::FactoryContext& context);
+      Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
@@ -45,12 +45,12 @@ public:
   }
   std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-      Configuration::FactoryContext& context) override {
+      Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
 
-  Network::ListenSocketSharedPtr
-  createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) override;
+  Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
@@ -166,7 +166,7 @@ private:
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Network::ListenerConfig,
-                     public Configuration::FactoryContext,
+                     public Configuration::ListenerFactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainFactory,
                      public Configuration::TransportSocketFactoryContext,
@@ -203,15 +203,15 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
-  const Network::ListenSocketSharedPtr& getSocket() const { return socket_; }
+  const Network::SocketSharedPtr& getSocket() const { return socket_; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
-  void setSocket(const Network::ListenSocketSharedPtr& socket);
+  void setSocket(const Network::SocketSharedPtr& socket);
 
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocket& socket() override { return *socket_; }
+  Network::Socket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
@@ -224,7 +224,7 @@ public:
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
 
-  // Server::Configuration::FactoryContext
+  // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
     return parent_.server_.accessLogManager();
   }
@@ -246,6 +246,9 @@ public:
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
   Admin& admin() override { return parent_.server_.admin(); }
   const envoy::api::v2::Metadata& listenerMetadata() const override { return metadata_; };
+  void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+    listen_socket_options_ = options;
+  }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -261,7 +264,7 @@ public:
 private:
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
-  Network::ListenSocketSharedPtr socket_;
+  Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   std::vector<Ssl::ServerContextPtr> tls_contexts_;
@@ -281,6 +284,7 @@ private:
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::api::v2::Metadata metadata_;
+  Network::Socket::OptionsSharedPtr listen_socket_options_;
 };
 
 } // namespace Server

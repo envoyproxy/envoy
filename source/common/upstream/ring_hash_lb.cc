@@ -26,8 +26,8 @@ void RingHashLoadBalancer::initialize() {
   // I will look into doing this in a follow up. Doing everything using a background thread heavily
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
-  priority_set_.addMemberUpdateCb([this](uint32_t, const std::vector<HostSharedPtr>&,
-                                         const std::vector<HostSharedPtr>&) -> void { refresh(); });
+  priority_set_.addMemberUpdateCb(
+      [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
 
   refresh();
 }
@@ -104,7 +104,7 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
 }
 
 RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-                                 const std::vector<HostSharedPtr>& hosts) {
+                                 const HostVector& hosts) {
   ENVOY_LOG(trace, "ring hash: building ring");
   if (hosts.empty()) {
     return;

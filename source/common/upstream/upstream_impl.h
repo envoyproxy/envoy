@@ -166,10 +166,31 @@ private:
   std::atomic<bool> used_;
 };
 
-typedef std::shared_ptr<std::vector<HostSharedPtr>> HostVectorSharedPtr;
-typedef std::shared_ptr<const std::vector<HostSharedPtr>> HostVectorConstSharedPtr;
-typedef std::shared_ptr<std::vector<std::vector<HostSharedPtr>>> HostListsSharedPtr;
-typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostListsConstSharedPtr;
+class HostsPerLocalityImpl : public HostsPerLocality {
+public:
+  HostsPerLocalityImpl() : HostsPerLocalityImpl({}, false) {}
+
+  HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
+      : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {
+    ASSERT(!has_local_locality || !hosts_per_locality_.empty());
+  }
+
+  bool hasLocalLocality() const override { return local_; }
+  const std::vector<HostVector>& get() const override { return hosts_per_locality_; }
+  HostsPerLocalityConstSharedPtr filter(std::function<bool(const Host&)> predicate) const override;
+
+  // The const shared pointer for the empty HostsPerLocalityImpl.
+  static HostsPerLocalityConstSharedPtr empty() {
+    static HostsPerLocalityConstSharedPtr empty = std::make_shared<HostsPerLocalityImpl>();
+    return empty;
+  }
+
+private:
+  // Does an entry exist for the local locality?
+  bool local_{};
+  // The first entry is for local hosts in the local locality.
+  std::vector<HostVector> hosts_per_locality_;
+};
 
 /**
  * A class for management of the set of hosts for a given priority level.
@@ -177,16 +198,12 @@ typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostLists
 class HostSetImpl : public HostSet {
 public:
   HostSetImpl(uint32_t priority)
-      : priority_(priority), hosts_(new std::vector<HostSharedPtr>()),
-        healthy_hosts_(new std::vector<HostSharedPtr>()),
-        hosts_per_locality_(new std::vector<std::vector<HostSharedPtr>>()),
-        healthy_hosts_per_locality_(new std::vector<std::vector<HostSharedPtr>>()) {}
+      : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
 
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
-                   HostListsConstSharedPtr hosts_per_locality,
-                   HostListsConstSharedPtr healthy_hosts_per_locality,
-                   const std::vector<HostSharedPtr>& hosts_added,
-                   const std::vector<HostSharedPtr>& hosts_removed) override {
+                   HostsPerLocalityConstSharedPtr hosts_per_locality,
+                   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                   const HostVector& hosts_added, const HostVector& hosts_removed) override {
     hosts_ = std::move(hosts);
     healthy_hosts_ = std::move(healthy_hosts);
     hosts_per_locality_ = std::move(hosts_per_locality);
@@ -199,27 +216,24 @@ public:
    * @param callback supplies the callback to invoke.
    * @return Common::CallbackHandle* the callback handle.
    */
-  typedef std::function<void(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed)>
+  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
+                             const HostVector& hosts_removed)>
       MemberUpdateCb;
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const {
     return member_update_cb_helper_.add(callback);
   }
 
   // Upstream::HostSet
-  const std::vector<HostSharedPtr>& hosts() const override { return *hosts_; }
-  const std::vector<HostSharedPtr>& healthyHosts() const override { return *healthy_hosts_; }
-  const std::vector<std::vector<HostSharedPtr>>& hostsPerLocality() const override {
-    return *hosts_per_locality_;
-  }
-  const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerLocality() const override {
+  const HostVector& hosts() const override { return *hosts_; }
+  const HostVector& healthyHosts() const override { return *healthy_hosts_; }
+  const HostsPerLocality& hostsPerLocality() const override { return *hosts_per_locality_; }
+  const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_per_locality_;
   }
   uint32_t priority() const override { return priority_; }
 
 protected:
-  virtual void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
-                                  const std::vector<HostSharedPtr>& hosts_removed) {
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
   }
 
@@ -227,11 +241,10 @@ private:
   uint32_t priority_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
-  HostListsConstSharedPtr hosts_per_locality_;
-  HostListsConstSharedPtr healthy_hosts_per_locality_;
+  HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
-                                  const std::vector<HostSharedPtr>&>
+  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
 };
 
@@ -261,8 +274,8 @@ protected:
   }
 
 private:
-  virtual void runUpdateCallbacks(uint32_t priority, const std::vector<HostSharedPtr>& hosts_added,
-                                  const std::vector<HostSharedPtr>& hosts_removed) {
+  virtual void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                  const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
@@ -270,8 +283,7 @@ private:
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<uint32_t, const std::vector<HostSharedPtr>&,
-                                  const std::vector<HostSharedPtr>&>
+  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
 };
 
@@ -404,9 +416,8 @@ protected:
                   Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager, bool added_via_api);
 
-  static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
-  static HostListsConstSharedPtr
-  createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
+  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
+  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -419,8 +430,6 @@ protected:
    * over and determines if there is an initial health check pass needed, etc.
    */
   void onPreInitComplete();
-
-  static const HostListsConstSharedPtr empty_host_lists_;
 
   Runtime::Loader& runtime_;
   ClusterInfoConstSharedPtr
@@ -468,10 +477,8 @@ class BaseDynamicClusterImpl : public ClusterImplBase {
 protected:
   using ClusterImplBase::ClusterImplBase;
 
-  bool updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
-                             std::vector<HostSharedPtr>& current_hosts,
-                             std::vector<HostSharedPtr>& hosts_added,
-                             std::vector<HostSharedPtr>& hosts_removed, bool depend_on_hc);
+  bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
+                             HostVector& hosts_added, HostVector& hosts_removed, bool depend_on_hc);
 };
 
 /**
@@ -500,13 +507,12 @@ private:
     std::string dns_address_;
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
-    std::vector<HostSharedPtr> hosts_;
+    HostVector hosts_;
   };
 
   typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
 
-  void updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
-                      const std::vector<HostSharedPtr>& hosts_removed);
+  void updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed);
 
   // ClusterImplBase
   void startPreInit() override;
