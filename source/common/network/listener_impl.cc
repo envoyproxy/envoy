@@ -1,5 +1,6 @@
 #include "common/network/listener_impl.h"
 
+#include <netinet/tcp.h>
 #include <sys/un.h>
 
 #include "envoy/common/exception.h"
@@ -12,6 +13,16 @@
 #include "common/network/address_impl.h"
 
 #include "event2/listener.h"
+
+// On macOS the socket MUST be listening already for TCP_FASTOPEN to be set and backlog MUST be 1
+// (the actual value is set via the net.inet.tcp.fastopen_backlog kernel parameter.
+// For Linux we default to 128, which libevent is using in
+// https://github.com/libevent/libevent/blob/release-2.1.8-stable/listener.c#L176
+#if defined(__APPLE__)
+#define TFO_BACKLOG 1
+#else
+#define TFO_BACKLOG 128
+#endif
 
 namespace Envoy {
 namespace Network {
@@ -45,7 +56,8 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                           bool bind_to_port, bool hand_off_restored_destination_connections)
+                           bool bind_to_port, bool enable_tcp_fast_open,
+                           bool hand_off_restored_destination_connections)
     : local_address_(nullptr), cb_(cb),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       listener_(nullptr) {
@@ -64,6 +76,48 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
     if (!listener_) {
       throw CreateListenerException(
           fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
+    }
+
+    // TODO: cleanup redundant setsockopt logic
+    if (enable_tcp_fast_open) {
+      int backlog = TFO_BACKLOG;
+      int fd = socket.fd();
+      int rc = setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &backlog, sizeof(backlog));
+      if (rc == -1) {
+        if (errno == ENOPROTOOPT) {
+          throw EnvoyException(fmt::format(
+              "TCP Fast Open is unsupported on listening socket fd {} : {}", fd, strerror(errno)));
+        } else {
+          throw EnvoyException(
+              fmt::format("Failed to enable TCP Fast Open on listening socket fd {} : {}", fd,
+                          strerror(errno)));
+        }
+      } else {
+        ENVOY_LOG_MISC(debug, "Enabled TFO on listening socket fd {}.", fd);
+      }
+    } else {
+      int curbacklog;
+      int fd = socket.fd();
+      socklen_t optlen = sizeof(curbacklog);
+      int rc = getsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &curbacklog, &optlen);
+      // curbacklog == 0 means TFO is supported and already disabled
+      if (rc != -1 && curbacklog != 0) {
+        int backlog = 0;
+        int rc = setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &backlog, sizeof(backlog));
+        if (rc == -1) {
+          if (errno == ENOPROTOOPT) {
+            throw EnvoyException(
+                fmt::format("TCP Fast Open is unsupported on listening socket fd {} : {}", fd,
+                            strerror(errno)));
+          } else {
+            throw EnvoyException(
+                fmt::format("Failed to disable TCP Fast Open on listening socket fd {} : {}", fd,
+                            strerror(errno)));
+          }
+        } else {
+          ENVOY_LOG_MISC(debug, "Disabled TFO on listening socket fd {}.", fd);
+        }
+      }
     }
 
     evconnlistener_set_error_cb(listener_.get(), errorCallback);

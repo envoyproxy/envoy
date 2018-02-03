@@ -59,7 +59,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
@@ -158,7 +158,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
 
   ClientContextConfigImpl client_ctx_config(client_ctx_proto);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
@@ -738,7 +738,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -796,7 +796,7 @@ TEST_P(SslSocketTest, HalfClose) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
-      dispatcher.createListener(socket, listener_callbacks, true, false);
+      dispatcher.createListener(socket, listener_callbacks, true, false, false);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -877,7 +877,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -958,8 +958,10 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
-  Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
+  Network::ListenerPtr listener1 =
+      dispatcher.createListener(socket1, callbacks, true, false, false);
+  Network::ListenerPtr listener2 =
+      dispatcher.createListener(socket2, callbacks, true, false, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
@@ -1280,8 +1282,9 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
-  Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
+  Network::ListenerPtr listener2 =
+      dispatcher.createListener(socket2, callbacks, true, false, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -1386,7 +1389,7 @@ TEST_P(SslSocketTest, SslError) {
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2021,7 +2024,7 @@ public:
     server_ssl_socket_factory_.reset(
         new ServerSslSocketFactory(*server_ctx_config_, "", {}, true, *manager_, stats_store_));
 
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false, false);
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
     client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));

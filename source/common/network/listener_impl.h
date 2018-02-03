@@ -17,7 +17,8 @@ namespace Network {
 class ListenerImpl : public Listener {
 public:
   ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-               bool bind_to_port, bool hand_off_restored_destination_connections);
+               bool bind_to_port, bool enable_tcp_fast_open,
+               bool hand_off_restored_destination_connections);
 
 protected:
   virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
