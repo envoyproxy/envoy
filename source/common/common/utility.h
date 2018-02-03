@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/interval_set.h"
 #include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
@@ -295,12 +296,12 @@ public:
  *
  * Value can be any type that is comparable with <.
  */
-template <typename Value> class IntervalSet {
+template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
 public:
-  typedef std::pair<Value, Value> Interval;
+  typedef typename IntervalSet<Value>::Interval Interval;
 
   // Inserts a new interval into the set, merging any overlaps.
-  void insert(Value left, Value right) {
+  void insert(Value left, Value right) override {
     auto left_pos = intervals_.lower_bound(Interval(left, left));
     // upper_bound is exclusive, and we want to be inclusive.
     auto right_pos = intervals_.upper_bound(Interval(right, right));
@@ -323,7 +324,7 @@ public:
   }
 
   // Returns the interval-set as a vector.
-  std::vector<Interval> toVector() const {
+  std::vector<Interval> toVector() const override {
     std::vector<Interval> out;
     out.reserve(intervals_.size());
     for (const Interval& interval : intervals_) {

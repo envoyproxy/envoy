@@ -173,7 +173,7 @@ std::string TagProducerImpl::produceTags(const std::string& stat_name,
                                          std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
 
-  IntervalSet<size_t> remove_characters;
+  IntervalSetImpl<size_t> remove_characters;
   for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
     tag_extractor->extractTag(stat_name, tags, remove_characters);
   }

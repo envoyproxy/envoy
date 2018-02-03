@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -17,8 +18,6 @@ class Dispatcher;
 namespace ThreadLocal {
 class Instance;
 }
-
-template <typename Value> class IntervalSet;
 
 namespace Stats {
 

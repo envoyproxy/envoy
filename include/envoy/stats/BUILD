@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "stats_interface",
     hdrs = ["stats.h"],
+    deps = ["//include/envoy/common:interval_set_interface"],
 )
 
 envoy_cc_library(

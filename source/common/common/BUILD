@@ -124,7 +124,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = ["//include/envoy/common:time_interface"],
+    deps = [
+        "//include/envoy/common:interval_set_interface",
+        "//include/envoy/common:time_interface",
+    ],
 )
 
 genrule(
