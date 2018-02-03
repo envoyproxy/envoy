@@ -310,7 +310,7 @@ TEST(RegexUtil, parseRegex) {
 }
 
 TEST(IntervalSet, testIntervals) {
-  IntervalSet<int> interval_set;
+  IntervalSetImpl<int> interval_set;
   auto insert_and_print = [&interval_set](int left, int right) -> std::string {
     interval_set.insert(left, right);
     std::string out;

@@ -53,7 +53,7 @@ public:
    * @param stat_name name from which the tag will be extracted if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the name.
    * @param remove_characters set of intervals of character-indices to be removed from name.
-   * @return std::string modified name with the tag removed.
+   * @return bool indicates whether a tags were found in the name.
    */
   virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                           IntervalSet<size_t>& remove_characters) const PURE;
