@@ -438,6 +438,7 @@ public:
             .WillOnce(SaveArg<0>(&upstream_read_filter_));
         EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
             .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
+        EXPECT_CALL(*upstream_connections_.at(i), enableHalfClose(true));
       }
     }
 
@@ -485,6 +486,28 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
+
+// Tests that half-closes are proxied and don't themselves cause any connection to be closed.
+TEST_F(TcpProxyTest, HalfCloseProxy) {
+  setup(1);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
+  EXPECT_CALL(*upstream_connections_.at(0), close(_)).Times(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), true));
+  filter_->onData(buffer, true);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), true));
+  upstream_read_filter_->onData(response, true);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(*upstream_connections_.at(0), close(_));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
 
 TEST_F(TcpProxyTest, UpstreamDisconnect) {
   setup(1);
@@ -900,6 +923,27 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
   EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
   EXPECT_EQ(1U, config_->stats().idle_timeout_.value());
+}
+
+// Tests that upstream flush will close a connection if it reads data from the upstream
+// connection after the downstream connection is closed (nowhere to send it).
+TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  // Send some bytes; no timeout configured so this should be a no-op (not a crash).
+  Buffer::OwnedImpl buffer("a");
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  upstream_connections_.at(0)->write(buffer, true);
 }
 
 class TcpProxyRoutingTest : public testing::Test {

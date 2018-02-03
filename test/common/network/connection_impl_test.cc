@@ -466,6 +466,32 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// Test that connections do not detect early close when half-close is enabled
+TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
+  setUpBasicConnection();
+  connect();
+
+  server_connection_->enableHalfClose(true);
+  server_connection_->readDisable(true);
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(0);
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  client_connection_->close(ConnectionCloseType::FlushWrite);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  server_connection_->readDisable(false);
+  EXPECT_CALL(*read_filter_, onData(_, _)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+    dispatcher_->exit();
+    return FilterStatus::StopIteration;
+  }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::NoFlush);
+}
+
 // Test that as watermark levels are changed, the appropriate callbacks are triggered.
 TEST_P(ConnectionImplTest, Watermarks) {
   useMockBuffer();
