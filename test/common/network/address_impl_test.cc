@@ -5,6 +5,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -286,6 +287,20 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ("/foo", address.asString());
   EXPECT_EQ(Type::Pipe, address.type());
   EXPECT_EQ(nullptr, address.ip());
+}
+
+TEST(PipeInstanceTest, AbstractNamespace) {
+  std::unique_ptr<PipeInstance> address;
+#if defined(__linux__)
+  address = std::make_unique<PipeInstance>("@/foo");
+#else
+  EXPECT_THROW(address = std::make_unique<PipeInstance>("@/foo"), EnvoyException);
+  return;
+#endif
+  ASSERT_NE(address, nullptr);
+  EXPECT_EQ("@/foo", address->asString());
+  EXPECT_EQ(Type::Pipe, address->type());
+  EXPECT_EQ(nullptr, address->ip());
 }
 
 TEST(AddressFromSockAddr, IPv4) {
