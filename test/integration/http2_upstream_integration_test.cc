@@ -19,6 +19,8 @@ TEST_P(Http2UpstreamIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
+TEST_P(Http2UpstreamIntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
+
 TEST_P(Http2UpstreamIntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
