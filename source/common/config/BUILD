@@ -133,7 +133,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:discovery_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
-        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 
