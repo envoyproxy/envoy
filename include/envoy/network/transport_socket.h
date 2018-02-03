@@ -14,7 +14,6 @@ namespace Network {
 enum class PostIoAction {
   // Close the connection.
   Close,
-
   // Keep the connection open.
   KeepOpen
 };
