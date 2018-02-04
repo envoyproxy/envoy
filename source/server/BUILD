@@ -46,6 +46,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/trace/v2:trace_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
+        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )

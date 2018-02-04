@@ -12,6 +12,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/ssl/context_manager.h"
 
@@ -97,7 +98,7 @@ void MainImpl::validateProtoDescriptors() {
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
   envoy::service::discovery::v2::AdsDummy dummy;
   envoy::service::ratelimit::v2::RateLimitRequest rls_dummy;
-
+  
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
