@@ -30,6 +30,8 @@ namespace {
 class GrpcMuxImplTest : public testing::Test {
 public:
   GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
+    // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
+    envoy::service::discovery::v2::AdsDummy dummy;
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
