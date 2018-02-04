@@ -10,9 +10,39 @@
 namespace Envoy {
 namespace Grpc {
 
-GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, Stats::Scope& scope,
+GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal()
+    : completion_thread_(new Thread::Thread([this] { completionThread(); })) {}
+
+GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
+  cq_.Shutdown();
+  ENVOY_LOG(debug, "Joining completionThread");
+  completion_thread_->join();
+  ENVOY_LOG(debug, "Joined completionThread");
+}
+
+void GoogleAsyncClientThreadLocal::completionThread() {
+  ENVOY_LOG(debug, "completionThread running");
+  void* tag;
+  bool ok;
+  while (cq_.Next(&tag, &ok)) {
+    const auto& google_async_tag = *reinterpret_cast<GoogleAsyncTag*>(tag);
+    const GoogleAsyncTag::Operation op = google_async_tag.op_;
+    GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
+    ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
+    std::unique_lock<std::mutex> lock(stream.cq_lock_);
+    if (!stream.draining_cq_) {
+      ++stream.inflight_completions_;
+      stream.parent_.dispatcher_.post([&stream, op, ok] { stream.handleOpCompletion(op, ok); });
+    }
+  }
+  ENVOY_LOG(debug, "completionThread exiting");
+}
+
+GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
+                                             GoogleAsyncClientThreadLocal& tls, Stats::Scope& scope,
                                              const envoy::api::v2::GrpcService::GoogleGrpc& config)
-    : dispatcher_(dispatcher), stat_prefix_(config.stat_prefix()), scope_(scope) {
+    : dispatcher_(dispatcher), cq_(tls.completionQueue()), stat_prefix_(config.stat_prefix()),
+      scope_(scope) {
   // TODO(htuch): add support for SSL, OAuth2, GCP, etc. credentials.
   std::shared_ptr<grpc::ChannelCredentials> creds = grpc::InsecureChannelCredentials();
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
@@ -29,8 +59,8 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, Stat
 }
 
 GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
-  while (!active_streams_.empty()) {
-    active_streams_.front()->resetStream();
+  for (auto it = active_streams_.begin(); it != active_streams_.end();) {
+    (*it++)->resetStream();
   }
 }
 
@@ -71,10 +101,7 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                                              const Protobuf::MethodDescriptor& service_method,
                                              AsyncStreamCallbacks& callbacks,
                                              const Optional<std::chrono::milliseconds>& timeout)
-    : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout),
-      completion_thread_(new Thread::Thread([this] { completionThread(); })) {}
-
-GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() { ASSERT(rw_ == nullptr); }
+    : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
 // TODO(htuch): figure out how to propagate "this request should be buffered for
 // retry" bit to Google gRPC library.
@@ -98,8 +125,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
       &ctxt_);
   // Invoke stub call.
   rw_ = parent_.stub_->Call(
-      &ctxt_, "/" + service_method_.service()->full_name() + "/" + service_method_.name(), &cq_,
-      tag(Operation::Init));
+      &ctxt_, "/" + service_method_.service()->full_name() + "/" + service_method_.name(),
+      &parent_.cq_, &init_tag_);
   if (rw_ == nullptr) {
     notifyRemoteClose(Status::GrpcStatus::Unavailable, nullptr, EMPTY_STRING);
     call_failed_ = true;
@@ -132,7 +159,10 @@ void GoogleAsyncStreamImpl::closeStream() {
   writeQueued();
 }
 
-void GoogleAsyncStreamImpl::resetStream() { cleanup(); }
+void GoogleAsyncStreamImpl::resetStream() {
+  ENVOY_LOG(debug, "resetStream");
+  cleanup();
+}
 
 void GoogleAsyncStreamImpl::writeQueued() {
   if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty()) {
@@ -143,25 +173,34 @@ void GoogleAsyncStreamImpl::writeQueued() {
 
   if (!msg.buf_.valid()) {
     ASSERT(msg.end_stream_);
-    rw_->WritesDone(tag(Operation::WriteLast));
+    rw_->WritesDone(&write_last_tag_);
   } else if (msg.end_stream_) {
     grpc::WriteOptions write_options;
-    rw_->WriteLast(msg.buf_.value(), write_options, tag(Operation::WriteLast));
+    rw_->WriteLast(msg.buf_.value(), write_options, &write_last_tag_);
   } else {
-    rw_->Write(msg.buf_.value(), tag(Operation::Write));
+    rw_->Write(msg.buf_.value(), &write_tag_);
   }
 }
 
-void GoogleAsyncStreamImpl::handleOpCompletion(Operation op, bool ok) {
+void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, bool ok) {
   ENVOY_LOG(trace, "handleOpCompletion {} {}", op, ok);
-  // Ignore op completions while CQ is shutting down.
-  if (cq_shutdown_in_progress_) {
-    return;
+  {
+    std::unique_lock<std::mutex> lock(cq_lock_);
+    ASSERT(inflight_completions_ > 0);
+    --inflight_completions_;
+    if (draining_cq_) {
+      if (inflight_completions_ == 0) {
+        deferredDelete();
+      }
+      // Ignore op completions while draining CQ.
+      return;
+    }
   }
   // Consider failure cases first.
   if (!ok) {
     // Early fails can be just treated as Internal.
-    if (op == Operation::Init || op == Operation::ReadInitialMetadata) {
+    if (op == GoogleAsyncTag::Operation::Init ||
+        op == GoogleAsyncTag::Operation::ReadInitialMetadata) {
       notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();
       return;
@@ -170,43 +209,43 @@ void GoogleAsyncStreamImpl::handleOpCompletion(Operation op, bool ok) {
     // TODO(htuch): We're assuming here that a failed Write/WriteLast operation will result in
     // stream termination, and pick up on the failed Read here. Confirm that this assumption is
     // valid.
-    if (op == Operation::Read) {
+    if (op == GoogleAsyncTag::Operation::Read) {
       finish_pending_ = true;
-      rw_->Finish(&status_, tag(Operation::Finish));
+      rw_->Finish(&status_, &finish_tag_);
     }
     return;
   }
   switch (op) {
-  case Operation::Init: {
+  case GoogleAsyncTag::Operation::Init: {
     ASSERT(ok);
     ASSERT(!call_initialized_);
     call_initialized_ = true;
-    rw_->ReadInitialMetadata(tag(Operation::ReadInitialMetadata));
+    rw_->ReadInitialMetadata(&read_initial_metadata_tag_);
     writeQueued();
     break;
   }
-  case Operation::ReadInitialMetadata: {
+  case GoogleAsyncTag::Operation::ReadInitialMetadata: {
     ASSERT(ok);
     ASSERT(call_initialized_);
-    rw_->Read(&read_buf_, tag(Operation::Read));
+    rw_->Read(&read_buf_, &read_tag_);
     Http::HeaderMapPtr initial_metadata = std::make_unique<Http::HeaderMapImpl>();
     metadataTranslate(ctxt_.GetServerInitialMetadata(), *initial_metadata);
     callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
     break;
   }
-  case Operation::Write: {
+  case GoogleAsyncTag::Operation::Write: {
     ASSERT(ok);
     write_pending_ = false;
     write_pending_queue_.pop();
     writeQueued();
     break;
   }
-  case Operation::WriteLast: {
+  case GoogleAsyncTag::Operation::WriteLast: {
     ASSERT(ok);
     write_pending_ = false;
     break;
   }
-  case Operation::Read: {
+  case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
     std::vector<grpc::Slice> slices;
     // Assuming this only fails due to OOM.
@@ -234,10 +273,10 @@ void GoogleAsyncStreamImpl::handleOpCompletion(Operation op, bool ok) {
       break;
     };
     callbacks_.onReceiveMessageUntyped(std::move(response));
-    rw_->Read(&read_buf_, tag(Operation::Read));
+    rw_->Read(&read_buf_, &read_tag_);
     break;
   }
-  case Operation::Finish: {
+  case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
     Http::HeaderMapPtr trailing_metadata = std::make_unique<Http::HeaderMapImpl>();
@@ -266,41 +305,29 @@ void GoogleAsyncStreamImpl::metadataTranslate(
   }
 }
 
-void GoogleAsyncStreamImpl::completionThread() {
-  ENVOY_LOG(debug, "completionThread running");
-  void* tag;
-  bool ok;
-  while (cq_.Next(&tag, &ok)) {
-    ENVOY_LOG(trace, "completionThread CQ event {} {}", operation(tag), ok);
-    parent_.dispatcher_.post([ this, op = operation(tag), ok ] { handleOpCompletion(op, ok); });
+void GoogleAsyncStreamImpl::deferredDelete() {
+  ENVOY_LOG(debug, "Deferred delete");
+  if (LinkedObject<GoogleAsyncStreamImpl>::inserted()) {
+    parent_.dispatcher_.deferredDelete(
+        LinkedObject<GoogleAsyncStreamImpl>::removeFromList(parent_.active_streams_));
   }
-  ENVOY_LOG(debug, "completionThread exiting");
 }
 
 void GoogleAsyncStreamImpl::cleanup() {
   ENVOY_LOG(debug, "Stream cleanup");
-
-  cq_shutdown_in_progress_ = true;
-  cq_.Shutdown();
+  bool no_inflight_completions;
+  // After setting draining_cq_, we don't expect the CQ to deliver any further
+  // handleOpCompletion() calls to this object. However, there may be previously
+  // posted handleOpCompletion() in-flight.
+  {
+    std::unique_lock<std::mutex> lock(cq_lock_);
+    ASSERT(!draining_cq_);
+    draining_cq_ = true;
+    no_inflight_completions = inflight_completions_ == 0;
+  }
   ctxt_.TryCancel();
-  ENVOY_LOG(debug, "CQ shutdown in progress");
-
-  // We join the completionThread during stream shutdown. This might appear to
-  // be a dangerous blocking operation, but should (?) be relatively
-  // non-contended; the completionThread is dedicated to this stream and should
-  // not be holding locks.
-  // TODO(htuch): Validate this assertion, and/or pursue per-silo CQ thread that
-  // doesn't require joining on stream shutdown.
-  ENVOY_LOG(debug, "Joining completionThread");
-  completion_thread_->join();
-  ENVOY_LOG(debug, "Joined completionThread");
-  rw_ = nullptr;
-
-  // This will destroy us, but only do so if we are actually in a list. This does not happen in
-  // the immediate failure case.
-  if (LinkedObject<GoogleAsyncStreamImpl>::inserted()) {
-    parent_.dispatcher_.deferredDelete(
-        LinkedObject<GoogleAsyncStreamImpl>::removeFromList(parent_.active_streams_));
+  if (no_inflight_completions) {
+    deferredDelete();
   }
 }
 

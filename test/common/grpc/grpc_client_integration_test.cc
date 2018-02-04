@@ -258,7 +258,7 @@ public:
     envoy::api::v2::GrpcService::GoogleGrpc config;
     config.set_target_uri(fake_upstream_->localAddress()->asString());
     config.set_stat_prefix("fake_cluster");
-    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, stats_store_, config);
+    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, google_tls_, stats_store_, config);
 #else
     NOT_REACHED;
 #endif
@@ -344,6 +344,9 @@ public:
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
+  // Must come before grpc_client_, since all clients/streams must be ended
+  // before we cleanup the CQ thread (as per interface contract).
+  GoogleAsyncClientThreadLocal google_tls_;
   AsyncClientPtr grpc_client_;
   Event::TimerPtr timeout_timer_;
   const TestMetadata empty_metadata_;
@@ -382,6 +385,13 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   stream->sendReply();
   stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a client destruction with open streams cleans up appropriately.
+TEST_P(GrpcClientIntegrationTest, ClientDestruct) {
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  grpc_client_.reset();
 }
 
 // Validate that a simple request-reply unary RPC works.
