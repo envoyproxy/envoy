@@ -39,19 +39,22 @@ std::string normalizeDate(const std::string& s) {
   return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
 }
 
-void setAllowAbsoluteUrl(envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
-  envoy::api::v2::Http1ProtocolOptions options;
+void setAllowAbsoluteUrl(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  envoy::api::v2::core::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
 
-envoy::api::v2::filter::network::HttpConnectionManager::CodecType
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
   case Http::CodecClient::Type::HTTP1:
-    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP1;
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP1;
   case Http::CodecClient::Type::HTTP2:
-    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP2;
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP2;
   default:
     RELEASE_ASSERT(0);
   }
@@ -338,7 +341,8 @@ void HttpIntegrationTest::testRouterDirectResponse() {
   static const std::string prefix("/");
   static const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("x-additional-header");

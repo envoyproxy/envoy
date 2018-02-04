@@ -121,7 +121,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/http:router_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )
 

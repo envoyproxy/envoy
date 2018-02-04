@@ -8,7 +8,7 @@ namespace Config {
 namespace {
 
 TEST(MetadataTest, MetadataValue) {
-  envoy::api::v2::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   Metadata::mutableMetadataValue(metadata, MetadataFilters::get().ENVOY_LB,
                                  MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);

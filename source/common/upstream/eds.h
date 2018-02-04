@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"

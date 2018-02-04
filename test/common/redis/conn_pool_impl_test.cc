@@ -27,8 +27,9 @@ namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
-envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings createConnPoolSettings() {
-  envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings setting{};
+envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
+createConnPoolSettings() {
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings setting{};
   setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
   return setting;
 }

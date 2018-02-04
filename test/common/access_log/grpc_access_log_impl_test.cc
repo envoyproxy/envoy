@@ -248,10 +248,10 @@ http_logs:
 TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   NiceMock<RequestInfo::MockRequestInfo> request_info;
   ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
-  envoy::api::v2::filter::accesslog::AccessLogCommon common_access_log;
+  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log;
   HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, request_info);
 
-  envoy::api::v2::filter::accesslog::AccessLogCommon common_access_log_expected;
+  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log_expected;
   common_access_log_expected.mutable_response_flags()->set_failed_local_healthcheck(true);
   common_access_log_expected.mutable_response_flags()->set_no_healthy_upstream(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_request_timeout(true);

@@ -42,7 +42,8 @@ TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuf
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyHttp1) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-  config_helper_.setClientCodec(envoy::api::v2::filter::network::HttpConnectionManager::AUTO);
+  config_helper_.setClientCodec(
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::AUTO);
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 

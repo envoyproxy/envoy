@@ -186,7 +186,8 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
-Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOptions& config) {
+Http2Settings
+Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& config) {
   Http2Settings ret;
   ret.hpack_table_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config, hpack_table_size, Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
@@ -200,7 +201,8 @@ Http2Settings Utility::parseHttp2Settings(const envoy::api::v2::Http2ProtocolOpt
   return ret;
 }
 
-Http1Settings Utility::parseHttp1Settings(const envoy::api::v2::Http1ProtocolOptions& config) {
+Http1Settings
+Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config) {
   Http1Settings ret;
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, false);
   return ret;

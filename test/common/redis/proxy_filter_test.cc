@@ -28,8 +28,9 @@ using testing::_;
 namespace Envoy {
 namespace Redis {
 
-envoy::api::v2::filter::network::RedisProxy parseProtoFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::network::RedisProxy config;
+envoy::config::filter::network::redis_proxy::v2::RedisProxy
+parseProtoFromJson(const std::string& json_string) {
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
 
@@ -53,7 +54,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config =
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       Envoy::Redis::parseProtoFromJson(json_string);
   ProxyFilterConfig config(proto_config, cm_, store_, drain_decision_, runtime_);
   EXPECT_EQ("fake_cluster", config.cluster_name_);
@@ -68,7 +69,7 @@ TEST_F(RedisProxyFilterConfigTest, InvalidCluster) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config =
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       Envoy::Redis::parseProtoFromJson(json_string);
 
   EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
@@ -85,7 +86,7 @@ TEST_F(RedisProxyFilterConfigTest, InvalidAddedByApi) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::RedisProxy proto_config =
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       Envoy::Redis::parseProtoFromJson(json_string);
 
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
@@ -117,7 +118,7 @@ public:
     }
     )EOF";
 
-    envoy::api::v2::filter::network::RedisProxy proto_config =
+    envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
         Envoy::Redis::parseProtoFromJson(json_string);
     NiceMock<Upstream::MockClusterManager> cm;
     config_.reset(new ProxyFilterConfig(proto_config, cm, store_, drain_decision_, runtime_));

@@ -25,11 +25,11 @@ bool ConfigUtility::QueryParameterMatcher::matches(
 }
 
 Upstream::ResourcePriority
-ConfigUtility::parsePriority(const envoy::api::v2::RoutingPriority& priority) {
+ConfigUtility::parsePriority(const envoy::api::v2::core::RoutingPriority& priority) {
   switch (priority) {
-  case envoy::api::v2::RoutingPriority::DEFAULT:
+  case envoy::api::v2::core::RoutingPriority::DEFAULT:
     return Upstream::ResourcePriority::Default;
-  case envoy::api::v2::RoutingPriority::HIGH:
+  case envoy::api::v2::core::RoutingPriority::HIGH:
     return Upstream::ResourcePriority::High;
   default:
     NOT_IMPLEMENTED;
