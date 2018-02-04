@@ -3773,13 +3773,27 @@ virtual_hosts:
       EnvoyException, "response body size is 4097 bytes; maximum is 4096");
 }
 
-TEST(RouteConfigurationV2, Metadata) {
+void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
+                             PathMatchType expected_type) {
+  ASSERT_NE(nullptr, route);
+  auto route_entry = route->routeEntry();
+  ASSERT_NE(nullptr, route_entry);
+  auto& match_criterion = route_entry->pathMatchCriterion();
+  EXPECT_EQ(expected_matcher, match_criterion.matcher());
+  EXPECT_EQ(expected_type, match_criterion.matchType());
+}
+
+TEST(RouteConfigurationV2, RouteConfigGetters) {
   std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
     domains: ["*"]
     routes:
+      - match: { regex: "/rege[xy]" }
+        route: { cluster: ww2 }
+      - match: { path: "/exact-path" }
+        route: { cluster: ww2 }
       - match: { prefix: "/"}
         route: { cluster: www2 }
         metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
@@ -3789,9 +3803,14 @@ virtual_hosts:
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
 
-  auto* route_entry = config.route(genHeaders("www.foo.com", "/", "GET"), 0)->routeEntry();
+  checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/regex", "GET"), 0).get(),
+                          "/rege[xy]", PathMatchType::Regex);
+  checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/exact-path", "GET"), 0).get(),
+                          "/exact-path", PathMatchType::Exact);
+  auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+  checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
 
-  const auto& metadata = route_entry->metadata();
+  const auto& metadata = route->routeEntry()->metadata();
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());

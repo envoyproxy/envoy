@@ -22,6 +22,8 @@ const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const envoy::api::v2::core::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
+const AsyncStreamImpl::NullPathMatchCriterion
+    AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
                                  Event::Dispatcher& dispatcher,
