@@ -4,7 +4,7 @@
 
 #include "common/config/well_known_names.h"
 
-#include "api/filter/http/gzip.pb.h"
+#include "envoy/api/v2/filter/http/gzip.pb.h"
 
 namespace Envoy {
 namespace Server {
