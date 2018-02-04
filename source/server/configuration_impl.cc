@@ -90,7 +90,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
 
 void MainImpl::validateProtoDescriptors() {
   ENVOY_LOG(info, "validating proto descriptors");
-  
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
