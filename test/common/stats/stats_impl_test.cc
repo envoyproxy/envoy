@@ -90,7 +90,7 @@ TEST(TagExtractorTest, TwoSubexpressions) {
   std::vector<Tag> tags;
   IntervalSetImpl<size_t> remove_characters;
   ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
-  std::string tag_extracted_name = TagExtractorImpl::applyRemovals(name, remove_characters);
+  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
   EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("test_cluster", tags.at(0).value_);
@@ -103,7 +103,7 @@ TEST(TagExtractorTest, SingleSubexpression) {
   std::vector<Tag> tags;
   IntervalSetImpl<size_t> remove_characters;
   ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
-  std::string tag_extracted_name = TagExtractorImpl::applyRemovals(name, remove_characters);
+  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
   EXPECT_EQ("listener.downstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("80.", tags.at(0).value_);
@@ -138,7 +138,7 @@ public:
     for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
       tag_extractor->extractTag(stat_name, tags, remove_characters);
     }
-    std::string tag_extracted_name = TagExtractorImpl::applyRemovals(stat_name, remove_characters);
+    std::string tag_extracted_name = StringUtil::removeCharacters(stat_name, remove_characters);
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
       return lhs.name_ == rhs.name_ && lhs.value_ == rhs.value_;
@@ -156,8 +156,7 @@ public:
     for (auto it = tag_extractors_.rbegin(); it != tag_extractors_.rend(); ++it) {
       (*it)->extractTag(stat_name, rev_tags, rev_remove_characters);
     }
-    std::string rev_tag_extracted_name =
-        TagExtractorImpl::applyRemovals(stat_name, remove_characters);
+    std::string rev_tag_extracted_name = StringUtil::removeCharacters(stat_name, remove_characters);
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);
     ASSERT_EQ(expected_tags.size(), rev_tags.size())

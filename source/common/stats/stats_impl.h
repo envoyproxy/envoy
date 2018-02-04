@@ -37,15 +37,6 @@ public:
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex);
 
-  /**
-   * Removes all the characters from str contained in the interval-set.
-   * @param str the string containing the characters to be removed.
-   * @param remove_characters the set of character-intervals .
-   * @return std::string the string with the desired characters removed.
-   */
-  static std::string applyRemovals(const std::string& str,
-                                   const IntervalSet<size_t>& remove_characters);
-
   TagExtractorImpl(const std::string& name, const std::string& regex);
   std::string name() const override { return name_; }
   bool extractTag(const std::string& tag_extracted_name, std::vector<Tag>& tags,

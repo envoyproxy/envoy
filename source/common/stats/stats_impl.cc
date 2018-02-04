@@ -118,23 +118,6 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
   return false;
 }
 
-std::string TagExtractorImpl::applyRemovals(const std::string& str,
-                                            const IntervalSet<size_t>& remove_characters) {
-  std::string ret;
-  size_t pos = 0;
-  for (const auto& interval : remove_characters.toVector()) {
-    if (interval.first != pos) {
-      ret += str.substr(pos, interval.first - pos);
-    }
-    pos = interval.second;
-  }
-  if (pos != str.size()) {
-    ret += str.substr(pos);
-  }
-
-  return ret;
-}
-
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // This must be zero-initialized
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
@@ -177,7 +160,7 @@ std::string TagProducerImpl::produceTags(const std::string& stat_name,
   for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
     tag_extractor->extractTag(stat_name, tags, remove_characters);
   }
-  return TagExtractorImpl::applyRemovals(stat_name, remove_characters);
+  return StringUtil::removeCharacters(stat_name, remove_characters);
 }
 
 // Roughly estimate the size of the vectors.

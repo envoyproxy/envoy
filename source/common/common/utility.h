@@ -13,6 +13,8 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/time.h"
 
+#include "common/common/assert.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -256,6 +258,15 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
+
+  /**
+   * Removes all the character indices from str contained in the interval-set.
+   * @param str the string containing the characters to be removed.
+   * @param remove_characters the set of character-intervals .
+   * @return std::string the string with the desired characters removed.
+   */
+  static std::string removeCharacters(const absl::string_view& str,
+                                      const IntervalSet<size_t>& remove_characters);
 };
 
 /**
@@ -302,6 +313,11 @@ public:
 
   // Inserts a new interval into the set, merging any overlaps.
   void insert(Value left, Value right) override {
+    if (left == right) {
+      return;
+    }
+    ASSERT(left < right);
+
     auto left_pos = intervals_.lower_bound(Interval(left, left));
     // upper_bound is exclusive, and we want to be inclusive.
     auto right_pos = intervals_.upper_bound(Interval(right, right));

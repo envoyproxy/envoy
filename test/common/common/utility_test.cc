@@ -280,6 +280,15 @@ TEST(StringUtil, StringViewSplit) {
   }
 }
 
+TEST(StringUtil, removeCharacters) {
+  IntervalSetImpl<size_t> removals;
+  removals.insert(3, 5);
+  removals.insert(7, 10);
+  EXPECT_EQ("01256", StringUtil::removeCharacters("0123456789", removals));
+  removals.insert(0, 1);
+  EXPECT_EQ("1256x", StringUtil::removeCharacters("0123456789x", removals));
+}
+
 TEST(Primes, isPrime) {
   EXPECT_TRUE(Primes::isPrime(67));
   EXPECT_FALSE(Primes::isPrime(49));
@@ -326,7 +335,10 @@ TEST(IntervalSet, testIntervals) {
   EXPECT_EQ("[-2, -1), [7, 10), [22, 23)", insert_and_print(22, 23)); // disjoint right
   EXPECT_EQ("[-2, -1), [7, 15), [22, 23)", insert_and_print(8, 15));  // right overhang
   EXPECT_EQ("[-2, -1), [5, 15), [22, 23)", insert_and_print(5, 12));  // left overhang
-  EXPECT_EQ("[-2, -1), [2, 4), [5, 15), [22, 23)",                    // disjoint in middle
+  EXPECT_EQ("[-2, -1), [5, 15), [22, 23)", insert_and_print(3, 3));   // empty; no change
+  EXPECT_EQ("[-2, -1), [3, 4), [5, 15), [22, 23)",                    // single-element add
+            insert_and_print(3, 4));
+  EXPECT_EQ("[-2, -1), [2, 4), [5, 15), [22, 23)", // disjoint in middle
             insert_and_print(2, 4));
   EXPECT_EQ("[-2, -1), [2, 15), [22, 23)", insert_and_print(3, 6)); // merge two intervals
   EXPECT_EQ("[-2, -1), [2, 15), [18, 19), [22, 23)",                // right disjoint
