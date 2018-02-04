@@ -139,6 +139,8 @@ public:
   }
 
 private:
+  void validateProtoDescriptors();
+
   /**
    * Initialize tracers and corresponding sinks.
    */

@@ -131,8 +131,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:logger_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-        "@envoy_api//envoy/service/discovery/v2:ads_cc",
     ],
 )
 
