@@ -106,7 +106,6 @@ void MainImpl::validateProtoDescriptors() {
       "envoy.service.metrics.v2.MetricsService.StreamMetrics",
       "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit",
   };
-
   for (const auto& method : methods) {
     if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
       throw EnvoyException(fmt::format("method descriptor not found for {}", method));
