@@ -500,6 +500,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
+  // TODO(mattklein123): We should set downstream_local_address_ and downstream_remote_address_
+  // as early as possible in this function since there are various places where we can return and
+  // still log before we get here.
   request_info_.downstream_local_address_ =
       connection_manager_.read_callbacks_->connection().localAddress();
   request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
