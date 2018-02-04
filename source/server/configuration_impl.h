@@ -147,8 +147,9 @@ private:
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
   envoy::service::discovery::v2::AdsDummy dummy;
   envoy::service::ratelimit::v2::RateLimitRequest rls_dummy;
+  
   /**
-   * Valides the protobuf method descriptors. 
+   * Validates the protobuf method descriptors. 
    */
   void validateProtoDescriptors();
 
