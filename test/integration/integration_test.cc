@@ -34,6 +34,8 @@ TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
 TEST_P(IntegrationTest, RouterDirectResponse) { testRouterDirectResponse(); }
 
+TEST_P(IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
+
 TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(IntegrationTest, ConnectionClose) {

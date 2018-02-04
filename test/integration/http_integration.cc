@@ -375,6 +375,30 @@ void HttpIntegrationTest::testRouterDirectResponse() {
   EXPECT_EQ(body, response->body());
 }
 
+// Add a health check filter and verify correct computation of health based on upstream status.
+void HttpIntegrationTest::testComputedHealthCheck() {
+  config_helper_.addFilter(R"EOF(
+name: envoy.health_check
+config:
+    pass_through_mode: false
+    endpoint: /healthcheck
+    cluster_min_healthy_percentages:
+        example_cluster_name: { value: 75 }
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/healthcheck"},
+                                                               {":scheme", "http"},
+                                                               {":authority", "host"}},
+                                       *response_);
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
+}
+
 // Add a health check filter and verify correct behavior when draining.
 void HttpIntegrationTest::testDrainClose() {
   config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);

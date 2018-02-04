@@ -40,6 +40,8 @@ TEST_P(Http2IntegrationTest, InvalidContentLength) { testInvalidContentLength();
 
 TEST_P(Http2IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
 
+TEST_P(Http2IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
+
 TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {

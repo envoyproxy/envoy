@@ -117,7 +117,7 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::
     }
     if (size > MaxBodySize) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, MaxBodySize));
+                                       filename, size, MaxBodySize));
     }
     return Filesystem::fileReadToEnd(filename);
   }
