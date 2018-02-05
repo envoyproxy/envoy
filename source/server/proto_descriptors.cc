@@ -11,14 +11,14 @@
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"
 
-#include "gtest/gtest.h"
-
 namespace Envoy {
 
-// This test verifies that critical descriptors have not changed name. It includes both gRPC
-// services as well as types that are referenced in Any messages. IF THIS TEST BREAKS YOU
-// HAVE DONE SOMETHING BAD. Consult with the larger dev team on how to handle.
-TEST(ProtoDescriptorTest, BackCompat) {
+// This function verifies that critical descriptors have not changed name. It includes both gRPC
+// services as well as types that are referenced in Any messages. 
+bool validateProtoDescriptors() {
+  
+  bool descriptors_valid = true;
+
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
   // TODO(kuat): Remove explicit proto descriptor import.
   envoy::service::discovery::v2::AdsDummy dummy;
@@ -42,8 +42,10 @@ TEST(ProtoDescriptorTest, BackCompat) {
   };
 
   for (const auto& method : methods) {
-    EXPECT_NE(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method), nullptr)
-        << fmt::format("{} not found", method);
+    if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
+        descriptors_valid = false;
+        break;
+    }
   }
 
   const auto types = {
@@ -54,9 +56,10 @@ TEST(ProtoDescriptorTest, BackCompat) {
   };
 
   for (const auto& type : types) {
-    EXPECT_NE(Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type), nullptr)
-        << fmt::format("{} not found", type);
+    if (Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) == nullptr) {
+       descriptors_valid = false;
+    }
   }
-}
-
+  return descriptors_valid;
+};
 } // namespace Envoy

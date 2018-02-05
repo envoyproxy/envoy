@@ -45,7 +45,6 @@ bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
-  validateProtoDescriptors();
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
       server.localInfo(), server.accessLogManager());
@@ -86,31 +85,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   }
 
   initializeStatsSinks(bootstrap, server);
-}
-
-void MainImpl::validateProtoDescriptors() {
-  ENVOY_LOG(info, "validating proto descriptors");
-  const auto methods = {
-      "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-      "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
-      "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
-      "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
-      "envoy.api.v2.ListenerDiscoveryService.StreamListeners",
-      "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
-      "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources",
-      "envoy.service.discovery.v2.HealthDiscoveryService.FetchHealthCheck",
-      "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck",
-      "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs",
-      "envoy.service.metrics.v2.MetricsService.StreamMetrics",
-      "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit",
-  };
-  for (const auto& method : methods) {
-    if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
-      throw EnvoyException(fmt::format("method descriptor not found for {}", method));
-    }
-  }
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,
