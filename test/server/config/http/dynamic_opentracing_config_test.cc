@@ -18,23 +18,6 @@ using testing::_;
 namespace Server {
 namespace Configuration {
 
-/**
- * With `cc_test`, if `data` points to a library, then bazel puts in in a platform-architecture
- * dependent location, so this function uses `find` to discover the path.
- *
- * See https://stackoverflow.com/q/48461242/4447365.
- */
-const char* mocktracer_library_path() {
-  static const std::string path = [] {
-    const std::string result =
-        TestEnvironment::runfilesDirectory() + "/libopentracing_mocktracer.so";
-    TestEnvironment::exec({"find", TestEnvironment::runfilesDirectory(),
-                           "-name *libmock* -exec ln -s {}", result, "\\;"});
-    return result;
-  }();
-  return path.c_str();
-}
-
 TEST(HttpTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("fake_cluster")).WillRepeatedly(Return(&cm.thread_local_cluster_));
@@ -43,13 +26,13 @@ TEST(HttpTracerConfigTest, DynamicOpentracingHttpTracer) {
 
   std::string valid_config = fmt::sprintf(R"EOF(
   {
-    "library": "%s",
+    "library": "%s/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so",
     "config": {
       "output_file" : "fake_file"
     }
   }
   )EOF",
-                                          mocktracer_library_path());
+                                          TestEnvironment::runfilesDirectory());
   Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
   NiceMock<MockInstance> server;
   DynamicOpenTracingHttpTracerFactory factory;
