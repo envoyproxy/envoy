@@ -14,9 +14,8 @@
 namespace Envoy {
 
 // This function verifies that critical descriptors have not changed name. It includes both gRPC
-// services as well as types that are referenced in Any messages. 
+// services as well as types that are referenced in Any messages.
 bool validateProtoDescriptors() {
-  
   bool descriptors_valid = true;
 
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
@@ -43,8 +42,8 @@ bool validateProtoDescriptors() {
 
   for (const auto& method : methods) {
     if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
-        descriptors_valid = false;
-        break;
+      descriptors_valid = false;
+      break;
     }
   }
 
@@ -57,7 +56,7 @@ bool validateProtoDescriptors() {
 
   for (const auto& type : types) {
     if (Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) == nullptr) {
-       descriptors_valid = false;
+      descriptors_valid = false;
     }
   }
   return descriptors_valid;
