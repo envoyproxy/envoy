@@ -50,7 +50,7 @@ public:
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
   // Tracer::OpenTracingDriver
-  const opentracing::Tracer& tracer() const override;
+  opentracing::Tracer& tracer() override;
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
 private:
@@ -90,7 +90,7 @@ private:
     TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
                        LightStepDriver& driver, Event::Dispatcher& dispatcher);
 
-    opentracing::Tracer& tracer() const;
+    opentracing::Tracer& tracer();
 
   private:
     void enableTimer();

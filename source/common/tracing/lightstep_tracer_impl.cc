@@ -112,7 +112,7 @@ LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
   enableTimer();
 }
 
-const opentracing::Tracer& LightStepDriver::TlsLightStepTracer::tracer() const { return *tracer_; }
+opentracing::Tracer& LightStepDriver::TlsLightStepTracer::tracer() { return *tracer_; }
 
 void LightStepDriver::TlsLightStepTracer::enableTimer() {
   const uint64_t flush_interval =
