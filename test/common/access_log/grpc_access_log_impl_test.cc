@@ -167,6 +167,30 @@ http_logs:
 
   {
     NiceMock<RequestInfo::MockRequestInfo> request_info;
+    request_info.host_ = nullptr;
+    request_info.start_time_ = SystemTime(1h);
+    request_info.duration_ = 2ms;
+    request_info.downstream_local_address_ = nullptr;
+    request_info.downstream_remote_address_ = nullptr;
+    request_info.protocol_ = Http::Protocol::Http2;
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      start_time:
+        seconds: 3600
+      time_to_last_downstream_tx_byte:
+        nanos: 2000000
+    protocol_version: HTTP2
+    request: {}
+    response: {}
+
+)EOF");
+    access_log_->log(nullptr, nullptr, request_info);
+  }
+
+  {
+    NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.start_time_ = SystemTime(1h);
     request_info.request_received_duration_ = 2ms;
     request_info.response_received_duration_ = 4ms;
