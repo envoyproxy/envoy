@@ -81,7 +81,8 @@ public:
   /**
    * Called when data is read on the connection.
    * @param data supplies the read data which may be modified.
-   * @param end_stream supplies whether this is the last byte on the connection.
+   * @param end_stream supplies whether this is the last byte on the connection. This will only
+   *        be set if the connection has half-close semantics enabled.
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onData(Buffer::Instance& data, bool end_stream) PURE;

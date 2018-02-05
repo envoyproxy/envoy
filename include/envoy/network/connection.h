@@ -194,6 +194,9 @@ public:
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
+   * @param end_stream If true, this indicates that this is the last write to the connection. If
+   *        end_stream is true, the connection is half-closed. This may only be called if
+   *        enableHalfClose(true) has been set on this connection.
    */
   virtual void write(Buffer::Instance& data, bool end_stream) PURE;
 
