@@ -32,15 +32,17 @@ public:
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::unique_ptr<envoy::api::v2::filter::network::HttpConnectionManager>(
-        new envoy::api::v2::filter::network::HttpConnectionManager());
+    return std::unique_ptr<
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
+        new envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager());
   }
   std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 
 private:
-  NetworkFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::network::HttpConnectionManager& proto_config,
-               FactoryContext& context);
+  NetworkFilterFactoryCb createFilter(
+      const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+          proto_config,
+      FactoryContext& context);
 };
 
 /**
@@ -64,9 +66,11 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::FilterChainFactory,
                                     public Http::ConnectionManagerConfig {
 public:
-  HttpConnectionManagerConfig(const envoy::api::v2::filter::network::HttpConnectionManager& config,
-                              FactoryContext& context, Http::DateProvider& date_provider,
-                              Router::RouteConfigProviderManager& route_config_provider_manager);
+  HttpConnectionManagerConfig(
+      const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+          config,
+      FactoryContext& context, Http::DateProvider& date_provider,
+      Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;

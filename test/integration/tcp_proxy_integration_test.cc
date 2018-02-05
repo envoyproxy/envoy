@@ -1,6 +1,6 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
@@ -101,6 +101,49 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
+// Test that an upstream flush works correctly (all data is flushed)
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
+  // Use a very large size to make sure it is larger than the kernel socket read buffer.
+  const uint32_t size = 50 * 1024 * 1024;
+  config_helper_.setBufferLimits(size, size);
+  initialize();
+
+  std::string data(size, 'a');
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->readDisable(true);
+  tcp_client->write(data);
+  tcp_client->close();
+
+  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  fake_upstream_connection->readDisable(false);
+  fake_upstream_connection->waitForData(data.size());
+  fake_upstream_connection->waitForDisconnect();
+
+  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
+  EXPECT_EQ(test_server_->gauge("tcp.tcp_stats.upstream_flush_active")->value(), 0);
+}
+
+// Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
+  // Use a very large size to make sure it is larger than the kernel socket read buffer.
+  const uint32_t size = 50 * 1024 * 1024;
+  config_helper_.setBufferLimits(size, size);
+  initialize();
+
+  std::string data(size, 'a');
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->readDisable(true);
+  tcp_client->write(data);
+  tcp_client->close();
+
+  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_.reset();
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+}
+
 // Test proxying data in both directions with envoy doing TCP and TLS
 // termination.
 void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_send_upstream,
@@ -183,12 +226,12 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
-    envoy::api::v2::filter::network::TcpProxy tcp_proxy_config;
+    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
     MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
-    envoy::api::v2::filter::accesslog::FileAccessLog access_log_config;
+    envoy::config::filter::accesslog::v2::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.set_format("upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
                                  "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_ADDRESS%\n");

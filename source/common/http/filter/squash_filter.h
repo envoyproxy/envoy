@@ -4,8 +4,8 @@
 #include <regex>
 #include <string>
 
-#include "envoy/api/v2/filter/http/squash.pb.h"
 #include "envoy/common/optional.h"
+#include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -18,7 +18,7 @@ namespace Http {
 
 class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
-  SquashFilterConfig(const envoy::api::v2::filter::http::Squash& proto_config,
+  SquashFilterConfig(const envoy::config::filter::http::squash::v2::Squash& proto_config,
                      Upstream::ClusterManager& clusterManager);
   const std::string& clusterName() { return cluster_name_; }
   const std::string& attachmentJson() { return attachment_json_; }

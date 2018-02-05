@@ -215,7 +215,7 @@ public:
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
-  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -275,10 +275,10 @@ public:
 
   MOCK_METHOD0(routeConfigProviders, std::vector<RdsRouteConfigProviderSharedPtr>());
   MOCK_METHOD5(getRouteConfigProvider,
-               RouteConfigProviderSharedPtr(const envoy::api::v2::filter::network::Rds& rds,
-                                            Upstream::ClusterManager& cm, Stats::Scope& scope,
-                                            const std::string& stat_prefix,
-                                            Init::Manager& init_manager));
+               RouteConfigProviderSharedPtr(
+                   const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+                   Upstream::ClusterManager& cm, Stats::Scope& scope,
+                   const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
 };
 

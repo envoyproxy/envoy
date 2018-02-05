@@ -53,8 +53,8 @@ public:
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
-                      const Optional<envoy::api::v2::ConfigSource>& eds_config,
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                      const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
 
 protected:
@@ -242,16 +242,15 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const Optional<std::string>& local_cluster_name);
     ~ThreadLocalClusterManagerImpl();
-    void drainConnPools(const std::vector<HostSharedPtr>& hosts);
+    void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
                                         HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
-                                        HostListsConstSharedPtr hosts_per_locality,
-                                        HostListsConstSharedPtr healthy_hosts_per_locality,
-                                        const std::vector<HostSharedPtr>& hosts_added,
-                                        const std::vector<HostSharedPtr>& hosts_removed,
-                                        ThreadLocal::Slot& tls);
+                                        HostsPerLocalityConstSharedPtr hosts_per_locality,
+                                        HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        const HostVector& hosts_added,
+                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ClusterManagerImpl& parent_;
@@ -284,8 +283,7 @@ private:
   void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
-                                    const std::vector<HostSharedPtr>& hosts_added,
-                                    const std::vector<HostSharedPtr>& hosts_removed);
+                                    const HostVector& hosts_added, const HostVector& hosts_removed);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
 
   ClusterManagerFactory& factory_;
@@ -294,7 +292,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
-  Optional<envoy::api::v2::ConfigSource> eds_config_;
+  Optional<envoy::api::v2::core::ConfigSource> eds_config_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;

@@ -53,9 +53,9 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
-  envoy::api::v2::Address& address = *sink_config.mutable_address();
-  envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
+  envoy::api::v2::core::Address& address = *sink_config.mutable_address();
+  envoy::api::v2::core::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::api::v2::core::SocketAddress::UDP);
   auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);
@@ -89,9 +89,9 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = Config::StatsSinkNames::get().DOG_STATSD;
 
   envoy::config::metrics::v2::DogStatsdSink sink_config;
-  envoy::api::v2::Address& address = *sink_config.mutable_address();
-  envoy::api::v2::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::api::v2::SocketAddress::UDP);
+  envoy::api::v2::core::Address& address = *sink_config.mutable_address();
+  envoy::api::v2::core::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::api::v2::core::SocketAddress::UDP);
   auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);

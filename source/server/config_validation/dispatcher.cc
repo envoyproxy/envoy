@@ -16,7 +16,7 @@ Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
   NOT_IMPLEMENTED;
 }
 
-Network::ListenerPtr ValidationDispatcher::createListener(Network::ListenSocket&,
+Network::ListenerPtr ValidationDispatcher::createListener(Network::Socket&,
                                                           Network::ListenerCallbacks&, bool, bool) {
   NOT_IMPLEMENTED;
 }

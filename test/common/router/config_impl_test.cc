@@ -2201,17 +2201,17 @@ TEST(RouteMatcherTest, DirectResponse) {
       "domains": ["redirect.lyft.com"],
       "routes": [
         {
-          "prefix": "/foo",
+          "path": "/host",
           "host_redirect": "new.lyft.com"
         },
         {
-          "prefix": "/bar",
-          "path_redirect": "/new_bar"
+          "path": "/path",
+          "path_redirect": "/new_path"
         },
         {
-          "prefix": "/baz",
+          "path": "/host_path",
           "host_redirect": "new.lyft.com",
-          "path_redirect": "/new_baz"
+          "path_redirect": "/new_path"
         }
       ]
     }
@@ -2241,12 +2241,20 @@ virtual_hosts:
   - name: redirect
     domains: [redirect.lyft.com]
     routes:
-      - match: { prefix: /foo }
+      - match: { path: /host }
         redirect: { host_redirect: new.lyft.com }
-      - match: { prefix: /bar }
-        redirect: { path_redirect: /new_bar }
-      - match: { prefix: /baz }
-        redirect: { host_redirect: new.lyft.com, path_redirect: /new_baz }
+      - match: { path: /path }
+        redirect: { path_redirect: /new_path }
+      - match: { path: /https }
+        redirect: { https_redirect: true }
+      - match: { path: /host_path }
+        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path }
+      - match: { path: /host_https }
+        redirect: { host_redirect: new.lyft.com, https_redirect: true }
+      - match: { path: /path_https }
+        redirect: { path_redirect: /new_path, https_redirect: true }
+      - match: { path: /host_path_https }
+        redirect: { host_redirect: new.lyft.com, path_redirect: /new_path, https_redirect: true }
   - name: direct
     domains: [direct.example.com]
     routes:
@@ -2292,20 +2300,20 @@ virtual_hosts:
     }
     {
       Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
-      EXPECT_EQ("http://new.lyft.com/foo",
+          genRedirectHeaders("redirect.lyft.com", "/host", false, false);
+      EXPECT_EQ("http://new.lyft.com/host",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     {
       Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/bar", true, false);
-      EXPECT_EQ("https://redirect.lyft.com/new_bar",
+          genRedirectHeaders("redirect.lyft.com", "/path", true, false);
+      EXPECT_EQ("https://redirect.lyft.com/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     {
       Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
-      EXPECT_EQ("https://new.lyft.com/new_baz",
+          genRedirectHeaders("redirect.lyft.com", "/host_path", true, false);
+      EXPECT_EQ("https://new.lyft.com/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     if (!test_v2) {
@@ -2340,6 +2348,30 @@ virtual_hosts:
       Http::TestHeaderMapImpl headers =
           genRedirectHeaders("direct.example.com", "/other", true, false);
       EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/https", false, false);
+      EXPECT_EQ("https://redirect.lyft.com/https",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/host_https", false, false);
+      EXPECT_EQ("https://new.lyft.com/host_https",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/path_https", false, false);
+      EXPECT_EQ("https://redirect.lyft.com/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    }
+    {
+      Http::TestHeaderMapImpl headers =
+          genRedirectHeaders("redirect.lyft.com", "/host_path_https", false, false);
+      EXPECT_EQ("https://new.lyft.com/new_path",
+                config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
   };
 
@@ -3649,6 +3681,23 @@ TEST(ConfigUtility, ParseResponseCode) {
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
   }
+}
+
+TEST(ConfigUtility, ParseDirectResponseBody) {
+  envoy::api::v2::route::Route route;
+  EXPECT_EQ(EMPTY_STRING, ConfigUtility::parseDirectResponseBody(route));
+
+  route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
+  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route), EnvoyException,
+                            "response body file missing_file does not exist");
+
+  std::string body(4097, '*');
+  auto filename = TestEnvironment::writeStringToFileForTest("body", body);
+  route.mutable_direct_response()->mutable_body()->set_filename(filename);
+  std::string expected_message("response body file " + filename +
+                               " size is 4097 bytes; maximum is 4096");
+  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route), EnvoyException,
+                            expected_message);
 }
 
 TEST(RouteConfigurationV2, RedirectCode) {

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/http/router.pb.validate.h"
+#include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -14,9 +14,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb
-RouterFilterConfig::createFilter(const envoy::api::v2::filter::http::Router& proto_config,
-                                 const std::string& stat_prefix, FactoryContext& context) {
+HttpFilterFactoryCb RouterFilterConfig::createFilter(
+    const envoy::config::filter::http::router::v2::Router& proto_config,
+    const std::string& stat_prefix, FactoryContext& context) {
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
       stat_prefix, context,
       Router::ShadowWriterPtr{new Router::ShadowWriterImpl(context.clusterManager())},
@@ -30,7 +30,7 @@ RouterFilterConfig::createFilter(const envoy::api::v2::filter::http::Router& pro
 HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                             const std::string& stat_prefix,
                                                             FactoryContext& context) {
-  envoy::api::v2::filter::http::Router proto_config;
+  envoy::config::filter::http::router::v2::Router proto_config;
   Config::FilterJson::translateRouter(json_config, proto_config);
   return createFilter(proto_config, stat_prefix, context);
 }
@@ -40,7 +40,8 @@ RouterFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_
                                                  const std::string& stat_prefix,
                                                  FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::Router&>(proto_config),
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::router::v2::Router&>(
+          proto_config),
       stat_prefix, context);
 }
 

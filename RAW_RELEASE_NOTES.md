@@ -54,3 +54,5 @@ final version.
 * Added support for proxying 100-Continue responses.
 * Added DOWNSTREAM_LOCAL_ADDRESS, DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT header formatters, and
   DOWNSTREAM_LOCAL_ADDRESS access log formatter.
+* Added support for HTTPS redirects on specific routes.
+* Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.

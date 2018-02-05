@@ -11,7 +11,7 @@ wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
 apt-get update
 apt-get install -y clang-5.0 clang-format-5.0
-# Bazel and related dependencies.
+# Bazel 0.10.0 and related dependencies.
 apt-get install -y openjdk-8-jdk curl
 echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
 curl https://bazel.build/bazel-release.pub.gpg | apt-key add -

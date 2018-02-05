@@ -9,7 +9,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -411,10 +411,10 @@ public:
   virtual bool includeVirtualHostRateLimits() const PURE;
 
   /**
-   * @return const envoy::api::v2::Metadata& return the metadata provided in the config for this
-   * route.
+   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
+   * this route.
    */
-  virtual const envoy::api::v2::Metadata& metadata() const PURE;
+  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 };
 
 /**

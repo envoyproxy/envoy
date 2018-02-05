@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/http/rate_limit.pb.h"
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
@@ -29,7 +29,7 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::api::v2::filter::http::RateLimit& config,
+  FilterConfig(const envoy::config::filter::http::rate_limit::v2::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),

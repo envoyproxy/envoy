@@ -42,7 +42,7 @@ public:
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
     ON_CALL(*cm_.conn_pool_.host_, locality())
-        .WillByDefault(ReturnRef(envoy::api::v2::Locality().default_instance()));
+        .WillByDefault(ReturnRef(envoy::api::v2::core::Locality().default_instance()));
   }
 
   void expectSuccess(uint64_t code) {

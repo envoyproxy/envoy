@@ -9,30 +9,63 @@ namespace Envoy {
 namespace Network {
 
 /**
- * An abstract listen socket.
+ * Base class for Sockets
  */
-class ListenSocket {
+class Socket {
 public:
-  virtual ~ListenSocket() {}
+  virtual ~Socket() {}
 
   /**
-   * @return the address that the socket is listening on.
+   * @return the local address of the socket.
    */
-  virtual Address::InstanceConstSharedPtr localAddress() const PURE;
+  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return fd the listen socket's file descriptor.
+   * @return fd the socket's file descriptor.
    */
-  virtual int fd() PURE;
+  virtual int fd() const PURE;
 
   /**
    * Close the underlying socket.
    */
   virtual void close() PURE;
+
+  /**
+   * Visitor class for setting socket options.
+   */
+  class Options {
+  public:
+    virtual ~Options() {}
+
+    /**
+     * @param socket the socket on which to apply options.
+     * @return true if succeeded, false otherwise.
+     */
+    virtual bool setOptions(Socket& socket) const PURE;
+
+    /**
+     * @return bits that can be used to separate connections based on the options. Should return
+     *         zero if connections with different options can be pooled together. This is limited
+     *         to 32 bits to allow these bits to be efficiently combined into a larger hash key
+     *         used in connection pool lookups.
+     */
+    virtual uint32_t hashKey() const PURE;
+  };
+  typedef std::shared_ptr<Options> OptionsSharedPtr;
+
+  /**
+   * Set the socket options for later retrieval with options().
+   */
+  virtual void setOptions(const OptionsSharedPtr&) PURE;
+
+  /**
+   * @return the socket options stored earlier with setOptions(), if any.
+   */
+  virtual const OptionsSharedPtr& options() const PURE;
 };
 
-typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
-typedef std::shared_ptr<ListenSocket> ListenSocketSharedPtr;
+typedef std::unique_ptr<Socket> SocketPtr;
+typedef std::shared_ptr<Socket> SocketSharedPtr;
 
 /**
  * A socket passed to a connection. For server connections this represents the accepted socket, and
@@ -41,14 +74,9 @@ typedef std::shared_ptr<ListenSocket> ListenSocketSharedPtr;
  * TODO(jrajahalme): Hide internals (e.g., fd) from listener filters by providing callbacks filters
  * may need (set/getsockopt(), peek(), recv(), etc.)
  */
-class ConnectionSocket {
+class ConnectionSocket : public virtual Socket {
 public:
   virtual ~ConnectionSocket() {}
-
-  /**
-   * @return the local address of the socket.
-   */
-  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
    * @return the remote address of the socket.
@@ -80,49 +108,6 @@ public:
    *         address the socket was initially accepted at.
    */
   virtual bool localAddressRestored() const PURE;
-
-  /**
-   * @return fd the socket's file descriptor.
-   */
-  virtual int fd() const PURE;
-
-  /**
-   * Close the underlying socket.
-   */
-  virtual void close() PURE;
-
-  /**
-   * Visitor class for setting socket options.
-   */
-  class Options {
-  public:
-    virtual ~Options() {}
-
-    /**
-     * @param socket the socket on which to apply options.
-     * @return true if succeeded, false otherwise.
-     */
-    virtual bool setOptions(ConnectionSocket& socket) const PURE;
-
-    /**
-     * @return bits that can be used to separate connections based on the options. Should return
-     *         zero if connections with different options can be pooled together. This is limited
-     *         to 32 bits to allow these bits to be efficiently combined into a larger hash key
-     *         used in connection pool lookups.
-     */
-    virtual uint32_t hashKey() const PURE;
-  };
-  typedef std::shared_ptr<Options> OptionsSharedPtr;
-
-  /**
-   * Set the socket options for later retrieval with options().
-   */
-  virtual void setOptions(const OptionsSharedPtr&) PURE;
-
-  /**
-   * @return the socket options stored earlier with setOptions(), if any.
-   */
-  virtual const ConnectionSocket::OptionsSharedPtr& options() const PURE;
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;

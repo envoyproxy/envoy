@@ -48,7 +48,7 @@ public:
         .WillByDefault(Return(true));
 
     Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::network::RateLimit proto_config{};
+    envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
     Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new MockClient();
@@ -86,7 +86,7 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RateLimit proto_config{};
+  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
 
   EXPECT_THROW(Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config),
                Json::Exception);

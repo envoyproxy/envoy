@@ -117,7 +117,7 @@ CidrRange CidrRange::create(const std::string& address, int length) {
   return create(Utility::parseInternetAddress(address), length);
 }
 
-CidrRange CidrRange::create(const envoy::api::v2::CidrRange& cidr) {
+CidrRange CidrRange::create(const envoy::api::v2::core::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
@@ -209,8 +209,8 @@ IpList::IpList(const std::vector<std::string>& subnets) {
   }
 }
 
-IpList::IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::CidrRange>& cidrs) {
-  for (const envoy::api::v2::CidrRange& entry : cidrs) {
+IpList::IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>& cidrs) {
+  for (const envoy::api::v2::core::CidrRange& entry : cidrs) {
     CidrRange list_entry = CidrRange::create(entry);
     if (list_entry.isValid()) {
       ip_list_.push_back(list_entry);
