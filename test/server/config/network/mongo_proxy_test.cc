@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/api/v2/filter/network/mongo_proxy.pb.h"
+#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
 
 #include "server/config/network/mongo_proxy.h"
 
@@ -35,7 +35,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
 }
 
 TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
-  envoy::api::v2::filter::network::MongoProxy config{};
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
 
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
@@ -51,8 +51,8 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
 TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   NiceMock<MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  envoy::api::v2::filter::network::MongoProxy config =
-      *dynamic_cast<envoy::api::v2::filter::network::MongoProxy*>(
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config =
+      *dynamic_cast<envoy::config::filter::network::mongo_proxy::v2::MongoProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
@@ -249,7 +249,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
 }
 
 TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
-  envoy::api::v2::filter::network::MongoProxy config{};
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
   config.set_stat_prefix("my_stat_prefix");
   config.mutable_delay()->set_percent(50);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);

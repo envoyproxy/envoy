@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/http/health_check.pb.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
@@ -25,14 +25,16 @@ public:
                                                    FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::HealthCheck()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::config::filter::http::health_check::v2::HealthCheck()};
   }
 
   std::string name() override { return Config::HttpFilterNames::get().HEALTH_CHECK; }
 
 private:
-  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::HealthCheck& proto_config,
-                                   const std::string& stats_prefix, FactoryContext& context);
+  HttpFilterFactoryCb
+  createFilter(const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
+               const std::string& stats_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

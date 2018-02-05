@@ -200,7 +200,7 @@ TEST(NetworkUtility, AnyAddress) {
 
 TEST(NetworkUtility, AddressToProtobufAddress) {
   {
-    envoy::api::v2::Address proto_address;
+    envoy::api::v2::core::Address proto_address;
     Address::Ipv4Instance address("127.0.0.1");
     Utility::addressToProtobufAddress(address, proto_address);
     EXPECT_EQ(true, proto_address.has_socket_address());
@@ -208,7 +208,7 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
     EXPECT_EQ(0, proto_address.socket_address().port_value());
   }
   {
-    envoy::api::v2::Address proto_address;
+    envoy::api::v2::core::Address proto_address;
     Address::PipeInstance address("/hello");
     Utility::addressToProtobufAddress(address, proto_address);
     EXPECT_EQ(true, proto_address.has_pipe());

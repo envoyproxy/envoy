@@ -422,15 +422,15 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluste
                                                     Runtime::Loader& runtime,
                                                     const std::string& cluster_name) {
   managers_[enumToInt(ResourcePriority::Default)] =
-      load(config, runtime, cluster_name, envoy::api::v2::RoutingPriority::DEFAULT);
+      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::DEFAULT);
   managers_[enumToInt(ResourcePriority::High)] =
-      load(config, runtime, cluster_name, envoy::api::v2::RoutingPriority::HIGH);
+      load(config, runtime, cluster_name, envoy::api::v2::core::RoutingPriority::HIGH);
 }
 
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
-                                        const envoy::api::v2::RoutingPriority& priority) {
+                                        const envoy::api::v2::core::RoutingPriority& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
@@ -438,10 +438,10 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
 
   std::string priority_name;
   switch (priority) {
-  case envoy::api::v2::RoutingPriority::DEFAULT:
+  case envoy::api::v2::core::RoutingPriority::DEFAULT:
     priority_name = "default";
     break;
-  case envoy::api::v2::RoutingPriority::HIGH:
+  case envoy::api::v2::core::RoutingPriority::HIGH:
     priority_name = "high";
     break;
   default:
@@ -479,8 +479,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(
         HostSharedPtr{new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
-                                   envoy::api::v2::Metadata::default_instance(), 1,
-                                   envoy::api::v2::Locality().default_instance())});
+                                   envoy::api::v2::core::Metadata::default_instance(), 1,
+                                   envoy::api::v2::core::Locality().default_instance())});
   }
 }
 
@@ -675,8 +675,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           ASSERT(address != nullptr);
           new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
                                               Network::Utility::getAddressWithPort(*address, port_),
-                                              envoy::api::v2::Metadata::default_instance(), 1,
-                                              envoy::api::v2::Locality().default_instance()));
+                                              envoy::api::v2::core::Metadata::default_instance(), 1,
+                                              envoy::api::v2::core::Locality().default_instance()));
         }
 
         HostVector hosts_added;

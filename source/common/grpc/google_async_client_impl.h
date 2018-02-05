@@ -30,7 +30,7 @@ struct GoogleAsyncClientStats {
 class GoogleAsyncClientImpl final : public AsyncClient {
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, Stats::Scope& scope,
-                        const envoy::api::v2::GrpcService::GoogleGrpc& config);
+                        const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient

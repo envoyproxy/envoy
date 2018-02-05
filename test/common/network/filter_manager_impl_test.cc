@@ -121,7 +121,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       .WillByDefault(Return(true));
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(rl_json);
-  envoy::api::v2::filter::network::RateLimit proto_config{};
+  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
   Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
 
   RateLimit::TcpFilter::ConfigSharedPtr rl_config(new RateLimit::TcpFilter::Config(
@@ -130,7 +130,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.addReadFilter(ReadFilterSharedPtr{
       new RateLimit::TcpFilter::Instance(rl_config, RateLimit::ClientPtr{rl_client})});
 
-  envoy::api::v2::filter::network::TcpProxy tcp_proxy;
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
   tcp_proxy.set_stat_prefix("name");
   tcp_proxy.set_cluster("fake_cluster");
   Envoy::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(

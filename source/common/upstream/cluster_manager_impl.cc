@@ -218,16 +218,16 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
     switch (sds_config.config_source_specifier_case()) {
-    case envoy::api::v2::ConfigSource::kPath: {
+    case envoy::api::v2::core::ConfigSource::kPath: {
       Config::Utility::checkFilesystemSubscriptionBackingPath(sds_config.path());
       break;
     }
-    case envoy::api::v2::ConfigSource::kApiConfigSource: {
+    case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
       Config::Utility::checkApiConfigSourceSubscriptionBackingCluster(
           loaded_clusters, sds_config.api_config_source());
       break;
     }
-    case envoy::api::v2::ConfigSource::kAds: {
+    case envoy::api::v2::core::ConfigSource::kAds: {
       // Backing cluster will be checked below
       break;
     }
@@ -804,8 +804,8 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 }
 
 CdsApiPtr
-ProdClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
-                                     const Optional<envoy::api::v2::ConfigSource>& eds_config,
+ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                                     const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                      ClusterManager& cm) {
   return CdsApiImpl::create(cds_config, eds_config, cm, primary_dispatcher_, random_, local_info_,
                             stats_);

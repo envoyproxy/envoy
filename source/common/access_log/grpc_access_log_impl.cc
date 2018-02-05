@@ -66,7 +66,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
       grpc_access_log_streamer_(grpc_access_log_streamer) {}
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
-    envoy::api::v2::filter::accesslog::AccessLogCommon& common_access_log,
+    envoy::config::filter::accesslog::v2::AccessLogCommon& common_access_log,
     const RequestInfo::RequestInfo& request_info) {
 
   static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
@@ -150,12 +150,17 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // TODO(mattklein123): Populate time_to_first_downstream_tx_byte field.
   // TODO(mattklein123): Populate metadata field and wire up to filters.
   auto* common_properties = log_entry->mutable_common_properties();
-  Network::Utility::addressToProtobufAddress(
-      *request_info.downstreamRemoteAddress(),
-      *common_properties->mutable_downstream_remote_address());
-  Network::Utility::addressToProtobufAddress(
-      *request_info.downstreamLocalAddress(),
-      *common_properties->mutable_downstream_local_address());
+
+  if (request_info.downstreamRemoteAddress() != nullptr) {
+    Network::Utility::addressToProtobufAddress(
+        *request_info.downstreamRemoteAddress(),
+        *common_properties->mutable_downstream_remote_address());
+  }
+  if (request_info.downstreamLocalAddress() != nullptr) {
+    Network::Utility::addressToProtobufAddress(
+        *request_info.downstreamLocalAddress(),
+        *common_properties->mutable_downstream_local_address());
+  }
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::MicrosecondsToTimestamp(
           std::chrono::duration_cast<std::chrono::microseconds>(
@@ -189,14 +194,15 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     switch (request_info.protocol().value()) {
     case Http::Protocol::Http10:
       log_entry->set_protocol_version(
-          envoy::api::v2::filter::accesslog::HTTPAccessLogEntry::HTTP10);
+          envoy::config::filter::accesslog::v2::HTTPAccessLogEntry::HTTP10);
       break;
     case Http::Protocol::Http11:
       log_entry->set_protocol_version(
-          envoy::api::v2::filter::accesslog::HTTPAccessLogEntry::HTTP11);
+          envoy::config::filter::accesslog::v2::HTTPAccessLogEntry::HTTP11);
       break;
     case Http::Protocol::Http2:
-      log_entry->set_protocol_version(envoy::api::v2::filter::accesslog::HTTPAccessLogEntry::HTTP2);
+      log_entry->set_protocol_version(
+          envoy::config::filter::accesslog::v2::HTTPAccessLogEntry::HTTP2);
       break;
     }
   }

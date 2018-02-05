@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.validate.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -13,9 +13,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb
-TcpProxyConfigFactory::createFilter(const envoy::api::v2::filter::network::TcpProxy& proto_config,
-                                    FactoryContext& context) {
+NetworkFilterFactoryCb TcpProxyConfigFactory::createFilter(
+    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
+    FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
   if (proto_config.has_deprecated_v1()) {
     ASSERT(proto_config.deprecated_v1().routes_size() > 0);
@@ -30,7 +30,7 @@ TcpProxyConfigFactory::createFilter(const envoy::api::v2::filter::network::TcpPr
 
 NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                                   FactoryContext& context) {
-  envoy::api::v2::filter::network::TcpProxy proto_config;
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
   Config::FilterJson::translateTcpProxy(json_config, proto_config);
   return createFilter(proto_config, context);
 }
@@ -39,8 +39,8 @@ NetworkFilterFactoryCb
 TcpProxyConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                     FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::TcpProxy&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::network::tcp_proxy::v2::TcpProxy&>(proto_config),
       context);
 }
 

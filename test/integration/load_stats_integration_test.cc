@@ -109,7 +109,7 @@ public:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
-      loadstats_config->set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
+      loadstats_config->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
       loadstats_config->add_cluster_names("load_report");
       auto* load_report_cluster = bootstrap.mutable_static_resources()->add_clusters();
       load_report_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);

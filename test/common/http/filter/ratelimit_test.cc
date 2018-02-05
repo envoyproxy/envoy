@@ -46,7 +46,7 @@ public:
 
   void SetUpTest(const std::string json) {
     Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::http::RateLimit proto_config{};
+    envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
     Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
     config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
 
@@ -93,7 +93,7 @@ TEST_F(HttpRateLimitFilterTest, BadConfig) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(filter_config);
-  envoy::api::v2::filter::http::RateLimit proto_config{};
+  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
   EXPECT_THROW(Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config),
                Json::Exception);
 }

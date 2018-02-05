@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Upstream {
 
-LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::Node& node,
+LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::core::Node& node,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::AsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)

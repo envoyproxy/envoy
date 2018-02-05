@@ -108,7 +108,7 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 }
 
 Network::ListenerPtr
-DispatcherImpl::createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                bool bind_to_port, bool hand_off_restored_destination_connections) {
   ASSERT(isThreadSafe());
   return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,

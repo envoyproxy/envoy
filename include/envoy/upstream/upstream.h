@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
@@ -474,9 +474,9 @@ public:
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
-   * @return const envoy::api::v2::Metadata& the configuration metadata for this cluster.
+   * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
    */
-  virtual const envoy::api::v2::Metadata& metadata() const PURE;
+  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

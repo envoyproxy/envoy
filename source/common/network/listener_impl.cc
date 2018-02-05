@@ -39,9 +39,8 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   listener->cb_.onAccept(std::move(socket), listener->hand_off_restored_destination_connections_);
 }
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket,
-                           ListenerCallbacks& cb, bool bind_to_port,
-                           bool hand_off_restored_destination_connections)
+ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
+                           bool bind_to_port, bool hand_off_restored_destination_connections)
     : local_address_(nullptr), cb_(cb),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       listener_(nullptr) {

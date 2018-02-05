@@ -1,12 +1,12 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Config {
 
 /**
- * Constant Api Type Values, used by envoy::api::v2::ApiConfigSource.
+ * Constant Api Type Values, used by envoy::api::v2::core::ApiConfigSource.
  */
 class ApiTypeValues {
 public:
@@ -72,21 +72,23 @@ public:
   }
 
   /**
-   * Extract refresh_delay as a std::chrono::milliseconds from envoy::api::v2::ApiConfigSource.
+   * Extract refresh_delay as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ApiConfigSource.
    */
   static std::chrono::milliseconds
-  apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source);
+  apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
-   * Populate an envoy::api::v2::ApiConfigSource.
+   * Populate an envoy::api::v2::core::ApiConfigSource.
    * @param cluster supplies the cluster name for the ApiConfigSource.
    * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
    * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::api::v2::ApiConfigSource object to populate.
+   * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to
+   * populate.
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
                                        const std::string& api_type,
-                                       envoy::api::v2::ApiConfigSource& api_config_source);
+                                       envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -130,39 +132,41 @@ public:
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
-      const envoy::api::v2::ApiConfigSource& api_config_source);
+      const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
-   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::ConfigSource.
+   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::core::ConfigSource.
    * @param json_config source v1 SDS JSON config.
-   * @param eds_config destination v2 EDS envoy::api::v2::ConfigSource.
+   * @param eds_config destination v2 EDS envoy::api::v2::core::ConfigSource.
    */
   static void translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::ConfigSource& eds_config);
+                                 envoy::api::v2::core::ConfigSource& eds_config);
 
   /**
-   * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::ConfigSource.
+   * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::core::ConfigSource.
    * @param json_config source v1 CDS JSON config.
-   * @param cds_config destination v2 CDS envoy::api::v2::ConfigSource.
+   * @param cds_config destination v2 CDS envoy::api::v2::core::ConfigSource.
    */
   static void translateCdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::ConfigSource& cds_config);
+                                 envoy::api::v2::core::ConfigSource& cds_config);
 
   /**
-   * Convert a v1 RDS JSON config to v2 RDS envoy::api::v2::filter::network::Rds.
+   * Convert a v1 RDS JSON config to v2 RDS
+   * envoy::config::filter::network::http_connection_manager::v2::Rds.
    * @param json_rds source v1 RDS JSON config.
-   * @param rds destination v2 RDS envoy::api::v2::filter::network::Rds.
+   * @param rds destination v2 RDS envoy::config::filter::network::http_connection_manager::v2::Rds.
    */
-  static void translateRdsConfig(const Json::Object& json_rds,
-                                 envoy::api::v2::filter::network::Rds& rds);
+  static void
+  translateRdsConfig(const Json::Object& json_rds,
+                     envoy::config::filter::network::http_connection_manager::v2::Rds& rds);
 
   /**
-   * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::ConfigSource.
+   * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::core::ConfigSource.
    * @param json_lds source v1 LDS JSON config.
-   * @param lds_config destination v2 LDS envoy::api::v2::ConfigSource.
+   * @param lds_config destination v2 LDS envoy::api::v2::core::ConfigSource.
    */
   static void translateLdsConfig(const Json::Object& json_lds,
-                                 envoy::api::v2::ConfigSource& lds_config);
+                                 envoy::api::v2::core::ConfigSource& lds_config);
 
   /**
    * Generate a SubscriptionStats object from stats scope.
@@ -247,14 +251,14 @@ public:
   static void checkObjNameLength(const std::string& error_prefix, const std::string& name);
 
   /**
-   * Obtain gRPC async client factory from a envoy::api::v2::ApiConfigSource.
+   * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
-   * @param api_config_source envoy::api::v2::ApiConfigSource. Must have config type GRPC.
+   * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                            const envoy::api::v2::ApiConfigSource& api_config_source,
+                            const envoy::api::v2::core::ApiConfigSource& api_config_source,
                             Stats::Scope& scope);
 };
 

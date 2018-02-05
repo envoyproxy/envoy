@@ -218,8 +218,8 @@ public:
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
-                              const Optional<envoy::api::v2::ConfigSource>& eds_config,
+  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                              const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                               ClusterManager& cm) PURE;
 };
 

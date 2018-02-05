@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
@@ -52,7 +52,7 @@ protected:
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
-    envoy::api::v2::ConfigSource eds_config;
+    envoy::api::v2::core::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_names("sds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
     sds_cluster_ = parseSdsClusterFromJson(raw_config, eds_config);

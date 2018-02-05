@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client.h"
@@ -14,7 +14,7 @@ namespace Config {
 template <class ResourceType>
 class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
-  GrpcSubscriptionImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
+  GrpcSubscriptionImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : grpc_mux_(node, std::move(async_client), dispatcher, service_method),

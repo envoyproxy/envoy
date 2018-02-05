@@ -22,16 +22,16 @@ namespace Config {
 
 void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
                                        const std::string& api_type,
-                                       envoy::api::v2::ApiConfigSource& api_config_source) {
+                                       envoy::api::v2::core::ApiConfigSource& api_config_source) {
   // TODO(junr03): document the option to chose an api type once we have created
   // stronger constraints around v2.
   if (api_type == ApiType::get().RestLegacy) {
-    api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::REST_LEGACY);
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
   } else if (api_type == ApiType::get().Rest) {
-    api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::REST);
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   } else {
     ASSERT(api_type == ApiType::get().Grpc);
-    api_config_source.set_api_type(envoy::api::v2::ApiConfigSource::GRPC);
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
   }
   api_config_source.add_cluster_names(cluster);
   api_config_source.mutable_refresh_delay()->CopyFrom(
@@ -80,11 +80,11 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
 
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterInfoMap& clusters,
-    const envoy::api::v2::ApiConfigSource& api_config_source) {
+    const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   if (api_config_source.cluster_names().size() != 1) {
     // TODO(htuch): Add support for multiple clusters, #1170.
     throw EnvoyException(
-        "envoy::api::v2::ConfigSource must have a singleton cluster name specified");
+        "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
   }
 
   const auto& cluster_name = api_config_source.cluster_names()[0];
@@ -92,14 +92,14 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
     throw EnvoyException(fmt::format(
-        "envoy::api::v2::ConfigSource must have a statically "
+        "envoy::api::v2::core::ConfigSource must have a statically "
         "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
         cluster_name));
   }
 }
 
-std::chrono::milliseconds
-Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_config_source) {
+std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
+    const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   if (!api_config_source.has_refresh_delay()) {
     throw EnvoyException("refresh_delay is required for REST API configuration sources");
   }
@@ -109,7 +109,7 @@ Utility::apiConfigSourceRefreshDelay(const envoy::api::v2::ApiConfigSource& api_
 }
 
 void Utility::translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::ConfigSource& eds_config) {
+                                 envoy::api::v2::core::ConfigSource& eds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
                            json_config.getString("api_type", ApiType::get().RestLegacy),
@@ -117,15 +117,16 @@ void Utility::translateEdsConfig(const Json::Object& json_config,
 }
 
 void Utility::translateCdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::ConfigSource& cds_config) {
+                                 envoy::api::v2::core::ConfigSource& cds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
                            json_config.getString("api_type", ApiType::get().RestLegacy),
                            *cds_config.mutable_api_config_source());
 }
 
-void Utility::translateRdsConfig(const Json::Object& json_rds,
-                                 envoy::api::v2::filter::network::Rds& rds) {
+void Utility::translateRdsConfig(
+    const Json::Object& json_rds,
+    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
 
   const std::string name = json_rds.getString("route_config_name", "");
@@ -139,7 +140,7 @@ void Utility::translateRdsConfig(const Json::Object& json_rds,
 }
 
 void Utility::translateLdsConfig(const Json::Object& json_lds,
-                                 envoy::api::v2::ConfigSource& lds_config) {
+                                 envoy::api::v2::core::ConfigSource& lds_config) {
   json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
   translateApiConfigSource(json_lds.getString("cluster"),
                            json_lds.getInteger("refresh_delay_ms", 30000),
@@ -179,29 +180,29 @@ void Utility::checkObjNameLength(const std::string& error_prefix, const std::str
 
 Grpc::AsyncClientFactoryPtr
 Utility::factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                                   const envoy::api::v2::ApiConfigSource& api_config_source,
+                                   const envoy::api::v2::core::ApiConfigSource& api_config_source,
                                    Stats::Scope& scope) {
-  ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::GRPC);
-  envoy::api::v2::GrpcService grpc_service;
+  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::api::v2::core::GrpcService grpc_service;
   if (api_config_source.cluster_names().empty()) {
     if (api_config_source.grpc_services().empty()) {
       throw EnvoyException(
-          fmt::format("Missing gRPC services in envoy::api::v2::ApiConfigSource: {}",
+          fmt::format("Missing gRPC services in envoy::api::v2::core::ApiConfigSource: {}",
                       api_config_source.DebugString()));
     }
     // TODO(htuch): Implement multiple gRPC services.
     if (api_config_source.grpc_services().size() != 1) {
-      throw EnvoyException(fmt::format(
-          "Only singleton gRPC service lists supported in envoy::api::v2::ApiConfigSource: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("Only singleton gRPC service lists supported in "
+                                       "envoy::api::v2::core::ApiConfigSource: {}",
+                                       api_config_source.DebugString()));
     }
     grpc_service.MergeFrom(api_config_source.grpc_services(0));
   } else {
     // TODO(htuch): cluster_names is deprecated, remove after 1.6.0.
     if (api_config_source.cluster_names().size() != 1) {
-      throw EnvoyException(fmt::format(
-          "Only singleton cluster name lists supported in envoy::api::v2::ApiConfigSource: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("Only singleton cluster name lists supported in "
+                                       "envoy::api::v2::core::ApiConfigSource: {}",
+                                       api_config_source.DebugString()));
     }
     grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
   }
