@@ -309,6 +309,7 @@ public:
  */
 template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
 public:
+  // Interval is a pair of Values.
   typedef typename IntervalSet<Value>::Interval Interval;
 
   void insert(Value left, Value right) override {
@@ -317,7 +318,7 @@ public:
     }
     ASSERT(left < right);
 
-    auto left_pos = intervals_.lower_bound(Interval(left, left));
+    const auto left_pos = intervals_.lower_bound(Interval(left, left));
     // upper_bound is exclusive, and we want to be inclusive.
     auto right_pos = intervals_.upper_bound(Interval(right, right));
     if (!intervals_.empty()) {
@@ -341,9 +342,7 @@ public:
   std::vector<Interval> toVector() const override {
     std::vector<Interval> out;
     out.reserve(intervals_.size());
-    for (const Interval& interval : intervals_) {
-      out.push_back(interval);
-    }
+    out.insert(out.end(), intervals_.begin(), intervals_.end());
     return out;
   }
 

@@ -43,17 +43,18 @@ public:
 
   /**
    * Finds tags for stat_name and adds them to the tags vector. If the tag is not
-   * represented in the name, the tags vector will remain unmodified. Also finds the character
-   * indexes for the tags in stat_name and adds them to remove_characters. Returns true if a
-   * tag-match was found. The characters removed from the name may be different from the values put
-   * into the tag vector for readability purposes. Note: The extraction process is expected to be
-   * run iteratively, aggregating the character intervals to be removed the name after all the tag
-   * extractions are complete. This approach simplifies the tag searching process because without
-   * mutations, the tag extraction will be order independent, apart from the order of the tag array.
+   * represented in the name, the tags vector will remain unmodified. Also finds the
+   * character indexes for the tags in stat_name and adds them to remove_characters (an
+   * in/out arg). Returns true if a tag-match was found. The characters removed from the
+   * name may be different from the values put into the tag vector for readability
+   * purposes. Note: The extraction process is expected to be run iteratively, aggregating
+   * the character intervals to be removed from the name after all the tag extractions are
+   * complete. This approach simplifies the tag searching process because without mutations,
+   * the tag extraction will be order independent, apart from the order of the tag array.
    * @param stat_name name from which the tag will be extracted if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the name.
    * @param remove_characters set of intervals of character-indices to be removed from name.
-   * @return bool indicates whether a tags were found in the name.
+   * @return bool indicates whether a tag was found in the name.
    */
   virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                           IntervalSet<size_t>& remove_characters) const PURE;
