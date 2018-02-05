@@ -55,7 +55,7 @@ protected:
                        const std::vector<std::string>& grpc_request_messages,
                        const std::vector<std::string>& grpc_response_messages,
                        const Status& grpc_status, Http::HeaderMap&& response_headers,
-                       const std::string& response_body) {
+                       const std::string& response_body, bool full_response = true) {
     response_.reset(new IntegrationStreamDecoder(*dispatcher_));
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -126,7 +126,11 @@ protected:
         },
         response_.get());
     if (!response_body.empty()) {
-      EXPECT_EQ(response_body, response_->body());
+      if (full_response) {
+        EXPECT_EQ(response_body, response_->body());
+      } else {
+        EXPECT_TRUE(StringUtil::startsWith(response_->body().c_str(), response_body));
+      }
     }
 
     codec_client_->close();
@@ -273,13 +277,17 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
+  // Usually the response would be
+  // "Unexpected token.\n"
+  //    "INVALID_JSON\n"
+  //    "^"
+  // But if there's a short read from upstream the full "INVALID_JSON" string
+  // may not be read.
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
       R"(INVALID_JSON)", {}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
-      "Unexpected token.\n"
-      "INVALID_JSON\n"
-      "^");
+      "Unexpected token.\nI", false);
 
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
@@ -289,13 +297,16 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
       "\n"
       "^");
 
+  // Usually the response would be
+  //    "Expected : between key:value pair.\n"
+  //    "{ \"theme\"  \"Children\" }\n"
+  //    "           ^");
+  // But as with INVALID_JSON the full response string may not be read.
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
       R"({ "theme"  "Children" })", {}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
-      "Expected : between key:value pair.\n"
-      "{ \"theme\"  \"Children\" }\n"
-      "           ^");
+      "Expected : between key:value pair.\n", false);
 }
 
 } // namespace Envoy
