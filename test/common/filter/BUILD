@@ -64,6 +64,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2/filter/network:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )

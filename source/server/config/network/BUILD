@@ -157,6 +157,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/filter:ext_authz_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/network:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )

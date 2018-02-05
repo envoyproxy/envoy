@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/network/ext_authz.pb.validate.h"
+#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/filter/ext_authz.h"
@@ -46,7 +46,7 @@ public:
     }
     )EOF";
 
-    envoy::api::v2::filter::network::ExtAuthz proto_config{};
+    envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
     MessageUtil::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_, cm_));
     client_ = new MockClient();
@@ -84,11 +84,11 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   }
   )EOF";
 
-  envoy::api::v2::filter::network::ExtAuthz proto_config{};
+  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
   MessageUtil::loadFromJson(json_string, proto_config);
 
-  EXPECT_THROW(MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::ExtAuthz&>(
-                   proto_config),
+  EXPECT_THROW(MessageUtil::downcastAndValidate<
+                   const envoy::config::filter::network::ext_authz::v2::ExtAuthz&>(proto_config),
                ProtoValidationException);
 }
 

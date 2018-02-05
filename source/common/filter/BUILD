@@ -80,6 +80,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/ext_authz:ext_authz_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2/filter/network:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )

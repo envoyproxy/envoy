@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/network/ext_authz.pb.h"
+#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -44,8 +44,8 @@ struct InstanceStats {
  */
 class Config {
 public:
-  // @saumoh: TBD: Take care of grpc service != envoy_grpc()
-  Config(const envoy::api::v2::filter::network::ExtAuthz& config, Stats::Scope& scope,
+  // TBD(saumoh): Take care of grpc service != envoy_grpc()
+  Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope,
          Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),

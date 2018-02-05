@@ -3,7 +3,7 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/api/v2/filter/network/ext_authz.pb.validate.h"
+#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -16,9 +16,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb
-ExtAuthzConfigFactory::createFilter(const envoy::api::v2::filter::network::ExtAuthz& proto_config,
-                                    FactoryContext& context) {
+NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
+    const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
+    FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.grpc_service().has_envoy_grpc());
@@ -36,16 +36,16 @@ ExtAuthzConfigFactory::createFilter(const envoy::api::v2::filter::network::ExtAu
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
                                                                                 context.scope());
 
-    auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(async_client_factory->create(),
-                                                   std::chrono::milliseconds(timeout_ms));
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new ExtAuthz::TcpFilter::Instance(
-        ext_authz_config, std::move(client))});
+    auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
+        async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
+        new ExtAuthz::TcpFilter::Instance(ext_authz_config, std::move(client))});
   };
 }
 
 NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                                   FactoryContext& context) {
-  envoy::api::v2::filter::network::ExtAuthz proto_config;
+  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config;
   MessageUtil::loadFromJson(json_config.asJsonString(), proto_config);
   return createFilter(proto_config, context);
 }
@@ -54,8 +54,8 @@ NetworkFilterFactoryCb
 ExtAuthzConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                     FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::ExtAuthz&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::network::ext_authz::v2::ExtAuthz&>(proto_config),
       context);
 }
 
