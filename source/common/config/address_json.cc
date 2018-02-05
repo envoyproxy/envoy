@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Config {
 
 void AddressJson::translateAddress(const std::string& json_address, bool url, bool resolved,
-                                   envoy::api::v2::Address& address) {
+                                   envoy::api::v2::core::Address& address) {
   if (resolved) {
     Network::Address::InstanceConstSharedPtr instance =
         url ? Network::Utility::resolveUrl(json_address)
@@ -35,13 +35,13 @@ void AddressJson::translateAddress(const std::string& json_address, bool url, bo
 
 void AddressJson::translateCidrRangeList(
     const std::vector<std::string>& json_ip_list,
-    Protobuf::RepeatedPtrField<envoy::api::v2::CidrRange>& range_list) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>& range_list) {
   for (const std::string& source_ip : json_ip_list) {
     Network::Address::CidrRange cidr(Network::Address::CidrRange::create(source_ip));
     if (!cidr.isValid()) {
       throw EnvoyException(fmt::format("Invalid cidr entry: {}", source_ip));
     }
-    envoy::api::v2::CidrRange* v2_cidr = range_list.Add();
+    envoy::api::v2::core::CidrRange* v2_cidr = range_list.Add();
     v2_cidr->set_address_prefix(cidr.ip()->addressAsString());
     v2_cidr->mutable_prefix_len()->set_value(cidr.length());
   }

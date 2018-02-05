@@ -312,7 +312,7 @@ protected:
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-               Network::ListenSocketPtr&& connection, FakeHttpConnection::Type type,
+               Network::SocketPtr&& connection, FakeHttpConnection::Type type,
                bool enable_half_close);
 
   class FakeListener : public Network::ListenerConfig {
@@ -322,7 +322,7 @@ private:
   private:
     // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocket& socket() override { return *parent_.socket_; }
+    Network::Socket& socket() override { return *parent_.socket_; }
     Network::TransportSocketFactory& transportSocketFactory() override {
       return *parent_.transport_socket_factory_;
     }
@@ -340,7 +340,7 @@ private:
   void threadRoutine();
 
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  Network::ListenSocketPtr socket_;
+  Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.

@@ -126,13 +126,29 @@ private:
     const std::string& runtimeKey() const override { return EMPTY_STRING; }
   };
 
+  struct NullConfig : public Router::Config {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+      return nullptr;
+    }
+
+    const std::list<LowerCaseString>& internalOnlyHeaders() const override {
+      return internal_only_headers_;
+    }
+
+    const std::string& name() const override { return EMPTY_STRING; }
+
+    static const std::list<LowerCaseString> internal_only_headers_;
+  };
+
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
+    const Router::Config& routeConfig() const override { return route_configuration_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
+    static const NullConfig route_configuration_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
@@ -174,14 +190,14 @@ private:
     bool autoHostRewrite() const override { return false; }
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-    const envoy::api::v2::Metadata& metadata() const override { return metadata_; }
+    const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
-    static const envoy::api::v2::Metadata metadata_;
+    static const envoy::api::v2::core::Metadata metadata_;
 
     const std::string& cluster_name_;
     Optional<std::chrono::milliseconds> timeout_;

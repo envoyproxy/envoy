@@ -42,7 +42,7 @@ public:
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
     ON_CALL(*cm_.conn_pool_.host_, locality())
-        .WillByDefault(ReturnRef(envoy::api::v2::Locality().default_instance()));
+        .WillByDefault(ReturnRef(envoy::api::v2::core::Locality().default_instance()));
   }
 
   void expectSuccess(uint64_t code) {
@@ -860,6 +860,24 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, NullRouteConfigTest) {
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>(), false);
+  stream->sendHeaders(headers, false);
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+  auto route = filter_callbacks->route();
+  auto route_entry = route->routeEntry();
+  ASSERT_NE(nullptr, route_entry);
+  const auto& route_config = route_entry->virtualHost().routeConfig();
+  EXPECT_EQ("", route_config.name());
+  EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
+  EXPECT_EQ(nullptr, route_config.route(headers, 0));
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 

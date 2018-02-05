@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
@@ -37,10 +37,10 @@ public:
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param init_manager supplies the init manager.
    */
-  virtual RouteConfigProviderSharedPtr
-  getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds,
-                         Upstream::ClusterManager& cm, Stats::Scope& scope,
-                         const std::string& stat_prefix, Init::Manager& init_manager) PURE;
+  virtual RouteConfigProviderSharedPtr getRouteConfigProvider(
+      const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+      Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
+      Init::Manager& init_manager) PURE;
 };
 
 /**

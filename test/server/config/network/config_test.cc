@@ -33,17 +33,17 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   NiceMock<MockFactoryContext> context;
 
   ClientSslAuthConfigFactory client_ssl_auth_factory;
-  envoy::api::v2::filter::network::ClientSSLAuth client_ssl_auth_proto;
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth client_ssl_auth_proto;
   HttpConnectionManagerFilterConfigFactory hcm_factory;
-  envoy::api::v2::filter::network::HttpConnectionManager hcm_proto;
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_proto;
   MongoProxyFilterConfigFactory mongo_factory;
-  envoy::api::v2::filter::network::MongoProxy mongo_proto;
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy mongo_proto;
   RateLimitConfigFactory rate_limit_factory;
-  envoy::api::v2::filter::network::RateLimit rate_limit_proto;
+  envoy::config::filter::network::rate_limit::v2::RateLimit rate_limit_proto;
   RedisProxyFilterConfigFactory redis_factory;
-  envoy::api::v2::filter::network::RedisProxy redis_proto;
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy redis_proto;
   TcpProxyConfigFactory tcp_proxy_factory;
-  envoy::api::v2::filter::network::TcpProxy tcp_proxy_proto;
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_proto;
   const std::vector<std::pair<NamedNetworkFilterConfigFactory&, Protobuf::Message&>> filter_cases =
       {
           {client_ssl_auth_factory, client_ssl_auth_proto},
@@ -60,7 +60,7 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   }
 
   EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
-                   envoy::api::v2::filter::accesslog::FileAccessLog(), nullptr, context),
+                   envoy::config::filter::accesslog::v2::FileAccessLog(), nullptr, context),
                ProtoValidationException);
 }
 
@@ -96,7 +96,7 @@ TEST(NetworkFilterConfigTest, RedisProxyCorrectProto) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RedisProxy proto_config{};
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
   Config::FilterJson::translateRedisProxy(*json_config, proto_config);
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
@@ -120,8 +120,8 @@ TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  envoy::api::v2::filter::network::RedisProxy proto_config =
-      *dynamic_cast<envoy::api::v2::filter::network::RedisProxy*>(
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
+      *dynamic_cast<envoy::config::filter::network::redis_proxy::v2::RedisProxy*>(
           factory.createEmptyConfigProto().get());
 
   Config::FilterJson::translateRedisProxy(*json_config, proto_config);
@@ -220,7 +220,7 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectProto) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::ClientSSLAuth proto_config{};
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
   Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
   NiceMock<MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
@@ -243,8 +243,8 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  envoy::api::v2::filter::network::ClientSSLAuth proto_config =
-      *dynamic_cast<envoy::api::v2::filter::network::ClientSSLAuth*>(
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config =
+      *dynamic_cast<envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth*>(
           factory.createEmptyConfigProto().get());
 
   Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
@@ -284,7 +284,7 @@ TEST(NetworkFilterConfigTest, RatelimitCorrectProto) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::network::RateLimit proto_config{};
+  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
   Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
 
   NiceMock<MockFactoryContext> context;
@@ -309,8 +309,8 @@ TEST(NetworkFilterConfigTest, RatelimitEmptyProto) {
 
   NiceMock<MockFactoryContext> context;
   RateLimitConfigFactory factory;
-  envoy::api::v2::filter::network::RateLimit proto_config =
-      *dynamic_cast<envoy::api::v2::filter::network::RateLimit*>(
+  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config =
+      *dynamic_cast<envoy::config::filter::network::rate_limit::v2::RateLimit*>(
           factory.createEmptyConfigProto().get());
   Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
 
@@ -502,7 +502,7 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   ASSERT_NE(nullptr, message);
 
-  envoy::api::v2::filter::accesslog::FileAccessLog file_access_log;
+  envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
   file_access_log.set_path("/dev/null");
   file_access_log.set_format("%START_TIME%");
   MessageUtil::jsonConvert(file_access_log, *message);
@@ -520,8 +520,8 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
 TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
   NiceMock<MockFactoryContext> context;
   TcpProxyConfigFactory factory;
-  envoy::api::v2::filter::network::TcpProxy config =
-      *dynamic_cast<envoy::api::v2::filter::network::TcpProxy*>(
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
+      *dynamic_cast<envoy::config::filter::network::tcp_proxy::v2::TcpProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");

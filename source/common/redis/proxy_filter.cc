@@ -10,10 +10,10 @@
 namespace Envoy {
 namespace Redis {
 
-ProxyFilterConfig::ProxyFilterConfig(const envoy::api::v2::filter::network::RedisProxy& config,
-                                     Upstream::ClusterManager& cm, Stats::Scope& scope,
-                                     const Network::DrainDecision& drain_decision,
-                                     Runtime::Loader& runtime)
+ProxyFilterConfig::ProxyFilterConfig(
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config,
+    Upstream::ClusterManager& cm, Stats::Scope& scope, const Network::DrainDecision& drain_decision,
+    Runtime::Loader& runtime)
     : drain_decision_(drain_decision), runtime_(runtime), cluster_name_(config.cluster()),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)) {

@@ -114,7 +114,7 @@ public:
 
   void SetUpTest(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::http::HTTPFault fault;
+    envoy::config::filter::http::fault::v2::HTTPFault fault;
 
     Config::FilterJson::translateFaultFilter(*config, fault);
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
@@ -140,7 +140,7 @@ public:
 
 void faultFilterBadConfigHelper(const std::string& json) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  envoy::api::v2::filter::http::HTTPFault fault;
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
   EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
 }
 

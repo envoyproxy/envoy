@@ -46,7 +46,7 @@ envoy_cc_library(
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_macros",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

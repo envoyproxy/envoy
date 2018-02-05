@@ -107,13 +107,14 @@ void LogicalDnsCluster::startResolve() {
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
               break;
             }
-            HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
+            HostVectorSharedPtr new_hosts(new HostVector());
             new_hosts->emplace_back(logical_host_);
             // Given the current config, only EDS clusters support multiple priorities.
             ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
             auto& first_host_set = priority_set_.getOrCreateHostSet(0);
             first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                                       empty_host_lists_, empty_host_lists_, *new_hosts, {});
+                                       HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                                       *new_hosts, {});
           }
         }
 

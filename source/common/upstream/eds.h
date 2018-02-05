@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
@@ -32,7 +32,7 @@ public:
   void onConfigUpdateFailed(const EnvoyException* e) override;
 
 private:
-  void updateHostsPerLocality(HostSet& host_set, std::vector<HostSharedPtr>& new_hosts);
+  void updateHostsPerLocality(HostSet& host_set, HostVector& new_hosts);
 
   // ClusterImplBase
   void startPreInit() override;

@@ -1,6 +1,6 @@
 #include "common/network/resolver_impl.h"
 
-#include "envoy/api/v2/address.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/address.h"
 #include "envoy/network/resolver.h"
@@ -20,11 +20,12 @@ namespace Address {
 class IpResolver : public Resolver {
 
 public:
-  InstanceConstSharedPtr resolve(const envoy::api::v2::SocketAddress& socket_address) override {
+  InstanceConstSharedPtr
+  resolve(const envoy::api::v2::core::SocketAddress& socket_address) override {
     switch (socket_address.port_specifier_case()) {
-    case envoy::api::v2::SocketAddress::kPortValue:
+    case envoy::api::v2::core::SocketAddress::kPortValue:
     // Default to port 0 if no port value is specified.
-    case envoy::api::v2::SocketAddress::PORT_SPECIFIER_NOT_SET:
+    case envoy::api::v2::core::SocketAddress::PORT_SPECIFIER_NOT_SET:
       return Network::Utility::parseInternetAddress(
           socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat());
 
@@ -42,11 +43,11 @@ public:
  */
 static Registry::RegisterFactory<IpResolver, Resolver> ip_registered_;
 
-InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::Address& address) {
+InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address) {
   switch (address.address_case()) {
-  case envoy::api::v2::Address::kSocketAddress:
+  case envoy::api::v2::core::Address::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
-  case envoy::api::v2::Address::kPipe:
+  case envoy::api::v2::core::Address::kPipe:
     return InstanceConstSharedPtr{new PipeInstance(address.pipe().path())};
   default:
     throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
@@ -54,7 +55,7 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::Address& addres
 }
 
 InstanceConstSharedPtr
-resolveProtoSocketAddress(const envoy::api::v2::SocketAddress& socket_address) {
+resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_address) {
   Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address.resolver_name();
   if (resolver_name.empty()) {

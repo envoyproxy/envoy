@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/stats/stats.h"
@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Filter {
 
 TcpProxyConfig::Route::Route(
-    const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& config) {
+    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
   cluster_name_ = config.cluster();
 
   source_ips_ = Network::Address::IpList(config.source_ip_list());
@@ -35,8 +35,9 @@ TcpProxyConfig::Route::Route(
   }
 }
 
-TcpProxyConfig::SharedConfig::SharedConfig(const envoy::api::v2::filter::network::TcpProxy& config,
-                                           Server::Configuration::FactoryContext& context)
+TcpProxyConfig::SharedConfig::SharedConfig(
+    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+    Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
@@ -45,8 +46,9 @@ TcpProxyConfig::SharedConfig::SharedConfig(const envoy::api::v2::filter::network
   }
 }
 
-TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& config,
-                               Server::Configuration::FactoryContext& context)
+TcpProxyConfig::TcpProxyConfig(
+    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+    Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)) {
@@ -56,8 +58,8 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
   });
 
   if (config.has_deprecated_v1()) {
-    for (const envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute& route_desc :
-         config.deprecated_v1().routes()) {
+    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
+             route_desc : config.deprecated_v1().routes()) {
       if (!context.clusterManager().get(route_desc.cluster())) {
         throw EnvoyException(
             fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
@@ -67,12 +69,12 @@ TcpProxyConfig::TcpProxyConfig(const envoy::api::v2::filter::network::TcpProxy& 
   }
 
   if (!config.cluster().empty()) {
-    envoy::api::v2::filter::network::TcpProxy::DeprecatedV1::TCPRoute default_route;
+    envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
     default_route.set_cluster(config.cluster());
     routes_.emplace_back(default_route);
   }
 
-  for (const envoy::api::v2::filter::accesslog::AccessLog& log_config : config.access_log()) {
+  for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 }

@@ -954,8 +954,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   conn_info.host_description_.reset(
       new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
                              Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                             envoy::api::v2::Metadata::default_instance(), 1,
-                             envoy::api::v2::Locality().default_instance()));
+                             envoy::api::v2::core::Metadata::default_instance(), 1,
+                             envoy::api::v2::core::Locality().default_instance()));
   EXPECT_CALL(*connect_timer, enableTimer(_));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
@@ -1002,8 +1002,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
   conn_info.host_description_.reset(
       new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
                              Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                             envoy::api::v2::Metadata::default_instance(), 1,
-                             envoy::api::v2::Locality().default_instance()));
+                             envoy::api::v2::core::Metadata::default_instance(), 1,
+                             envoy::api::v2::core::Locality().default_instance()));
   EXPECT_CALL(*connect_timer, enableTimer(_));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
@@ -1057,8 +1057,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   conn_info.host_description_.reset(
       new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
                              Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                             envoy::api::v2::Metadata::default_instance(), 1,
-                             envoy::api::v2::Locality().default_instance()));
+                             envoy::api::v2::core::Metadata::default_instance(), 1,
+                             envoy::api::v2::core::Locality().default_instance()));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
