@@ -305,13 +305,12 @@ public:
  * Maintains sets of numeric intervals. As new intervals are added, existing ones in the
  * set are combined so that no overlapping intervals remain in the representation.
  *
- * Value can be any type that is comparable with <.
+ * Value can be any type that is comparable with <, ==, and >.
  */
 template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
 public:
   typedef typename IntervalSet<Value>::Interval Interval;
 
-  // Inserts a new interval into the set, merging any overlaps.
   void insert(Value left, Value right) override {
     if (left == right) {
       return;
@@ -339,7 +338,6 @@ public:
     }
   }
 
-  // Returns the interval-set as a vector.
   std::vector<Interval> toVector() const override {
     std::vector<Interval> out;
     out.reserve(intervals_.size());
