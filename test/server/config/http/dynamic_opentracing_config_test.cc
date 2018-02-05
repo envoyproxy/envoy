@@ -24,7 +24,7 @@ TEST(HttpTracerConfigTest, DynamicOpentracingHttpTracer) {
   ON_CALL(*cm.thread_local_cluster_.cluster_.info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  std::string valid_config = fmt::sprintf(R"EOF(
+  const std::string valid_config = fmt::sprintf(R"EOF(
   {
     "library": "%s/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so",
     "config": {
@@ -32,12 +32,12 @@ TEST(HttpTracerConfigTest, DynamicOpentracingHttpTracer) {
     }
   }
   )EOF",
-                                          TestEnvironment::runfilesDirectory());
-  Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
+                                                TestEnvironment::runfilesDirectory());
+  const Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
   NiceMock<MockInstance> server;
   DynamicOpenTracingHttpTracerFactory factory;
 
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*valid_json, server, cm);
+  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*valid_json, server, cm);
   EXPECT_NE(nullptr, tracer);
 }
 

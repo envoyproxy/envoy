@@ -16,8 +16,8 @@ namespace Configuration {
 Tracing::HttpTracerPtr DynamicOpenTracingHttpTracerFactory::createHttpTracer(
     const Json::Object& json_config, Server::Instance& server,
     Upstream::ClusterManager& /*cluster_manager*/) {
-  std::string library = json_config.getString("library");
-  std::string config = json_config.getObject("config")->asJsonString();
+  const std::string library = json_config.getString("library");
+  const std::string config = json_config.getObject("config")->asJsonString();
   Tracing::DriverPtr dynamic_driver{
       new Tracing::DynamicOpenTracingDriver{server.stats(), library, config}};
   return Tracing::HttpTracerPtr(
