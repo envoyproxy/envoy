@@ -278,6 +278,8 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
 }
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!end_stream || enable_half_close_);
+
   if (write_end_stream_) {
     // It is an API violation to write more data after writing end_stream,
     // but a duplicate end_stream with no data is ok.
