@@ -255,7 +255,7 @@ public:
 
   AsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
-    envoy::api::v2::GrpcService::GoogleGrpc config;
+    envoy::api::v2::core::GrpcService::GoogleGrpc config;
     config.set_target_uri(fake_upstream_->localAddress()->asString());
     config.set_stat_prefix("fake_cluster");
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, stats_store_, config);
@@ -359,7 +359,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
-  envoy::api::v2::Locality host_locality_;
+  envoy::api::v2::core::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
       new NiceMock<Upstream::MockHostDescription>();

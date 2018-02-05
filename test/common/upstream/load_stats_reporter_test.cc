@@ -65,7 +65,7 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
-  envoy::api::v2::Node node_;
+  envoy::api::v2::core::Node node_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;

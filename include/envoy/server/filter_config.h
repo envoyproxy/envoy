@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
@@ -124,9 +124,18 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::api::v2::Metadata& the config metadata associated with this listener.
+   * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
+   * listener.
    */
-  virtual const envoy::api::v2::Metadata& listenerMetadata() const PURE;
+  virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+};
+
+class ListenerFactoryContext : public FactoryContext {
+public:
+  /**
+   * Store socket options to be set on the listen socket before listening.
+   */
+  virtual void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
 };
 
 /**
@@ -156,8 +165,9 @@ public:
    * @param context supplies the filter's context.
    * @return ListenerFilterFactoryCb the factory creation function.
    */
-  virtual ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                               FactoryContext& context) PURE;
+  virtual ListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               ListenerFactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter

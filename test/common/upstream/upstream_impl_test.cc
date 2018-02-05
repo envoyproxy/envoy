@@ -335,11 +335,11 @@ TEST(HostImplTest, Weight) {
 
 TEST(HostImplTest, HostnameCanaryAndLocality) {
   MockCluster cluster;
-  envoy::api::v2::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);
-  envoy::api::v2::Locality locality;
+  envoy::api::v2::core::Locality locality;
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");

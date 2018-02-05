@@ -33,9 +33,9 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-envoy::api::v2::filter::accesslog::AccessLog
+envoy::config::filter::accesslog::v2::AccessLog
 parseAccessLogFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::accesslog::AccessLog access_log;
+  envoy::config::filter::accesslog::v2::AccessLog access_log;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateAccessLog(*json_object_ptr, access_log);
   return access_log;
@@ -492,9 +492,9 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 }
 
 TEST_F(AccessLogImplTest, ConfigureFromProto) {
-  envoy::api::v2::filter::accesslog::AccessLog config;
+  envoy::config::filter::accesslog::v2::AccessLog config;
 
-  envoy::api::v2::filter::accesslog::FileAccessLog fal_config;
+  envoy::config::filter::accesslog::v2::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
   MessageUtil::jsonConvert(fal_config, *config.mutable_config());
@@ -526,7 +526,7 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   NiceMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr filter_object = loader->getObject("filter");
-  envoy::api::v2::filter::accesslog::AccessLogFilter config;
+  envoy::config::filter::accesslog::v2::AccessLogFilter config;
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
@@ -560,7 +560,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   NiceMock<Runtime::MockLoader> runtime;
 
   Json::ObjectSharedPtr filter_object = loader->getObject("filter");
-  envoy::api::v2::filter::accesslog::AccessLogFilter config;
+  envoy::config::filter::accesslog::v2::AccessLogFilter config;
   Config::FilterJson::translateAccessLogFilter(*filter_object, config);
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 

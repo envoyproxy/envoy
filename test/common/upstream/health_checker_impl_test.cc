@@ -42,15 +42,15 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::api::v2::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
-  envoy::api::v2::HealthCheck health_check;
+envoy::api::v2::core::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
+  envoy::api::v2::core::HealthCheck health_check;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
   return health_check;
 }
 
-envoy::api::v2::HealthCheck createGrpcHealthCheckConfig() {
-  envoy::api::v2::HealthCheck health_check;
+envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
+  envoy::api::v2::core::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
   health_check.mutable_interval()->set_seconds(1);
   health_check.mutable_unhealthy_threshold()->set_value(2);
@@ -88,7 +88,7 @@ TEST(HealthCheckerFactoryTest, MissingFieldiException) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  envoy::api::v2::HealthCheck health_check;
+  envoy::api::v2::core::HealthCheck health_check;
   // No health checker type set
   EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
                EnvoyException);
@@ -860,7 +860,7 @@ TEST_F(HttpHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("39000000");
     repeated_payload.Add()->set_text("EEEEEEEE");
 
@@ -870,14 +870,14 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
     EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
     EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
@@ -889,7 +889,7 @@ static void add_uint8(Buffer::Instance& buffer, uint8_t addend) {
 }
 
 TEST(TcpHealthCheckMatcher, match) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
 

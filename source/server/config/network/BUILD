@@ -113,7 +113,7 @@ envoy_cc_library(
         "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/filter:tcp_proxy_lib",
-        "@envoy_api//envoy/api/v2/filter/network:tcp_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
     ],
 )
 

@@ -333,7 +333,7 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
-  const envoy::api::v2::Metadata& metadata() const override { return metadata_; }
+  const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -407,7 +407,7 @@ private:
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
-    const envoy::api::v2::Metadata& metadata() const override { return parent_->metadata(); }
+    const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -490,7 +490,7 @@ private:
   MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
-  envoy::api::v2::Metadata metadata_;
+  envoy::api::v2::core::Metadata metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;

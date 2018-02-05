@@ -27,7 +27,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 

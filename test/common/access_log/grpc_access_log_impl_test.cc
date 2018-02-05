@@ -167,6 +167,30 @@ http_logs:
 
   {
     NiceMock<RequestInfo::MockRequestInfo> request_info;
+    request_info.host_ = nullptr;
+    request_info.start_time_ = SystemTime(1h);
+    request_info.duration_ = 2ms;
+    request_info.downstream_local_address_ = nullptr;
+    request_info.downstream_remote_address_ = nullptr;
+    request_info.protocol_ = Http::Protocol::Http2;
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      start_time:
+        seconds: 3600
+      time_to_last_downstream_tx_byte:
+        nanos: 2000000
+    protocol_version: HTTP2
+    request: {}
+    response: {}
+
+)EOF");
+    access_log_->log(nullptr, nullptr, request_info);
+  }
+
+  {
+    NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.start_time_ = SystemTime(1h);
     request_info.request_received_duration_ = 2ms;
     request_info.response_received_duration_ = 4ms;
@@ -248,10 +272,10 @@ http_logs:
 TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   NiceMock<RequestInfo::MockRequestInfo> request_info;
   ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
-  envoy::api::v2::filter::accesslog::AccessLogCommon common_access_log;
+  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log;
   HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, request_info);
 
-  envoy::api::v2::filter::accesslog::AccessLogCommon common_access_log_expected;
+  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log_expected;
   common_access_log_expected.mutable_response_flags()->set_failed_local_healthcheck(true);
   common_access_log_expected.mutable_response_flags()->set_no_healthy_upstream(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_request_timeout(true);

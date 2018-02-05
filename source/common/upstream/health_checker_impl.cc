@@ -29,21 +29,20 @@
 namespace Envoy {
 namespace Upstream {
 
-HealthCheckerSharedPtr HealthCheckerFactory::create(const envoy::api::v2::HealthCheck& hc_config,
-                                                    Upstream::Cluster& cluster,
-                                                    Runtime::Loader& runtime,
-                                                    Runtime::RandomGenerator& random,
-                                                    Event::Dispatcher& dispatcher) {
+HealthCheckerSharedPtr
+HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
+                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher) {
   switch (hc_config.health_checker_case()) {
-  case envoy::api::v2::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
+  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random);
-  case envoy::api::v2::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
+  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return std::make_shared<TcpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random);
-  case envoy::api::v2::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
+  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     return std::make_shared<RedisHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random,
                                                     Redis::ConnPool::ClientFactoryImpl::instance_);
-  case envoy::api::v2::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
+  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
                                        cluster.info()->name()));
@@ -59,7 +58,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(const envoy::api::v2::Health
 const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
 
 HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
-                                             const envoy::api::v2::HealthCheck& config,
+                                             const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
@@ -277,7 +276,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
-                                             const envoy::api::v2::HealthCheck& config,
+                                             const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
@@ -408,7 +407,7 @@ ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionDat
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload>& byte_array) {
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload>& byte_array) {
   MatchSegments result;
 
   for (const auto& entry : byte_array) {
@@ -434,11 +433,11 @@ bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::I
 }
 
 TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
-                                           const envoy::api::v2::HealthCheck& config,
+                                           const envoy::api::v2::core::HealthCheck& config,
                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random), send_bytes_([&config] {
-        Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> send_repeated;
+        Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> send_repeated;
         if (!config.tcp_health_check().send().text().empty()) {
           send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
         }
@@ -520,7 +519,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
 }
 
 RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
-                                               const envoy::api::v2::HealthCheck& config,
+                                               const envoy::api::v2::core::HealthCheck& config,
                                                Event::Dispatcher& dispatcher,
                                                Runtime::Loader& runtime,
                                                Runtime::RandomGenerator& random,
@@ -596,7 +595,7 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
 }
 
 GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
-                                             const envoy::api::v2::HealthCheck& config,
+                                             const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)

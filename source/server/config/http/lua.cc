@@ -1,6 +1,6 @@
 #include "server/config/http/lua.h"
 
-#include "envoy/api/v2/filter/http/lua.pb.validate.h"
+#include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -11,7 +11,7 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb
-LuaFilterConfig::createFilter(const envoy::api::v2::filter::http::Lua& proto_config,
+LuaFilterConfig::createFilter(const envoy::config::filter::http::lua::v2::Lua& proto_config,
                               const std::string&, FactoryContext& context) {
   Http::Filter::Lua::FilterConfigConstSharedPtr filter_config(new Http::Filter::Lua::FilterConfig{
       proto_config.inline_code(), context.threadLocal(), context.clusterManager()});
@@ -23,7 +23,7 @@ LuaFilterConfig::createFilter(const envoy::api::v2::filter::http::Lua& proto_con
 HttpFilterFactoryCb LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                          const std::string& stat_prefix,
                                                          FactoryContext& context) {
-  envoy::api::v2::filter::http::Lua proto_config;
+  envoy::config::filter::http::lua::v2::Lua proto_config;
   Config::FilterJson::translateLuaFilter(json_config, proto_config);
   return createFilter(proto_config, stat_prefix, context);
 }
@@ -33,7 +33,8 @@ LuaFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_con
                                               const std::string& stat_prefix,
                                               FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::Lua&>(proto_config),
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::lua::v2::Lua&>(
+          proto_config),
       stat_prefix, context);
 }
 

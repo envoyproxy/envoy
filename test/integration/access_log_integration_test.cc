@@ -33,7 +33,8 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [this](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+        [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                   hcm) {
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.http_grpc_access_log");
 

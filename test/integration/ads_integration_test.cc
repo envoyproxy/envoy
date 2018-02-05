@@ -180,7 +180,6 @@ public:
     ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
-    envoy::service::discovery::v2::AdsDummy dummy;
   }
 
   FakeHttpConnectionPtr ads_connection_;

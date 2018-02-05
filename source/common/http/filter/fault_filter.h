@@ -6,8 +6,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "envoy/api/v2/filter/http/fault.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -38,8 +38,8 @@ struct FaultFilterStats {
  */
 class FaultFilterConfig {
 public:
-  FaultFilterConfig(const envoy::api::v2::filter::http::HTTPFault& fault, Runtime::Loader& runtime,
-                    const std::string& stats_prefix, Stats::Scope& scope);
+  FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
+                    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope);
 
   const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {
     return fault_filter_headers_;

@@ -251,7 +251,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

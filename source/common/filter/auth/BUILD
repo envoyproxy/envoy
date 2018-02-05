@@ -29,6 +29,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/network:client_ssl_auth_cc",
+        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth_cc",
     ],
 )
