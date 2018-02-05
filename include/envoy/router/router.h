@@ -246,7 +246,7 @@ public:
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
 
   /**
-   * @return const Config& return the router configuration that owns this virtual host.
+   * @return const Config& the RouteConfiguration that owns this virtual host.
    */
   virtual const Config& routeConfig() const PURE;
 };
@@ -495,7 +495,7 @@ public:
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
 
   /**
-   * @return const std::string Gets the RouteConfiguration name.
+   * @return const std::string the RouteConfiguration name.
    */
   virtual const std::string& name() const PURE;
 };
