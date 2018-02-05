@@ -3814,6 +3814,8 @@ virtual_hosts:
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_EQ("bar", route_entry->virtualHost().name());
+  EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
 
 } // namespace

@@ -863,7 +863,7 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
-TEST_F(AsyncClientImplTest, NullPathMatchCriterion) {
+TEST_F(AsyncClientImplTest, RdsGettersTest) {
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream =
@@ -878,6 +878,10 @@ TEST_F(AsyncClientImplTest, NullPathMatchCriterion) {
   auto& path_match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ("", path_match_criterion.matcher());
   EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
+  const auto& route_config = route_entry->virtualHost().routeConfig();
+  EXPECT_EQ("", route_config.name());
+  EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
+  EXPECT_EQ(nullptr, route_config.route(headers, 0));
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
