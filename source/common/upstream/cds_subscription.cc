@@ -13,8 +13,8 @@ namespace Envoy {
 namespace Upstream {
 
 CdsSubscription::CdsSubscription(Config::SubscriptionStats stats,
-                                 const envoy::api::v2::ConfigSource& cds_config,
-                                 const Optional<envoy::api::v2::ConfigSource>& eds_config,
+                                 const envoy::api::v2::core::ConfigSource& cds_config,
+                                 const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                  ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)
@@ -24,7 +24,7 @@ CdsSubscription::CdsSubscription(Config::SubscriptionStats stats,
   const auto& api_config_source = cds_config.api_config_source();
   UNREFERENCED_PARAMETER(api_config_source);
   // If we are building an CdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::ApiConfigSource::REST_LEGACY);
+  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
   // TODO(htuch): Add support for multiple clusters, #1170.
   ASSERT(api_config_source.cluster_names().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());

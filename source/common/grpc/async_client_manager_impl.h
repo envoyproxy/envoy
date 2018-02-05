@@ -22,14 +22,14 @@ private:
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, Stats::Scope& scope,
-                               const envoy::api::v2::GrpcService::GoogleGrpc& config);
+                               const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
 
   AsyncClientPtr create() override;
 
 private:
   ThreadLocal::Instance& tls_;
   Stats::ScopePtr scope_;
-  const envoy::api::v2::GrpcService::GoogleGrpc config_;
+  const envoy::api::v2::core::GrpcService::GoogleGrpc config_;
 };
 
 class AsyncClientManagerImpl : public AsyncClientManager {
@@ -37,7 +37,7 @@ public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls);
 
   // Grpc::AsyncClientManager
-  AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::GrpcService& grpc_service,
+  AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
                                               Stats::Scope& scope) override;
 
 private:

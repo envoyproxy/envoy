@@ -127,7 +127,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:base_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

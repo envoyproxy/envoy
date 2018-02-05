@@ -34,7 +34,8 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // RequestInfoHeaderFormatter.
-HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header_value_option) {
+HeaderFormatterPtr
+parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
 
   absl::string_view format(header_value_option.header().value());
@@ -207,7 +208,7 @@ HeaderFormatterPtr parseInternal(const envoy::api::v2::HeaderValueOption& header
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add) {
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
@@ -221,7 +222,7 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& headers_to_add,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
     const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 

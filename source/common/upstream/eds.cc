@@ -45,7 +45,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
-  typedef std::unique_ptr<std::vector<HostSharedPtr>> HostListPtr;
+  typedef std::unique_ptr<HostVector> HostListPtr;
   std::vector<HostListPtr> new_hosts(1);
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
@@ -73,7 +73,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       new_hosts.resize(priority + 1);
     }
     if (new_hosts[priority] == nullptr) {
-      new_hosts[priority] = HostListPtr{new std::vector<HostSharedPtr>};
+      new_hosts[priority] = HostListPtr{new HostVector};
     }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       new_hosts[priority]->emplace_back(new HostImpl(
@@ -94,23 +94,22 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   onPreInitComplete();
 }
 
-void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set,
-                                            std::vector<HostSharedPtr>& new_hosts) {
-  HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(host_set.hosts()));
+void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, HostVector& new_hosts) {
+  HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
-  std::vector<HostSharedPtr> hosts_added;
-  std::vector<HostSharedPtr> hosts_removed;
+  HostVector hosts_added;
+  HostVector hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
     ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({}) priority {}", info_->name(),
               host_set.hosts().size(), host_set.priority());
-    HostListsSharedPtr per_locality(new std::vector<std::vector<HostSharedPtr>>());
+    std::vector<HostVector> per_locality;
 
     // If local locality is not defined then skip populating per locality hosts.
     const Locality local_locality(local_info_.node().locality());
     ENVOY_LOG(trace, "Local locality: {}", local_info_.node().locality().DebugString());
     if (!local_locality.empty()) {
-      std::map<Locality, std::vector<HostSharedPtr>> hosts_per_locality;
+      std::map<Locality, HostVector> hosts_per_locality;
 
       for (const HostSharedPtr& host : *current_hosts_copy) {
         hosts_per_locality[Locality(host->locality())].push_back(host);
@@ -118,19 +117,22 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set,
 
       // Populate per_locality hosts only if upstream cluster has hosts in the same locality.
       if (hosts_per_locality.find(local_locality) != hosts_per_locality.end()) {
-        per_locality->push_back(hosts_per_locality[local_locality]);
+        per_locality.push_back(hosts_per_locality[local_locality]);
 
         for (auto& entry : hosts_per_locality) {
           if (local_locality != entry.first) {
-            per_locality->push_back(entry.second);
+            per_locality.push_back(entry.second);
           }
         }
       }
     }
 
+    auto per_locality_shared =
+        std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), !per_locality.empty());
+
     host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
-                         per_locality, createHealthyHostLists(*per_locality), hosts_added,
-                         hosts_removed);
+                         per_locality_shared, createHealthyHostLists(*per_locality_shared),
+                         hosts_added, hosts_removed);
   }
 }
 

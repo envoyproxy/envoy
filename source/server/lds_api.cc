@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Server {
 
-LdsApi::LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::ClusterManager& cm,
+LdsApi::LdsApi(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, ListenerManager& lm)

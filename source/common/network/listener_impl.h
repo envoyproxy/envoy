@@ -16,7 +16,7 @@ namespace Network {
  */
 class ListenerImpl : public Listener {
 public:
-  ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket, ListenerCallbacks& cb,
+  ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
                bool bind_to_port, bool hand_off_restored_destination_connections);
 
 protected:

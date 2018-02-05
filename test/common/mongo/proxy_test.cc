@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/fault.pb.h"
+#include "envoy/config/filter/fault/v2/fault.pb.h"
 
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
@@ -83,7 +83,7 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    envoy::api::v2::filter::FaultDelay fault{};
+    envoy::config::filter::fault::v2::FaultDelay fault{};
     fault.set_percent(50);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 

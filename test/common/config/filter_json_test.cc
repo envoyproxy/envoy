@@ -1,4 +1,4 @@
-#include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/config/filter/http/router/v2/router.pb.h"
 
 #include "common/config/filter_json.h"
 #include "common/json/json_loader.h"
@@ -9,8 +9,9 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-envoy::api::v2::filter::http::Router parseRouterFromJson(const std::string& json_string) {
-  envoy::api::v2::filter::http::Router router;
+envoy::config::filter::http::router::v2::Router
+parseRouterFromJson(const std::string& json_string) {
+  envoy::config::filter::http::router::v2::Router router;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateRouter(*json_object_ptr, router);
   return router;

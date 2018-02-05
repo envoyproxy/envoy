@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
@@ -85,7 +85,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
-  envoy::api::v2::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::Metadata>(
+  envoy::api::v2::core::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
       R"EOF(
         filter_metadata:
           namespace:
@@ -395,7 +395,7 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  envoy::api::v2::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::Metadata>(
+  envoy::api::v2::core::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
       R"EOF(
         filter_metadata:
           ns:
@@ -404,8 +404,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
 
   for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption> to_add;
-    envoy::api::v2::HeaderValueOption* header = to_add.Add();
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
+    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
     header->mutable_header()->set_key("x-header");
     header->mutable_header()->set_value(test_case.input_);
 
@@ -471,7 +471,7 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  envoy::api::v2::Metadata metadata;
+  envoy::api::v2::core::Metadata metadata;
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
   req_header_parser->evaluateHeaders(headerMap, request_info);
@@ -545,7 +545,7 @@ route:
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  envoy::api::v2::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::Metadata>(
+  envoy::api::v2::core::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
       R"EOF(
         filter_metadata:
           namespace:

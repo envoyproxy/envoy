@@ -145,6 +145,7 @@ protected:
   void testValidZeroLengthContent();
   void testInvalidContentLength();
   void testMultipleContentLengths();
+  void testComputedHealthCheck();
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();

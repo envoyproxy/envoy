@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 
@@ -21,7 +21,7 @@ class SdsSubscription : public Http::RestApiFetcher,
                         public Config::Subscription<envoy::api::v2::ClusterLoadAssignment>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
-  SdsSubscription(ClusterStats& stats, const envoy::api::v2::ConfigSource& eds_config,
+  SdsSubscription(ClusterStats& stats, const envoy::api::v2::core::ConfigSource& eds_config,
                   ClusterManager& cm, Event::Dispatcher& dispatcher,
                   Runtime::RandomGenerator& random);
 

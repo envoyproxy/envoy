@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/filter/http/buffer.pb.validate.h"
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -15,9 +15,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb
-BufferFilterConfig::createFilter(const envoy::api::v2::filter::http::Buffer& proto_config,
-                                 const std::string& stats_prefix, FactoryContext& context) {
+HttpFilterFactoryCb BufferFilterConfig::createFilter(
+    const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
+    const std::string& stats_prefix, FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
   ASSERT(proto_config.has_max_request_time());
 
@@ -34,7 +34,7 @@ BufferFilterConfig::createFilter(const envoy::api::v2::filter::http::Buffer& pro
 HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                             const std::string& stats_prefix,
                                                             FactoryContext& context) {
-  envoy::api::v2::filter::http::Buffer proto_config;
+  envoy::config::filter::http::buffer::v2::Buffer proto_config;
   Config::FilterJson::translateBufferFilter(json_config, proto_config);
   return createFilter(proto_config, stats_prefix, context);
 }
@@ -44,7 +44,8 @@ BufferFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_
                                                  const std::string& stats_prefix,
                                                  FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::Buffer&>(proto_config),
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::buffer::v2::Buffer&>(
+          proto_config),
       stats_prefix, context);
 }
 

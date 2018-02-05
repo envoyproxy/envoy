@@ -27,10 +27,10 @@ public:
   virtual FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return ListenSocket& the actual listen socket. The address of this socket may be
+   * @return Socket& the actual listen socket. The address of this socket may be
    *         different from configured if for example the configured address binds to port zero.
    */
-  virtual ListenSocket& socket() PURE;
+  virtual Socket& socket() PURE;
 
   /**
    * @return TransportSocketFactory& the transport socket factory.

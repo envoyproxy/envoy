@@ -16,7 +16,8 @@ public:
   Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
   ClientType clientType() const { return std::get<1>(GetParam()); }
 
-  void setGrpcService(envoy::api::v2::GrpcService& grpc_service, const std::string& cluster_name,
+  void setGrpcService(envoy::api::v2::core::GrpcService& grpc_service,
+                      const std::string& cluster_name,
                       Network::Address::InstanceConstSharedPtr address) {
     switch (clientType()) {
     case ClientType::EnvoyGrpc:

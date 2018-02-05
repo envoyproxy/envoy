@@ -20,7 +20,7 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
-  Network::ListenerPtr createListener(Network::ListenSocket&, Network::ListenerCallbacks&,
+  Network::ListenerPtr createListener(Network::Socket&, Network::ListenerCallbacks&,
                                       bool bind_to_port,
                                       bool hand_off_restored_destination_connections) override;
 };

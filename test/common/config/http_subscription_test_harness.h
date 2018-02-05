@@ -139,7 +139,7 @@ public:
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  envoy::api::v2::Node node_;
+  envoy::api::v2::core::Node node_;
   Runtime::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;

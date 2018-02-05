@@ -126,7 +126,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   Stats::MockStore scope;
   EXPECT_CALL(async_client_manager,
               factoryForGrpcService(ProtoEq(config.grpc_service()), Ref(scope)))
-      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   GrpcFactoryImpl factory(config, async_client_manager, scope);
@@ -139,11 +139,11 @@ TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
   config.set_cluster_name("foo");
   Grpc::MockAsyncClientManager async_client_manager;
   Stats::MockStore scope;
-  envoy::api::v2::GrpcService expected_grpc_service;
+  envoy::api::v2::core::GrpcService expected_grpc_service;
   expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(async_client_manager,
               factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope)))
-      .WillOnce(Invoke([](const envoy::api::v2::GrpcService&, Stats::Scope&) {
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   GrpcFactoryImpl factory(config, async_client_manager, scope);

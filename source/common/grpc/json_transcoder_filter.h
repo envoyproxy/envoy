@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/filter/http/transcoder.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
@@ -44,7 +44,8 @@ public:
    * constructor that loads protobuf descriptors from the file specified in the JSON config.
    * and construct a path matcher for HTTP path bindings.
    */
-  JsonTranscoderConfig(const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config);
+  JsonTranscoderConfig(
+      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config);
 
   /**
    * Create an instance of Transcoder interface based on incoming request
