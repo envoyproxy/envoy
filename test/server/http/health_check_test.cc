@@ -324,7 +324,7 @@ TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSetJson) 
 
 TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSetProto) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
-  envoy::api::v2::filter::http::HealthCheck config{};
+  envoy::config::filter::http::health_check::v2::HealthCheck config{};
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -338,7 +338,7 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSetProto) {
 
 TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSetProto) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
-  envoy::api::v2::filter::http::HealthCheck config{};
+  envoy::config::filter::http::health_check::v2::HealthCheck config{};
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
@@ -349,8 +349,8 @@ TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSetProto)
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  envoy::api::v2::filter::http::HealthCheck config =
-      *dynamic_cast<envoy::api::v2::filter::http::HealthCheck*>(
+  envoy::config::filter::http::health_check::v2::HealthCheck config =
+      *dynamic_cast<envoy::config::filter::http::health_check::v2::HealthCheck*>(
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);

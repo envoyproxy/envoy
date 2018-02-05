@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -45,16 +45,16 @@ TEST(HttpFilterConfigTest, ValidateFail) {
   NiceMock<MockFactoryContext> context;
 
   BufferFilterConfig buffer_factory;
-  envoy::api::v2::filter::http::Buffer buffer_proto;
+  envoy::config::filter::http::buffer::v2::Buffer buffer_proto;
   FaultFilterConfig fault_factory;
-  envoy::api::v2::filter::http::HTTPFault fault_proto;
+  envoy::config::filter::http::fault::v2::HTTPFault fault_proto;
   fault_proto.mutable_abort();
   GrpcJsonTranscoderFilterConfig grpc_json_transcoder_factory;
-  envoy::api::v2::filter::http::GrpcJsonTranscoder grpc_json_transcoder_proto;
+  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder grpc_json_transcoder_proto;
   LuaFilterConfig lua_factory;
-  envoy::api::v2::filter::http::Lua lua_proto;
+  envoy::config::filter::http::lua::v2::Lua lua_proto;
   RateLimitFilterConfig rate_limit_factory;
-  envoy::api::v2::filter::http::RateLimit rate_limit_proto;
+  envoy::config::filter::http::rate_limit::v2::RateLimit rate_limit_proto;
   const std::vector<std::pair<NamedHttpFilterConfigFactory&, Protobuf::Message&>> filter_cases = {
       {buffer_factory, buffer_proto},
       {fault_factory, fault_proto},
@@ -102,7 +102,7 @@ TEST(HttpFilterConfigTest, BufferFilterIncorrectJson) {
 }
 
 TEST(HttpFilterConfigTest, BufferFilterCorrectProto) {
-  envoy::api::v2::filter::http::Buffer config{};
+  envoy::config::filter::http::buffer::v2::Buffer config{};
   config.mutable_max_request_bytes()->set_value(1028);
   config.mutable_max_request_time()->set_seconds(2);
 
@@ -116,8 +116,9 @@ TEST(HttpFilterConfigTest, BufferFilterCorrectProto) {
 
 TEST(HttpFilterConfigTest, BufferFilterEmptyProto) {
   BufferFilterConfig factory;
-  envoy::api::v2::filter::http::Buffer config =
-      *dynamic_cast<envoy::api::v2::filter::http::Buffer*>(factory.createEmptyConfigProto().get());
+  envoy::config::filter::http::buffer::v2::Buffer config =
+      *dynamic_cast<envoy::config::filter::http::buffer::v2::Buffer*>(
+          factory.createEmptyConfigProto().get());
 
   config.mutable_max_request_bytes()->set_value(1028);
   config.mutable_max_request_time()->set_seconds(2);
@@ -155,7 +156,7 @@ TEST(HttpFilterConfigTest, RateLimitFilterCorrectProto) {
   )EOF";
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::http::RateLimit proto_config{};
+  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
   Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
 
   NiceMock<MockFactoryContext> context;
@@ -178,8 +179,8 @@ TEST(HttpFilterConfigTest, RateLimitFilterEmptyProto) {
   RateLimitFilterConfig factory;
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::api::v2::filter::http::RateLimit proto_config =
-      *dynamic_cast<envoy::api::v2::filter::http::RateLimit*>(
+  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config =
+      *dynamic_cast<envoy::config::filter::http::rate_limit::v2::RateLimit*>(
           factory.createEmptyConfigProto().get());
   Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
 
@@ -239,7 +240,7 @@ TEST(HttpFilterConfigTest, FaultFilterCorrectJson) {
 }
 
 TEST(HttpFilterConfigTest, FaultFilterCorrectProto) {
-  envoy::api::v2::filter::http::HTTPFault config{};
+  envoy::config::filter::http::fault::v2::HTTPFault config{};
   config.mutable_delay()->set_percent(100);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
 
@@ -252,7 +253,7 @@ TEST(HttpFilterConfigTest, FaultFilterCorrectProto) {
 }
 
 TEST(HttpFilterConfigTest, InvalidFaultFilterInProto) {
-  envoy::api::v2::filter::http::HTTPFault config{};
+  envoy::config::filter::http::fault::v2::HTTPFault config{};
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
@@ -376,7 +377,7 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
 }
 
 TEST(HttpFilterConigTest, RouterV2Filter) {
-  envoy::api::v2::filter::http::Router router_config;
+  envoy::config::filter::http::router::v2::Router router_config;
   router_config.mutable_dynamic_stats()->set_value(true);
 
   NiceMock<MockFactoryContext> context;

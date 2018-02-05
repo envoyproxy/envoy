@@ -36,7 +36,8 @@ public:
                      fake_upstreams_.back()->localAddress());
     });
     config_helper_.addConfigModifier(
-        [](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+               hcm) {
           auto* rate_limit = hcm.mutable_route_config()
                                  ->mutable_virtual_hosts(0)
                                  ->mutable_routes(0)

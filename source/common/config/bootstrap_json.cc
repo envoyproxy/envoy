@@ -17,12 +17,12 @@ void BootstrapJson::translateClusterManagerBootstrap(
     const Json::Object& json_cluster_manager, envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   json_cluster_manager.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
 
-  Optional<envoy::api::v2::ConfigSource> eds_config;
+  Optional<envoy::api::v2::core::ConfigSource> eds_config;
   if (json_cluster_manager.hasObject("sds")) {
     const auto json_sds = json_cluster_manager.getObject("sds");
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
     Config::CdsJson::translateCluster(*json_sds->getObject("cluster"),
-                                      Optional<envoy::api::v2::ConfigSource>(), *cluster);
+                                      Optional<envoy::api::v2::core::ConfigSource>(), *cluster);
     Config::Utility::translateEdsConfig(
         *json_sds,
         *bootstrap.mutable_dynamic_resources()->mutable_deprecated_v1()->mutable_sds_config());

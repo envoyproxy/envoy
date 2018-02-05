@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/mongo_proxy.pb.validate.h"
+#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -15,7 +15,8 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilter(
-    const envoy::api::v2::filter::network::MongoProxy& proto_config, FactoryContext& context) {
+    const envoy::config::filter::network::mongo_proxy::v2::MongoProxy& proto_config,
+    FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
@@ -43,7 +44,7 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilter(
 NetworkFilterFactoryCb
 MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                    FactoryContext& context) {
-  envoy::api::v2::filter::network::MongoProxy proto_config;
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
   Config::FilterJson::translateMongoProxy(json_config, proto_config);
   return createFilter(proto_config, context);
 }
@@ -52,8 +53,8 @@ NetworkFilterFactoryCb
 MongoProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::MongoProxy&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::network::mongo_proxy::v2::MongoProxy&>(proto_config),
       context);
 }
 

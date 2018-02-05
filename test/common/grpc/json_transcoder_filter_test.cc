@@ -42,12 +42,12 @@ namespace Grpc {
 
 class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
-  const envoy::api::v2::filter::http::GrpcJsonTranscoder
+  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
-    envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
+    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
     return proto_config;
   }
@@ -106,7 +106,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseConfig) {
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
-  envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
+  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
   proto_config.set_proto_descriptor_bin(
       Filesystem::fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   proto_config.add_services("bookstore.Bookstore");
@@ -139,7 +139,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, NonProto) {
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, NonBinaryProto) {
-  envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
+  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
   proto_config.set_proto_descriptor_bin("This is invalid proto");
   proto_config.add_services("bookstore.Bookstore");
   EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(proto_config), EnvoyException,
@@ -202,11 +202,11 @@ public:
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  const envoy::api::v2::filter::http::GrpcJsonTranscoder bookstoreProtoConfig() {
+  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder bookstoreProtoConfig() {
     std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                               "\",\"services\": [\"bookstore.Bookstore\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
-    envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
+    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config{};
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
     return proto_config;
   }
@@ -391,7 +391,7 @@ public:
   GrpcJsonTranscoderFilterPrintTest() {
     auto json_config =
         Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_));
-    envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config{};
+    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config{};
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
     config_ = new JsonTranscoderConfig(proto_config);
     filter_ = new JsonTranscoderFilter(*config_);

@@ -67,8 +67,8 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/accesslog:accesslog_cc",
         "@envoy_api//envoy/config/accesslog/v2:als_cc",
+        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
         "@envoy_api//envoy/service/accesslog/v2:als_cc",
     ],
 )

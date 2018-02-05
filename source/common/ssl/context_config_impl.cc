@@ -74,14 +74,14 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
   }
 }
 
-const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::DataSource& source,
+const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::core::DataSource& source,
                                                     bool allow_empty) {
   switch (source.specifier_case()) {
-  case envoy::api::v2::DataSource::kFilename:
+  case envoy::api::v2::core::DataSource::kFilename:
     return Filesystem::fileReadToEnd(source.filename());
-  case envoy::api::v2::DataSource::kInlineBytes:
+  case envoy::api::v2::core::DataSource::kInlineBytes:
     return source.inline_bytes();
-  case envoy::api::v2::DataSource::kInlineString:
+  case envoy::api::v2::core::DataSource::kInlineString:
     return source.inline_string();
   default:
     if (!allow_empty) {
@@ -92,8 +92,10 @@ const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::DataSo
   }
 }
 
-const std::string ContextConfigImpl::getDataSourcePath(const envoy::api::v2::DataSource& source) {
-  return source.specifier_case() == envoy::api::v2::DataSource::kFilename ? source.filename() : "";
+const std::string
+ContextConfigImpl::getDataSourcePath(const envoy::api::v2::core::DataSource& source) {
+  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename ? source.filename()
+                                                                                : "";
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

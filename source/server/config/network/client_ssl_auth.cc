@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/client_ssl_auth.pb.validate.h"
+#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -14,7 +14,8 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
-    const envoy::api::v2::filter::network::ClientSSLAuth& proto_config, FactoryContext& context) {
+    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
+    FactoryContext& context) {
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
 
@@ -30,7 +31,7 @@ NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                 FactoryContext& context) {
-  envoy::api::v2::filter::network::ClientSSLAuth proto_config;
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
   Config::FilterJson::translateClientSslAuthFilter(json_config, proto_config);
   return createFilter(proto_config, context);
 }
@@ -39,8 +40,8 @@ NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                          FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::ClientSSLAuth&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth&>(proto_config),
       context);
 }
 

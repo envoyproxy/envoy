@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -39,7 +39,7 @@ public:
   /**
    * v2 API Node protobuf. This is the full node identity presented to management servers.
    */
-  virtual const envoy::api::v2::Node& node() const PURE;
+  virtual const envoy::api::v2::core::Node& node() const PURE;
 };
 
 typedef std::unique_ptr<LocalInfo> LocalInfoPtr;

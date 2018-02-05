@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr async_client,
+GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method)
     : node_(node), async_client_(std::move(async_client)), service_method_(service_method) {
@@ -16,6 +16,10 @@ GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::Node& node, Grpc::AsyncClientPtr 
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() {
+  // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
+  // TODO(kuat): Remove explicit proto descriptor import.
+  envoy::service::discovery::v2::AdsDummy dummy;
+
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
       watch->inserted_ = false;

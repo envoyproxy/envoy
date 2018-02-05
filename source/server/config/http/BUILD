@@ -175,7 +175,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
-        "@envoy_api//envoy/api/v2/filter/http:router_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )
 

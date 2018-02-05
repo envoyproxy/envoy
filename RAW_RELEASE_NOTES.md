@@ -55,3 +55,5 @@ final version.
   DOWNSTREAM_LOCAL_ADDRESS access log formatter.
 * Added support for HTTPS redirects on specific routes.
 * Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
+* Added support for abstract unix domain sockets on linux. The abstract
+  namespace can be used by prepending '@' to a socket path.

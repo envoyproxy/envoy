@@ -678,14 +678,16 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::route::VirtualCluster& virtual_cluster) {
-  if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
-    method_ = envoy::api::v2::RequestMethod_Name(virtual_cluster.method());
+  if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
+    method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
 
   const std::string pattern = virtual_cluster.pattern();
   pattern_ = RegexUtil::parseRegex(pattern);
   name_ = virtual_cluster.name();
 }
+
+const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
   // We do a longest wildcard suffix match against the host that's passed in.
@@ -811,7 +813,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 }
 
 ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-                       Upstream::ClusterManager& cm, bool validate_clusters_default) {
+                       Upstream::ClusterManager& cm, bool validate_clusters_default)
+    : name_(config.name()) {
   route_matcher_.reset(new RouteMatcher(
       config, *this, runtime, cm,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));

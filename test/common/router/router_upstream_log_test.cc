@@ -29,7 +29,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-Optional<envoy::api::v2::filter::accesslog::AccessLog> testUpstreamLog() {
+Optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string json_string = R"EOF(
   {
@@ -40,10 +40,10 @@ Optional<envoy::api::v2::filter::accesslog::AccessLog> testUpstreamLog() {
 
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
 
-  envoy::api::v2::filter::accesslog::AccessLog upstream_log;
+  envoy::config::filter::accesslog::v2::AccessLog upstream_log;
   Envoy::Config::FilterJson::translateAccessLog(*json_object_ptr, upstream_log);
 
-  return Optional<envoy::api::v2::filter::accesslog::AccessLog>(upstream_log);
+  return Optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log);
 }
 
 } // namespace
@@ -73,14 +73,14 @@ class RouterUpstreamLogTest : public testing::Test {
 public:
   RouterUpstreamLogTest() {}
 
-  void init(Optional<envoy::api::v2::filter::accesslog::AccessLog> upstream_log) {
-    envoy::api::v2::filter::http::Router router_proto;
+  void init(Optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
+    envoy::config::filter::http::router::v2::Router router_proto;
 
     if (upstream_log.valid()) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(Invoke([&](const std::string& data) { output_.push_back(data); }));
 
-      envoy::api::v2::filter::accesslog::AccessLog* current_upstream_log =
+      envoy::config::filter::accesslog::v2::AccessLog* current_upstream_log =
           router_proto.add_upstream_log();
       current_upstream_log->CopyFrom(upstream_log.value());
     }
@@ -196,7 +196,7 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
-  envoy::api::v2::Locality upstream_locality_;
+  envoy::api::v2::core::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   Event::MockTimer* response_timeout_{};

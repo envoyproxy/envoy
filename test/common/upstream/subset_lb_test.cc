@@ -168,7 +168,7 @@ public:
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
-    envoy::api::v2::Metadata m;
+    envoy::api::v2::core::Metadata m;
     for (const auto& m_it : metadata) {
       Config::Metadata::mutableMetadataValue(m, Config::MetadataFilters::get().ENVOY_LB, m_it.first)
           .set_string_value(m_it.second);

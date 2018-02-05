@@ -66,8 +66,9 @@ public:
     return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
-  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&,
-                      const Optional<envoy::api::v2::ConfigSource>&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&,
+                      const Optional<envoy::api::v2::core::ConfigSource>&,
+                      ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 

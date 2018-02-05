@@ -20,7 +20,8 @@ class LdsSubscription : public Http::RestApiFetcher,
                         public Config::Subscription<envoy::api::v2::Listener>,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
-  LdsSubscription(Config::SubscriptionStats stats, const envoy::api::v2::ConfigSource& lds_config,
+  LdsSubscription(Config::SubscriptionStats stats,
+                  const envoy::api::v2::core::ConfigSource& lds_config,
                   Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                   Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
 

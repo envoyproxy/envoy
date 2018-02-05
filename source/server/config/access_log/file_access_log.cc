@@ -1,6 +1,6 @@
 #include "server/config/access_log/file_access_log.h"
 
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -17,7 +17,7 @@ namespace Configuration {
 AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter, FactoryContext& context) {
   const auto& fal_config =
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::accesslog::FileAccessLog&>(
+      MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::FileAccessLog&>(
           config);
   AccessLog::FormatterPtr formatter;
   if (fal_config.format().empty()) {
@@ -30,7 +30,7 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::accesslog::FileAccessLog()};
+  return ProtobufTypes::MessagePtr{new envoy::config::filter::accesslog::v2::FileAccessLog()};
 }
 
 std::string FileAccessLogFactory::name() const { return Config::AccessLogNames::get().FILE; }

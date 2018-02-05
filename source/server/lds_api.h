@@ -19,7 +19,7 @@ class LdsApi : public Init::Target,
                Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
                Logger::Loggable<Logger::Id::upstream> {
 public:
-  LdsApi(const envoy::api::v2::ConfigSource& lds_config, Upstream::ClusterManager& cm,
+  LdsApi(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
          Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
          ListenerManager& lm);

@@ -1,6 +1,6 @@
 #include "server/config/http/grpc_json_transcoder.h"
 
-#include "envoy/api/v2/filter/http/transcoder.pb.validate.h"
+#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -12,8 +12,8 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilter(
-    const envoy::api::v2::filter::http::GrpcJsonTranscoder& proto_config, const std::string&,
-    FactoryContext&) {
+    const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+    const std::string&, FactoryContext&) {
   ASSERT(!proto_config.proto_descriptor().empty());
   ASSERT(proto_config.services_size() > 0);
 
@@ -28,7 +28,7 @@ HttpFilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilter(
 
 HttpFilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactory(
     const Json::Object& json_config, const std::string& stat_prefix, FactoryContext& context) {
-  envoy::api::v2::filter::http::GrpcJsonTranscoder proto_config;
+  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
   Config::FilterJson::translateGrpcJsonTranscoder(json_config, proto_config);
   return createFilter(proto_config, stat_prefix, context);
 }
@@ -38,8 +38,8 @@ GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProto(const Protobuf::Mes
                                                              const std::string& stat_prefix,
                                                              FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::GrpcJsonTranscoder&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder&>(proto_config),
       stat_prefix, context);
 }
 

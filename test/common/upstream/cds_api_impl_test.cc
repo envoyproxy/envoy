@@ -40,10 +40,11 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    envoy::api::v2::ConfigSource cds_config;
+    envoy::api::v2::core::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
     if (v2_rest) {
-      cds_config.mutable_api_config_source()->set_api_type(envoy::api::v2::ApiConfigSource::REST);
+      cds_config.mutable_api_config_source()->set_api_type(
+          envoy::api::v2::core::ApiConfigSource::REST);
     }
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
@@ -105,7 +106,7 @@ public:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
-  Optional<envoy::api::v2::ConfigSource> eds_config_;
+  Optional<envoy::api::v2::core::ConfigSource> eds_config_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -134,7 +135,7 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.node_.set_cluster("");
   local_info_.node_.set_id("");
-  envoy::api::v2::ConfigSource cds_config;
+  envoy::api::v2::core::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
   EXPECT_THROW(
       CdsApiImpl::create(cds_config, eds_config_, cm_, dispatcher_, random_, local_info_, store_),

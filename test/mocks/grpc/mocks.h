@@ -83,7 +83,7 @@ public:
   ~MockAsyncClientManager();
 
   MOCK_METHOD2(factoryForGrpcService,
-               AsyncClientFactoryPtr(const envoy::api::v2::GrpcService& grpc_service,
+               AsyncClientFactoryPtr(const envoy::api::v2::core::GrpcService& grpc_service,
                                      Stats::Scope& scope));
 };
 

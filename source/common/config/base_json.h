@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/json/json_object.h"
 
 namespace Envoy {
@@ -9,20 +9,21 @@ namespace Config {
 class BaseJson {
 public:
   /**
-   * Translate a v1 JSON integer runtime object to v2 envoy::api::v2::RuntimeUInt32.
+   * Translate a v1 JSON integer runtime object to v2 envoy::api::v2::core::RuntimeUInt32.
    * @param json_runtime source v1 JSON integer runtime object.
-   * @param runtime destination v2 envoy::api::v2::RuntimeUInt32.
+   * @param runtime destination v2 envoy::api::v2::core::RuntimeUInt32.
    */
   static void translateRuntimeUInt32(const Json::Object& json_runtime,
-                                     envoy::api::v2::RuntimeUInt32& runtime);
+                                     envoy::api::v2::core::RuntimeUInt32& runtime);
 
   /**
-   * Translate a v1 JSON header-value object to v2 envoy::api::v2::HeaderValueOption.
+   * Translate a v1 JSON header-value object to v2 envoy::api::v2::core::HeaderValueOption.
    * @param json_header_value source v1 JSON header-value object.
-   * @param header_value_option destination v2 envoy::api::v2::HeaderValueOption.
+   * @param header_value_option destination v2 envoy::api::v2::core::HeaderValueOption.
    */
-  static void translateHeaderValueOption(const Json::Object& json_header_value,
-                                         envoy::api::v2::HeaderValueOption& header_value_option);
+  static void
+  translateHeaderValueOption(const Json::Object& json_header_value,
+                             envoy::api::v2::core::HeaderValueOption& header_value_option);
 };
 
 } // namespace Config

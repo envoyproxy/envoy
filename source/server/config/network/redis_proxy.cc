@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/network/redis_proxy.pb.validate.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -17,7 +17,8 @@ namespace Server {
 namespace Configuration {
 
 NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilter(
-    const envoy::api::v2::filter::network::RedisProxy& proto_config, FactoryContext& context) {
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
+    FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(!proto_config.cluster().empty());
@@ -43,7 +44,7 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilter(
 NetworkFilterFactoryCb
 RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                    FactoryContext& context) {
-  envoy::api::v2::filter::network::RedisProxy proto_config;
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
   Config::FilterJson::translateRedisProxy(json_config, proto_config);
   return createFilter(proto_config, context);
 }
@@ -52,8 +53,8 @@ NetworkFilterFactoryCb
 RedisProxyFilterConfigFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                             FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::network::RedisProxy&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::network::redis_proxy::v2::RedisProxy&>(proto_config),
       context);
 }
 
