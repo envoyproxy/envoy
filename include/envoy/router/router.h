@@ -221,6 +221,7 @@ public:
 };
 
 class RateLimitPolicy;
+class Config;
 
 /**
  * Virtual host defintion.
@@ -243,6 +244,11 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+
+  /**
+   * @return const Config& the RouteConfiguration that owns this virtual host.
+   */
+  virtual const Config& routeConfig() const PURE;
 };
 
 /**
@@ -487,6 +493,11 @@ public:
    * (RFC1918) source.
    */
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
+
+  /**
+   * @return const std::string the RouteConfiguration name.
+   */
+  virtual const std::string& name() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

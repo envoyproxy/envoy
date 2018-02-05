@@ -126,13 +126,29 @@ private:
     const std::string& runtimeKey() const override { return EMPTY_STRING; }
   };
 
+  struct NullConfig : public Router::Config {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+      return nullptr;
+    }
+
+    const std::list<LowerCaseString>& internalOnlyHeaders() const override {
+      return internal_only_headers_;
+    }
+
+    const std::string& name() const override { return EMPTY_STRING; }
+
+    static const std::list<LowerCaseString> internal_only_headers_;
+  };
+
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
+    const Router::Config& routeConfig() const override { return route_configuration_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
+    static const NullConfig route_configuration_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {

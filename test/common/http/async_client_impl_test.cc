@@ -863,6 +863,24 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
+TEST_F(AsyncClientImplTest, NullRouteConfigTest) {
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>(), false);
+  stream->sendHeaders(headers, false);
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+  auto route = filter_callbacks->route();
+  auto route_entry = route->routeEntry();
+  ASSERT_NE(nullptr, route_entry);
+  const auto& route_config = route_entry->virtualHost().routeConfig();
+  EXPECT_EQ("", route_config.name());
+  EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
+  EXPECT_EQ(nullptr, route_config.route(headers, 0));
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

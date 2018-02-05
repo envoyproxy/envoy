@@ -3773,7 +3773,7 @@ virtual_hosts:
       EnvoyException, "response body size is 4097 bytes; maximum is 4096");
 }
 
-TEST(RouteConfigurationV2, Metadata) {
+TEST(RouteConfigurationV2, RouteConfigGetters) {
   std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -3795,6 +3795,8 @@ virtual_hosts:
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
+  EXPECT_EQ("bar", route_entry->virtualHost().name());
+  EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
 
 } // namespace
