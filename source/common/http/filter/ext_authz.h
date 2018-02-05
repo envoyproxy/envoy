@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/filter/http/ext_authz.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/ext_authz/ext_authz.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
@@ -30,8 +30,8 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  // @saumoh: TBD : Take care of grpc service != envoy_grpc()
-  FilterConfig(const envoy::api::v2::filter::http::ExtAuthz& config,
+  // TBD(saumoh) Take care of grpc service != envoy_grpc()
+  FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),

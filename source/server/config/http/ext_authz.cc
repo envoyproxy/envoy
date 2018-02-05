@@ -3,7 +3,7 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/api/v2/filter/http/ext_authz.pb.validate.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/ext_authz/ext_authz_impl.h"
@@ -14,9 +14,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb
-ExtAuthzFilterConfig::createFilter(const envoy::api::v2::filter::http::ExtAuthz& proto_config,
-                                   const std::string&, FactoryContext& context) {
+HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
+    const envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config, const std::string&,
+    FactoryContext& context) {
 
   ASSERT(proto_config.grpc_service().has_envoy_grpc());
   ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty());
@@ -44,7 +44,7 @@ ExtAuthzFilterConfig::createFilter(const envoy::api::v2::filter::http::ExtAuthz&
 HttpFilterFactoryCb ExtAuthzFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                               const std::string& stats_prefix,
                                                               FactoryContext& context) {
-  envoy::api::v2::filter::http::ExtAuthz proto_config;
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config;
   MessageUtil::loadFromJson(json_config.asJsonString(), proto_config);
   return createFilter(proto_config, stats_prefix, context);
 }
@@ -54,7 +54,8 @@ ExtAuthzFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& prot
                                                    const std::string& stats_prefix,
                                                    FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::ExtAuthz&>(proto_config),
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
+          proto_config),
       stats_prefix, context);
 }
 

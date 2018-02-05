@@ -182,6 +182,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_validator_lib",
-        "@envoy_api//envoy/api/v2/filter/http:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )

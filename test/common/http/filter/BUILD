@@ -101,7 +101,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/filter/http:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )
 
