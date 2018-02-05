@@ -232,6 +232,8 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
     return true;
   }
 
+  // lb_local_cluster_not_ok is bumped for "Local host set is not set or it is
+  // panic mode for local cluster".
   if (!host_set.healthyHostsPerLocality().hasLocalLocality() ||
       host_set.healthyHostsPerLocality().get()[0].empty()) {
     stats_.lb_local_cluster_not_ok_.inc();
