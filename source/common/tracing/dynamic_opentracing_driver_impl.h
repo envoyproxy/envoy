@@ -22,7 +22,7 @@ public:
                            const std::string& tracer_config);
 
   // Tracer::OpenTracingDriver
-  const opentracing::Tracer& tracer() const override { return *tracer_; }
+  opentracing::Tracer& tracer() override { return *tracer_; }
 
   PropagationMode propagationMode() const override {
     return OpenTracingDriver::PropagationMode::TracerNative;

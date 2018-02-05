@@ -90,7 +90,7 @@ private:
     TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
                        LightStepDriver& driver, Event::Dispatcher& dispatcher);
 
-    const opentracing::Tracer& tracer() const;
+    opentracing::Tracer& tracer() const;
 
   private:
     void enableTimer();

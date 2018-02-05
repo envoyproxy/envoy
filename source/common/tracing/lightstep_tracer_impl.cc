@@ -160,7 +160,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
   });
 }
 
-const opentracing::Tracer& LightStepDriver::tracer() const {
+opentracing::Tracer& LightStepDriver::tracer() {
   return tls_->getTyped<TlsLightStepTracer>().tracer();
 }
 

@@ -61,8 +61,15 @@ envoy_cc_test(
     srcs = [
         "dynamic_opentracing_driver_impl_test.cc",
     ],
+    data = [
+        "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
+    ],
     deps = [
+        "//source/common/http:header_map_lib",
         "//source/common/tracing:dynamic_opentracing_driver_lib",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:environment_lib",
     ],
 )
