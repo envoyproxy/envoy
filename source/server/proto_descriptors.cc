@@ -13,8 +13,8 @@
 
 namespace Envoy {
 
-// This function verifies that critical descriptors have not changed name. It includes both gRPC
-// services as well as types that are referenced in Any messages.
+// This function validates that the method descriptors for gRPC services and type descriptors that
+// are referenced in Any messages are available in the descriptor pool.
 bool validateProtoDescriptors() {
   bool descriptors_valid = true;
 
