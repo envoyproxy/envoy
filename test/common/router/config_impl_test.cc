@@ -3810,7 +3810,8 @@ virtual_hosts:
   auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
   checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
 
-  const auto& metadata = route->routeEntry()->metadata();
+  auto route_entry = route->routeEntry();
+  const auto& metadata = route_entry->metadata();
 
   EXPECT_EQ("test_value",
             Envoy::Config::Metadata::metadataValue(metadata, "com.bar.foo", "baz").string_value());
