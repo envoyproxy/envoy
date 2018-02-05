@@ -53,8 +53,8 @@ public:
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::api::v2::ConfigSource& cds_config,
-                      const Optional<envoy::api::v2::ConfigSource>& eds_config,
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+                      const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
 
 protected:
@@ -292,7 +292,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
-  Optional<envoy::api::v2::ConfigSource> eds_config_;
+  Optional<envoy::api::v2::core::ConfigSource> eds_config_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;

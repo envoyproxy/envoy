@@ -3,7 +3,7 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/api/v2/filter/http/rate_limit.pb.validate.h"
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -14,9 +14,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb
-RateLimitFilterConfig::createFilter(const envoy::api::v2::filter::http::RateLimit& proto_config,
-                                    const std::string&, FactoryContext& context) {
+HttpFilterFactoryCb RateLimitFilterConfig::createFilter(
+    const envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config, const std::string&,
+    FactoryContext& context) {
   ASSERT(!proto_config.domain().empty());
   Http::RateLimit::FilterConfigSharedPtr filter_config(
       new Http::RateLimit::FilterConfig(proto_config, context.localInfo(), context.scope(),
@@ -32,7 +32,7 @@ RateLimitFilterConfig::createFilter(const envoy::api::v2::filter::http::RateLimi
 HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                                const std::string& stats_prefix,
                                                                FactoryContext& context) {
-  envoy::api::v2::filter::http::RateLimit proto_config;
+  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config;
   Config::FilterJson::translateHttpRateLimitFilter(json_config, proto_config);
   return createFilter(proto_config, stats_prefix, context);
 }
@@ -42,8 +42,8 @@ RateLimitFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& pro
                                                     const std::string& stats_prefix,
                                                     FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::RateLimit&>(
-          proto_config),
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::http::rate_limit::v2::RateLimit&>(proto_config),
       stats_prefix, context);
 }
 

@@ -77,13 +77,13 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
-  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
-  MOCK_CONST_METHOD0(locality, const envoy::api::v2::Locality&());
+  MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -121,7 +121,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
-  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::Metadata&());
+  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(counters, std::list<Stats::CounterSharedPtr>());
   MOCK_CONST_METHOD2(
@@ -143,7 +143,7 @@ public:
   MOCK_METHOD1(weight, void(uint32_t new_weight));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(used, void(bool new_used));
-  MOCK_CONST_METHOD0(locality, const envoy::api::v2::Locality&());
+  MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;

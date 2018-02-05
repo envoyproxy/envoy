@@ -23,7 +23,7 @@ public:
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_);
-  envoy::api::v2::GrpcService grpc_service;
+  envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -38,7 +38,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_);
-  envoy::api::v2::GrpcService grpc_service;
+  envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   EXPECT_CALL(cm_, clusters());
@@ -48,7 +48,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_);
-  envoy::api::v2::GrpcService grpc_service;
+  envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -64,7 +64,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   AsyncClientManagerImpl async_client_manager(cm_, tls_);
-  envoy::api::v2::GrpcService grpc_service;
+  envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
 #ifdef ENVOY_GOOGLE_GRPC

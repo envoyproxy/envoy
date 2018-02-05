@@ -678,8 +678,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::route::VirtualCluster& virtual_cluster) {
-  if (virtual_cluster.method() != envoy::api::v2::RequestMethod::METHOD_UNSPECIFIED) {
-    method_ = envoy::api::v2::RequestMethod_Name(virtual_cluster.method());
+  if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
+    method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
   }
 
   const std::string pattern = virtual_cluster.pattern();

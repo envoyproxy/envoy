@@ -3,7 +3,7 @@
 #include <regex>
 #include <string>
 
-#include "envoy/api/v2/filter/http/squash.pb.h"
+#include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -25,14 +25,15 @@ public:
                                                    FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::Squash()};
+    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::squash::v2::Squash()};
   }
 
   std::string name() override { return Config::HttpFilterNames::get().SQUASH; }
 
 private:
-  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Squash& proto_config,
-                                   FactoryContext& context);
+  HttpFilterFactoryCb
+  createFilter(const envoy::config::filter::http::squash::v2::Squash& proto_config,
+               FactoryContext& context);
 };
 
 } // namespace Configuration

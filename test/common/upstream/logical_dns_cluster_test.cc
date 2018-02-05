@@ -210,7 +210,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ("", data.host_description_->locality().zone());
   EXPECT_EQ("", data.host_description_->locality().sub_zone());
   EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
-  EXPECT_EQ(&envoy::api::v2::Metadata::default_instance(), &data.host_description_->metadata());
+  EXPECT_EQ(&envoy::api::v2::core::Metadata::default_instance(),
+            &data.host_description_->metadata());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
   data.host_description_->healthChecker().setUnhealthy();
 

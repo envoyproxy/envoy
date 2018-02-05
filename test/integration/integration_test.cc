@@ -34,6 +34,8 @@ TEST_P(IntegrationTest, RouterRedirect) { testRouterRedirect(); }
 
 TEST_P(IntegrationTest, RouterDirectResponse) { testRouterDirectResponse(); }
 
+TEST_P(IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
+
 TEST_P(IntegrationTest, DrainClose) { testDrainClose(); }
 
 TEST_P(IntegrationTest, ConnectionClose) {
@@ -180,7 +182,8 @@ TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
-void setRouteUsingWebsocket(envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+void setRouteUsingWebsocket(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
   auto route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
   route->mutable_match()->set_prefix("/websocket/test");
   route->mutable_route()->set_prefix_rewrite("/websocket");
