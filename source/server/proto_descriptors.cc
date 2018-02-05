@@ -16,7 +16,6 @@ namespace Envoy {
 // This function validates that the method descriptors for gRPC services and type descriptors that
 // are referenced in Any messages are available in the descriptor pool.
 bool validateProtoDescriptors() {
-  bool descriptors_valid = true;
 
   // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
   // TODO(kuat): Remove explicit proto descriptor import.
@@ -42,8 +41,7 @@ bool validateProtoDescriptors() {
 
   for (const auto& method : methods) {
     if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
-      descriptors_valid = false;
-      break;
+      return false;
     }
   }
 
@@ -56,9 +54,9 @@ bool validateProtoDescriptors() {
 
   for (const auto& type : types) {
     if (Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) == nullptr) {
-      descriptors_valid = false;
+      return false;
     }
   }
-  return descriptors_valid;
+  return true;
 };
 } // namespace Envoy

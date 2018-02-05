@@ -11,6 +11,7 @@
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
+#include "server/proto_descriptors.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
 
@@ -41,8 +42,6 @@ public:
 };
 
 } // namespace Server
-
-bool validateProtoDescriptors();
 
 int main_common(OptionsImpl& options) {
   Stats::RawStatData::configure(options);

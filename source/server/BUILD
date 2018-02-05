@@ -216,6 +216,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "proto_descriptors_lib",
     srcs = ["proto_descriptors.cc"],
+    hdrs = ["proto_descriptors.h"],
     deps = [
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
