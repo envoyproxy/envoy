@@ -47,7 +47,7 @@ protected:
   // GzipFilterTest Helpers
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::http::Gzip gzip;
+    envoy::config::filter::http::gzip::v2::Gzip gzip;
     Config::FilterJson::translateGzipFilter(*config, gzip);
     config_.reset(new GzipFilterConfig(gzip));
     filter_.reset(new GzipFilter(config_));
@@ -98,7 +98,7 @@ protected:
 
   void gzipFilterBadConfigHelper(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::api::v2::filter::http::Gzip gzip;
+    envoy::config::filter::http::gzip::v2::Gzip gzip;
     EXPECT_THROW(Config::FilterJson::translateGzipFilter(*config, gzip), EnvoyException);
   }
 
@@ -117,6 +117,7 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(30, config_->minimumLength());
   EXPECT_EQ(28, config_->windowBits());
   EXPECT_EQ(false, config_->disableOnEtagHeader());
+  EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
@@ -610,6 +611,23 @@ TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("accept-encoding", headers.get_("vary"));
+}
+
+// Verify removeAcceptEncoding header.
+TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    setUpFilter("{}");
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, gzip, br", headers.get_("accept-encoding"));
+  }
 }
 
 } // namespace Http

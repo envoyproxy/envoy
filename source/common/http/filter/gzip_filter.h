@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
@@ -11,8 +12,6 @@
 #include "common/json/json_validator.h"
 #include "common/protobuf/protobuf.h"
 
-#include "envoy/api/v2/filter/http/gzip.pb.h"
-
 namespace Envoy {
 namespace Http {
 
@@ -21,7 +20,7 @@ namespace Http {
  */
 class GzipFilterConfig {
 public:
-  GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip);
+  GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
     return compression_level_;
@@ -31,15 +30,16 @@ public:
   }
   const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
+  bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
   uint64_t memoryLevel() const { return memory_level_; }
   uint64_t minimumLength() const { return content_length_; }
   uint64_t windowBits() const { return window_bits_; }
 
 private:
-  static Compressor::ZlibCompressorImpl::CompressionLevel
-  compressionLevelEnum(envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum compression_level);
+  static Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
+      envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level);
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
-      envoy::api::v2::filter::http::Gzip_CompressionStrategy compression_strategy);
+      envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
   static std::unordered_set<std::string>
   contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
@@ -55,7 +55,9 @@ private:
   int32_t window_bits_;
 
   std::unordered_set<std::string> content_type_values_;
+
   bool disable_on_etag_header_;
+  bool remove_accept_encoding_header_;
 };
 
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;

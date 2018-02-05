@@ -1110,7 +1110,8 @@ const char Json::Schema::GZIP_HTTP_FILTER_SCHEMA[] = R"EOF(
           "type": "string"
         }
       },
-      "disable_on_etag_header" : {"type" : "boolean"}
+      "disable_on_etag_header" : {"type" : "boolean"},
+      "remove_accept_encoding_header" : {"type" : "boolean"}
     },
     "additionalProperties" : false
   }

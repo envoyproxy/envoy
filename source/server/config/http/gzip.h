@@ -1,10 +1,9 @@
 #pragma once
 
+#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-
-#include "envoy/api/v2/filter/http/gzip.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -23,13 +22,13 @@ public:
                                                    FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::http::Gzip()};
+    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::gzip::v2::Gzip()};
   }
 
   std::string name() override { return Config::HttpFilterNames::get().ENVOY_GZIP; }
 
 private:
-  HttpFilterFactoryCb createFilter(const envoy::api::v2::filter::http::Gzip& gzip);
+  HttpFilterFactoryCb createFilter(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
 };
 
 } // namespace Configuration

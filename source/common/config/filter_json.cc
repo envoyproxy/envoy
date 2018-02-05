@@ -431,10 +431,12 @@ void FilterJson::translateClientSslAuthFilter(
 }
 
 void FilterJson::translateGzipFilter(const Json::Object& json_config,
-                                     envoy::api::v2::filter::http::Gzip& proto_config) {
+                                     envoy::config::filter::http::gzip::v2::Gzip& proto_config) {
   json_config.validateSchema(Json::Schema::GZIP_HTTP_FILTER_SCHEMA);
 
   proto_config.set_disable_on_etag_header(json_config.getBoolean("disable_on_etag_header", false));
+  proto_config.set_remove_accept_encoding_header(
+      json_config.getBoolean("remove_accept_encoding_header", false));
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, content_length);
   JSON_UTIL_SET_INTEGER(json_config, proto_config, memory_level);
@@ -445,11 +447,11 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
     *content_type = json_content_type;
   }
 
-  static const NameAndEnum<envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum> levels_map[] =
-      {
-          {"default", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_DEFAULT},
-          {"best", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_BEST},
-          {"speed", envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum_SPEED},
+  static const NameAndEnum<envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum>
+      levels_map[] = {
+          {"default", envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum_DEFAULT},
+          {"best", envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum_BEST},
+          {"speed", envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum_SPEED},
       };
 
   const auto json_compression_level = json_config.getString("compression_level", "default");
@@ -460,12 +462,12 @@ void FilterJson::translateGzipFilter(const Json::Object& json_config,
     }
   }
 
-  static const NameAndEnum<envoy::api::v2::filter::http::Gzip_CompressionStrategy>
+  static const NameAndEnum<envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy>
       strategies_map[] = {
-          {"default", envoy::api::v2::filter::http::Gzip_CompressionStrategy_DEFAULT},
-          {"filtered", envoy::api::v2::filter::http::Gzip_CompressionStrategy_FILTERED},
-          {"huffman", envoy::api::v2::filter::http::Gzip_CompressionStrategy_HUFFMAN},
-          {"rle", envoy::api::v2::filter::http::Gzip_CompressionStrategy_RLE},
+          {"default", envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy_DEFAULT},
+          {"filtered", envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy_FILTERED},
+          {"huffman", envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy_HUFFMAN},
+          {"rle", envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy_RLE},
       };
 
   const auto json_compression_strategy = json_config.getString("compression_strategy", "default");

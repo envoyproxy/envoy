@@ -81,7 +81,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/filter/http:gzip_cc",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
     ],
 )
 

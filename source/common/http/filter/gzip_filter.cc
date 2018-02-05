@@ -34,21 +34,24 @@ const std::unordered_set<std::string> defaultContentEncoding() {
 }
 } // namespace
 
-GzipFilterConfig::GzipFilterConfig(const envoy::api::v2::filter::http::Gzip& gzip)
+GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       content_length_(contentLengthUint(gzip.content_length().value())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
-      disable_on_etag_header_(gzip.disable_on_etag_header()) {}
+      disable_on_etag_header_(gzip.disable_on_etag_header()),
+      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()) {}
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
-    envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum compression_level) {
+    envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level) {
   switch (compression_level) {
-  case envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum::Gzip_CompressionLevel_Enum_BEST:
+  case envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum::
+      Gzip_CompressionLevel_Enum_BEST:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
-  case envoy::api::v2::filter::http::Gzip_CompressionLevel_Enum::Gzip_CompressionLevel_Enum_SPEED:
+  case envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum::
+      Gzip_CompressionLevel_Enum_SPEED:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
   default:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
@@ -56,13 +59,16 @@ Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLe
 }
 
 Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressionStrategyEnum(
-    envoy::api::v2::filter::http::Gzip_CompressionStrategy compression_strategy) {
+    envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy) {
   switch (compression_strategy) {
-  case envoy::api::v2::filter::http::Gzip_CompressionStrategy::Gzip_CompressionStrategy_RLE:
+  case envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy::
+      Gzip_CompressionStrategy_RLE:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
-  case envoy::api::v2::filter::http::Gzip_CompressionStrategy::Gzip_CompressionStrategy_FILTERED:
+  case envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy::
+      Gzip_CompressionStrategy_FILTERED:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
-  case envoy::api::v2::filter::http::Gzip_CompressionStrategy::Gzip_CompressionStrategy_HUFFMAN:
+  case envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy::
+      Gzip_CompressionStrategy_HUFFMAN:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
   default:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
@@ -92,7 +98,12 @@ GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
 
 FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
-  skip_compression_ = !isAcceptEncodingAllowed(headers);
+  if (isAcceptEncodingAllowed(headers)) {
+    skip_compression_ = false;
+    if (config_->removeAcceptEncodingHeader()) {
+      headers.removeAcceptEncoding();
+    }
+  }
   return FilterHeadersStatus::Continue;
 }
 
