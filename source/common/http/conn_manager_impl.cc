@@ -64,9 +64,11 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()) {}
 
-const std::unique_ptr<const Http::HeaderMap> ConnectionManagerImpl::CONTINUE_HEADER{
-    new Http::HeaderMapImpl{
-        {Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}}};
+const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
+  CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
+                         Http::HeaderMapImpl{{Http::Headers::get().Status,
+                                              std::to_string(enumToInt(Code::Continue))}});
+}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -458,8 +460,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
-    chargeStats(*CONTINUE_HEADER);
-    response_encoder_->encode100ContinueHeaders(*CONTINUE_HEADER);
+    chargeStats(continueHeader());
+    response_encoder_->encode100ContinueHeaders(continueHeader());
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(
@@ -811,7 +813,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     }
   }
 
-  // Stip the T-E headers etc. Defer other header additions as well as drain-close logic to the
+  // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
 

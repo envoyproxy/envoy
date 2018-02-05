@@ -382,16 +382,17 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
         stream->waiting_for_non_informational_headers_ = true;
       }
 
-      FALLTHRU;
-    }
-
-    case NGHTTP2_HCAT_REQUEST: {
-      if (stream->headers_->Status() && stream->headers_->Status()->value() == "100") {
+      if (stream->headers_->Status()->value() == "100") {
         ASSERT(!stream->remote_end_stream_);
         stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
       } else {
         stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
       }
+      break;
+    }
+
+    case NGHTTP2_HCAT_REQUEST: {
+      stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
       break;
     }
 

@@ -307,7 +307,7 @@ public:
                                  ConnectionManagerTracingStats& tracing_stats);
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
-  static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
+  static const HeaderMapImpl& continueHeader();
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -605,7 +605,7 @@ private:
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
     HeaderMapPtr response_trailers_{};
-    HeaderMapPtr request_headers_{};
+    HeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
