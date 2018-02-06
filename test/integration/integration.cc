@@ -232,7 +232,7 @@ void BaseIntegrationTest::createEnvoy() {
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
 
   std::vector<std::string> named_ports;
-  const auto static_resources = config_helper_.bootstrap().static_resources();
+  const auto& static_resources = config_helper_.bootstrap().static_resources();
   for (int i = 0; i < static_resources.listeners_size(); ++i) {
     named_ports.push_back(static_resources.listeners(i).name());
   }

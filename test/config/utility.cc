@@ -299,7 +299,7 @@ void ConfigHelper::addSslConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 }
 
-void ConfigHelper::renameListener(const char* name) {
+void ConfigHelper::renameListener(const std::string& name) {
   auto* static_resources = bootstrap_.mutable_static_resources();
   if (static_resources->listeners_size() > 0) {
     static_resources->mutable_listeners(0)->set_name(name);
