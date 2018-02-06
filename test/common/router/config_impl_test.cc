@@ -3776,9 +3776,9 @@ virtual_hosts:
 void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
                              PathMatchType expected_type) {
   ASSERT_NE(nullptr, route);
-  auto route_entry = route->routeEntry();
+  const auto route_entry = route->routeEntry();
   ASSERT_NE(nullptr, route_entry);
-  auto& match_criterion = route_entry->pathMatchCriterion();
+  const auto& match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ(expected_matcher, match_criterion.matcher());
   EXPECT_EQ(expected_type, match_criterion.matchType());
 }
@@ -3801,16 +3801,16 @@ virtual_hosts:
 
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
 
   checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/regex", "GET"), 0).get(),
                           "/rege[xy]", PathMatchType::Regex);
   checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/exact-path", "GET"), 0).get(),
                           "/exact-path", PathMatchType::Exact);
-  auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+  const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
   checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
 
-  auto route_entry = route->routeEntry();
+  const auto route_entry = route->routeEntry();
   const auto& metadata = route_entry->metadata();
 
   EXPECT_EQ("test_value",
