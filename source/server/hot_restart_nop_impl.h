@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/server/hot_restart.h"
+
 #include "common/common/thread.h"
 
 namespace Envoy {
@@ -28,7 +29,7 @@ public:
   void shutdown() override {}
   std::string version() override { return "disabled"; }
 
- private:
+private:
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::HeapRawStatDataAllocator stats_allocator_;

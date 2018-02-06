@@ -1,3 +1,5 @@
+#include "exe/main_common.h"
+
 #include <iostream>
 #include <memory>
 
@@ -5,8 +7,6 @@
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
-
-#include "exe/main_common.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
@@ -25,19 +25,18 @@ namespace Envoy {
 
 Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instance& server) {
   return Server::DrainManagerPtr{
-    // The global drain manager only triggers on listener modification, which effectively is
-    // hot restart at the global level. The per-listener drain managers decide whether to
-    // to include /healthcheck/fail status.
-    new Server::DrainManagerImpl(server, envoy::api::v2::Listener_DrainType_MODIFY_ONLY)};
+      // The global drain manager only triggers on listener modification, which effectively is
+      // hot restart at the global level. The per-listener drain managers decide whether to
+      // to include /healthcheck/fail status.
+      new Server::DrainManagerImpl(server, envoy::api::v2::Listener_DrainType_MODIFY_ONLY)};
 }
 
-Runtime::LoaderPtr ProdComponentFactory::createRuntime(
-    Server::Instance& server, Server::Configuration::Initial& config) {
+Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
+                                                       Server::Configuration::Initial& config) {
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart)
-    : options_(options) {
+MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
 
 #ifdef ENVOY_HOT_RESTART
   if (hot_restart) {
@@ -72,18 +71,15 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart)
                                          *stats_store_, access_log_lock, component_factory_, tls_));
 }
 
-MainCommonBase::~MainCommonBase() {
-  ares_library_cleanup();
-}
+MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 MainCommon::MainCommon(int argc, const char** argv, bool hot_restart)
-    : options_(computeOptions(argc, argv, hot_restart)),
-      base_(*options_, hot_restart) {
-}
+    : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}
 
 OptionsImpl* MainCommon::computeOptions(int argc, const char** argv, bool hot_restart) {
-  OptionsImpl::HotRestartVersionCb hot_restart_version_cb =
-      [](uint64_t, uint64_t) { return "disabled"; };
+  OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
+    return "disabled";
+  };
 
 #ifdef ENVOY_HOT_RESTART
   if (hot_restart) {
@@ -96,13 +92,14 @@ OptionsImpl* MainCommon::computeOptions(int argc, const char** argv, bool hot_re
   // Hot-restart should not be specified if the support is not compiled in.
   RELEASE_ASSERT(!hot_restart);
 #endif
-  return new OptionsImpl(argc, const_cast<char**>(argv), hot_restart_version_cb, spdlog::level::info);
+  return new OptionsImpl(argc, const_cast<char**>(argv), hot_restart_version_cb,
+                         spdlog::level::info);
 }
 
 // Legacy implementation of main_common.
 //
-// TODO(jmarantz): Remove this when all callers are removed.  At that time, MainCommonBase
-// and MainCommon can be merged.  The current theory is that only Google calls this.
+// TODO(jmarantz): Remove this when all callers are removed. At that time, MainCommonBase
+// and MainCommon can be merged. The current theory is that only Google calls this.
 int main_common(OptionsImpl& options) {
 #if ENVOY_HOT_RESTART
   MainCommonBase main_common(options, true);

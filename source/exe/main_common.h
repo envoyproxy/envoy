@@ -21,13 +21,13 @@ public:
 };
 
 class MainCommonBase {
- public:
+public:
   MainCommonBase(OptionsImpl& options, bool hot_restart);
   ~MainCommonBase();
 
   void run() { server_->run(); }
 
- protected:
+protected:
   Envoy::OptionsImpl& options_;
   ProdComponentFactory component_factory_;
   ThreadLocal::InstanceImpl tls_;
@@ -38,11 +38,11 @@ class MainCommonBase {
 };
 
 class MainCommon {
- public:
+public:
   MainCommon(int argc, const char** argv, bool hot_restart);
   void run() { base_.run(); }
 
- private:
+private:
   static Envoy::OptionsImpl* computeOptions(int argc, const char** argv, bool hot_restart);
 
 #ifdef ENVOY_HANDLE_SIGNALS
