@@ -1032,6 +1032,58 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) 
   file_ready_cb_(Event::FileReadyType::Write);
 }
 
+// Test that if end_stream is raised, but a filter stops iteration, that end_stream
+// propagates correctly.
+TEST_F(MockTransportConnectionImplTest, ReadEndStreamStopIteration) {
+  const std::string val("a");
+  std::shared_ptr<MockReadFilter> read_filter1(new StrictMock<MockReadFilter>());
+  std::shared_ptr<MockReadFilter> read_filter2(new StrictMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter1);
+  connection_->addReadFilter(read_filter2);
+
+  EXPECT_CALL(*read_filter1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([val](Buffer::Instance& buffer) -> IoResult {
+        buffer.add(val.c_str(), val.size());
+        return {PostIoAction::KeepOpen, val.size(), true};
+      }));
+
+  EXPECT_CALL(*read_filter1, onData(BufferStringEqual(val), true))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  EXPECT_CALL(*read_filter2, onData(BufferStringEqual(val), true))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  read_filter1->callbacks_->continueReading();
+}
+
+// Test that if end_stream is written, but a filter stops iteration, that end_stream
+// propagates correctly.
+TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
+  const std::string val("a");
+  std::shared_ptr<MockWriteFilter> write_filter1(new StrictMock<MockWriteFilter>());
+  std::shared_ptr<MockWriteFilter> write_filter2(new StrictMock<MockWriteFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addWriteFilter(write_filter1);
+  connection_->addWriteFilter(write_filter2);
+
+  // EXPECT_CALL(*write_filter1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  // EXPECT_CALL(*write_filter2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*write_filter1, onWrite(BufferStringEqual(val), true))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  Buffer::OwnedImpl buffer(val);
+  connection_->write(buffer, true);
+
+  EXPECT_CALL(*write_filter1, onWrite(BufferStringEqual(val), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*write_filter2, onWrite(BufferStringEqual(val), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write));
+  connection_->write(buffer, true);
+}
+
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
