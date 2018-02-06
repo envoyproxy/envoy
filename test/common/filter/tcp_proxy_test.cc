@@ -947,7 +947,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   // Send some bytes; no timeout configured so this should be a no-op (not a crash).
   Buffer::OwnedImpl buffer("a");
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
-  upstream_connections_.at(0)->write(buffer, true);
+  upstream_read_filter_->onData(buffer, false);
 }
 
 class TcpProxyRoutingTest : public testing::Test {
