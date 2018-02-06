@@ -241,6 +241,7 @@ void TcpProxyIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_s
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
   ssl_client->addConnectionCallbacks(connect_callbacks);
+  ssl_client->enableHalfClose(true);
   ssl_client->connect();
   while (!connect_callbacks.connected()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
