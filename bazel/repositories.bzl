@@ -141,6 +141,8 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
         environ = [
             "CC",
             "CXX",
+            "CFLAGS",
+            "CXXFLAGS",
             "LD_LIBRARY_PATH"
         ],
         # Don't pretend we're in the sandbox, we do some evil stuff with envoy_dep_cache.
