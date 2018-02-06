@@ -810,6 +810,14 @@ public:
 
   ~MockTransportConnectionImplTest() { connection_->close(ConnectionCloseType::NoFlush); }
 
+  // This may be invoked for doWrite() on the transport to simulate all the data
+  // being written.
+  static IoResult SimulateSuccessfulWrite(Buffer::Instance& buffer, bool) {
+    uint64_t size = buffer.length();
+    buffer.drain(size);
+    return {PostIoAction::KeepOpen, size, false};
+  }
+
   std::unique_ptr<ConnectionImpl> connection_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockConnectionCallbacks> callbacks_;
@@ -899,6 +907,32 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
   EXPECT_EQ(connection_->state(), Connection::State::Closed);
 }
 
+// Test that onWrite does not have end_stream set, with half-close disabled
+TEST_F(MockTransportConnectionImplTest, FullCloseWrite) {
+  const std::string val("some data");
+  Buffer::OwnedImpl buffer(val);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Invoke(SimulateSuccessfulWrite));
+  connection_->write(buffer, false);
+}
+
+// Test that onWrite has end_stream set correctly, with half-close enabled
+TEST_F(MockTransportConnectionImplTest, HalfCloseWrite) {
+  connection_->enableHalfClose(true);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write))
+      .WillRepeatedly(Invoke(file_ready_cb_));
+
+  const std::string val("some data");
+  Buffer::OwnedImpl buffer(val);
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Invoke(SimulateSuccessfulWrite));
+  connection_->write(buffer, false);
+
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).WillOnce(Invoke(SimulateSuccessfulWrite));
+  connection_->write(buffer, true);
+}
+
 TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
@@ -967,12 +1001,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst)
   file_ready_cb_(Event::FileReadyType::Read);
 
   EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::LocalClose));
-  EXPECT_CALL(*transport_socket_, doWrite(_, true))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool) -> IoResult {
-        uint64_t len = data.length();
-        data.drain(len);
-        return {PostIoAction::KeepOpen, len, false};
-      }));
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).WillOnce(Invoke(SimulateSuccessfulWrite));
   file_ready_cb_(Event::FileReadyType::Write);
 }
 
