@@ -214,6 +214,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "proto_descriptors_lib",
+    srcs = ["proto_descriptors.cc"],
+    hdrs = ["proto_descriptors.h"],
+    deps = [
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/service/accesslog/v2:als_cc",
+        "@envoy_api//envoy/service/discovery/v2:ads_cc",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
