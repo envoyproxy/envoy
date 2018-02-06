@@ -282,7 +282,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
   //    "INVALID_JSON\n"
   //    "^"
   // If Envoy does a short read of the upstream connection, it may only read part of the
-  // string "INVALID_JSON".  Envoy will note "Unexpected token [whatever substring is read]
+  // string "INVALID_JSON". Envoy will note "Unexpected token [whatever substring is read]
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
       R"(INVALID_JSON)", {}, {}, Status(),
