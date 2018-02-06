@@ -77,6 +77,7 @@ public:
     decoded_grpc_frames_.erase(decoded_grpc_frames_.begin());
   }
   template <class T> void waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message) {
+    ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
       decodeGrpcFrame(message);
       return;
@@ -94,6 +95,7 @@ public:
       }
     }
     decodeGrpcFrame(message);
+    ENVOY_LOG(debug, "Received gRPC message: {}", message.DebugString());
   }
 
   // Http::StreamDecoder
