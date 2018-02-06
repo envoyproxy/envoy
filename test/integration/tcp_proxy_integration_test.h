@@ -4,7 +4,6 @@
 #include <string>
 
 #include "test/integration/integration.h"
-
 #include "test/mocks/runtime/mocks.h"
 
 #include "gtest/gtest.h"
