@@ -291,6 +291,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Matchable,
                            public DirectResponseEntry,
                            public Route,
+                           public PathMatchCriterion,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
   /**
@@ -335,6 +336,7 @@ public:
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -409,6 +411,9 @@ private:
       return parent_->includeVirtualHostRateLimits();
     }
     const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
+    const PathMatchCriterion& pathMatchCriterion() const override {
+      return parent_->pathMatchCriterion();
+    }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -513,6 +518,10 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const RequestInfo::RequestInfo& request_info) const override;
 
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return prefix_; }
+  PathMatchType matchType() const override { return PathMatchType::Prefix; }
+
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
@@ -531,6 +540,10 @@ public:
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const RequestInfo::RequestInfo& request_info) const override;
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return path_; }
+  PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
@@ -551,11 +564,16 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers,
                               const RequestInfo::RequestInfo& request_info) const override;
 
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return regex_str_; }
+  PathMatchType matchType() const override { return PathMatchType::Regex; }
+
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::regex regex_;
+  const std::string regex_str_;
 };
 
 /**

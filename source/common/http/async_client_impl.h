@@ -151,6 +151,11 @@ private:
     static const NullConfig route_configuration_;
   };
 
+  struct NullPathMatchCriterion : public Router::PathMatchCriterion {
+    Router::PathMatchType matchType() const override { return Router::PathMatchType::None; }
+    const std::string& matcher() const override { return EMPTY_STRING; }
+  };
+
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
                    const Optional<std::chrono::milliseconds>& timeout)
@@ -191,6 +196,9 @@ private:
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+    const Router::PathMatchCriterion& pathMatchCriterion() const override {
+      return path_match_criterion_;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -198,6 +206,7 @@ private:
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
     static const envoy::api::v2::core::Metadata metadata_;
+    static const NullPathMatchCriterion path_match_criterion_;
 
     const std::string& cluster_name_;
     Optional<std::chrono::milliseconds> timeout_;
