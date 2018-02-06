@@ -24,10 +24,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 void TcpProxyIntegrationTest::initialize() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto static_resources = bootstrap.mutable_static_resources();
-    static_resources->mutable_listeners(0)->set_name("tcp_proxy");
-  });
+  config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
 

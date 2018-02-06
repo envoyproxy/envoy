@@ -160,13 +160,8 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto static_resources = bootstrap.mutable_static_resources();
-    // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
-    if (static_resources->listeners_size() > 0) {
-      static_resources->mutable_listeners(0)->set_name("http");
-    }
-  });
+  // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
+  config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
