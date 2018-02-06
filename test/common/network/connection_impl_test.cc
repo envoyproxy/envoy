@@ -983,6 +983,10 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) 
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
 
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  file_ready_cb_(Event::FileReadyType::Read);
+
   Buffer::OwnedImpl buffer("data");
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
@@ -995,12 +999,8 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) 
         data.drain(len);
         return {PostIoAction::KeepOpen, len, false};
       }));
+  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::LocalClose));
   file_ready_cb_(Event::FileReadyType::Write);
-
-  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::RemoteClose));
-  EXPECT_CALL(*transport_socket_, doRead(_))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
-  file_ready_cb_(Event::FileReadyType::Read);
 }
 
 class MockTransportConnectionImplDeathTest : public MockTransportConnectionImplTest {};
