@@ -33,8 +33,8 @@ struct ConstantValues {
 
 typedef ConstSingleton<ConstantValues> Constants;
 
-// TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
-// This will require support for more than one outstanding request per client.
+// NOTE: We create gRPC client for each filter stack instead of a client per thread.
+// That is ok since this is unary RPC and the cost of doing this is minimal.
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
@@ -75,7 +75,7 @@ public:
    * createHttpCheck is used to extract the attributes from the stream and the http headers
    * and fill them up in the CheckRequest proto message.
    * @param callbacks supplies the Http stream context from which data can be extracted.
-   * @param headers supplies the heeader map with http headers that will be used to create the
+   * @param headers supplies the header map with http headers that will be used to create the
    *        check request.
    * @param request is the reference to the check request that will be filled up.
    *
@@ -87,7 +87,7 @@ public:
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
    * in the CheckRequest proto message.
-   * @param callbacks supplies the networklayer context from which data can be extracted.
+   * @param callbacks supplies the network layer context from which data can be extracted.
    * @param request is the reference to the check request that will be filled up.
    *
    */

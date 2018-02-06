@@ -72,33 +72,31 @@ void CreateCheckRequest::setAttrContextPeer(envoy::service::auth::v2::AttributeC
 
   // Set the address
   auto addr = peer.mutable_address();
-  if (!local) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
-  } else {
+  if (local) {
     Envoy::Network::Utility::addressToProtobufAddress(*connection.localAddress(), *addr);
+  } else {
+    Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
   }
 
   // Set the principal
   // Preferably the SAN from the peer's cert or
   // Subject from the peer's cert.
-  std::string principal;
   Ssl::Connection* ssl = const_cast<Ssl::Connection*>(connection.ssl());
   if (ssl != nullptr) {
-    if (!local) {
-      principal = ssl->uriSanPeerCertificate();
+    if (local) {
+      peer.set_principal(ssl->uriSanLocalCertificate());
 
-      if (principal.empty()) {
-        principal = ssl->subjectPeerCertificate();
+      if (peer.principal().empty()) {
+        peer.set_principal(ssl->subjectLocalCertificate());
       }
     } else {
-      principal = ssl->uriSanLocalCertificate();
+      peer.set_principal(ssl->uriSanPeerCertificate());
 
-      if (principal.empty()) {
-        principal = ssl->subjectLocalCertificate();
+      if (peer.principal().empty()) {
+        peer.set_principal(ssl->subjectPeerCertificate());
       }
     }
   }
-  peer.set_principal(principal);
 
   if (!service.empty()) {
     peer.set_service(service);
@@ -170,7 +168,7 @@ void CreateCheckRequest::createHttpCheck(const Envoy::Http::StreamDecoderFilterC
   Envoy::Http::StreamDecoderFilterCallbacks* cb =
       const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
 
-  std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
+  const std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
 
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
