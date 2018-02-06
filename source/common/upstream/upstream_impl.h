@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -37,14 +37,14 @@
 namespace Envoy {
 namespace Upstream {
 
-// Wrapper around envoy::api::v2::Locality to make it easier to compare for ordering in std::map and
-// in tests to construct literals.
+// Wrapper around envoy::api::v2::core::Locality to make it easier to compare for ordering in
+// std::map and in tests to construct literals.
 // TODO(htuch): Consider making this reference based when we have a single string implementation.
 class Locality : public std::tuple<std::string, std::string, std::string> {
 public:
   Locality(const std::string& region, const std::string& zone, const std::string& sub_zone)
       : std::tuple<std::string, std::string, std::string>(region, zone, sub_zone) {}
-  Locality(const envoy::api::v2::Locality& locality)
+  Locality(const envoy::api::v2::core::Locality& locality)
       : std::tuple<std::string, std::string, std::string>(locality.region(), locality.zone(),
                                                           locality.sub_zone()) {}
   bool empty() const {
@@ -68,8 +68,8 @@ class HostDescriptionImpl : virtual public HostDescription {
 public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                       Network::Address::InstanceConstSharedPtr dest_address,
-                      const envoy::api::v2::Metadata& metadata,
-                      const envoy::api::v2::Locality& locality)
+                      const envoy::api::v2::core::Metadata& metadata,
+                      const envoy::api::v2::core::Locality& locality)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -80,7 +80,7 @@ public:
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
-  const envoy::api::v2::Metadata& metadata() const override { return metadata_; }
+  const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
   const ClusterInfo& cluster() const override { return *cluster_; }
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
@@ -103,15 +103,15 @@ public:
   const HostStats& stats() const override { return stats_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const envoy::api::v2::Locality& locality() const override { return locality_; }
+  const envoy::api::v2::core::Locality& locality() const override { return locality_; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   const bool canary_;
-  const envoy::api::v2::Metadata metadata_;
-  const envoy::api::v2::Locality locality_;
+  const envoy::api::v2::core::Metadata metadata_;
+  const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
@@ -127,8 +127,8 @@ class HostImpl : public HostDescriptionImpl,
 public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,
-           const envoy::api::v2::Metadata& metadata, uint32_t initial_weight,
-           const envoy::api::v2::Locality& locality)
+           const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
+           const envoy::api::v2::core::Locality& locality)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality), used_(true) {
     weight(initial_weight);
   }
@@ -328,7 +328,7 @@ public:
     return source_address_;
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
-  const envoy::api::v2::Metadata& metadata() const override { return metadata_; }
+  const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
 
   // Server::Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
@@ -339,7 +339,7 @@ private:
                      const std::string& cluster_name);
     ResourceManagerImplPtr load(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
                                 const std::string& cluster_name,
-                                const envoy::api::v2::RoutingPriority& priority);
+                                const envoy::api::v2::core::RoutingPriority& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
 
@@ -369,7 +369,7 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
-  const envoy::api::v2::Metadata metadata_;
+  const envoy::api::v2::core::Metadata metadata_;
 };
 
 /**

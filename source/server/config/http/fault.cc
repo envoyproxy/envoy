@@ -1,6 +1,6 @@
 #include "server/config/http/fault.h"
 
-#include "envoy/api/v2/filter/http/fault.pb.validate.h"
+#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -11,7 +11,7 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb
-FaultFilterConfig::createFilter(const envoy::api::v2::filter::http::HTTPFault& config,
+FaultFilterConfig::createFilter(const envoy::config::filter::http::fault::v2::HTTPFault& config,
                                 const std::string& stats_prefix, FactoryContext& context) {
   Http::FaultFilterConfigSharedPtr filter_config(
       new Http::FaultFilterConfig(config, context.runtime(), stats_prefix, context.scope()));
@@ -24,7 +24,7 @@ FaultFilterConfig::createFilter(const envoy::api::v2::filter::http::HTTPFault& c
 HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(const Json::Object& json_config,
                                                            const std::string& stats_prefix,
                                                            FactoryContext& context) {
-  envoy::api::v2::filter::http::HTTPFault proto_config;
+  envoy::config::filter::http::fault::v2::HTTPFault proto_config;
   Config::FilterJson::translateFaultFilter(json_config, proto_config);
   return createFilter(proto_config, stats_prefix, context);
 }
@@ -34,7 +34,7 @@ FaultFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_c
                                                 const std::string& stats_prefix,
                                                 FactoryContext& context) {
   return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::filter::http::HTTPFault&>(
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::fault::v2::HTTPFault&>(
           proto_config),
       stats_prefix, context);
 }

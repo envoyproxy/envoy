@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/filter/network/tcp_proxy.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -21,15 +21,16 @@ public:
                                              FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::unique_ptr<envoy::api::v2::filter::network::TcpProxy>(
-        new envoy::api::v2::filter::network::TcpProxy());
+    return std::unique_ptr<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+        new envoy::config::filter::network::tcp_proxy::v2::TcpProxy());
   }
 
   std::string name() override { return Config::NetworkFilterNames::get().TCP_PROXY; }
 
 private:
-  NetworkFilterFactoryCb createFilter(const envoy::api::v2::filter::network::TcpProxy& proto_config,
-                                      FactoryContext& context);
+  NetworkFilterFactoryCb
+  createFilter(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
+               FactoryContext& context);
 };
 
 } // namespace Configuration

@@ -74,7 +74,8 @@ public:
   /**
    * @return the resource priority parsed from proto.
    */
-  static Upstream::ResourcePriority parsePriority(const envoy::api::v2::RoutingPriority& priority);
+  static Upstream::ResourcePriority
+  parsePriority(const envoy::api::v2::core::RoutingPriority& priority);
 
   /**
    * See if the headers specified in the config are present in a request.

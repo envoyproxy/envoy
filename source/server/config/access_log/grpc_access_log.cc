@@ -1,7 +1,7 @@
 #include "server/config/access_log/grpc_access_log.h"
 
-#include "envoy/api/v2/filter/accesslog/accesslog.pb.validate.h"
 #include "envoy/config/accesslog/v2/als.pb.validate.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
@@ -55,7 +55,7 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual const envoy::api::v2::Metadata& metadata() const PURE;
+  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
    * @return the cluster the host is a member of.
@@ -92,7 +92,7 @@ public:
    * @return the locality of the host (deployment specific). This will be the default instance if
    *         unknown.
    */
-  virtual const envoy::api::v2::Locality& locality() const PURE;
+  virtual const envoy::api::v2::core::Locality& locality() const PURE;
 };
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;

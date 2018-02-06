@@ -24,9 +24,9 @@ public:
    * Creates a socket.
    * @param address supplies the socket's address.
    * @param bind_to_port supplies whether to actually bind the socket.
-   * @return Network::ListenSocketSharedPtr an initialized and potentially bound socket.
+   * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
-  virtual Network::ListenSocketSharedPtr
+  virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address, bool bind_to_port) PURE;
 
   /**
@@ -47,7 +47,7 @@ public:
    */
   virtual std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-      Configuration::FactoryContext& context) PURE;
+      Configuration::ListenerFactoryContext& context) PURE;
 
   /**
    * @return DrainManagerPtr a new drain manager.

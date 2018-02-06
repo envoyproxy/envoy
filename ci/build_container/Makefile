@@ -13,6 +13,10 @@ CXXFLAGS ?= -ggdb3 -fno-omit-frame-pointer -O2
 CFLAGS ?= -ggdb3 -fno-omit-frame-pointer -O2
 CPPFLAGS ?= -DNDEBUG
 
+# Keep track of the env vars we depend upon for $(THIRDPARTY_DEPS)/%.dep.env. If the list (captured
+# above) of flags changes, this should be updated.
+ENV_STR := $(CC) $(CXX) $(CXXFLAGS) $(CFLAGS) $(CPPFLAGS)
+
 # If $(BUILD_DISTINCT) is set in the make environment, the artifacts are built and installed in
 # distinct directories under $(THIRDPARTY_BUILD) and $(THIRDPARTY_SRC). They end up looking like
 # $(THIRDPARTY_BUILD)/protobuf.dep/include, etc. instead of all being under
@@ -47,7 +51,15 @@ build-recipe = cd "$(THIRDPARTY_SRC)" && \
 	   bash -c "time $(CURDIR)/recipe_wrapper.sh $(realpath $<)" 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
 
-$(THIRDPARTY_DEPS)/%.dep: $(RECIPES)/%.sh
+# Simplify wildcard phony with FORCE target.
+.PHONY: FORCE
+FORCE:
+
+# Capture $(ENV_STR) deps to retrigger build when they change.
+$(THIRDPARTY_DEPS)/%.dep.env: FORCE
+	@[ "$(cat $@)" != "$(ENV_STR)" ] && echo "$(ENV_STR)" > $@
+
+$(THIRDPARTY_DEPS)/%.dep: $(RECIPES)/%.sh $(THIRDPARTY_DEPS)/%.dep.env
 	@+$(call build-recipe,)
 
 # Special support for targets that need protobuf, and hence take a dependency on protobuf.dep.

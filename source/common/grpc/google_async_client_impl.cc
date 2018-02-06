@@ -38,9 +38,9 @@ void GoogleAsyncClientThreadLocal::completionThread() {
   ENVOY_LOG(debug, "completionThread exiting");
 }
 
-GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
-                                             GoogleAsyncClientThreadLocal& tls, Stats::Scope& scope,
-                                             const envoy::api::v2::GrpcService::GoogleGrpc& config)
+GoogleAsyncClientImpl::GoogleAsyncClientImpl(
+    Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls, Stats::Scope& scope,
+    const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
     : dispatcher_(dispatcher), cq_(tls.completionQueue()), stat_prefix_(config.stat_prefix()),
       scope_(scope) {
   // TODO(htuch): add support for SSL, OAuth2, GCP, etc. credentials.

@@ -54,6 +54,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "codec_wrappers_test",
+    srcs = ["codec_wrappers_test.cc"],
+    deps = [
+        "//source/common/http:codec_wrappers_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codes_test",
     srcs = ["codes_test.cc"],
     deps = [

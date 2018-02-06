@@ -32,7 +32,7 @@ class LoadStatsReporter
     : Grpc::TypedAsyncStreamCallbacks<envoy::service::load_stats::v2::LoadStatsResponse>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  LoadStatsReporter(const envoy::api::v2::Node& node, ClusterManager& cluster_manager,
+  LoadStatsReporter(const envoy::api::v2::core::Node& node, ClusterManager& cluster_manager,
                     Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
                     Event::Dispatcher& dispatcher);
 

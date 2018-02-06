@@ -250,6 +250,9 @@ public:
   }
 
   // Http::StreamEncoderFilter
+  FilterHeadersStatus encode100ContinueHeaders(HeaderMap&) override {
+    return FilterHeadersStatus::Continue;
+  }
   FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) override {
     return doHeaders(response_stream_wrapper_, encoder_callbacks_, config_->responseFunctionRef(),
                      headers, end_stream);

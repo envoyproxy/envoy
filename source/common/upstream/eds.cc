@@ -108,27 +108,36 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, HostVector& new_h
     // If local locality is not defined then skip populating per locality hosts.
     const Locality local_locality(local_info_.node().locality());
     ENVOY_LOG(trace, "Local locality: {}", local_info_.node().locality().DebugString());
-    if (!local_locality.empty()) {
-      std::map<Locality, HostVector> hosts_per_locality;
 
-      for (const HostSharedPtr& host : *current_hosts_copy) {
-        hosts_per_locality[Locality(host->locality())].push_back(host);
-      }
+    // We use std::map to guarantee a stable ordering for zone aware routing.
+    std::map<Locality, HostVector> hosts_per_locality;
 
-      // Populate per_locality hosts only if upstream cluster has hosts in the same locality.
-      if (hosts_per_locality.find(local_locality) != hosts_per_locality.end()) {
-        per_locality.push_back(hosts_per_locality[local_locality]);
+    for (const HostSharedPtr& host : *current_hosts_copy) {
+      hosts_per_locality[Locality(host->locality())].push_back(host);
+    }
 
-        for (auto& entry : hosts_per_locality) {
-          if (local_locality != entry.first) {
-            per_locality.push_back(entry.second);
-          }
-        }
+    // Do we have hosts for the local locality?
+    const bool non_empty_local_locality =
+        !local_locality.empty() &&
+        hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+
+    // As per HostsPerLocality::get(), the per_locality vector must have the
+    // local locality hosts first if non_empty_local_locality.
+    if (non_empty_local_locality) {
+      per_locality.push_back(hosts_per_locality[local_locality]);
+    }
+
+    // After the local locality hosts (if any), we place the remaining locality
+    // host groups in lexicographic order. This provides a stable ordering for
+    // zone aware routing.
+    for (auto& entry : hosts_per_locality) {
+      if (!non_empty_local_locality || local_locality != entry.first) {
+        per_locality.push_back(entry.second);
       }
     }
 
     auto per_locality_shared =
-        std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), !per_locality.empty());
+        std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
 
     host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
                          per_locality_shared, createHealthyHostLists(*per_locality_shared),

@@ -5,9 +5,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/init/init.h"
@@ -34,7 +34,8 @@ public:
    *         configuration.
    */
   static RouteConfigProviderSharedPtr
-  create(const envoy::api::v2::filter::network::HttpConnectionManager& config,
+  create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+             config,
          Runtime::Loader& runtime, Upstream::ClusterManager& cm, Stats::Scope& scope,
          const std::string& stat_prefix, Init::Manager& init_manager,
          RouteConfigProviderManager& route_config_provider_manager);
@@ -115,13 +116,13 @@ private:
     ConfigConstSharedPtr config_;
   };
 
-  RdsRouteConfigProviderImpl(const envoy::api::v2::filter::network::Rds& rds,
-                             const std::string& manager_identifier, Runtime::Loader& runtime,
-                             Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                             const std::string& stat_prefix, ThreadLocal::SlotAllocator& tls,
-                             RouteConfigProviderManagerImpl& route_config_provider_manager);
+  RdsRouteConfigProviderImpl(
+      const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+      const std::string& manager_identifier, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+      Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+      const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
+      ThreadLocal::SlotAllocator& tls,
+      RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
@@ -156,10 +157,10 @@ public:
   // ServerRouteConfigProviderManager
   std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr
-  getRouteConfigProvider(const envoy::api::v2::filter::network::Rds& rds,
-                         Upstream::ClusterManager& cm, Stats::Scope& scope,
-                         const std::string& stat_prefix, Init::Manager& init_manager) override;
+  RouteConfigProviderSharedPtr getRouteConfigProvider(
+      const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+      Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
+      Init::Manager& init_manager) override;
 
 private:
   /**
