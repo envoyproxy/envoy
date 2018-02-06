@@ -1,8 +1,9 @@
+#include "server/proto_descriptors.h"
+
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
-
 #include "envoy/service/accesslog/v2/als.pb.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -11,7 +12,6 @@
 
 #include "common/common/fmt.h"
 #include "common/config/protobuf_link_hacks.h"
-#include "server/proto_descriptors.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
