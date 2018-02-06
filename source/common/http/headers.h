@@ -203,7 +203,7 @@ public:
   } ContentEncodingValues;
 
   struct {
-    const std::string AcceptEncoding{"accept-encoding"};
+    const std::string AcceptEncoding{"Accept-Encoding"};
     const std::string Wildcard{"*"};
   } VaryValues;
 };

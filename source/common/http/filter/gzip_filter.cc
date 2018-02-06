@@ -104,6 +104,7 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
       headers.removeAcceptEncoding();
     }
   }
+
   return FilterHeadersStatus::Continue;
 }
 
@@ -154,6 +155,7 @@ bool GzipFilter::hasCacheControlNoTransform(HeaderMap& headers) const {
     return StringUtil::findToken(cache_control->value().c_str(), ",",
                                  Http::Headers::get().CacheControlValues.NoTransform.c_str());
   }
+
   return false;
 }
 
@@ -172,7 +174,6 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
                                                    false /* keep_empty */)) {
       const auto value = StringUtil::trim(StringUtil::cropRight(token, ";"));
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
-
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
         return (q_value != ZeroQvalueString);
@@ -185,6 +186,7 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
         is_wildcard = (q_value != ZeroQvalueString);
       }
     }
+
     // if neither identity nor gzip codings are present, we return the wildcard.
     return is_wildcard;
   }
@@ -198,6 +200,7 @@ bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
     std::string value{StringUtil::trim(StringUtil::cropRight(content_type->value().c_str(), ";"))};
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
+
   return true;
 }
 
@@ -233,18 +236,20 @@ bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
       }
     }
   }
+
   return true;
 }
 
 void GzipFilter::insertVaryHeader(HeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
-
-  if (vary && !StringUtil::findToken(vary->value().c_str(), ",",
-                                     Http::Headers::get().VaryValues.AcceptEncoding, true)) {
-    std::string new_header;
-    absl::StrAppend(&new_header, vary->value().c_str(), ", ",
-                    Http::Headers::get().VaryValues.AcceptEncoding);
-    headers.insertVary().value(new_header);
+  if (vary) {
+    if (!StringUtil::findToken(vary->value().c_str(), ",",
+                               Http::Headers::get().VaryValues.AcceptEncoding, true)) {
+      std::string new_header;
+      absl::StrAppend(&new_header, vary->value().c_str(), ", ",
+                      Http::Headers::get().VaryValues.AcceptEncoding);
+      headers.insertVary().value(new_header);
+    }
   } else {
     headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
   }

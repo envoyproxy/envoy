@@ -11,7 +11,6 @@
 
 #include "common/common/fmt.h"
 
-#include "absl/strings/ascii.h"
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 
@@ -99,15 +98,16 @@ absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtri
 
 bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
                            absl::string_view key_token, bool trim_whitespace) {
-  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, trim_whitespace);
+  const auto tokens = splitToken(source, delimiters, trim_whitespace);
   if (trim_whitespace) {
-    for (auto token : tokens) {
+    for (const auto token : tokens) {
       if (key_token == trim(token)) {
         return true;
       }
     }
     return false;
   }
+
   return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
 }
 
