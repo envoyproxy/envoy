@@ -282,6 +282,8 @@ TEST_P(TcpProxyIntegrationTest, LargeBidirectionalTlsWrites) {
   sendAndReceiveTlsData(large_data, large_data);
 }
 
+// TODO: test half-close with TLS
+
 TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}.txt", GetParam() == Network::Address::IpVersion::v4 ? "v4" : "v6"));

@@ -789,17 +789,18 @@ TEST_P(ConnectionImplTest, EmptyReadOnCloseTest) {
   disconnect(true);
 }
 
-class ConnectionImplBytesSentTest : public testing::Test {
+class MockTransportConnectionImplTest : public testing::Test {
 public:
-  ConnectionImplBytesSentTest() {
+  MockTransportConnectionImplTest() {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low,
                                   std::function<void()> above_high) -> Buffer::Instance* {
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
+    file_event_ = new Event::MockFileEvent;
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
-        .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(new Event::MockFileEvent)));
+        .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
     connection_.reset(
         new ConnectionImpl(dispatcher_, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
@@ -807,17 +808,18 @@ public:
     connection_->addConnectionCallbacks(callbacks_);
   }
 
-  ~ConnectionImplBytesSentTest() { connection_->close(ConnectionCloseType::NoFlush); }
+  ~MockTransportConnectionImplTest() { connection_->close(ConnectionCloseType::NoFlush); }
 
   std::unique_ptr<ConnectionImpl> connection_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockConnectionCallbacks> callbacks_;
   NiceMock<MockTransportSocket>* transport_socket_;
+  Event::MockFileEvent* file_event_;
   Event::FileReadyCb file_ready_cb_;
 };
 
 // Test that BytesSentCb is invoked at the correct times
-TEST_F(ConnectionImplBytesSentTest, BytesSentCallback) {
+TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
   uint64_t bytes_sent = 0;
   uint64_t cb_called = 0;
   connection_->addBytesSentCallback([&](uint64_t arg) {
@@ -853,7 +855,7 @@ TEST_F(ConnectionImplBytesSentTest, BytesSentCallback) {
 }
 
 // Make sure that multiple registered callbacks all get called
-TEST_F(ConnectionImplBytesSentTest, BytesSentMultiple) {
+TEST_F(MockTransportConnectionImplTest, BytesSentMultiple) {
   uint64_t cb_called1 = 0;
   uint64_t cb_called2 = 0;
   uint64_t bytes_sent1 = 0;
@@ -878,7 +880,7 @@ TEST_F(ConnectionImplBytesSentTest, BytesSentMultiple) {
 }
 
 // Test that if a callback closes the connection, further callbacks are not called.
-TEST_F(ConnectionImplBytesSentTest, CloseInCallback) {
+TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
   // Order is not defined, so register two callbacks that both close the connection. Only
   // one of them should be called.
   uint64_t cb_called = 0;
@@ -895,6 +897,131 @@ TEST_F(ConnectionImplBytesSentTest, CloseInCallback) {
 
   EXPECT_EQ(cb_called, 1);
   EXPECT_EQ(connection_->state(), Connection::State::Closed);
+}
+
+TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .Times(2)
+      .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  EXPECT_CALL(*read_filter, onData(_, true)).Times(1);
+  file_ready_cb_(Event::FileReadyType::Read);
+  file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Test that if both sides half-close, the connection is closed, with the read half-close coming
+// first.
+TEST_F(MockTransportConnectionImplTest, BothHalfCloseReadFirst) {
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::LocalClose));
+  connection_->write(buffer, true);
+}
+
+// Test that if both sides half-close, the connection is closed, with the write half-close coming
+// first.
+TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  connection_->write(buffer, true);
+
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Test that if both sides half-close, but writes have not yet been written to the Transport, that
+// the connection closes only when the writes complete flushing. The write half-close happens first.
+TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst) {
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  Buffer::OwnedImpl buffer("data");
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  connection_->write(buffer, true);
+
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Invoke([](Buffer::Instance& data, bool) -> IoResult {
+        uint64_t len = data.length();
+        data.drain(len);
+        return {PostIoAction::KeepOpen, len, false};
+      }));
+  file_ready_cb_(Event::FileReadyType::Write);
+}
+
+// Test that if both sides half-close, but writes have not yet been written to the Transport, that
+// the connection closes only when the writes complete flushing. The read half-close happens first.
+TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) {
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  Buffer::OwnedImpl buffer("data");
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  connection_->write(buffer, true);
+
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Invoke([](Buffer::Instance& data, bool) -> IoResult {
+        uint64_t len = data.length();
+        data.drain(len);
+        return {PostIoAction::KeepOpen, len, false};
+      }));
+  file_ready_cb_(Event::FileReadyType::Write);
+
+  EXPECT_CALL(callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+  file_ready_cb_(Event::FileReadyType::Read);
+}
+
+class MockTransportConnectionImplDeathTest : public MockTransportConnectionImplTest {};
+
+// Validate that writing end_stream == true is disallowed unless half-open is enabled
+TEST_F(MockTransportConnectionImplDeathTest, WriteEndStreamWhileHalfCloseDisabled) {
+  Buffer::OwnedImpl buffer;
+  connection_->enableHalfClose(false);
+  EXPECT_DEATH(connection_->write(buffer, true), ".*assert failure.*");
+}
+
+// Test that no more data can be written after end_stream == true is written
+TEST_F(MockTransportConnectionImplDeathTest, WriteAfterEndStream) {
+  connection_->enableHalfClose(true);
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  connection_->write(buffer, true);
+  Buffer::OwnedImpl buffer2("hello");
+  EXPECT_DEATH(connection_->write(buffer2, false), ".*assert failure.*");
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

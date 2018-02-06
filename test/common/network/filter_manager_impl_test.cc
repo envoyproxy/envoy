@@ -76,24 +76,72 @@ TEST_F(NetworkFilterManagerTest, All) {
   read_filter->callbacks_->continueReading();
 
   read_buffer_.add("hello");
-  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), _))
+  read_end_stream_ = false;
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), false))
       .WillOnce(Return(FilterStatus::StopIteration));
   manager.onRead();
 
   read_buffer_.add("world");
-  EXPECT_CALL(*filter, onData(BufferStringEqual("helloworld"), _))
+  EXPECT_CALL(*filter, onData(BufferStringEqual("helloworld"), false))
       .WillOnce(Return(FilterStatus::Continue));
   read_filter->callbacks_->continueReading();
 
   write_buffer_.add("foo");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), _))
+  write_end_stream_ = false;
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), false))
       .WillOnce(Return(FilterStatus::StopIteration));
   manager.onWrite();
 
   write_buffer_.add("bar");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), _))
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), false))
       .WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), _))
+  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  manager.onWrite();
+}
+
+TEST_F(NetworkFilterManagerTest, EndStream) {
+  InSequence s;
+
+  Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+  MockFilter* filter(new LocalMockFilter());
+
+  NiceMock<MockConnection> connection;
+  FilterManagerImpl manager(connection, *this);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
+  EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
+
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  read_buffer_.add("hello");
+  read_end_stream_ = true;
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), true))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  manager.onRead();
+
+  read_buffer_.add("world");
+  EXPECT_CALL(*filter, onData(BufferStringEqual("helloworld"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  read_filter->callbacks_->continueReading();
+
+  write_buffer_.add("foo");
+  write_end_stream_ = true;
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), true))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  manager.onWrite();
+
+  write_buffer_.add("bar");
+  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), true))
       .WillOnce(Return(FilterStatus::Continue));
   manager.onWrite();
 }

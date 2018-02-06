@@ -458,6 +458,7 @@ public:
 
     filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(connections >= 1 ? Network::FilterStatus::Continue
                                : Network::FilterStatus::StopIteration,
