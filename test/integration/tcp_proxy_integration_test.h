@@ -14,10 +14,7 @@ class TcpProxyIntegrationTest : public BaseIntegrationTest,
 public:
   TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::TCP_PROXY_CONFIG) {}
 
-  void initialize() override {
-    named_ports_ = {{"tcp_proxy"}};
-    BaseIntegrationTest::initialize();
-  }
+  void initialize() override;
 
   void TearDown() override {
     test_server_.reset();

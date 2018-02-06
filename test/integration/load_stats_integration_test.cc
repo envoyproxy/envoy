@@ -129,7 +129,6 @@ public:
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->set_path(eds_path_);
     });
-    named_ports_ = {"http"};
     HttpIntegrationTest::initialize();
     for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
       fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
