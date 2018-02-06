@@ -10,4 +10,3 @@ namespace Envoy {
 const envoy::service::discovery::v2::AdsDummy _ads_dummy;
 const envoy::service::ratelimit::v2::RateLimitRequest _rls_dummy;
 } // namespace Envoy
-
