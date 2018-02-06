@@ -220,6 +220,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "protobuf_link_hacks",
+    hdrs = ["protobuf_link_hacks.h"],
+    deps = [
+        "@envoy_api//envoy/service/discovery/v2:ads_cc",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "protocol_json_lib",
     srcs = ["protocol_json.cc"],
     hdrs = ["protocol_json.h"],

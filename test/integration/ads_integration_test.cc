@@ -6,6 +6,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 
+#include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -51,10 +52,7 @@ admin:
 
 class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
-  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
-    // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
-    envoy::service::discovery::v2::AdsDummy dummy;
-  }
+  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
     test_server_.reset();

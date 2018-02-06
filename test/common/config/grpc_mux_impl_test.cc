@@ -1,8 +1,8 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
 
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 
@@ -30,8 +30,6 @@ namespace {
 class GrpcMuxImplTest : public testing::Test {
 public:
   GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
-    // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
-    envoy::service::discovery::v2::AdsDummy dummy;
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;

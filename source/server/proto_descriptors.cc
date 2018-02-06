@@ -2,6 +2,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
+
 #include "envoy/service/accesslog/v2/als.pb.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -9,19 +10,16 @@
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 
 #include "common/common/fmt.h"
+#include "common/config/protobuf_link_hacks.h"
+#include "server/proto_descriptors.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
+namespace Server {
 
 // This function validates that the method descriptors for gRPC services and type descriptors that
 // are referenced in Any messages are available in the descriptor pool.
 bool validateProtoDescriptors() {
-
-  // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
-  // TODO(kuat): Remove explicit proto descriptor import.
-  envoy::service::discovery::v2::AdsDummy dummy;
-  envoy::service::ratelimit::v2::RateLimitRequest rls_dummy;
-
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
@@ -59,4 +57,5 @@ bool validateProtoDescriptors() {
   }
   return true;
 };
+} // namespace Server
 } // namespace Envoy

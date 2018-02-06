@@ -66,7 +66,7 @@ int main_common(OptionsImpl& options) {
   Stats::HeapRawStatDataAllocator stats_allocator;
 #endif
 
-  RELEASE_ASSERT(validateProtoDescriptors());
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
   Event::Libevent::Global::initialize();
   Server::ProdComponentFactory component_factory;
   auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
