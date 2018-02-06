@@ -262,6 +262,7 @@ void TcpProxySslIntegrationTest::initialize() {
   TcpProxyIntegrationTest::initialize();
 
   context_manager_.reset(new Ssl::ContextManagerImpl(runtime_));
+  payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 
 void TcpProxySslIntegrationTest::setupConnections() {
@@ -293,6 +294,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // filter so there will be no pause waiting on auth data.
   ssl_client_->addConnectionCallbacks(connect_callbacks_);
   ssl_client_->enableHalfClose(true);
+  ssl_client_->addReadFilter(payload_reader_);
   ssl_client_->connect();
   while (!connect_callbacks_.connected()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -314,13 +316,12 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
 
   // Make sure the data makes it upstream.
   fake_upstream_connection_->waitForData(data_to_send_upstream.size());
-  // Now send data downstream and make sure it arrives.
 
-  std::shared_ptr<WaitForPayloadReader> payload_reader(new WaitForPayloadReader(*dispatcher_));
-  ssl_client_->addReadFilter(payload_reader);
+  // Now send data downstream and make sure it arrives.
   fake_upstream_connection_->write(data_to_send_downstream);
-  payload_reader->set_data_to_wait_for(data_to_send_downstream);
+  payload_reader_->set_data_to_wait_for(data_to_send_downstream);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+
   // Clean up.
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
@@ -328,9 +329,9 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
   fake_upstream_connection_->waitForHalfClose();
   fake_upstream_connection_->write("", true);
   fake_upstream_connection_->waitForDisconnect();
-  while (!connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader_->readLastByte());
+  EXPECT_TRUE(connect_callbacks_.closed());
 }
 
 TEST_P(TcpProxySslIntegrationTest, SendTlsToTlsListener) {
@@ -344,7 +345,49 @@ TEST_P(TcpProxySslIntegrationTest, LargeBidirectionalTlsWrites) {
   sendAndReceiveTlsData(large_data, large_data);
 }
 
-// TODO: test half-close with TLS
+// Test that a half-close on the downstream side is proxied correctly.
+TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
+  setupConnections();
+
+  Buffer::OwnedImpl empty_buffer;
+  ssl_client_->write(empty_buffer, true);
+  fake_upstream_connection_->waitForHalfClose();
+
+  const std::string data("data");
+  fake_upstream_connection_->write(data, false);
+  payload_reader_->set_data_to_wait_for(data);
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(payload_reader_->readLastByte());
+
+  fake_upstream_connection_->write("", true);
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader_->readLastByte());
+}
+
+// Test that a half-close on the upstream side is proxied correctly.
+TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
+  setupConnections();
+
+  fake_upstream_connection_->write("", true);
+  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader_->readLastByte());
+  EXPECT_FALSE(connect_callbacks_.closed());
+
+  const std::string& val("data");
+  Buffer::OwnedImpl buffer(val);
+  ssl_client_->write(buffer, false);
+  while (client_write_buffer_->bytes_drained() != val.size()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  fake_upstream_connection_->waitForData(val.size());
+
+  Buffer::OwnedImpl empty_buffer;
+  ssl_client_->write(empty_buffer, true);
+  while (!connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  fake_upstream_connection_->waitForHalfClose();
+}
 
 } // namespace
 } // namespace Envoy
