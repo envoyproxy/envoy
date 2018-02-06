@@ -1032,27 +1032,6 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) 
   file_ready_cb_(Event::FileReadyType::Write);
 }
 
-class MockTransportConnectionImplDeathTest : public MockTransportConnectionImplTest {};
-
-// Validate that writing end_stream == true is disallowed unless half-open is enabled
-TEST_F(MockTransportConnectionImplDeathTest, WriteEndStreamWhileHalfCloseDisabled) {
-  Buffer::OwnedImpl buffer;
-  connection_->enableHalfClose(false);
-  EXPECT_DEATH(connection_->write(buffer, true), ".*assert failure.*");
-}
-
-// Test that no more data can be written after end_stream == true is written
-TEST_F(MockTransportConnectionImplDeathTest, WriteAfterEndStream) {
-  connection_->enableHalfClose(true);
-  Buffer::OwnedImpl buffer;
-  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
-  EXPECT_CALL(*transport_socket_, doWrite(_, true))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
-  connection_->write(buffer, true);
-  Buffer::OwnedImpl buffer2("hello");
-  EXPECT_DEATH(connection_->write(buffer2, false), ".*assert failure.*");
-}
-
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
