@@ -340,10 +340,7 @@ public:
   }
 
   std::vector<Interval> toVector() const override {
-    std::vector<Interval> out;
-    out.reserve(intervals_.size());
-    out.insert(out.end(), intervals_.begin(), intervals_.end());
-    return out;
+    return std::vector<Interval>(intervals_.begin(), intervals_.end());
   }
 
 private:
