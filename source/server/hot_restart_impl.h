@@ -120,8 +120,9 @@ class HotRestartImpl : public HotRestart,
 public:
   HotRestartImpl(Options& options);
 
-  Thread::BasicLockable& logLock() { return log_lock_; }
-  Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
+  Thread::BasicLockable& logLock() override { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  Stats::RawStatDataAllocator& stats_allocator() { return *this; }
 
   // Server::HotRestart
   void drainParentListeners() override;

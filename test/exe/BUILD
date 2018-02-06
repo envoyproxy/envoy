@@ -24,6 +24,16 @@ sh_test(
 )
 
 envoy_cc_test(
+    name = "main_common_test",
+    srcs = ["main_common_test.cc"],
+    data = ["//configs:google_com_proxy"],
+    deps = [
+        "//source/exe:envoy_main_common_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
     tags = ["backtrace"],

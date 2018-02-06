@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/server/hot_restart.h"
+#include "common/common/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -14,6 +15,10 @@ class HotRestartNopImpl : public Server::HotRestart {
 public:
   HotRestartNopImpl(){};
 
+  Thread::BasicLockable& logLock() override { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  Stats::RawStatDataAllocator& stats_allocator() { return stats_allocator_; }
+
   void drainParentListeners() override {}
   int duplicateParentListenSocket(const std::string&) override { return -1; }
   void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
@@ -22,6 +27,11 @@ public:
   void terminateParent() override {}
   void shutdown() override {}
   std::string version() override { return "disabled"; }
+
+ private:
+  Thread::MutexBasicLockable log_lock_;
+  Thread::MutexBasicLockable access_log_lock_;
+  Stats::HeapRawStatDataAllocator stats_allocator_;
 };
 
 } // namespace Server

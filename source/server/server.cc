@@ -51,7 +51,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
   try {
     if (!options.logPath().empty()) {
@@ -82,6 +82,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
 }
 
 InstanceImpl::~InstanceImpl() {
+  terminate();
   restarter_.shutdown();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
@@ -363,6 +364,15 @@ void InstanceImpl::run() {
   ENVOY_LOG(info, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
+
+  terminate();
+}
+
+void InstanceImpl::terminate() {
+  if (terminated_) {
+    return;
+  }
+  terminated_ = true;
 
   // Before starting to shutdown anything else, stop slot destruction updates.
   thread_local_.shutdownGlobalThreading();

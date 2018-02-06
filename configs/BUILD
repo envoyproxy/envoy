@@ -32,3 +32,8 @@ genrule(
         ":configgen",
     ],
 )
+
+filegroup(
+    name = "google_com_proxy",
+    srcs = ["google_com_proxy.json"],
+)
