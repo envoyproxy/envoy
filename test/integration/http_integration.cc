@@ -740,6 +740,71 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
 }
 
+void HttpIntegrationTest::testEnvoyHandling100Continue() {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/dynamo/url"},
+                                                               {":scheme", "http"},
+                                                               {":authority", "host"},
+                                                               {"expect", "100-continue"}},
+                                       *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response_->waitForEndStream();
+  ASSERT_TRUE(response_->complete());
+  ASSERT(response_->continue_headers() != nullptr);
+  EXPECT_STREQ("100", response_->continue_headers()->Status()->value().c_str());
+
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+}
+
+void HttpIntegrationTest::testEnvoyProxying100Continue(bool with_encoder_filter) {
+  if (with_encoder_filter) {
+    // Because 100-continue only affects encoder filters, make sure it plays well
+    // with one.
+    config_helper_.addFilter("name: envoy.cors");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+            -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          {
+            auto* cors = virtual_host->mutable_cors();
+            cors->add_allow_origin("*");
+            cors->set_allow_headers("content-type,x-grpc-web");
+            cors->set_allow_methods("GET,POST");
+          }
+        });
+  }
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/dynamo/url"},
+                                                               {":scheme", "http"},
+                                                               {":authority", "host"},
+                                                               {"expect", "100-continue"}},
+                                       *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response_->waitForEndStream();
+  EXPECT_TRUE(response_->complete());
+  ASSERT(response_->continue_headers() != nullptr);
+  EXPECT_STREQ("100", response_->continue_headers()->Status()->value().c_str());
+
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+}
+
 void HttpIntegrationTest::testTwoRequests() {
   initialize();
 

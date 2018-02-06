@@ -151,6 +151,11 @@ private:
     static const NullConfig route_configuration_;
   };
 
+  struct NullPathMatchCriterion : public Router::PathMatchCriterion {
+    Router::PathMatchType matchType() const override { return Router::PathMatchType::None; }
+    const std::string& matcher() const override { return EMPTY_STRING; }
+  };
+
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
                    const Optional<std::chrono::milliseconds>& timeout)
@@ -191,6 +196,9 @@ private:
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+    const Router::PathMatchCriterion& pathMatchCriterion() const override {
+      return path_match_criterion_;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -198,6 +206,7 @@ private:
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
     static const envoy::api::v2::core::Metadata metadata_;
+    static const NullPathMatchCriterion path_match_criterion_;
 
     const std::string& cluster_name_;
     Optional<std::chrono::milliseconds> timeout_;
@@ -233,6 +242,9 @@ private:
   void continueDecoding() override { NOT_IMPLEMENTED; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
+  // The async client won't pause if sending an Expect: 100-Continue so simply
+  // swallows any incoming encode100Continue.
+  void encode100ContinueHeaders(HeaderMapPtr&&) override {}
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;

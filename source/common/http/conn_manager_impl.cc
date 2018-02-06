@@ -64,6 +64,12 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()) {}
 
+const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
+  CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
+                         Http::HeaderMapImpl{{Http::Headers::get().Status,
+                                              std::to_string(enumToInt(Code::Continue))}});
+}
+
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   stats_.named_.downstream_cx_total_.inc();
@@ -395,7 +401,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
   access_log_handlers_.push_back(handler);
 }
 
-void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
+void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
   request_info_.response_code_.value(response_code);
 
@@ -403,7 +409,10 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
     return;
   }
 
-  if (CodeUtility::is2xx(response_code)) {
+  if (CodeUtility::is1xx(response_code)) {
+    connection_manager_.stats_.named_.downstream_rq_1xx_.inc();
+    connection_manager_.listener_stats_.downstream_rq_1xx_.inc();
+  } else if (CodeUtility::is2xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_2xx_.inc();
     connection_manager_.listener_stats_.downstream_rq_2xx_.inc();
   } else if (CodeUtility::is3xx(response_code)) {
@@ -445,6 +454,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       },
       this);
 #endif
+
+  if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
+      request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
+    // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
+    // and sends the 100-Continue directly to the encoder.
+    chargeStats(continueHeader());
+    response_encoder_->encode100ContinueHeaders(continueHeader());
+  }
 
   connection_manager_.user_agent_.initializeFromHeaders(
       *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_);
@@ -773,6 +790,50 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   cached_route_.value(std::move(route));
 }
 
+void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
+    ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
+  // Make sure commonContinue continues encode100ContinueHeaders.
+  has_continue_headers_ = true;
+
+  // Similar to the block in encodeHeaders, run encode100ContinueHeaders on each
+  // filter. This is simpler than that case because 100 continue implies no
+  // end-stream, and because there are normal headers coming there's no need for
+  // complex continuation logic.
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
+  for (; entry != encoder_filters_.end(); entry++) {
+    ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode100ContinueHeaders));
+    state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
+    FilterHeadersStatus status = (*entry)->handle_->encode100ContinueHeaders(headers);
+    state_.filter_call_state_ &= ~FilterCallState::Encode100ContinueHeaders;
+    ENVOY_STREAM_LOG(trace, "encode 100 continue headers called: filter={} status={}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    if (!(*entry)->commonHandleAfter100ContinueHeadersCallback(status)) {
+      return;
+    }
+  }
+
+  // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
+  // continuation headers.
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+
+  // Count both the 1xx and follow-up response code in stats.
+  chargeStats(headers);
+
+  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec", *this);
+#ifndef NVLOG
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+        ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
+                         header.key().c_str(), header.value().c_str());
+        return HeaderMap::Iterate::Continue;
+      },
+      this);
+#endif
+
+  // Now actually encode via the codec.
+  response_encoder_->encode100ContinueHeaders(headers);
+}
+
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
@@ -1039,6 +1100,17 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   ASSERT(stopped_);
   stopped_ = false;
 
+  // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
+  if (parent_.has_continue_headers_ && !continue_headers_continued_) {
+    continue_headers_continued_ = true;
+    do100ContinueHeaders();
+    // If the response headers have not yet come in, don't continue on with
+    // headers and body. doHeaders expects request headers to exist.
+    if (!parent_.response_headers_.get()) {
+      return;
+    }
+  }
+
   // Make sure that we handle the zero byte data frame case. We make no effort to optimize this
   // case in terms of merging it into a header only request/response. This could be done in the
   // future.
@@ -1058,9 +1130,24 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   }
 }
 
+bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
+    FilterHeadersStatus status) {
+  ASSERT(parent_.has_continue_headers_);
+  ASSERT(!continue_headers_continued_);
+  ASSERT(!stopped_);
+
+  if (status == FilterHeadersStatus::StopIteration) {
+    stopped_ = true;
+    return false;
+  } else {
+    ASSERT(status == FilterHeadersStatus::Continue);
+    continue_headers_continued_ = true;
+    return true;
+  }
+}
+
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCallback(
     FilterHeadersStatus status) {
-
   ASSERT(!headers_continued_);
   ASSERT(!stopped_);
 
@@ -1181,6 +1268,12 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
+    HeaderMapPtr&& headers) {
+  parent_.continue_headers_ = std::move(headers);
+  parent_.encode100ContinueHeaders(nullptr, *parent_.continue_headers_);
+}
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPtr&& headers,
                                                                      bool end_stream) {

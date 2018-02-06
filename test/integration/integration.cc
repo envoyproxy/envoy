@@ -66,6 +66,10 @@ void IntegrationStreamDecoder::waitForReset() {
   }
 }
 
+void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+  continue_headers_ = std::move(headers);
+}
+
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);

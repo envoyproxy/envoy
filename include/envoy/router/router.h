@@ -313,6 +313,34 @@ public:
 };
 
 /**
+ * Type of path matching that a route entry uses.
+ */
+enum class PathMatchType {
+  None,
+  Prefix,
+  Exact,
+  Regex,
+};
+
+/**
+ * Criterion that a route entry uses for matching a particular path.
+ */
+class PathMatchCriterion {
+public:
+  virtual ~PathMatchCriterion() {}
+
+  /**
+   * @return PathMatchType type of path match.
+   */
+  virtual PathMatchType matchType() const PURE;
+
+  /**
+   * @return const std::string& the string with which to compare paths.
+   */
+  virtual const std::string& matcher() const PURE;
+};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry : public ResponseEntry {
@@ -421,6 +449,11 @@ public:
    * this route.
    */
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+
+  /**
+   * @return const PathMatchCriterion& the match criterion for this route.
+   */
+  virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 };
 
 /**

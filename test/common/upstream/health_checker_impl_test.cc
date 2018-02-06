@@ -321,6 +321,33 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
 
+TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  std::unique_ptr<Http::TestHeaderMapImpl> continue_headers(
+      new Http::TestHeaderMapImpl{{":status", "100"}});
+  test_sessions_[0]->stream_response_callbacks_->decode100ContinueHeaders(
+      std::move(continue_headers));
+
+  respond(0, "200", false, true);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
 // Test host check success with multiple hosts.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   setupNoServiceValidationHC();

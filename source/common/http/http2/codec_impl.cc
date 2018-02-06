@@ -38,9 +38,6 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
-const std::unique_ptr<const Http::HeaderMap> ConnectionImpl::CONTINUE_HEADER{
-    new Http::HeaderMapImpl{
-        {Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}}};
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -98,6 +95,11 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
         return HeaderMap::Iterate::Continue;
       },
       &final_headers);
+}
+
+void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+  ASSERT(headers.Status()->value() == "100");
+  encodeHeaders(headers, false);
 }
 
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -374,28 +376,19 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       stream->headers_->addViaMove(std::move(key), std::move(stream->cookies_));
     }
 
-    if (frame->headers.cat == NGHTTP2_HCAT_REQUEST && stream->headers_->Expect() &&
-        0 == StringUtil::caseInsensitiveCompare(stream->headers_->Expect()->value().c_str(),
-                                                Headers::get().ExpectValues._100Continue.c_str())) {
-      // Deal with expect: 100-continue here since higher layers are never going to do anything
-      // other than say to continue so that we can respond before request complete if necessary.
-      std::vector<nghttp2_nv> final_headers;
-      StreamImpl::buildHeaders(final_headers, *CONTINUE_HEADER);
-      int rc = nghttp2_submit_headers(session_, 0, stream->stream_id_, nullptr, &final_headers[0],
-                                      final_headers.size(), nullptr);
-      ASSERT(rc == 0);
-      UNREFERENCED_PARAMETER(rc);
-
-      stream->headers_->removeExpect();
-    }
-
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE: {
       if (CodeUtility::is1xx(Http::Utility::getResponseStatus(*stream->headers_))) {
         stream->waiting_for_non_informational_headers_ = true;
       }
 
-      FALLTHRU;
+      if (stream->headers_->Status()->value() == "100") {
+        ASSERT(!stream->remote_end_stream_);
+        stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
+      } else {
+        stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+      }
+      break;
     }
 
     case NGHTTP2_HCAT_REQUEST: {
@@ -417,10 +410,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           // This can only happen in the client case in a response, when we received a 1xx to
           // start out with. In this case, raise as headers. nghttp2 message checking guarantees
           // proper flow here.
-          // TODO(mattklein123): Higher layers don't currently deal with a double decodeHeaders()
-          // call and will probably crash. We do this in the client path for testing when the server
-          // responds with 1xx. In the future, if needed, we can properly handle 1xx in higher layer
-          // code, or just eat it.
+          ASSERT(!stream->headers_->Status() || stream->headers_->Status()->value() != "100");
           stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
         }
       }

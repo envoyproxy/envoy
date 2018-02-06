@@ -102,6 +102,8 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
+  response_decoder_->decode100ContinueHeaders(
+      HeaderMapPtr(new TestHeaderMapImpl{{":status", "100"}}));
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, true);
 
@@ -863,7 +865,7 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
-TEST_F(AsyncClientImplTest, NullRouteConfigTest) {
+TEST_F(AsyncClientImplTest, RdsGettersTest) {
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream =
@@ -872,8 +874,12 @@ TEST_F(AsyncClientImplTest, NullRouteConfigTest) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
+  ASSERT_NE(nullptr, route);
   auto route_entry = route->routeEntry();
   ASSERT_NE(nullptr, route_entry);
+  auto& path_match_criterion = route_entry->pathMatchCriterion();
+  EXPECT_EQ("", path_match_criterion.matcher());
+  EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
   const auto& route_config = route_entry->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
