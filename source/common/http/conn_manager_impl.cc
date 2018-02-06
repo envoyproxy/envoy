@@ -412,8 +412,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) 
   if (CodeUtility::is1xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_1xx_.inc();
     connection_manager_.listener_stats_.downstream_rq_1xx_.inc();
-  }
-  if (CodeUtility::is2xx(response_code)) {
+  } else if (CodeUtility::is2xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_2xx_.inc();
     connection_manager_.listener_stats_.downstream_rq_2xx_.inc();
   } else if (CodeUtility::is3xx(response_code)) {
