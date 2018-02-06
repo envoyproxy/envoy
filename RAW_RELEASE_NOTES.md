@@ -45,6 +45,7 @@ final version.
   This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.
 * The Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
   overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_GrpcService>`.
+* Added cluster configuration for healthy panic threshold percentage.
 * Added support for more granular weighted cluster routing by allowing the total weight to be specified in configuration.
 * Added support for custom request/response headers with mixed static and dynamic values.
 * Added support for [Squash microservices debugger](https://github.com/solo-io/squash).
