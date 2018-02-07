@@ -723,7 +723,7 @@ TEST(ClusterMetadataTest, Metadata) {
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
-    common_load_balancer_settings:
+    common_lb_config:
       healthy_panic_threshold:
         value: 0.3
   )EOF";
