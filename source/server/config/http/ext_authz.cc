@@ -24,7 +24,7 @@ HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
   Http::ExtAuthz::FilterConfigSharedPtr filter_config(
       new Http::ExtAuthz::FilterConfig(proto_config, context.localInfo(), context.scope(),
                                        context.runtime(), context.clusterManager()));
-  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 20);
+  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [ grpc_service = proto_config.grpc_service(), &context, filter_config,
            timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks)
