@@ -197,7 +197,7 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address);
+  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len);
 
   /**
    * Construct from a string pipe path.
@@ -212,6 +212,9 @@ public:
 
 private:
   sockaddr_un address_;
+  // For abstract namespaces.
+  bool abstract_namespace_{false};
+  uint32_t address_length_{0};
 };
 
 } // namespace Address

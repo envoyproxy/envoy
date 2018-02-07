@@ -228,9 +228,15 @@ void ZoneAwareLoadBalancerBase::resizePerPriorityState() {
 bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   // We only do locality routing for P=0.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
+  if (host_set.healthyHostsPerLocality().get().size() < 2) {
+    return true;
+  }
+
+  // lb_local_cluster_not_ok is bumped for "Local host set is not set or it is
+  // panic mode for local cluster".
   if (!host_set.healthyHostsPerLocality().hasLocalLocality() ||
-      host_set.healthyHostsPerLocality().get().size() < 2 ||
       host_set.healthyHostsPerLocality().get()[0].empty()) {
+    stats_.lb_local_cluster_not_ok_.inc();
     return true;
   }
 
