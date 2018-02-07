@@ -1109,8 +1109,6 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
   connection_->addWriteFilter(write_filter1);
   connection_->addWriteFilter(write_filter2);
 
-  // EXPECT_CALL(*write_filter1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
-  // EXPECT_CALL(*write_filter2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*write_filter1, onWrite(BufferStringEqual(val), true))
       .WillOnce(Return(FilterStatus::StopIteration));
   Buffer::OwnedImpl buffer(val);

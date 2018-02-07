@@ -100,6 +100,8 @@ TEST_F(NetworkFilterManagerTest, All) {
   manager.onWrite();
 }
 
+// Test that end_stream is delivered in the correct order with the data, even
+// if FilterStatus::StopIteration occurs.
 TEST_F(NetworkFilterManagerTest, EndStream) {
   InSequence s;
 
