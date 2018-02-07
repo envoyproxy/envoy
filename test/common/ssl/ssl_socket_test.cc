@@ -30,6 +30,7 @@
 
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
 using testing::_;
@@ -766,6 +767,89 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher.exit(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+// Test that half-close is sent and received correctly
+TEST_P(SslSocketTest, HalfClose) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_certificates.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ContextManagerImpl manager(runtime);
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, "", {}, true, manager,
+                                                        stats_store);
+
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener =
+      dispatcher.createListener(socket, listener_callbacks, true, false);
+  std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
+  std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
+
+  std::string client_ctx_json = R"EOF(
+  {
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory.createTransportSocket(), nullptr);
+  client_connection->enableHalfClose(true);
+  client_connection->addReadFilter(client_read_filter);
+  client_connection->connect();
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_connection_callbacks;
+  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), server_ssl_socket_factory.createTransportSocket());
+        listener_callbacks.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->enableHalfClose(true);
+        server_connection->addReadFilter(server_read_filter);
+        server_connection->addConnectionCallbacks(server_connection_callbacks);
+        Buffer::OwnedImpl data("hello");
+        server_connection->write(data, true);
+      }));
+
+  EXPECT_CALL(*server_read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(*client_read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), true))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
+        Buffer::OwnedImpl buffer("world");
+        client_connection->write(buffer, true);
+        return Network::FilterStatus::Continue;
+      }));
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*server_read_filter, onData(BufferStringEqual("world"), true));
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher.exit(); }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
