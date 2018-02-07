@@ -242,10 +242,10 @@ public:
     upstream_request_->encodeData(response_size_, true);
     response_->waitForEndStream();
 
-    EXPECT_TRUE(upstream_request_->complete());
+    ASSERT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
 
-    EXPECT_TRUE(response_->complete());
+    ASSERT_TRUE(response_->complete());
     EXPECT_STREQ(std::to_string(response_code).c_str(),
                  response_->headers().Status()->value().c_str());
     EXPECT_EQ(response_size_, response_->body().size());
@@ -506,7 +506,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   // This should count as dropped, since we trigger circuit breaking.
   initiateClientConnection();
   response_->waitForEndStream();
-  EXPECT_TRUE(response_->complete());
+  ASSERT_TRUE(response_->complete());
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
   cleanupUpstreamConnection();
 
