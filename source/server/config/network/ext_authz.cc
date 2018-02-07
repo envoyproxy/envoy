@@ -26,7 +26,7 @@ NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
 
   ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(new ExtAuthz::TcpFilter::Config(
       proto_config, context.scope(), context.runtime(), context.clusterManager()));
-  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 20);
+  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [ grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
            timeout_ms ](Network::FilterManager & filter_manager)
