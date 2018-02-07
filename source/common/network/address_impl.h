@@ -157,6 +157,7 @@ public:
 
 private:
   struct Ipv6Helper : public Ipv6 {
+    Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
     uint32_t port() const;
 
