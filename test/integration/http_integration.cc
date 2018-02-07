@@ -160,7 +160,8 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
-  named_ports_ = {{"http"}};
+  // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
+  config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
@@ -957,14 +958,10 @@ void HttpIntegrationTest::testEquivalent(const std::string& request) {
     auto* old_listener = static_resources->mutable_listeners(0);
     auto* cloned_listener = static_resources->add_listeners();
     cloned_listener->CopyFrom(*old_listener);
-    cloned_listener->set_name("listener2");
+    old_listener->set_name("http_forward");
   });
   // Set the first listener to allow absoute URLs.
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
-  // Make sure both listeners can be reached.
-  // TODO(alyssawilk) in a follow-up, instead have these named ports pulled automatically from the
-  // listener names.
-  named_ports_ = {"http_forward", "http"};
   initialize();
 
   std::string response1;

@@ -177,10 +177,10 @@ protected:
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
+  // A map of keys to port names. Generally the names are pulled from the v2 listener name
+  // but if a listener is created via ADS, it will be from whatever key is used with registerPort.
   TestEnvironment::PortMap port_map_;
 
-  // The named ports for createGeneratedApiTestServer. Used mostly for lookupPort.
-  std::vector<std::string> named_ports_{{"default_port"}};
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
 
