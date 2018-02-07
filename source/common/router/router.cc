@@ -576,10 +576,22 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool en
   }
 }
 
+void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+  ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
+
+  downstream_response_started_ = true;
+  // Don't send retries after 100-Continue has been sent on. Arguably we could attempt to do a
+  // retry, assume the next upstream would also send an 100-Continue and swallow the second one
+  // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
+  // the complexity until someone asks for it.
+  retry_state_.reset();
+
+  callbacks_->encode100ContinueHeaders(std::move(headers));
+}
+
 void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&& headers,
                                bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
-  ASSERT(!downstream_response_started_);
 
   upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(response_code);
 
@@ -798,6 +810,11 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_, request_info_);
   }
+}
+
+void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+  ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  parent_.onUpstream100ContinueHeaders(std::move(headers));
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {

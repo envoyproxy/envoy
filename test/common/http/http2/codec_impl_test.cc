@@ -125,54 +125,6 @@ public:
   MockStreamCallbacks server_stream_callbacks_;
 };
 
-TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
-  initialize();
-
-  TestHeaderMapImpl request_headers;
-  request_headers.addCopy("expect", "100-continue");
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
-  HttpTestUtility::addDefaultHeaders(expected_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&continue_headers), false));
-  request_encoder_->encodeHeaders(request_headers, false);
-
-  EXPECT_CALL(request_decoder_, decodeData(_, true));
-  Buffer::OwnedImpl hello("hello");
-  request_encoder_->encodeData(hello, true);
-
-  TestHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), true));
-  response_encoder_->encodeHeaders(response_headers, true);
-}
-
-TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
-  initialize();
-
-  TestHeaderMapImpl request_headers;
-  request_headers.addCopy("expect", "100-continue");
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&continue_headers), false));
-  request_encoder_->encodeHeaders(request_headers, false);
-
-  EXPECT_CALL(request_decoder_, decodeData(_, true));
-  Buffer::OwnedImpl hello("hello");
-  request_encoder_->encodeData(hello, true);
-
-  TestHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), false));
-  response_encoder_->encodeHeaders(response_headers, false);
-
-  TestHeaderMapImpl response_trailers{{"foo", "bar"}};
-  EXPECT_CALL(response_decoder_, decodeTrailers_(HeaderMapEqual(&response_trailers)));
-  response_encoder_->encodeTrailers(response_trailers);
-}
-
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
 
@@ -189,6 +141,50 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
 }
+
+TEST_P(Http2CodecImplTest, ContinueHeaders) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+};
+
+TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+};
+
+TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+};
 
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   initialize();

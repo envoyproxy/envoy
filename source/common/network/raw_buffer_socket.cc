@@ -57,7 +57,8 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer) {
     int rc = buffer.write(callbacks_->fd());
     ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), rc);
     if (rc == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(), errno);
+      ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), errno,
+                     strerror(errno));
       if (errno == EAGAIN) {
         action = PostIoAction::KeepOpen;
       } else {
