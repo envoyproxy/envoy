@@ -124,13 +124,14 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
       },
       &ctxt_);
   // Invoke stub call.
-  rw_ = parent_.stub_->Call(
+  rw_ = parent_.stub_->PrepareCall(
       &ctxt_, "/" + service_method_.service()->full_name() + "/" + service_method_.name(),
-      &parent_.cq_, &init_tag_);
+      &parent_.cq_);
   if (rw_ == nullptr) {
     notifyRemoteClose(Status::GrpcStatus::Unavailable, nullptr, EMPTY_STRING);
     call_failed_ = true;
   }
+  rw_->StartCall(&init_tag_);
 }
 
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
