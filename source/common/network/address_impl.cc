@@ -199,13 +199,16 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
 }
 
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only) : InstanceBase(Type::Ip) {
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
   ip_.ipv6_.address_ = address;
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   ip_.v6only_ = v6only;
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
 }
 
-Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0) {}
+Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0) {
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
+}
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : InstanceBase(Type::Ip) {
   memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
@@ -223,7 +226,9 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : Instance
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
 }
 
-Ipv6Instance::Ipv6Instance(uint32_t port) : Ipv6Instance("", port) {}
+Ipv6Instance::Ipv6Instance(uint32_t port) : Ipv6Instance("", port) {
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
+}
 
 int Ipv6Instance::bind(int fd) const {
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
