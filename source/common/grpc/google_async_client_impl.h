@@ -58,14 +58,26 @@ struct GoogleAsyncTag {
 class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
-  GoogleAsyncClientThreadLocal();
+  GoogleAsyncClientThreadLocal(Event::Dispatcher& dispatcher);
   ~GoogleAsyncClientThreadLocal();
 
   grpc::CompletionQueue& completionQueue() { return cq_; }
 
+  void registerStream(GoogleAsyncStreamImpl* stream) {
+    ASSERT(streams_.find(stream) == streams_.end());
+    streams_.insert(stream);
+  }
+
+  void unregisterStream(GoogleAsyncStreamImpl* stream) {
+    auto it = streams_.find(stream);
+    ASSERT(it != streams_.end());
+    streams_.erase(it);
+  }
+
 private:
   void completionThread();
 
+  Event::Dispatcher& dispatcher_;
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
   grpc::CompletionQueue cq_;
@@ -79,6 +91,9 @@ private:
   // We have an independent completion thread for each TLS silo (i.e. one per worker and
   // also one for the main thread).
   Thread::ThreadPtr completion_thread_;
+  // Track all streams that are currently using this CQ, so we can notify them
+  // on shutdown.
+  std::unordered_set<GoogleAsyncStreamImpl*> streams_;
 };
 
 // Google gRPC client stats. TODO(htuch): consider how a wider set of stats collected by the
@@ -91,7 +106,7 @@ struct GoogleAsyncClientStats {
 };
 
 // Google gRPC C++ client library implementation of Grpc::AsyncClient.
-class GoogleAsyncClientImpl final : public AsyncClient {
+class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         Stats::Scope& scope,
@@ -108,8 +123,11 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  grpc::CompletionQueue& cq_;
-  std::unique_ptr<grpc::GenericStub> stub_;
+  GoogleAsyncClientThreadLocal& tls_;
+  // This is shared with child streams, so that they can cleanup independent of
+  // the client if it gets destructed. The streams need to wait for their tags
+  // to drain from the CQ.
+  std::shared_ptr<grpc::GenericStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
   Stats::Scope& scope_;
@@ -129,6 +147,7 @@ public:
                         const Protobuf::MethodDescriptor& service_method,
                         AsyncStreamCallbacks& callbacks,
                         const Optional<std::chrono::milliseconds>& timeout);
+  ~GoogleAsyncStreamImpl();
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -190,6 +209,9 @@ private:
   GoogleAsyncTag finish_tag_{*this, GoogleAsyncTag::Operation::Finish};
 
   GoogleAsyncClientImpl& parent_;
+  // We hold a ref count on the stub_ to allow the stream to wait for its tags
+  // to drain from the CQ on cleanup.
+  std::shared_ptr<grpc::GenericStub> stub_;
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
   const Optional<std::chrono::milliseconds>& timeout_;
@@ -208,17 +230,10 @@ private:
   bool finish_pending_{};
   // Have we entered CQ draining state? If so, we're just waiting for all our
   // ops on the CQ to drain away before freeing the stream.
-  // We need to access this cross-thread. The rationale for this is that the
-  // GoogleAsyncStreamImpl silo thread can safely set and check while draining
-  // the status. However, if the completion thread does not check this before
-  // posting, it might post a new completion after cleanup() is invoked. So, we
-  // need to share state here to allow the completion thread to avoid doing
-  // this.
-  bool draining_cq_{}; // Guarded by cq_lock.
-  // Number of handleOpCompletion() posted to this stream that haven't yet been
-  // processed on the silo thread. We can't delete until this number hits zero.
-  uint32_t inflight_completions_{}; // Guarded by cq_lock.
-  std::mutex cq_lock_;
+  bool draining_cq_{};
+  // Count of the tags in-flight. This must hit zero before the stream can be
+  // freed.
+  uint32_t inflight_tags_{};
 
   friend class GoogleAsyncClientImpl;
   friend class GoogleAsyncClientThreadLocal;

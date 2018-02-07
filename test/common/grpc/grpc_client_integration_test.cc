@@ -64,6 +64,7 @@ public:
   }
 
   void runDispatcher() {
+    ENVOY_LOG_MISC(debug, "Run dispatcher with {} events pending", pending_stream_events_);
     if (pending_stream_events_ > 0) {
       dispatcher_.run(Event::Dispatcher::RunType::Block);
     }
@@ -135,7 +136,11 @@ public:
   }
 
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
-    EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
+    if (grpc_status == Status::GrpcStatus::InvalidCode) {
+      EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
+    } else {
+      EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
+    }
     dispatcher_helper_.setStreamEventPending();
   }
 
@@ -225,6 +230,10 @@ public:
       fake_connection_->close();
       fake_connection_->waitForDisconnect();
     }
+    // Shutdown Google gRPC client TLS. This will force all CQs to drain. We
+    // then kick the dispatcher to ensure all orphan streams are scheduled for
+    // cleanup.
+    google_tls_.reset();
   }
 
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
@@ -258,7 +267,8 @@ public:
     envoy::api::v2::core::GrpcService::GoogleGrpc config;
     config.set_target_uri(fake_upstream_->localAddress()->asString());
     config.set_stat_prefix("fake_cluster");
-    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, google_tls_, stats_store_, config);
+    google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(dispatcher_);
+    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stats_store_, config);
 #else
     NOT_REACHED;
 #endif
@@ -344,9 +354,7 @@ public:
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
-  // Must come before grpc_client_, since all clients/streams must be ended
-  // before we cleanup the CQ thread (as per interface contract).
-  GoogleAsyncClientThreadLocal google_tls_;
+  std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
   AsyncClientPtr grpc_client_;
   Event::TimerPtr timeout_timer_;
   const TestMetadata empty_metadata_;
@@ -525,8 +533,7 @@ TEST_P(GrpcClientIntegrationTest, MissingGrpcStatus) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that a reply terminated without trailers is handled as an UNKNOWN
-// gRPC error.
+// Validate that a reply terminated without trailers is handled as a gRPC error.
 TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
@@ -536,7 +543,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   EXPECT_CALL(*stream, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   stream->expectTrailingMetadata(empty_metadata_);
-  stream->expectGrpcStatus(Status::GrpcStatus::Unknown);
+  stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);
   auto serialized_response = Grpc::Common::serializeBody(reply);
   stream->fake_stream_->encodeData(*serialized_response, true);
   stream->fake_stream_->encodeResetStream();
