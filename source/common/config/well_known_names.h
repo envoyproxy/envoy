@@ -78,13 +78,15 @@ public:
   const std::string REDIS_PROXY = "envoy.redis_proxy";
   // IP tagging filter
   const std::string TCP_PROXY = "envoy.tcp_proxy";
+  // Authorization filter
+  const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
 
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 
   NetworkFilterNameValues()
       : v1_converter_({CLIENT_SSL_AUTH, ECHO, HTTP_CONNECTION_MANAGER, MONGO_PROXY, RATE_LIMIT,
-                       REDIS_PROXY, TCP_PROXY}) {}
+                       REDIS_PROXY, TCP_PROXY, EXT_AUTHORIZATION}) {}
 };
 
 typedef ConstSingleton<NetworkFilterNameValues> NetworkFilterNames;
@@ -131,13 +133,16 @@ public:
   const std::string LUA = "envoy.lua";
   // Squash filter
   const std::string SQUASH = "envoy.squash";
+  // External Authorization filter
+  const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
 
   // Converts names from v1 to v2
   const V1Converter v1_converter_;
 
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA}) {}
+                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
+                       EXT_AUTHORIZATION}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

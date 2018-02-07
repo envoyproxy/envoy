@@ -217,6 +217,7 @@ private:
     }
 
     // Http::StreamDecoder
+    void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
@@ -298,6 +299,7 @@ private:
   void maybeDoShadowing();
   void onRequestComplete();
   void onResponseTimeout();
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
