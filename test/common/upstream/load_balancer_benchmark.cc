@@ -16,6 +16,7 @@ public:
     HostSet& host_set = priority_set_.getOrCreateHostSet(0);
 
     HostVector hosts;
+    ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
       hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256)));
     }
@@ -95,14 +96,17 @@ static void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     // Do not time computation of mean, standard deviation, and relative standard deviation.
     state.PauseTiming();
     double mean = 0;
-    std::for_each(hit_counter.begin(), hit_counter.end(),
-                  [&mean](const auto pair) { mean += pair.second; });
+    for (const auto& pair : hit_counter) {
+      mean += pair.second;
+    }
     mean /= hit_counter.size();
+
     double variance = 0;
-    std::for_each(hit_counter.begin(), hit_counter.end(), [&variance, mean](const auto pair) {
+    for (const auto& pair : hit_counter) {
       variance += std::pow(pair.second - mean, 2);
-    });
+    }
     variance /= hit_counter.size();
+
     double stddev = std::sqrt(variance);
     state.counters["mean_hits"] = mean;
     state.counters["stddev_hits"] = stddev;
