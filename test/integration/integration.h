@@ -29,6 +29,7 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
+  const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   void waitForHeaders();
@@ -37,6 +38,7 @@ public:
   void waitForReset();
 
   // Http::StreamDecoder
+  void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
@@ -48,6 +50,7 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
+  Http::HeaderMapPtr continue_headers_;
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   bool waiting_for_end_stream_{};
@@ -146,7 +149,20 @@ public:
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
-  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
+
+  /**
+   * Open a connection to Envoy, send a series of bytes, and return the
+   * response. This function will continue reading response bytes until Envoy
+   * closes the connection (as a part of error handling) or (if configured true)
+   * the complete headers are read.
+   *
+   * @param port the port to connect to.
+   * @param raw_http the data to send.
+   * @param response the response data will be sent here
+   * @param if the connection should be terminated onece '\r\n\r\n' has been read.
+   **/
+  void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
+                                     bool disconnect_after_headers_complete = false);
 
 protected:
   bool initialized() const { return initialized_; }

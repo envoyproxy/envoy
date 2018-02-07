@@ -1,3 +1,5 @@
+#include "server/proto_descriptors.h"
+
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
@@ -9,21 +11,13 @@
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 
 #include "common/common/fmt.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"
 
-#include "gtest/gtest.h"
-
 namespace Envoy {
+namespace Server {
 
-// This test verifies that critical descriptors have not changed name. It includes both gRPC
-// services as well as types that are referenced in Any messages. IF THIS TEST BREAKS YOU
-// HAVE DONE SOMETHING BAD. Consult with the larger dev team on how to handle.
-TEST(ProtoDescriptorTest, BackCompat) {
-  // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221
-  // TODO(kuat): Remove explicit proto descriptor import.
-  envoy::service::discovery::v2::AdsDummy dummy;
-  envoy::service::ratelimit::v2::RateLimitRequest rls_dummy;
-
+bool validateProtoDescriptors() {
   const auto methods = {
       "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
       "envoy.api.v2.ClusterDiscoveryService.StreamClusters",
@@ -42,8 +36,9 @@ TEST(ProtoDescriptorTest, BackCompat) {
   };
 
   for (const auto& method : methods) {
-    EXPECT_NE(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method), nullptr)
-        << fmt::format("{} not found", method);
+    if (Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) == nullptr) {
+      return false;
+    }
   }
 
   const auto types = {
@@ -54,9 +49,11 @@ TEST(ProtoDescriptorTest, BackCompat) {
   };
 
   for (const auto& type : types) {
-    EXPECT_NE(Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type), nullptr)
-        << fmt::format("{} not found", type);
+    if (Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) == nullptr) {
+      return false;
+    }
   }
-}
-
+  return true;
+};
+} // namespace Server
 } // namespace Envoy

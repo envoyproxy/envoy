@@ -66,6 +66,10 @@ void IntegrationStreamDecoder::waitForReset() {
   }
 }
 
+void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+  continue_headers_ = std::move(headers);
+}
+
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
@@ -316,13 +320,17 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
   registerTestServerPorts(port_names);
 }
 
-void BaseIntegrationTest::sendRawHttpAndWaitForResponse(const char* raw_http,
-                                                        std::string* response) {
+void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
+                                                        std::string* response,
+                                                        bool disconnect_after_headers_complete) {
   Buffer::OwnedImpl buffer(raw_http);
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+      port, buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response->append(TestUtility::bufferToString(data));
+        if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
+          client.close(Network::ConnectionCloseType::NoFlush);
+        }
       },
       version_);
 

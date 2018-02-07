@@ -113,6 +113,14 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(IntegrationTest, Retry) { testRetry(); }
 
+TEST_P(IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
+
+TEST_P(IntegrationTest, EnvoyProxying100Continue) { testEnvoyProxying100Continue(); }
+
+TEST_P(IntegrationTest, EnvoyProxying100ContinueWithEncoderFilter) {
+  testEnvoyProxying100Continue(true);
+}
+
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }

@@ -1,8 +1,8 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
 
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 

@@ -184,6 +184,11 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   Http::TestHeaderMapImpl request_headers{{"content-type", request_content_type()},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data("hello");

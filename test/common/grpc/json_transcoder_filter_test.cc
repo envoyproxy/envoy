@@ -295,6 +295,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
 
+  Http::TestHeaderMapImpl continue_headers{{":status", "000"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
