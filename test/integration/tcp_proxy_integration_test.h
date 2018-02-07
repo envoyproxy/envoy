@@ -17,10 +17,7 @@ public:
     enable_half_close_ = true;
   }
 
-  void initialize() override {
-    named_ports_ = {{"tcp_proxy"}};
-    BaseIntegrationTest::initialize();
-  }
+  void initialize() override;
 
   void TearDown() override {
     test_server_.reset();

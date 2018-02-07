@@ -1,13 +1,13 @@
 admin:
   access_log_path: /tmp/admin_access.log
   address:
-    socket_address: { address: 127.0.0.1, port_value: 9901 }
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
 
 static_resources:
   listeners:
   - name: listener_0
     address:
-      socket_address: { address: 127.0.0.1, port_value: 10000 }
+      socket_address: { address: 0.0.0.0, port_value: 10000 }
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
@@ -28,8 +28,8 @@ static_resources:
   - name: service_google
     connect_timeout: 0.25s
     type: LOGICAL_DNS
-    # Uncomment the following line if your environment doesn't have v6 network access or Envoy may try to talk to a v6 endpoint which will result in a 503 error.
-    # dns_lookup_family: V4_ONLY
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
     tls_context: { sni: www.google.com }

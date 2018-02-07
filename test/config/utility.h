@@ -83,6 +83,9 @@ public:
   // Add the default SSL configuration.
   void addSslConfig();
 
+  // Renames the first listener to the name specified.
+  void renameListener(const std::string& name);
+
   // Allows callers to do their own modification to |bootstrap_| which will be
   // applied just before ports are modified in finalize().
   void addConfigModifier(ConfigModifierFunction function);

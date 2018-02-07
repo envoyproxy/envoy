@@ -9,16 +9,17 @@ Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNC
 
 ## Documentation
 
-* [Official documentation](https://www.envoyproxy.io/).
-* [Unofficial Chinese documentation](https://github.com/lixiangyun/envoyproxy_doc_ZH_CN).
+* [Official documentation](https://www.envoyproxy.io/)
+* [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
+* [Unofficial Chinese documentation](https://github.com/lixiangyun/envoyproxy_doc_ZH_CN)
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
-to find out more about the origin story and design philosophy of Envoy.
-* [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model.
-* [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart.
-* [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture.
-* [Blog](https://medium.com/@mattklein123/the-universal-data-plane-api-d15cec7a) about universal data plane API.
-* [Blog](https://medium.com/@mattklein123/lyfts-envoy-dashboards-5c91738816b1) on Lyft's Envoy dashboards.
+to find out more about the origin story and design philosophy of Envoy
+* [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model
+* [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart
+* [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture
+* [Blog](https://medium.com/@mattklein123/the-universal-data-plane-api-d15cec7a) about universal data plane API
+* [Blog](https://medium.com/@mattklein123/lyfts-envoy-dashboards-5c91738816b1) on Lyft's Envoy dashboards
 
 ## Related
 
