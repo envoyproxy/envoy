@@ -35,7 +35,7 @@ HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
                                                                                 context.scope());
 
     auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
-        std::move(async_client_factory->create()), std::chrono::milliseconds(timeout_ms));
+        async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
     callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
         new Http::ExtAuthz::Filter(filter_config, std::move(client))});
   };
