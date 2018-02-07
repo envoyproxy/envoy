@@ -353,6 +353,11 @@ TEST(IntervalSet, testIntervals) {
   EXPECT_EQ("[-2, -1), [2, 23)", insert_and_print(3, 22));           // merge all via overlap
   EXPECT_EQ("[-2, 23)", insert_and_print(-2, 23));                   // merge all covering exact
   EXPECT_EQ("[-3, 24)", insert_and_print(-3, 24)); // merge all with overhand on both sides
+
+  interval_set.clear();
+  EXPECT_EQ("", insert_and_print(10, 10));
+  EXPECT_EQ("[25, 26)", insert_and_print(25, 26));
+  EXPECT_EQ("[5, 11), [25, 26)", insert_and_print(5, 11));
 }
 
 } // namespace Envoy

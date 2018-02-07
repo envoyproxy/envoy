@@ -318,30 +318,35 @@ public:
     }
     ASSERT(left < right);
 
-    const auto left_pos = intervals_.lower_bound(Interval(left, left));
-    // upper_bound is exclusive, and we want to be inclusive.
-    auto right_pos = intervals_.upper_bound(Interval(right, right));
+    // There 3 cases where we'll decide the [left, right) is disjoint with the
+    // current contents, and just need to insert. But we'll structure the code
+    // to search for where existing interval(s) needs to be merged, and fall back
+    // to the disjoint insertion case.
     if (!intervals_.empty()) {
-      --right_pos;
+      const auto left_pos = intervals_.lower_bound(Interval(left, left));
+      if (left_pos != intervals_.end() && (right >= left_pos->first)) {
+        // upper_bound is exclusive, and we want to be inclusive.
+        auto right_pos = intervals_.upper_bound(Interval(right, right));
+        if (right_pos != intervals_.begin()) {
+          --right_pos;
+          if (right_pos->second >= left) {
+            // Both bounds overlap, with one or more existing intervals.
+            left = std::min(left_pos->first, left);
+            right = std::max(right_pos->second, right);
+            ++right_pos; // erase is non-inclusive on upper bound.
+            intervals_.erase(left_pos, right_pos);
+          }
+        }
+      }
     }
-
-    if ((left_pos == intervals_.end()) || (right_pos == intervals_.end()) ||
-        (right < left_pos->first) || (right_pos->second < left)) {
-      // Fully disjoint. Simply insert.
-      intervals_.insert(Interval(left, right));
-    } else {
-      // Both bounds overlap.
-      left = std::min(left_pos->first, left);
-      right = std::max(right_pos->second, right);
-      ++right_pos; // erase is non-inclusive on upper bound.
-      intervals_.erase(left_pos, right_pos);
-      intervals_.insert(Interval(left, right));
-    }
+    intervals_.insert(Interval(left, right));
   }
 
   std::vector<Interval> toVector() const override {
     return std::vector<Interval>(intervals_.begin(), intervals_.end());
   }
+
+  void clear() override { intervals_.clear(); }
 
 private:
   struct Compare {
