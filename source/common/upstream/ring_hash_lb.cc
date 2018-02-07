@@ -16,9 +16,9 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-    const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
 
-    : LoadBalancerBase(priority_set, stats, runtime, random, common_settings), config_(config),
+    : LoadBalancerBase(priority_set, stats, runtime, random, common_config), config_(config),
       factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 void RingHashLoadBalancer::initialize() {

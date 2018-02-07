@@ -50,7 +50,7 @@
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
   ((message).has_##field_name()                                                                    \
-       ? (static_cast<double>(max_value) * (message).field_name().value())                         \
+       ? static_cast<double>(max_value) * ((message).field_name().value() / 100.0)                 \
        : default_value)
 
 namespace Envoy {

@@ -25,7 +25,7 @@ public:
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                      const LoadBalancerSubsetInfo& subsets,
                      const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
-                     const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings);
+                     const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -129,7 +129,7 @@ private:
 
   const LoadBalancerType lb_type_;
   const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  const envoy::api::v2::Cluster::CommonLoadBalancerSettings common_settings_;
+  const envoy::api::v2::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;

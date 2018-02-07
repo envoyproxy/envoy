@@ -40,7 +40,7 @@ public:
 
   void init() {
     lb_.reset(new RingHashLoadBalancer(priority_set_, stats_, runtime_, random_, config_,
-                                       common_settings_));
+                                       common_config_));
     lb_->initialize();
   }
 
@@ -55,7 +55,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
-  envoy::api::v2::Cluster::CommonLoadBalancerSettings common_settings_;
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<RingHashLoadBalancer> lb_;
@@ -323,7 +323,7 @@ TEST_P(DISABLED_RingHashLoadBalancerTest, DetermineSpread) {
   config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
   config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(false);
   RingHashLoadBalancer thread_aware_lb{priority_set_, stats_,  runtime_,
-                                       random_,       config_, common_settings_};
+                                       random_,       config_, common_config_};
   thread_aware_lb.initialize();
 
   LoadBalancerPtr lb = thread_aware_lb.factory()->create();

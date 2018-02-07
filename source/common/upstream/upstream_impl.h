@@ -303,8 +303,8 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
-  const envoy::api::v2::Cluster::CommonLoadBalancerSettings& lbSettings() const override {
-    return common_load_balancer_settings_;
+  const envoy::api::v2::Cluster::CommonLbConfig& lbConfig() const override {
+    return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   uint32_t perConnectionBufferLimitBytes() const override {
@@ -373,7 +373,7 @@ private:
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
-  const envoy::api::v2::Cluster::CommonLoadBalancerSettings common_load_balancer_settings_;
+  const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
 };
 
 /**

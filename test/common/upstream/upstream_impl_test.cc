@@ -733,7 +733,7 @@ TEST(ClusterMetadataTest, Metadata) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
-  EXPECT_EQ(0.3, cluster.info()->lbSettings().healthy_panic_threshold().value());
+  EXPECT_EQ(0.3, cluster.info()->lbConfig().healthy_panic_threshold().value());
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

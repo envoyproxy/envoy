@@ -37,15 +37,15 @@ protected:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  envoy::api::v2::Cluster::CommonLoadBalancerSettings common_settings_;
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
 };
 
 class TestLb : public LoadBalancerBase {
 public:
   TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random,
-         const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
-      : LoadBalancerBase(priority_set, stats, runtime, random, common_settings) {}
+         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::percentageLoad;
 };
@@ -74,8 +74,8 @@ public:
     return ret;
   }
 
-  envoy::api::v2::Cluster::CommonLoadBalancerSettings common_settings_;
-  TestLb lb_{priority_set_, stats_, runtime_, random_, common_settings_};
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  TestLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
 
 INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
@@ -201,7 +201,7 @@ public:
       local_host_set_ = reinterpret_cast<HostSetImpl*>(&local_priority_set_->getOrCreateHostSet(0));
     }
     lb_.reset(new RoundRobinLoadBalancer(priority_set_, local_priority_set_.get(), stats_, runtime_,
-                                         random_, common_settings_));
+                                         random_, common_config_));
   }
 
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
@@ -366,7 +366,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
-  common_settings_.mutable_healthy_panic_threshold()->set_value(0);
+  common_config_.mutable_healthy_panic_threshold()->set_value(0);
   init(true);
   local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality,
                                empty_host_vector_, empty_host_vector_);
@@ -414,7 +414,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   hostSet().healthy_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
-  common_settings_.mutable_healthy_panic_threshold()->set_value(1.0);
+  common_config_.mutable_healthy_panic_threshold()->set_value(1.0);
   init(true);
   local_host_set_->updateHosts(hosts, hosts, local_hosts_per_locality, local_hosts_per_locality,
                                empty_host_vector_, empty_host_vector_);
@@ -680,7 +680,7 @@ INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_settings_};
+  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -839,7 +839,7 @@ INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
 
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  RandomLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_settings_};
+  RandomLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
 };
 
 TEST_P(RandomLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }

@@ -38,10 +38,10 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
 LoadBalancerBase::LoadBalancerBase(
     const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : stats_(stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_settings, healthy_panic_threshold, 100, 50)),
+          common_config, healthy_panic_threshold, 100, 50)),
       priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority());
@@ -104,8 +104,8 @@ const HostSet& LoadBalancerBase::chooseHostSet() {
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
-    : LoadBalancerBase(priority_set, stats, runtime, random, common_settings),
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
       local_priority_set_(local_priority_set) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
@@ -384,9 +384,9 @@ HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
 LeastRequestLoadBalancer::LeastRequestLoadBalancer(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                common_settings) {
+                                common_config) {
   priority_set.addMemberUpdateCb(
       [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         if (last_host_) {

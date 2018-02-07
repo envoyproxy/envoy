@@ -33,7 +33,7 @@ protected:
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random,
-                   const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings);
+                   const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the per_priority_load_;
   const HostSet& chooseHostSet();
@@ -67,7 +67,7 @@ protected:
   ZoneAwareLoadBalancerBase(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings);
+      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
   ~ZoneAwareLoadBalancerBase();
 
   /**
@@ -144,9 +144,9 @@ public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random,
-                         const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
+                         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                  common_settings) {}
+                                  common_config) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -173,7 +173,7 @@ public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings);
+      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -191,9 +191,9 @@ public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random,
-                     const envoy::api::v2::Cluster::CommonLoadBalancerSettings& common_settings)
+                     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                  common_settings) {}
+                                  common_config) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;

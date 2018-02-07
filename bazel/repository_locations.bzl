@@ -72,7 +72,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     envoy_api = dict(
         # FIXFIX FOR REVIEW ONLY POINTING TO BRANCH
-        commit = "024cf9f9761ab45039420d15efe99068e539d792",
+        commit = "dd6d8299bbd75cb247e7e01b958e56b37d67f573",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(
