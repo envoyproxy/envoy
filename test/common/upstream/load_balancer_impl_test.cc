@@ -52,8 +52,6 @@ public:
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
-  TestLb lb_{priority_set_, stats_, runtime_, random_, common_settings_};
-
   void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts) {
     ASSERT(num_healthy_hosts <= num_hosts);
 
@@ -77,6 +75,7 @@ public:
   }
 
   envoy::api::v2::Cluster::CommonLoadBalancerSettings common_settings_;
+  TestLb lb_{priority_set_, stats_, runtime_, random_, common_settings_};
 };
 
 INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
