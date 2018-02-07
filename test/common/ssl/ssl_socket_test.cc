@@ -86,6 +86,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
           if (!expected_digest.empty()) {
+            // Assert twice to ensure a cached value is returned and still valid.
+            EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
             EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
           }
           EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
@@ -99,6 +101,9 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
             EXPECT_EQ(expected_local_subject, server_connection->ssl()->subjectLocalCertificate());
           }
           if (!expected_peer_cert.empty()) {
+            // Assert twice to ensure a cached value is returned and still valid.
+            EXPECT_EQ(expected_peer_cert,
+                      server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
             EXPECT_EQ(expected_peer_cert,
                       server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
           }

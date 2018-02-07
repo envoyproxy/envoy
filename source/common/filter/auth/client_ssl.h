@@ -5,7 +5,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/api/v2/filter/network/client_ssl_auth.pb.h"
+#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -74,17 +74,17 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  */
 class Config : public Http::RestApiFetcher {
 public:
-  static ConfigSharedPtr create(const envoy::api::v2::filter::network::ClientSSLAuth& config,
-                                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-                                Event::Dispatcher& dispatcher, Stats::Scope& scope,
-                                Runtime::RandomGenerator& random);
+  static ConfigSharedPtr
+  create(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+         ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
+         Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::Address::IpList& ipWhiteList() { return ip_white_list_; }
   GlobalStats& stats() { return stats_; }
 
 private:
-  Config(const envoy::api::v2::filter::network::ClientSSLAuth& config,
+  Config(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 

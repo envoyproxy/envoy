@@ -89,6 +89,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
     return std::make_shared<Address::Ipv4Instance>(&sa4);
   }
   sockaddr_in6 sa6;
+  memset(&sa6, 0, sizeof(sa6));
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
@@ -116,6 +117,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
       throwWithMalformedIp(ip_address);
     }
     sockaddr_in6 sa6;
+    memset(&sa6, 0, sizeof(sa6));
     if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
       throwWithMalformedIp(ip_address);
     }
@@ -369,6 +371,18 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
     data >>= 8;
   }
   return result;
+}
+
+void Utility::addressToProtobufAddress(const Address::Instance& address,
+                                       envoy::api::v2::core::Address& proto_address) {
+  if (address.type() == Address::Type::Pipe) {
+    proto_address.mutable_pipe()->set_path(address.asString());
+  } else {
+    ASSERT(address.type() == Address::Type::Ip);
+    auto* socket_address = proto_address.mutable_socket_address();
+    socket_address->set_address(address.ip()->addressAsString());
+    socket_address->set_port_value(address.ip()->port());
+  }
 }
 
 } // namespace Network

@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::_;
@@ -63,6 +64,10 @@ void IntegrationStreamDecoder::waitForReset() {
     waiting_for_reset_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
+}
+
+void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+  continue_headers_ = std::move(headers);
 }
 
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -153,7 +158,7 @@ void IntegrationTcpClient::waitForDisconnect() {
 void IntegrationTcpClient::write(const std::string& data) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));
-  EXPECT_CALL(*client_write_buffer_, write(_));
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
@@ -309,13 +314,17 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
   registerTestServerPorts(port_names);
 }
 
-void BaseIntegrationTest::sendRawHttpAndWaitForResponse(const char* raw_http,
-                                                        std::string* response) {
+void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
+                                                        std::string* response,
+                                                        bool disconnect_after_headers_complete) {
   Buffer::OwnedImpl buffer(raw_http);
   RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+      port, buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
         response->append(TestUtility::bufferToString(data));
+        if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
+          client.close(Network::ConnectionCloseType::NoFlush);
+        }
       },
       version_);
 

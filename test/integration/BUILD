@@ -29,6 +29,7 @@ envoy_cc_test(
     data = ["//test/config/integration:server_ads.yaml"],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -107,7 +108,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/filter/network:http_connection_manager_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 

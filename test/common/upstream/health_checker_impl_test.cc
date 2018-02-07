@@ -42,15 +42,15 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::api::v2::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
-  envoy::api::v2::HealthCheck health_check;
+envoy::api::v2::core::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
+  envoy::api::v2::core::HealthCheck health_check;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
   return health_check;
 }
 
-envoy::api::v2::HealthCheck createGrpcHealthCheckConfig() {
-  envoy::api::v2::HealthCheck health_check;
+envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
+  envoy::api::v2::core::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
   health_check.mutable_interval()->set_seconds(1);
   health_check.mutable_unhealthy_threshold()->set_value(2);
@@ -88,7 +88,7 @@ TEST(HealthCheckerFactoryTest, MissingFieldiException) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  envoy::api::v2::HealthCheck health_check;
+  envoy::api::v2::core::HealthCheck health_check;
   // No health checker type set
   EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
                EnvoyException);
@@ -317,6 +317,33 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, true);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  std::unique_ptr<Http::TestHeaderMapImpl> continue_headers(
+      new Http::TestHeaderMapImpl{{":status", "100"}});
+  test_sessions_[0]->stream_response_callbacks_->decode100ContinueHeaders(
+      std::move(continue_headers));
+
   respond(0, "200", false, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
@@ -728,7 +755,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
@@ -860,7 +887,7 @@ TEST_F(HttpHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("39000000");
     repeated_payload.Add()->set_text("EEEEEEEE");
 
@@ -870,14 +897,14 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
     EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
     EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
@@ -889,7 +916,7 @@ static void add_uint8(Buffer::Instance& buffer, uint8_t addend) {
 }
 
 TEST(TcpHealthCheckMatcher, match) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload> repeated_payload;
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
 
@@ -1103,7 +1130,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
@@ -1254,8 +1281,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
 
   // Remove before the cross thread event comes in.
   EXPECT_CALL(*connection_, close(_));
-  std::vector<HostSharedPtr> old_hosts =
-      std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
+  HostVector old_hosts = std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
   post_cb();
 
@@ -2088,7 +2114,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
       {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
-  std::vector<HostSharedPtr> removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
+  HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);

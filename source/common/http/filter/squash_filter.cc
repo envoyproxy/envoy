@@ -25,8 +25,9 @@ const std::string SquashFilter::SERVER_AUTHORITY = "squash-server";
 const std::string SquashFilter::ATTACHED_STATE = "attached";
 const std::string SquashFilter::ERROR_STATE = "error";
 
-SquashFilterConfig::SquashFilterConfig(const envoy::api::v2::filter::http::Squash& proto_config,
-                                       Upstream::ClusterManager& clusterManager)
+SquashFilterConfig::SquashFilterConfig(
+    const envoy::config::filter::http::squash::v2::Squash& proto_config,
+    Upstream::ClusterManager& clusterManager)
     : cluster_name_(proto_config.cluster()),
       attachment_json_(getAttachment(proto_config.attachment_template())),
       attachment_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_timeout, 60000)),

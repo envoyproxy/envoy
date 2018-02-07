@@ -22,7 +22,7 @@ namespace Envoy {
 namespace AccessLog {
 
 ComparisonFilter::ComparisonFilter(
-    const envoy::api::v2::filter::accesslog::ComparisonFilter& config, Runtime::Loader& runtime)
+    const envoy::config::filter::accesslog::v2::ComparisonFilter& config, Runtime::Loader& runtime)
     : config_(config), runtime_(runtime) {}
 
 bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
@@ -33,31 +33,32 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
   }
 
   switch (config_.op()) {
-  case envoy::api::v2::filter::accesslog::ComparisonFilter::GE:
+  case envoy::config::filter::accesslog::v2::ComparisonFilter::GE:
     return lhs >= value;
-  case envoy::api::v2::filter::accesslog::ComparisonFilter::EQ:
+  case envoy::config::filter::accesslog::v2::ComparisonFilter::EQ:
     return lhs == value;
   default:
     NOT_REACHED;
   }
 }
 
-FilterPtr FilterFactory::fromProto(const envoy::api::v2::filter::accesslog::AccessLogFilter& config,
-                                   Runtime::Loader& runtime) {
+FilterPtr
+FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
+                         Runtime::Loader& runtime) {
   switch (config.filter_specifier_case()) {
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kStatusCodeFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kStatusCodeFilter:
     return FilterPtr{new StatusCodeFilter(config.status_code_filter(), runtime)};
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kDurationFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kDurationFilter:
     return FilterPtr{new DurationFilter(config.duration_filter(), runtime)};
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kNotHealthCheckFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kNotHealthCheckFilter:
     return FilterPtr{new NotHealthCheckFilter()};
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kTraceableFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kTraceableFilter:
     return FilterPtr{new TraceableRequestFilter()};
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kRuntimeFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kRuntimeFilter:
     return FilterPtr{new RuntimeFilter(config.runtime_filter(), runtime)};
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kAndFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kAndFilter:
     return FilterPtr{new AndFilter(config.and_filter(), runtime)};
-  case envoy::api::v2::filter::accesslog::AccessLogFilter::kOrFilter:
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kOrFilter:
     return FilterPtr{new OrFilter(config.or_filter(), runtime)};
   default:
     NOT_REACHED;
@@ -84,7 +85,7 @@ bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::
       std::chrono::duration_cast<std::chrono::milliseconds>(info.duration()).count());
 }
 
-RuntimeFilter::RuntimeFilter(const envoy::api::v2::filter::accesslog::RuntimeFilter& config,
+RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::RuntimeFilter& config,
                              Runtime::Loader& runtime)
     : runtime_(runtime), runtime_key_(config.runtime_key()) {}
 
@@ -102,19 +103,19 @@ bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
   }
 }
 
-OperatorFilter::OperatorFilter(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::filter::accesslog::AccessLogFilter>& configs,
-    Runtime::Loader& runtime) {
+OperatorFilter::OperatorFilter(const Protobuf::RepeatedPtrField<
+                                   envoy::config::filter::accesslog::v2::AccessLogFilter>& configs,
+                               Runtime::Loader& runtime) {
   for (const auto& config : configs) {
     filters_.emplace_back(FilterFactory::fromProto(config, runtime));
   }
 }
 
-OrFilter::OrFilter(const envoy::api::v2::filter::accesslog::OrFilter& config,
+OrFilter::OrFilter(const envoy::config::filter::accesslog::v2::OrFilter& config,
                    Runtime::Loader& runtime)
     : OperatorFilter(config.filters(), runtime) {}
 
-AndFilter::AndFilter(const envoy::api::v2::filter::accesslog::AndFilter& config,
+AndFilter::AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& config,
                      Runtime::Loader& runtime)
     : OperatorFilter(config.filters(), runtime) {}
 
@@ -151,7 +152,7 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo::RequestInfo& info, const 
 }
 
 InstanceSharedPtr
-AccessLogFactory::fromProto(const envoy::api::v2::filter::accesslog::AccessLog& config,
+AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLog& config,
                             Server::Configuration::FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {

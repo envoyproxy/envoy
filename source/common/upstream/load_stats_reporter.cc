@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Upstream {
 
-LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::Node& node,
+LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::core::Node& node,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::AsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
@@ -50,7 +50,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      for (auto& hosts : host_set->hostsPerLocality()) {
+      ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
+      for (auto& hosts : host_set->hostsPerLocality().get()) {
         ASSERT(hosts.size() > 0);
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;

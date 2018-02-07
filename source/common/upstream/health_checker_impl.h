@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/health_check.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -43,7 +43,7 @@ public:
    * @param dispatcher supplies the dispatcher.
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr create(const envoy::api::v2::HealthCheck& hc_config,
+  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& hc_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher);
@@ -114,7 +114,7 @@ protected:
 
   typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
 
-  HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+  HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
 
@@ -143,13 +143,12 @@ private:
     std::weak_ptr<Host> host_;
   };
 
-  void addHosts(const std::vector<HostSharedPtr>& hosts);
+  void addHosts(const HostVector& hosts);
   void decHealthy();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
   std::chrono::milliseconds interval() const;
-  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed);
+  void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, bool changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
@@ -168,7 +167,7 @@ private:
  */
 class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+  HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
 
@@ -187,6 +186,7 @@ private:
     void onTimeout() override;
 
     // Http::StreamDecoder
+    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override {
       if (end_stream) {
@@ -294,7 +294,7 @@ public:
   typedef std::list<std::vector<uint8_t>> MatchSegments;
 
   static MatchSegments loadProtoBytes(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::HealthCheck::Payload>& byte_array);
+      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload>& byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };
 
@@ -303,7 +303,7 @@ public:
  */
 class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  TcpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+  TcpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random);
 
@@ -361,7 +361,7 @@ private:
  */
 class RedisHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  RedisHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+  RedisHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random,
                          Redis::ConnPool::ClientFactory& client_factory);
@@ -425,7 +425,7 @@ private:
  */
 class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::HealthCheck& config,
+  GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
 
@@ -448,6 +448,7 @@ private:
     void onTimeout() override;
 
     // Http::StreamDecoder
+    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&&) override;

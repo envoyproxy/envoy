@@ -75,6 +75,7 @@ namespace Http {
   COUNTER  (downstream_rq_non_relative_path)                                                       \
   COUNTER  (downstream_rq_ws_on_non_ws_route)                                                      \
   COUNTER  (downstream_rq_too_large)                                                               \
+  COUNTER  (downstream_rq_1xx)                                                                     \
   COUNTER  (downstream_rq_2xx)                                                                     \
   COUNTER  (downstream_rq_3xx)                                                                     \
   COUNTER  (downstream_rq_4xx)                                                                     \
@@ -132,6 +133,7 @@ typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManager
  */
 // clang-format off
 #define CONN_MAN_LISTENER_STATS(COUNTER)                                                           \
+  COUNTER(downstream_rq_1xx)                                                                       \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \
   COUNTER(downstream_rq_4xx)                                                                       \
@@ -275,6 +277,11 @@ public:
    * @return ConnectionManagerListenerStats& the stats to write to.
    */
   virtual ConnectionManagerListenerStats& listenerStats() PURE;
+
+  /**
+   * @return bool supplies if the HttpConnectionManager should proxy the Expect: 100-Continue
+   */
+  virtual bool proxy100Continue() const PURE;
 };
 
 /**
@@ -300,6 +307,7 @@ public:
                                  ConnectionManagerTracingStats& tracing_stats);
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
+  static const HeaderMapImpl& continueHeader();
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -330,8 +338,10 @@ private:
    */
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
-        : parent_(parent), headers_continued_(false), stopped_(false), dual_filter_(dual_filter) {}
+        : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
+          stopped_(false), dual_filter_(dual_filter) {}
 
+    bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
     void commonHandleBufferData(Buffer::Instance& provided_data);
     bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
@@ -343,6 +353,7 @@ private:
     virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
     virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
     virtual bool complete() PURE;
+    virtual void do100ContinueHeaders() PURE;
     virtual void doHeaders(bool end_stream) PURE;
     virtual void doData(bool end_stream) PURE;
     virtual void doTrailers() PURE;
@@ -361,6 +372,7 @@ private:
 
     ActiveStream& parent_;
     bool headers_continued_ : 1;
+    bool continue_headers_continued_ : 1;
     bool stopped_ : 1;
     const bool dual_filter_ : 1;
   };
@@ -387,6 +399,7 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
+    void do100ContinueHeaders() override { NOT_REACHED; }
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
@@ -402,6 +415,7 @@ private:
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
+    void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
@@ -437,6 +451,9 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
     bool complete() override { return parent_.state_.local_complete_; }
+    void do100ContinueHeaders() override {
+      parent_.encode100ContinueHeaders(this, *parent_.continue_headers_);
+    }
     void doHeaders(bool end_stream) override {
       parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
     }
@@ -481,7 +498,7 @@ private:
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
-    void chargeStats(HeaderMap& headers);
+    void chargeStats(const HeaderMap& headers);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
@@ -492,6 +509,7 @@ private:
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
@@ -504,6 +522,7 @@ private:
     void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
+    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED; }
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
@@ -550,6 +569,11 @@ private:
       static constexpr uint32_t EncodeHeaders   = 0x08;
       static constexpr uint32_t EncodeData      = 0x10;
       static constexpr uint32_t EncodeTrailers  = 0x20;
+      // Encode100ContinueHeaders is a bit of a special state as 100 continue
+      // headers may be sent during request processing. This state is only used
+      // to verify we do not encode100Continue headers more than once per
+      // filter.
+      static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
     };
     // clang-format on
 
@@ -577,6 +601,7 @@ private:
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
+    HeaderMapPtr continue_headers_;
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
     HeaderMapPtr response_trailers_{};
@@ -594,6 +619,9 @@ private:
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
+    // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
+    // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
+    bool has_continue_headers_{};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

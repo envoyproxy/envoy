@@ -19,10 +19,9 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
       bootstrap, *this, stats, tls, runtime, random, local_info, log_manager, primary_dispatcher_)};
 }
 
-CdsApiPtr
-ValidationClusterManagerFactory::createCds(const envoy::api::v2::ConfigSource& cds_config,
-                                           const Optional<envoy::api::v2::ConfigSource>& eds_config,
-                                           ClusterManager& cm) {
+CdsApiPtr ValidationClusterManagerFactory::createCds(
+    const envoy::api::v2::core::ConfigSource& cds_config,
+    const Optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
   // Create the CdsApiImpl...
   ProdClusterManagerFactory::createCds(cds_config, eds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.

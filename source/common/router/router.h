@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/filter/http/router.pb.h"
+#include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -96,7 +96,8 @@ public:
         shadow_writer_(std::move(shadow_writer)) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
-               ShadowWriterPtr&& shadow_writer, const envoy::api::v2::filter::http::Router& config)
+               ShadowWriterPtr&& shadow_writer,
+               const envoy::config::filter::http::router::v2::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
@@ -216,6 +217,7 @@ private:
     }
 
     // Http::StreamDecoder
+    void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
@@ -297,6 +299,7 @@ private:
   void maybeDoShadowing();
   void onRequestComplete();
   void onResponseTimeout();
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);

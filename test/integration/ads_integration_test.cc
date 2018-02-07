@@ -6,6 +6,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 
+#include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -180,7 +181,6 @@ public:
     ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
-    envoy::service::discovery::v2::AdsDummy dummy;
   }
 
   FakeHttpConnectionPtr ads_connection_;

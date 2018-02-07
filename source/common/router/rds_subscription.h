@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/common/assert.h"
@@ -21,9 +21,9 @@ class RdsSubscription : public Http::RestApiFetcher,
                         Logger::Loggable<Logger::Id::upstream> {
 public:
   RdsSubscription(Envoy::Config::SubscriptionStats stats,
-                  const envoy::api::v2::filter::network::Rds& rds, Upstream::ClusterManager& cm,
-                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                  const LocalInfo::LocalInfo& local_info);
+                  const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
 
 private:
   // Config::Subscription

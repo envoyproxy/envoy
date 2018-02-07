@@ -145,12 +145,15 @@ protected:
   void testValidZeroLengthContent();
   void testInvalidContentLength();
   void testMultipleContentLengths();
+  void testComputedHealthCheck();
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
   void testGrpcRetry();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
+  void testEnvoyHandling100Continue();
+  void testEnvoyProxying100Continue(bool with_encoder_filter = false);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

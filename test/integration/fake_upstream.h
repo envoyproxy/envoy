@@ -43,6 +43,7 @@ public:
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
   bool complete() { return end_stream_; }
+  void encode100ContinueHeaders(const Http::HeaderMapImpl& headers);
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
@@ -77,6 +78,7 @@ public:
     decoded_grpc_frames_.erase(decoded_grpc_frames_.begin());
   }
   template <class T> void waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message) {
+    ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
       decodeGrpcFrame(message);
       return;
@@ -94,9 +96,11 @@ public:
       }
     }
     decodeGrpcFrame(message);
+    ENVOY_LOG(debug, "Received gRPC message: {}", message.DebugString());
   }
 
   // Http::StreamDecoder
+  void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
@@ -308,7 +312,7 @@ protected:
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-               Network::ListenSocketPtr&& connection, FakeHttpConnection::Type type);
+               Network::SocketPtr&& connection, FakeHttpConnection::Type type);
 
   class FakeListener : public Network::ListenerConfig {
   public:
@@ -317,7 +321,7 @@ private:
   private:
     // Network::ListenerConfig
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocket& socket() override { return *parent_.socket_; }
+    Network::Socket& socket() override { return *parent_.socket_; }
     Network::TransportSocketFactory& transportSocketFactory() override {
       return *parent_.transport_socket_factory_;
     }
@@ -335,7 +339,7 @@ private:
   void threadRoutine();
 
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  Network::ListenSocketPtr socket_;
+  Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.

@@ -103,7 +103,7 @@ public:
   }
 
   std::string upstream_zone_{"to_az"};
-  envoy::api::v2::Locality upstream_locality_;
+  envoy::api::v2::core::Locality upstream_locality_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -1144,6 +1144,32 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // The 100-continue will result in resetting retry_state_, so when the stream
+  // is reset we won't even check shouldRetry().
+  EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).Times(0);
+  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
+  Http::HeaderMapPtr continue_headers(new Http::TestHeaderMapImpl{{":status", "100"}});
+  response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 
 TEST_F(RouterTest, RetryUpstream5xx) {

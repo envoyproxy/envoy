@@ -96,7 +96,8 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  config_helper_.setClientCodec(envoy::api::v2::filter::network::HttpConnectionManager::AUTO);
+  config_helper_.setClientCodec(
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::AUTO);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(true, false);
   };

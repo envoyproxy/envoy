@@ -13,7 +13,8 @@ public:
   void initialize() override {
     config_helper_.addFilter("name: envoy.cors");
     config_helper_.addConfigModifier(
-        [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
+        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+            -> void {
           auto* route_config = hcm.mutable_route_config();
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {

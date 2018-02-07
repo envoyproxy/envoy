@@ -53,7 +53,7 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+  Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                       bool bind_to_port,
                                       bool hand_off_restored_destination_connections) override {
     return Network::ListenerPtr{
@@ -91,7 +91,7 @@ public:
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
   MOCK_METHOD4(createListener_,
-               Network::Listener*(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+               Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));

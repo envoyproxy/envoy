@@ -1,5 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/filter/network/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace {
 void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>& header_value_options) {
+    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
     i.mutable_append()->set_value(false);
   }
@@ -91,9 +91,9 @@ public:
     fake_upstreams_.clear();
   }
 
-  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::HeaderValueOption>* field,
+  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>* field,
                  const std::string& key, const std::string& value, bool append) {
-    envoy::api::v2::HeaderValueOption* header_value_option = field->Add();
+    envoy::api::v2::core::HeaderValueOption* header_value_option = field->Add();
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
@@ -156,7 +156,8 @@ public:
 
   void initializeFilter(HeaderMode mode, bool include_route_config_headers) {
     config_helper_.addConfigModifier(
-        [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
+        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                hcm) {
           // Overwrite default config with our own.
           MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
 

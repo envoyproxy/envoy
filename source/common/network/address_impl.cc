@@ -52,7 +52,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
     const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
     ASSERT(AF_UNIX == sun->sun_family);
     RELEASE_ASSERT(ss_len == 0 || ss_len >= offsetof(struct sockaddr_un, sun_path) + 1);
-    return std::make_shared<Address::PipeInstance>(sun);
+    return std::make_shared<Address::PipeInstance>(sun, ss_len);
   }
   default:
     throw EnvoyException(fmt::format("Unexpected sockaddr family: {}", ss.ss_family));
@@ -208,7 +208,6 @@ Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only) : InstanceB
 Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0) {}
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : InstanceBase(Type::Ip) {
-  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
   ip_.ipv6_.address_.sin6_family = AF_INET6;
   ip_.ipv6_.address_.sin6_port = htons(port);
   if (!address.empty()) {
@@ -244,12 +243,21 @@ int Ipv6Instance::socket(SocketType type) const {
   return fd;
 }
 
-PipeInstance::PipeInstance(const sockaddr_un* address) : InstanceBase(Type::Pipe) {
+PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
+    : InstanceBase(Type::Pipe) {
   if (address->sun_path[0] == '\0') {
-    throw EnvoyException("Abstract AF_UNIX sockets not supported.");
+#if !defined(__linux__)
+    throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
+#endif
+    RELEASE_ASSERT(ss_len >= offsetof(struct sockaddr_un, sun_path) + 1);
+    abstract_namespace_ = true;
+    address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
   address_ = *address;
-  friendly_name_ = address_.sun_path;
+  friendly_name_ =
+      abstract_namespace_
+          ? fmt::format("@{}", absl::string_view(address_.sun_path + 1, address_length_ - 1))
+          : address_.sun_path;
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
@@ -257,13 +265,29 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
   address_.sun_family = AF_UNIX;
   StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
   friendly_name_ = address_.sun_path;
+  if (address_.sun_path[0] == '@') {
+#if !defined(__linux__)
+    throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
+#endif
+    abstract_namespace_ = true;
+    address_length_ = strlen(address_.sun_path);
+    address_.sun_path[0] = '\0';
+  }
 }
 
 int PipeInstance::bind(int fd) const {
+  if (abstract_namespace_) {
+    return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
+                  offsetof(struct sockaddr_un, sun_path) + address_length_);
+  }
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 
 int PipeInstance::connect(int fd) const {
+  if (abstract_namespace_) {
+    return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
+                     offsetof(struct sockaddr_un, sun_path) + address_length_);
+  }
   return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 

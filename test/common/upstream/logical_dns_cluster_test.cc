@@ -35,8 +35,9 @@ public:
                                          ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
                                          false));
     cluster_->prioritySet().addMemberUpdateCb(
-        [&](uint32_t, const std::vector<HostSharedPtr>&,
-            const std::vector<HostSharedPtr>&) -> void { membership_updated_.ready(); });
+        [&](uint32_t, const HostVector&, const HostVector&) -> void {
+          membership_updated_.ready();
+        });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
@@ -171,9 +172,10 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
   EXPECT_EQ(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
             cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
   HostSharedPtr logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
@@ -208,7 +210,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ("", data.host_description_->locality().zone());
   EXPECT_EQ("", data.host_description_->locality().sub_zone());
   EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
-  EXPECT_EQ(&envoy::api::v2::Metadata::default_instance(), &data.host_description_->metadata());
+  EXPECT_EQ(&envoy::api::v2::core::Metadata::default_instance(),
+            &data.host_description_->metadata());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
   data.host_description_->healthChecker().setUnhealthy();
 

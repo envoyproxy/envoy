@@ -66,8 +66,9 @@ public:
     return clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
   }
 
-  CdsApiPtr createCds(const envoy::api::v2::ConfigSource&,
-                      const Optional<envoy::api::v2::ConfigSource>&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&,
+                      const Optional<envoy::api::v2::core::ConfigSource>&,
+                      ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
@@ -742,8 +743,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
   foo->prioritySet().addMemberUpdateCb(
-      [&membership_updated](uint32_t, const std::vector<HostSharedPtr>&,
-                            const std::vector<HostSharedPtr>&) -> void {
+      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
         membership_updated.ready();
       });
 

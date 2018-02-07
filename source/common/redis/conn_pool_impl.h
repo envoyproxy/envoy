@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/filter/network/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/redis/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -27,7 +27,8 @@ namespace ConnPool {
 
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config);
+  ConfigImpl(
+      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
@@ -115,9 +116,10 @@ private:
 
 class InstanceImpl : public Instance {
 public:
-  InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-               ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-               const envoy::api::v2::filter::network::RedisProxy::ConnPoolSettings& config);
+  InstanceImpl(
+      const std::string& cluster_name, Upstream::ClusterManager& cm, ClientFactory& client_factory,
+      ThreadLocal::SlotAllocator& tls,
+      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   // Redis::ConnPool::Instance
   PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,

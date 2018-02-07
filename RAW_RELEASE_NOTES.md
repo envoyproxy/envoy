@@ -51,6 +51,10 @@ final version.
   :ref:`Squash <envoy_api_msg_filter.http.Squash>` allows debugging an incoming request to a microservice in the mesh.
 * lua: added headers replace() API.
 * Added support for direct responses -- i.e., sending a preconfigured HTTP response without proxying anywhere.
+* Added support for proxying 100-Continue responses.
 * Added DOWNSTREAM_LOCAL_ADDRESS, DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT header formatters, and
   DOWNSTREAM_LOCAL_ADDRESS access log formatter.
 * Added support for HTTPS redirects on specific routes.
+* Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
+* Added support for abstract unix domain sockets on linux. The abstract
+  namespace can be used by prepending '@' to a socket path.

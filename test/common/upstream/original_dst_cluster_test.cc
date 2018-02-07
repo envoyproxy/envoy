@@ -56,8 +56,9 @@ public:
     cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
                                           ssl_context_manager_, cm, dispatcher_, false));
     cluster_->prioritySet().addMemberUpdateCb(
-        [&](uint32_t, const std::vector<HostSharedPtr>&,
-            const std::vector<HostSharedPtr>&) -> void { membership_updated_.ready(); });
+        [&](uint32_t, const HostVector&, const HostVector&) -> void {
+          membership_updated_.ready();
+        });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
@@ -136,9 +137,10 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   // No downstream connection => no host.
   {
@@ -194,9 +196,10 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_CALL(membership_updated_, ready());
 
@@ -219,9 +222,10 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(*connection.local_address_,
@@ -283,9 +287,10 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   // Host gets the local address of the downstream connection.
 
@@ -318,9 +323,10 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_EQ(host1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(*connection1.local_address_,
@@ -372,9 +378,10 @@ TEST_F(OriginalDstClusterTest, Connection) {
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().size());
-  EXPECT_EQ(0UL,
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_CALL(membership_updated_, ready());
 
@@ -412,18 +419,18 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setup(json);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addMemberUpdateCb([&](uint32_t, const std::vector<HostSharedPtr>& added,
-                                                const std::vector<HostSharedPtr>& removed) -> void {
-    // Update second hostset accordingly;
-    HostVectorSharedPtr new_hosts(
-        new std::vector<HostSharedPtr>(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-    HostVectorSharedPtr healthy_hosts(
-        new std::vector<HostSharedPtr>(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
-    const HostListsConstSharedPtr empty_host_lists{new std::vector<std::vector<HostSharedPtr>>()};
+  cluster_->prioritySet().addMemberUpdateCb(
+      [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
+        // Update second hostset accordingly;
+        HostVectorSharedPtr new_hosts(
+            new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+        HostVectorSharedPtr healthy_hosts(
+            new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
+        const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
 
-    second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_host_lists,
-                                             empty_host_lists, added, removed);
-  });
+        second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_hosts_per_locality,
+                                                 empty_hosts_per_locality, added, removed);
+      });
 
   EXPECT_CALL(membership_updated_, ready());
 

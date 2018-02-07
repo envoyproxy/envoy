@@ -39,19 +39,22 @@ std::string normalizeDate(const std::string& s) {
   return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
 }
 
-void setAllowAbsoluteUrl(envoy::api::v2::filter::network::HttpConnectionManager& hcm) {
-  envoy::api::v2::Http1ProtocolOptions options;
+void setAllowAbsoluteUrl(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  envoy::api::v2::core::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
 
-envoy::api::v2::filter::network::HttpConnectionManager::CodecType
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
   case Http::CodecClient::Type::HTTP1:
-    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP1;
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP1;
   case Http::CodecClient::Type::HTTP2:
-    return envoy::api::v2::filter::network::HttpConnectionManager::HTTP2;
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP2;
   default:
     RELEASE_ASSERT(0);
   }
@@ -233,7 +236,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 
-  EXPECT_TRUE(response_->complete());
+  ASSERT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   EXPECT_EQ(response_size, response_->body().size());
 }
@@ -275,7 +278,7 @@ void HttpIntegrationTest::testRouterNotFound() {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
@@ -286,7 +289,7 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
@@ -299,7 +302,7 @@ void HttpIntegrationTest::testRouterClusterNotFound404() {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
 
@@ -312,7 +315,7 @@ void HttpIntegrationTest::testRouterClusterNotFound503() {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 }
 
@@ -325,7 +328,7 @@ void HttpIntegrationTest::testRouterRedirect() {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, "www.redirect.com");
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->complete());
   EXPECT_STREQ("301", response->headers().Status()->value().c_str());
   EXPECT_STREQ("https://www.redirect.com/foo",
                response->headers().get(Http::Headers::get().Location)->value().c_str());
@@ -338,7 +341,8 @@ void HttpIntegrationTest::testRouterDirectResponse() {
   static const std::string prefix("/");
   static const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&](envoy::api::v2::filter::network::HttpConnectionManager& hcm) -> void {
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("x-additional-header");
@@ -361,7 +365,7 @@ void HttpIntegrationTest::testRouterDirectResponse() {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("example-value", response->headers()
                                     .get(Envoy::Http::LowerCaseString("x-additional-header"))
@@ -369,6 +373,30 @@ void HttpIntegrationTest::testRouterDirectResponse() {
                                     .c_str());
   EXPECT_STREQ("text/html", response->headers().ContentType()->value().c_str());
   EXPECT_EQ(body, response->body());
+}
+
+// Add a health check filter and verify correct computation of health based on upstream status.
+void HttpIntegrationTest::testComputedHealthCheck() {
+  config_helper_.addFilter(R"EOF(
+name: envoy.health_check
+config:
+    pass_through_mode: false
+    endpoint: /healthcheck
+    cluster_min_healthy_percentages:
+        example_cluster_name: { value: 75 }
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/healthcheck"},
+                                                               {":scheme", "http"},
+                                                               {":authority", "host"}},
+                                       *response_);
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
 }
 
 // Add a health check filter and verify correct behavior when draining.
@@ -678,7 +706,7 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
                                      1024 * 65, *response_);
 
   response_->waitForEndStream();
-  EXPECT_TRUE(response_->complete());
+  ASSERT_TRUE(response_->complete());
   EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
 }
 
@@ -710,6 +738,71 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   response_->waitForEndStream();
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
+}
+
+void HttpIntegrationTest::testEnvoyHandling100Continue() {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/dynamo/url"},
+                                                               {":scheme", "http"},
+                                                               {":authority", "host"},
+                                                               {"expect", "100-continue"}},
+                                       *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response_->waitForEndStream();
+  ASSERT_TRUE(response_->complete());
+  ASSERT(response_->continue_headers() != nullptr);
+  EXPECT_STREQ("100", response_->continue_headers()->Status()->value().c_str());
+
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+}
+
+void HttpIntegrationTest::testEnvoyProxying100Continue(bool with_encoder_filter) {
+  if (with_encoder_filter) {
+    // Because 100-continue only affects encoder filters, make sure it plays well
+    // with one.
+    config_helper_.addFilter("name: envoy.cors");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+            -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          {
+            auto* cors = virtual_host->mutable_cors();
+            cors->add_allow_origin("*");
+            cors->set_allow_headers("content-type,x-grpc-web");
+            cors->set_allow_methods("GET,POST");
+          }
+        });
+  }
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.set_proxy_100_continue(true); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                               {":path", "/dynamo/url"},
+                                                               {":scheme", "http"},
+                                                               {":authority", "host"},
+                                                               {"expect", "100-continue"}},
+                                       *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response_->waitForEndStream();
+  EXPECT_TRUE(response_->complete());
+  ASSERT(response_->continue_headers() != nullptr);
+  EXPECT_STREQ("100", response_->continue_headers()->Status()->value().c_str());
+
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
 void HttpIntegrationTest::testTwoRequests() {
@@ -757,60 +850,45 @@ void HttpIntegrationTest::testTwoRequests() {
 void HttpIntegrationTest::testBadFirstline() {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse("hello", &response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
 void HttpIntegrationTest::testMissingDelimiter() {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse("GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
 void HttpIntegrationTest::testInvalidCharacterInFirstline() {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse("GE(T / HTTP/1.1\r\nHost: host\r\n\r\n", &response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
 void HttpIntegrationTest::testLowVersion() {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse("GET / HTTP/0.8\r\nHost: host\r\n\r\n", &response);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/0.8\r\nHost: host\r\n\r\n",
+                                &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
 void HttpIntegrationTest::testHttp10Request() {
   initialize();
-  Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection.run();
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
 void HttpIntegrationTest::testNoHost() {
   initialize();
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection.run();
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
 }
 
@@ -823,17 +901,10 @@ void HttpIntegrationTest::testAbsolutePath() {
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
 
   initialize();
-  Buffer::OwnedImpl buffer("GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection.run();
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
@@ -845,17 +916,10 @@ void HttpIntegrationTest::testAbsolutePathWithPort() {
                           envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
-  Buffer::OwnedImpl buffer("GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection.run();
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
+      &response, true);
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
@@ -868,18 +932,11 @@ void HttpIntegrationTest::testAbsolutePathWithoutPort() {
                           envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
-  Buffer::OwnedImpl buffer("GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection.run();
-  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0) << response;
 }
 
 void HttpIntegrationTest::testAllowAbsoluteSameRelative() {
@@ -905,51 +962,26 @@ void HttpIntegrationTest::testEquivalent(const std::string& request) {
   // Set the first listener to allow absoute URLs.
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   // Make sure both listeners can be reached.
-  // TODO(alyssar) in a follow-up, instead have these named ports pulled automatically from the
+  // TODO(alyssawilk) in a follow-up, instead have these named ports pulled automatically from the
   // listener names.
   named_ports_ = {"http_forward", "http"};
   initialize();
 
-  Buffer::OwnedImpl buffer1(request);
   std::string response1;
-  RawConnectionDriver connection1(
-      lookupPort("http"), buffer1,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response1.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response1, true);
 
-  connection1.run();
-
-  Buffer::OwnedImpl buffer2(request);
   std::string response2;
-  RawConnectionDriver connection2(
-      lookupPort("http_forward"), buffer2,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response2.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection2.run();
+  sendRawHttpAndWaitForResponse(lookupPort("http_forward"), request.c_str(), &response2, true);
 
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
 void HttpIntegrationTest::testBadPath() {
   initialize();
-  Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("http"), buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
-        client.close(Network::ConnectionCloseType::NoFlush);
-      },
-      version_);
-
-  connection.run();
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n", &response,
+                                true);
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 

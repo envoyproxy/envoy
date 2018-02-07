@@ -28,6 +28,7 @@ public:
   const std::string& body() { return body_; }
 
   // Http::StreamDecoder
+  void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance&, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;

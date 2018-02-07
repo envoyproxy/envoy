@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/filter/network/client_ssl_auth.pb.h"
+#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -23,15 +23,16 @@ public:
                                                       FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::api::v2::filter::network::ClientSSLAuth()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth()};
   }
 
   std::string name() override { return Config::NetworkFilterNames::get().CLIENT_SSL_AUTH; }
 
 private:
-  NetworkFilterFactoryCb
-  createFilter(const envoy::api::v2::filter::network::ClientSSLAuth& proto_config,
-               FactoryContext& context);
+  NetworkFilterFactoryCb createFilter(
+      const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
+      FactoryContext& context);
 };
 
 } // namespace Configuration

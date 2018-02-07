@@ -18,7 +18,6 @@
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
-#include "common/ssl/connection_impl.h"
 
 #include "event2/event.h"
 
@@ -109,7 +108,7 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 }
 
 Network::ListenerPtr
-DispatcherImpl::createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                bool bind_to_port, bool hand_off_restored_destination_connections) {
   ASSERT(isThreadSafe());
   return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,

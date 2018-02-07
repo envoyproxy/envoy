@@ -4,7 +4,7 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/address.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
@@ -200,6 +200,14 @@ public:
    * @return the absl::uint128 IPv6 address in network byte order.
    */
   static absl::uint128 Ip6htonl(const absl::uint128& address);
+
+  /**
+   * Copies the address instance into the protobuf representation of an address.
+   * @param address is the address to be copied into the protobuf representation of this address.
+   * @param proto_address is the protobuf address to which the address instance is copied into.
+   */
+  static void addressToProtobufAddress(const Address::Instance& address,
+                                       envoy::api::v2::core::Address& proto_address);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);

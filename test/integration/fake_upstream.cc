@@ -51,6 +51,13 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   decoder_event_.notify_one();
 }
 
+void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
+      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+  parent_.connection().dispatcher().post(
+      [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
+}
+
 void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
   std::shared_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
@@ -232,13 +239,12 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dis
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   Network::ListenSocketPtr{new Network::UdsListenSocket(uds_path)}, type) {
+                   Network::SocketPtr{new Network::UdsListenSocket(uds_path)}, type) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
-static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port,
-                                                    Network::Address::IpVersion version) {
-  return Network::ListenSocketPtr{new Network::TcpListenSocket(
+static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
+  return Network::SocketPtr{new Network::TcpListenSocket(
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
       true)};
@@ -261,7 +267,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                           Network::ListenSocketPtr&& listen_socket, FakeHttpConnection::Type type)
+                           Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type)
     : http_type_(type), transport_socket_factory_(std::move(transport_socket_factory)),
       socket_(std::move(listen_socket)), api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),

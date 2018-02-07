@@ -33,10 +33,11 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    envoy::api::v2::ConfigSource lds_config;
+    envoy::api::v2::core::ConfigSource lds_config;
     Config::Utility::translateLdsConfig(*config, lds_config);
     if (v2_rest) {
-      lds_config.mutable_api_config_source()->set_api_type(envoy::api::v2::ApiConfigSource::REST);
+      lds_config.mutable_api_config_source()->set_api_type(
+          envoy::api::v2::core::ApiConfigSource::REST);
     }
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
@@ -131,16 +132,17 @@ TEST_F(LdsApiTest, UnknownCluster) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::ConfigSource lds_config;
+  envoy::api::v2::core::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_,
-                                   local_info_, store_, listener_manager_),
-                            EnvoyException,
-                            "envoy::api::v2::ConfigSource must have a statically defined non-EDS "
-                            "cluster: 'foo_cluster' does not exist, was added via api, or is an "
-                            "EDS cluster");
+  EXPECT_THROW_WITH_MESSAGE(
+      LdsApi(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_, store_,
+             listener_manager_),
+      EnvoyException,
+      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
+      "cluster: 'foo_cluster' does not exist, was added via api, or is an "
+      "EDS cluster");
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {
@@ -153,7 +155,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   )EOF";
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-  envoy::api::v2::ConfigSource lds_config;
+  envoy::api::v2::core::ConfigSource lds_config;
   Config::Utility::translateLdsConfig(*config, lds_config);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;

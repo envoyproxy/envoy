@@ -9,7 +9,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/base.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -221,6 +221,7 @@ public:
 };
 
 class RateLimitPolicy;
+class Config;
 
 /**
  * Virtual host defintion.
@@ -243,6 +244,11 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+
+  /**
+   * @return const Config& the RouteConfiguration that owns this virtual host.
+   */
+  virtual const Config& routeConfig() const PURE;
 };
 
 /**
@@ -304,6 +310,34 @@ public:
    */
   virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
   metadataMatchCriteria() const PURE;
+};
+
+/**
+ * Type of path matching that a route entry uses.
+ */
+enum class PathMatchType {
+  None,
+  Prefix,
+  Exact,
+  Regex,
+};
+
+/**
+ * Criterion that a route entry uses for matching a particular path.
+ */
+class PathMatchCriterion {
+public:
+  virtual ~PathMatchCriterion() {}
+
+  /**
+   * @return PathMatchType type of path match.
+   */
+  virtual PathMatchType matchType() const PURE;
+
+  /**
+   * @return const std::string& the string with which to compare paths.
+   */
+  virtual const std::string& matcher() const PURE;
 };
 
 /**
@@ -411,10 +445,15 @@ public:
   virtual bool includeVirtualHostRateLimits() const PURE;
 
   /**
-   * @return const envoy::api::v2::Metadata& return the metadata provided in the config for this
-   * route.
+   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
+   * this route.
    */
-  virtual const envoy::api::v2::Metadata& metadata() const PURE;
+  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+
+  /**
+   * @return const PathMatchCriterion& the match criterion for this route.
+   */
+  virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 };
 
 /**
@@ -487,6 +526,11 @@ public:
    * (RFC1918) source.
    */
   virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
+
+  /**
+   * @return const std::string the RouteConfiguration name.
+   */
+  virtual const std::string& name() const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
