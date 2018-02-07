@@ -740,7 +740,7 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
   std::vector<std::set<std::string>> subset_keys = {{"x"}};
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
 
-  common_config_.mutable_healthy_panic_threshold()->set_value(0.4);
+  common_config_.mutable_healthy_panic_threshold()->set_value(40);
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 40))
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
