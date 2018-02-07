@@ -1,6 +1,6 @@
 REPOSITORY_LOCATIONS = dict(
     com_google_absl = dict(
-        commit = "152218a11036efbb36ad65ac67cc0dcd8d8dc2c0",
+        commit = "787891a3882795cee0364e8a0f0dda315578d155",
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
@@ -34,7 +34,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "dc1e79eb92e17fb78e2c39c4a62971bdd1cebb74",
+        commit = "152218a11036efbb36ad65ac67cc0dcd8d8dc2c0",
         remote = "https://github.com/rnburn/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
