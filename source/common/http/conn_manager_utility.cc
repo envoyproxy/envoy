@@ -50,9 +50,24 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
+  auto xff_num_trusted_hops = config.xffNumTrustedHops();
   if (config.useRemoteAddress()) {
-    final_remote_address = connection.remoteAddress();
     single_xff_address = request_headers.ForwardedFor() == nullptr;
+    // If there are any trusted proxies in front of this Envoy instance (as indicated by
+    // the xff_num_trusted_hops configuration option), get the trusted client address
+    // from the XFF.
+    if (xff_num_trusted_hops > 0) {
+      auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops - 1);
+      if (ret.address_ != nullptr) {
+        final_remote_address = ret.address_;
+      }
+    }
+    // If there aren't any trusted proxies in front of this Envoy instance, or there
+    // are but they didn't populate XFF properly, the trusted client address is the
+    // source address of the immediate downstream's connection to us.
+    if (final_remote_address == nullptr) {
+      final_remote_address = connection.remoteAddress();
+    }
     if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
@@ -64,7 +79,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
     final_remote_address = ret.address_;
     single_xff_address = ret.single_address_;
   }

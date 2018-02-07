@@ -239,7 +239,7 @@ void Utility::sendLocalReply(
 }
 
 Utility::GetLastAddressFromXffInfo
-Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
+Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t num_to_skip) {
   const auto xff_header = request_headers.ForwardedFor();
   if (xff_header == nullptr) {
     return {nullptr, false};
@@ -247,6 +247,16 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
 
   absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
   static const std::string seperator(", ");
+  // Ignore the last num_to_skip addresses at the end of XFF.
+  for (uint32_t i = 0; i < num_to_skip; i++) {
+    std::string::size_type last_comma = xff_string.rfind(seperator);
+    if (last_comma == std::string::npos) {
+      return {nullptr, false};
+    }
+    xff_string = xff_string.substr(0, last_comma);
+  }
+  // The text after the last remaining comma, or the entirety of the string if there
+  // is no comma, is the requested IP address.
   std::string::size_type last_comma = xff_string.rfind(seperator);
   if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + seperator.size());
@@ -259,7 +269,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
     // TODO(mattklein123 PERF: Avoid the copy here.
     return {
         Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
-        last_comma == std::string::npos};
+        last_comma == std::string::npos && num_to_skip == 0};
   } catch (const EnvoyException&) {
     return {nullptr, false};
   }

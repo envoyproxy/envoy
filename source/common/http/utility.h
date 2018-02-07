@@ -143,7 +143,8 @@ public:
    * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
    *         @see GetLastAddressFromXffInfo for more information.
    */
-  static GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers);
+  static GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers,
+                                                         uint32_t num_to_skip = 0);
 
   /**
    * Get the string for the given http protocol.
