@@ -35,10 +35,9 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
   NOT_REACHED;
 }
 
-LoadBalancerBase::LoadBalancerBase(
-    const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : stats_(stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config, healthy_panic_threshold, 100, 50)),

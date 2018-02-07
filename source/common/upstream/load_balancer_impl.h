@@ -64,10 +64,10 @@ protected:
 class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
-  ZoneAwareLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                            ClusterStats& stats, Runtime::Loader& runtime,
+                            Runtime::RandomGenerator& random,
+                            const envoy::api::v2::Cluster::CommonLbConfig& common_config);
   ~ZoneAwareLoadBalancerBase();
 
   /**
@@ -170,10 +170,10 @@ private:
  */
 class LeastRequestLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
-  LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                           ClusterStats& stats, Runtime::Loader& runtime,
+                           Runtime::RandomGenerator& random,
+                           const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;

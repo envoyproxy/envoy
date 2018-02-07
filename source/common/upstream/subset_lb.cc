@@ -21,11 +21,10 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     const LoadBalancerSubsetInfo& subsets,
     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
-      common_config_(common_config), stats_(stats), runtime_(runtime), random_(random),
-      fallback_policy_(subsets.fallbackPolicy()), default_subset_(subsets.defaultSubset()),
-      subset_keys_(subsets.subsetKeys()), original_priority_set_(priority_set),
-      original_local_priority_set_(local_priority_set) {
+    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), common_config_(common_config),
+      stats_(stats), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      default_subset_(subsets.defaultSubset()), subset_keys_(subsets.subsetKeys()),
+      original_priority_set_(priority_set), original_local_priority_set_(local_priority_set) {
   ASSERT(subsets.isEnabled());
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
