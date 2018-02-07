@@ -14,7 +14,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x800, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
@@ -28,7 +28,9 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::NoRouteFound, "NR"),
       std::make_pair(ResponseFlag::DelayInjected, "DI"),
       std::make_pair(ResponseFlag::FaultInjected, "FI"),
-      std::make_pair(ResponseFlag::RateLimited, "RL")};
+      std::make_pair(ResponseFlag::RateLimited, "RL"),
+      std::make_pair(ResponseFlag::Unauthorized, "UA"),
+  };
 
   for (const auto& test_case : expected) {
     NiceMock<MockRequestInfo> request_info;

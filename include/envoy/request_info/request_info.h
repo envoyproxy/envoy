@@ -43,8 +43,10 @@ enum ResponseFlag {
   FaultInjected = 0x400,
   // Request was ratelimited locally by rate limit filter.
   RateLimited = 0x800,
+  // Request was unauthorized.
+  Unauthorized = 0x1000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = RateLimited
+  LastFlag = Unauthorized
 };
 
 /**
