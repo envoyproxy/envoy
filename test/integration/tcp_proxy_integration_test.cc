@@ -23,6 +23,11 @@ namespace {
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+void TcpProxyIntegrationTest::initialize() {
+  config_helper_.renameListener("tcp_proxy");
+  BaseIntegrationTest::initialize();
+}
+
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   initialize();

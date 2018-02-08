@@ -234,7 +234,13 @@ void BaseIntegrationTest::createEnvoy() {
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-  createGeneratedApiTestServer(bootstrap_path, named_ports_);
+
+  std::vector<std::string> named_ports;
+  const auto& static_resources = config_helper_.bootstrap().static_resources();
+  for (int i = 0; i < static_resources.listeners_size(); ++i) {
+    named_ports.push_back(static_resources.listeners(i).name());
+  }
+  createGeneratedApiTestServer(bootstrap_path, named_ports);
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
