@@ -131,11 +131,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()) {
+      metadata_(config.metadata()), common_lb_config_(config.common_lb_config()) {
 
-  // If the cluster doesn't have transport socke configured, override with default transport
-  // socket implementation based on tls_context. We copy by value first then override if
-  // neccessary.
+  // If the cluster doesn't have a transport socket configured, override with the default transport
+  // socket implementation based on the tls_context. We copy by value first then override if
+  // necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {

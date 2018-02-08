@@ -122,7 +122,7 @@ public:
     }
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                     subset_info_, ring_hash_lb_config_));
+                                     subset_info_, ring_hash_lb_config_, common_config_));
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -164,7 +164,8 @@ public:
         local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {}, {});
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, &local_priority_set_, stats_,
-                                     runtime_, random_, subset_info_, ring_hash_lb_config_));
+                                     runtime_, random_, subset_info_, ring_hash_lb_config_,
+                                     common_config_));
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -300,6 +301,7 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::api::v2::Cluster::RingHashLbConfig ring_hash_lb_config_;
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -706,7 +708,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
   lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_));
+                                   subset_info_, ring_hash_lb_config_, common_config_));
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
@@ -738,7 +740,8 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
   std::vector<std::set<std::string>> subset_keys = {{"x"}};
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+  common_config_.mutable_healthy_panic_threshold()->set_value(40);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 40))
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));

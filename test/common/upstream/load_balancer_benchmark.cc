@@ -25,8 +25,8 @@ public:
 
     config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_.reset(
-        new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_});
+    ring_hash_lb_.reset(new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_,
+                                                 common_config_});
   }
 
   PrioritySetImpl priority_set_;
@@ -37,6 +37,7 @@ public:
   Runtime::RandomGeneratorImpl random_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
   std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
 };
 
 static void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
