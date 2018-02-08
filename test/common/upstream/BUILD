@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -229,6 +230,22 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_binary(
+    name = "load_balancer_benchmark",
+    testonly = 1,
+    srcs = ["load_balancer_benchmark.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/upstream:ring_hash_lb_lib",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:printers_lib",
     ],
 )
 
