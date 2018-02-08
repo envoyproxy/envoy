@@ -160,6 +160,9 @@ protected:
   bool call_failed() const { return call_failed_; }
 
 private:
+  // Process queued events in completed_ops_ with handleOpCompletion() on
+  // GoogleAsyncClient silo thread.
+  void onCompletedOp();
   // Handle Operation completion on GoogleAsyncClient silo thread. This is posted by
   // GoogleAsyncClientThreadLocal::completionThread() when a message is received on cq_.
   void handleOpCompletion(GoogleAsyncTag::Operation op, bool ok);
@@ -234,6 +237,10 @@ private:
   // Count of the tags in-flight. This must hit zero before the stream can be
   // freed.
   uint32_t inflight_tags_{};
+  // Queue of completed (op, ok) passed from completionThread() to
+  // handleOpCompletion().
+  std::list<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops_;
+  std::mutex completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
   friend class GoogleAsyncClientThreadLocal;

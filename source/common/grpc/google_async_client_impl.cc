@@ -27,10 +27,8 @@ GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   completion_thread_->join();
   ENVOY_LOG(debug, "Joined completionThread");
   // Ensure that we have cleaned up all orphan streams, now that CQ is gone.
-  // Note, we expect that we're not in a dispatcher loop here, and participating
-  // in global teardown.
-  if (!streams_.empty()) {
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  while (!streams_.empty()) {
+    (*streams_.begin())->onCompletedOp();
   }
 }
 
@@ -43,7 +41,11 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
     ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
-    stream.parent_.dispatcher_.post([&stream, op, ok] { stream.handleOpCompletion(op, ok); });
+    {
+      std::unique_lock<std::mutex> lock(stream.completed_ops_lock_);
+      stream.completed_ops_.emplace_back(op, ok);
+    }
+    stream.parent_.dispatcher_.post([&stream] { stream.onCompletedOp(); });
   }
   ENVOY_LOG(debug, "completionThread exiting");
 }
@@ -202,6 +204,17 @@ void GoogleAsyncStreamImpl::writeQueued() {
     ++inflight_tags_;
   }
   ENVOY_LOG(trace, "Write op dispatched");
+}
+
+void GoogleAsyncStreamImpl::onCompletedOp() {
+  std::unique_lock<std::mutex> lock(completed_ops_lock_);
+  while (!completed_ops_.empty()) {
+    GoogleAsyncTag::Operation op;
+    bool ok;
+    std::tie(op, ok) = completed_ops_.front();
+    completed_ops_.pop_front();
+    handleOpCompletion(op, ok);
+  }
 }
 
 void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, bool ok) {
