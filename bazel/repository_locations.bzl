@@ -4,7 +4,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
-        commit = "cd1c4bd9e48afe812a0e996d335298c455afcd92",  # v1.3
+        commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_cyan4973_xxhash = dict(
