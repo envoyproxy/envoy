@@ -1,7 +1,7 @@
 #include "common/compressor/zlib_compressor_impl.h"
-#include "common/config/filter_json.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/http/filter/gzip_filter.h"
+#include "common/protobuf/utility.h"
 
 #include "test/test_common/utility.h"
 
@@ -48,7 +48,7 @@ protected:
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::gzip::v2::Gzip gzip;
-    Config::FilterJson::translateGzipFilter(*config, gzip);
+    MessageUtil::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip));
     filter_.reset(new GzipFilter(config_));
   }
@@ -96,12 +96,6 @@ protected:
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
   }
 
-  void gzipFilterBadConfigHelper(std::string&& json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::config::filter::http::gzip::v2::Gzip gzip;
-    EXPECT_THROW(Config::FilterJson::translateGzipFilter(*config, gzip), EnvoyException);
-  }
-
   GzipFilterConfigSharedPtr config_;
   std::unique_ptr<GzipFilter> filter_;
   Buffer::OwnedImpl data_;
@@ -123,36 +117,6 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
   EXPECT_EQ(8, config_->contentTypeValues().size());
-}
-
-// Verifies bad config params.
-TEST_F(GzipFilterTest, BadConfigurationParams) {
-  gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 10 })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "memory_level" : 0 })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "window_bits" : 16 })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "window_bits" : 8 })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "content_length" : 0 })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "compression_level" : "banana" })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "compression_strategy" : "banana" })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "disable_on_etag" : "banana" })EOF");
-  gzipFilterBadConfigHelper(R"EOF({ "banana" : "banana" })EOF");
-  gzipFilterBadConfigHelper(R"EOF(
-    {
-      "content_type" : [
-        "val1", "val2", "val3", "val4", "val5",
-        "val6", "val7", "val8", "val9", "val10",
-        "val11", "val12", "val13", "val14", "val15",
-        "val16", "val17", "val18", "val19", "val20",
-        "val21", "val22", "val23", "val24", "val25",
-        "val26", "val27", "val28", "val29", "val30",
-        "val31", "val32", "val33", "val34", "val35",
-        "val36", "val37", "val38", "val39", "val40",
-        "val41", "val42", "val43", "val44", "val45",
-        "val46", "val47", "val48", "val49", "val50",
-        "val51"
-      ]
-    }
-  )EOF");
 }
 
 // Acceptance Testing with default configuration.

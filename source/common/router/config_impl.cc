@@ -592,7 +592,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::route::Route& route,
                                          Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader),
-      regex_(RegexUtil::parseRegex(route.match().regex().c_str())) {}
+      regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
+      regex_str_(route.match().regex()) {}
 
 void RegexRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
@@ -686,6 +687,8 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   pattern_ = RegexUtil::parseRegex(pattern);
   name_ = virtual_cluster.name();
 }
+
+const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
   // We do a longest wildcard suffix match against the host that's passed in.
@@ -811,7 +814,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 }
 
 ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-                       Upstream::ClusterManager& cm, bool validate_clusters_default) {
+                       Upstream::ClusterManager& cm, bool validate_clusters_default)
+    : name_(config.name()) {
   route_matcher_.reset(new RouteMatcher(
       config, *this, runtime, cm,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));

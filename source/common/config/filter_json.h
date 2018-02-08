@@ -186,13 +186,6 @@ public:
   static void translateSquashConfig(const Json::Object& json_config,
                                     envoy::config::filter::http::squash::v2::Squash& proto_config);
 
-  /**
-   * Translate a v1 JSON Gzip filter object to v2 envoy::config::filter::http::squash::v2::Gzip.
-   * @param json_config source v1 JSON HTTP Gzip Filter object.
-   * @param proto_config destination v2 envoy::config::filter::http::squash::v2::Gzip.
-   */
-  static void translateGzipFilter(const Json::Object& json_config,
-                                  envoy::config::filter::http::gzip::v2::Gzip& proto_config);
 };
 } // namespace Config
 } // namespace Envoy

@@ -13,8 +13,9 @@ export ENVOY_SRCDIR="$(pwd)"
 # hard code this (basically due to how docker works).
 export NUM_CPUS=8
 
-# Circle does not currently support IPv6 so we don't test it here. We will add and remove Travis
-# when it is supported.
+# CircleCI doesn't support IPv6 by default, so we run all tests with IPv4, and
+# a limited subset with IPv6 using "machine: true" and do_circle_ci_ipv6_tests.sh
+# (see https://circleci.com/docs/2.0/executor-types/#using-machine)
 export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
 
 function finish {

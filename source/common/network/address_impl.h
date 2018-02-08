@@ -157,6 +157,7 @@ public:
 
 private:
   struct Ipv6Helper : public Ipv6 {
+    Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
     uint32_t port() const;
 
@@ -197,7 +198,7 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address);
+  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len);
 
   /**
    * Construct from a string pipe path.
@@ -212,6 +213,9 @@ public:
 
 private:
   sockaddr_un address_;
+  // For abstract namespaces.
+  bool abstract_namespace_{false};
+  uint32_t address_length_{0};
 };
 
 } // namespace Address

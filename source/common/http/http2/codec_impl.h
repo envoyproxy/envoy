@@ -147,6 +147,7 @@ protected:
     void submitTrailers(const HeaderMap& trailers);
 
     // Http::StreamEncoder
+    void encode100ContinueHeaders(const HeaderMap& headers) override;
     void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
@@ -252,8 +253,6 @@ private:
   int onInvalidFrame(int error_code);
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
-
-  static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;

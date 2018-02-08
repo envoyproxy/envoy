@@ -86,6 +86,9 @@ public:
   };
 
   // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
   FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) override;
   FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
   FilterTrailersStatus encodeTrailers(HeaderMap&) override {

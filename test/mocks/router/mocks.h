@@ -161,6 +161,7 @@ public:
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
+  MOCK_CONST_METHOD0(routeConfig, const Config&());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -186,6 +187,19 @@ public:
   // Router::MetadataMatchCriteria
   MOCK_CONST_METHOD0(metadataMatchCriteria,
                      const std::vector<MetadataMatchCriterionConstSharedPtr>&());
+};
+
+class MockPathMatchCriterion : public PathMatchCriterion {
+public:
+  MockPathMatchCriterion();
+  ~MockPathMatchCriterion();
+
+  // Router::PathMatchCriterion
+  MOCK_CONST_METHOD0(matchType, PathMatchType());
+  MOCK_CONST_METHOD0(matcher, const std::string&());
+
+  PathMatchType type_;
+  std::string matcher_;
 };
 
 class MockRouteEntry : public RouteEntry {
@@ -216,6 +230,7 @@ public:
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -227,6 +242,7 @@ public:
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
+  testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
 };
 
 class MockDecorator : public Decorator {
@@ -263,9 +279,11 @@ public:
   // Router::Config
   MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(name, const std::string&());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
+  std::string name_{"fake_config"};
 };
 
 class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {

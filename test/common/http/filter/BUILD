@@ -59,9 +59,9 @@ envoy_cc_test(
     srcs = ["gzip_filter_test.cc"],
     deps = [
         "//source/common/compressor:compressor_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/decompressor:decompressor_lib",
         "//source/common/http/filter:gzip_filter_lib",
+        "//source/common/protobuf:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

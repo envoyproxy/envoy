@@ -37,6 +37,7 @@ envoy_cc_test(
     srcs = ["grpc_mux_impl_test.cc"],
     deps = [
         "//source/common/config:grpc_mux_lib",
+        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf",
         "//test/mocks/config:config_mocks",

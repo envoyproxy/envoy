@@ -51,6 +51,13 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   decoder_event_.notify_one();
 }
 
+void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
+      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+  parent_.connection().dispatcher().post(
+      [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
+}
+
 void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
   std::shared_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
