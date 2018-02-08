@@ -155,9 +155,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   // If we are an external request, AND we are "using remote address" (see above), we set
   // x-envoy-external-address since this is our first ingress point into the trusted network.
-  if (edge_request && connection.remoteAddress()->type() == Network::Address::Type::Ip) {
+  if (edge_request && final_remote_address->type() == Network::Address::Type::Ip) {
     request_headers.insertEnvoyExternalAddress().value(
-        connection.remoteAddress()->ip()->addressAsString());
+        final_remote_address->ip()->addressAsString());
   }
 
   // Generate x-request-id for all edge requests, or if there is none.

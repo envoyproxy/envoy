@@ -104,6 +104,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
   TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
   EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress()->value(), "198.51.100.1");
 }
 
 // Verify that xff_num_trusted_hops works when not using remote address.
@@ -114,6 +115,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
 }
 
 // Verify that we don't set user agent when it is already set.
