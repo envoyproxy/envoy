@@ -262,7 +262,7 @@ public:
   /**
    * Removes all the character indices from str contained in the interval-set.
    * @param str the string containing the characters to be removed.
-   * @param remove_characters the set of character-intervals .
+   * @param remove_characters the set of character-intervals.
    * @return std::string the string with the desired characters removed.
    */
   static std::string removeCharacters(const absl::string_view& str,
