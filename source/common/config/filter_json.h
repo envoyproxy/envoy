@@ -2,7 +2,6 @@
 
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
-#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
@@ -19,11 +18,6 @@
 
 namespace Envoy {
 namespace Config {
-
-template <typename Enum> struct NameAndEnum {
-  const char* name;
-  Enum enumerator;
-};
 
 class FilterJson {
 public:
