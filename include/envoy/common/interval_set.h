@@ -29,7 +29,7 @@ public:
   virtual void insert(Value left_inclusive, Value right_exclusive) PURE;
 
   /**
-   * Returns the interval-set as a vector.
+   * @return std::vector<Interval> the interval-set as a vector.
    */
   virtual std::vector<Interval> toVector() const PURE;
 
