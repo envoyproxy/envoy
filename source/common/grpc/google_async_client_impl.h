@@ -58,7 +58,7 @@ struct GoogleAsyncTag {
 class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
-  GoogleAsyncClientThreadLocal(Event::Dispatcher& dispatcher);
+  GoogleAsyncClientThreadLocal();
   ~GoogleAsyncClientThreadLocal();
 
   grpc::CompletionQueue& completionQueue() { return cq_; }
@@ -77,7 +77,6 @@ public:
 private:
   void completionThread();
 
-  Event::Dispatcher& dispatcher_;
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
   grpc::CompletionQueue cq_;
