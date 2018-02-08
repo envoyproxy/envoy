@@ -11,18 +11,16 @@ namespace Server {
 namespace Configuration {
 
 HttpFilterFactoryCb
-GzipFilterConfig::createFilter(const envoy::config::filter::http::gzip::v2::Gzip& gzip) {
-  Http::GzipFilterConfigSharedPtr config(new Http::GzipFilterConfig(gzip));
+GzipFilterConfig::createFilter(const envoy::config::filter::http::gzip::v2::Gzip& proto_config) {
+  Http::GzipFilterConfigSharedPtr config = std::make_shared<Http::GzipFilterConfig>(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Http::GzipFilter>(config));
   };
 }
 
-HttpFilterFactoryCb GzipFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                                          const std::string&, FactoryContext&) {
-  envoy::config::filter::http::gzip::v2::Gzip proto_config;
-  MessageUtil::loadFromJson(json_config.asJsonString(), proto_config);
-  return createFilter(proto_config);
+HttpFilterFactoryCb GzipFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
+                                                          FactoryContext&) {
+  NOT_IMPLEMENTED;
 }
 
 HttpFilterFactoryCb

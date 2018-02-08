@@ -1075,48 +1075,6 @@ const std::string Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
-const char Json::Schema::GZIP_HTTP_FILTER_SCHEMA[] = R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "memory_level" : {
-        "type" : "integer",
-        "minimum" : 1,
-        "maximum" : 9
-      },
-      "compression_level" : {
-        "type" : "string",
-        "enum" : ["best", "speed", "default"]
-      },
-      "compression_strategy" : {
-        "type" : "string",
-        "enum" : ["filtered", "huffman", "rle", "default"]
-      },
-      "window_bits" : {
-        "type" : "integer",
-        "minimum" : 9,
-        "maximum" : 15
-      },
-      "content_length" : {
-        "type" : "integer",
-        "minimum" : 30
-      },
-      "content_type" : {
-        "type" : "array",
-        "minItems" : 0,
-        "maxItems" : 50,
-        "items" : {
-          "type": "string"
-        }
-      },
-      "disable_on_etag_header" : {"type" : "boolean"},
-      "remove_accept_encoding_header" : {"type" : "boolean"}
-    },
-    "additionalProperties" : false
-  }
-  )EOF";
-
 const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
