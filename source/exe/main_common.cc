@@ -21,6 +21,8 @@
 
 #include "ares.h"
 
+#include <pthread.h>
+
 namespace Envoy {
 
 Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instance& server) {
@@ -37,7 +39,6 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 }
 
 MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
-
 #ifdef ENVOY_HOT_RESTART
   if (hot_restart) {
     restarter_.reset(new Server::HotRestartImpl(options_));
@@ -53,25 +54,33 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
   Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
   Event::Libevent::Global::initialize();
   auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+  Logger::Registry::initialize(options_.logLevel(), log_lock);
   switch (options_.mode()) {
   case Server::Mode::Serve:
+    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
+    server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_, *restarter_,
+                                           *stats_store_, access_log_lock, component_factory_, tls_));
     break;
   case Server::Mode::Validate:
-    Logger::Registry::initialize(options_.logLevel(), log_lock);
-    if (!Server::validateConfig(options_, local_address, component_factory_) ? 0 : 1) {
-      throw EnvoyException("Server config validation failed");
-    }
+    break;
   }
-
-  ares_library_init(ARES_LIB_INIT_ALL);
-
-  Logger::Registry::initialize(options_.logLevel(), log_lock);
-  stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
-  server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_, *restarter_,
-                                         *stats_store_, access_log_lock, component_factory_, tls_));
 }
 
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+
+bool MainCommonBase::run() {
+  switch (options_.mode()) {
+    case Server::Mode::Serve:
+      server_->run();
+      return true;
+    case Server::Mode::Validate: {
+      auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+      return Server::validateConfig(options_, local_address, component_factory_);
+    }
+  }
+  throw EnvoyException(fmt::format("Invalid server mode: {}", int(options_.mode())));
+  return false;
+}
 
 MainCommon::MainCommon(int argc, const char** argv, bool hot_restart)
     : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}

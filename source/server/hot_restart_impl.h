@@ -122,7 +122,7 @@ public:
 
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& stats_allocator() { return *this; }
+  Stats::RawStatDataAllocator& stats_allocator() override { return *this; }
 
   // Server::HotRestart
   void drainParentListeners() override;

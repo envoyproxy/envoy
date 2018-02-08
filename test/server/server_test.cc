@@ -107,14 +107,6 @@ protected:
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
 
-  void TearDown() override {
-    if (server_) {
-      server_->threadLocal().shutdownGlobalThreading();
-      server_->clusterManager().shutdown();
-      server_->threadLocal().shutdownThread();
-    }
-  }
-
   Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
   DefaultTestHooks hooks_;

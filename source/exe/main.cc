@@ -9,19 +9,21 @@
  * deployment such as initializing signal handling. It calls main_common
  * after setting up command line options.
  */
-int main(int argc, char** argv) {
+int main(int argc, const char** argv) {
   try {
 #ifdef ENVOY_HOT_RESTART
     Envoy::MainCommon main_common(argc, argv, true);
 #else
     Envoy::MainCommon main_common(argc, argv, false);
 #endif
-    main_common.run();
+    return main_common.run() ? 0 : 1;
   } catch (const Envoy::NoServingException& e) {
     return 0;
   } catch (const Envoy::MalformedArgvException& e) {
+    std::cerr << "MalformedArgvException: " << e.what() << std::endl;
     return 1;
   } catch (const Envoy::EnvoyException& e) {
+    std::cerr << "EnvoyException: " << e.what() << std::endl;
     return 1;
   }
   return 0;

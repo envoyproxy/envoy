@@ -70,13 +70,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
 
-    // Invoke shutdown methods called in run().
-    thread_local_.shutdownGlobalThreading();
-    stats_store_.shutdownThreading();
-    thread_local_.shutdownThread();
-
-    // Invoke the shutdown method called in the destructor.
-    restarter_.shutdown();
+    terminate();
     throw;
   }
 }
@@ -381,14 +375,18 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // Shutdown all the workers now that the main dispatch loop is done.
-  listener_manager_->stopWorkers();
+  if (listener_manager_.get() != nullptr) {
+    listener_manager_->stopWorkers();
+  }
 
   // Only flush if we have not been hot restarted.
   if (stat_flush_timer_) {
     flushStats();
   }
 
-  config_->clusterManager().shutdown();
+  if (config_.get() != nullptr) {
+    config_->clusterManager().shutdown();
+  }
   handler_.reset();
   thread_local_.shutdownThread();
   ENVOY_LOG(info, "exiting");

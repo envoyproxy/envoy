@@ -135,6 +135,15 @@ public:
   MOCK_METHOD0(terminateParent, void());
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
+
+  Thread::BasicLockable& logLock() override { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  Stats::RawStatDataAllocator& stats_allocator() override { return stats_allocator_; }
+
+private:
+  Thread::MutexBasicLockable log_lock_;
+  Thread::MutexBasicLockable access_log_lock_;
+  Stats::HeapRawStatDataAllocator stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {

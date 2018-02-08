@@ -25,7 +25,7 @@ public:
   MainCommonBase(OptionsImpl& options, bool hot_restart);
   ~MainCommonBase();
 
-  void run() { server_->run(); }
+  bool run();
 
 protected:
   Envoy::OptionsImpl& options_;
@@ -40,7 +40,7 @@ protected:
 class MainCommon {
 public:
   MainCommon(int argc, const char** argv, bool hot_restart);
-  void run() { base_.run(); }
+  bool run() { return base_.run(); }
 
 private:
   static Envoy::OptionsImpl* computeOptions(int argc, const char** argv, bool hot_restart);
