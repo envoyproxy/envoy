@@ -30,10 +30,7 @@ public:
   /**
    * Initializer for an individual test.
    */
-  void SetUp() override {
-    named_ports_ = {{"echo"}};
-    BaseIntegrationTest::initialize();
-  }
+  void SetUp() override { BaseIntegrationTest::initialize(); }
 
   /**
    *  Destructor for an individual test.
@@ -51,7 +48,7 @@ TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      lookupPort("echo"), buffer,
+      lookupPort("listener_0"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(TestUtility::bufferToString(data));
         connection.close();

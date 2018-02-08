@@ -149,7 +149,20 @@ public:
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
-  void sendRawHttpAndWaitForResponse(const char* http, std::string* response);
+
+  /**
+   * Open a connection to Envoy, send a series of bytes, and return the
+   * response. This function will continue reading response bytes until Envoy
+   * closes the connection (as a part of error handling) or (if configured true)
+   * the complete headers are read.
+   *
+   * @param port the port to connect to.
+   * @param raw_http the data to send.
+   * @param response the response data will be sent here
+   * @param if the connection should be terminated onece '\r\n\r\n' has been read.
+   **/
+  void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
+                                     bool disconnect_after_headers_complete = false);
 
 protected:
   bool initialized() const { return initialized_; }
@@ -164,10 +177,10 @@ protected:
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
+  // A map of keys to port names. Generally the names are pulled from the v2 listener name
+  // but if a listener is created via ADS, it will be from whatever key is used with registerPort.
   TestEnvironment::PortMap port_map_;
 
-  // The named ports for createGeneratedApiTestServer. Used mostly for lookupPort.
-  std::vector<std::string> named_ports_{{"default_port"}};
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
 

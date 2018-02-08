@@ -18,6 +18,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
@@ -38,8 +39,8 @@ public:
 
   TagExtractorImpl(const std::string& name, const std::string& regex);
   std::string name() const override { return name_; }
-  std::string extractTag(const std::string& tag_extracted_name,
-                         std::vector<Tag>& tags) const override;
+  bool extractTag(const std::string& tag_extracted_name, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
 
 private:
   const std::string name_;
