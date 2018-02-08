@@ -318,17 +318,21 @@ TEST(RegexUtil, parseRegex) {
   }
 }
 
-TEST(IntervalSet, testIntervals) {
+static std::string intervalSetIntToString(const IntervalSetImpl<int>& interval_set) {
+  std::string out;
+  const char* prefix = "";
+  for (const auto& interval : interval_set.toVector()) {
+    absl::StrAppend(&out, prefix, "[", interval.first, ", ", interval.second, ")");
+    prefix = ", ";
+  }
+  return out;
+}
+
+TEST(IntervalSet, testIntervalAccumulation) {
   IntervalSetImpl<int> interval_set;
   auto insert_and_print = [&interval_set](int left, int right) -> std::string {
     interval_set.insert(left, right);
-    std::string out;
-    const char* prefix = "";
-    for (const auto& interval : interval_set.toVector()) {
-      absl::StrAppend(&out, prefix, "[", interval.first, ", ", interval.second, ")");
-      prefix = ", ";
-    }
-    return out;
+    return intervalSetIntToString(interval_set);
   };
   EXPECT_EQ("[7, 10)", insert_and_print(7, 10));
   EXPECT_EQ("[-2, -1), [7, 10)", insert_and_print(-2, -1));           // disjoint left
@@ -358,6 +362,259 @@ TEST(IntervalSet, testIntervals) {
   EXPECT_EQ("", insert_and_print(10, 10));
   EXPECT_EQ("[25, 26)", insert_and_print(25, 26));
   EXPECT_EQ("[5, 11), [25, 26)", insert_and_print(5, 11));
+}
+
+TEST(IntervalSet, testIntervalTargeted) {
+  auto test = [](int left, int right) -> std::string {
+    IntervalSetImpl<int> interval_set;
+    interval_set.insert(15, 20);
+    interval_set.insert(25, 30);
+    interval_set.insert(35, 40);
+    interval_set.insert(left, right);
+    return intervalSetIntToString(interval_set);
+  };
+
+  // There are 3 spans, and there are 19 potentially interesting slots
+  // for each coordinate, with the constraint that each left < right.
+  // We'll do one test that left==right has no effect first. So there's
+  // about 19^2/2 = 180 combinations, which is a lot but not too bad. Of
+  // course many of these are essentially the same case but it's worth making
+  // sure there's no problems in corner cases.
+  //
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:  x   x   x   xxx  x  x   x  xxx  x  x   x  xxx x
+
+  // First the corner-case of an empty insertion, leaving the input unchanged.
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(2, 2));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:  [)
+  EXPECT_EQ("[2, 3), [15, 20), [25, 30), [35, 40)", test(2, 3));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:  [   )   )   )))  )  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[2, 20), [25, 30), [35, 40)", test(2, 15));
+  EXPECT_EQ("[2, 20), [25, 30), [35, 40)", test(2, 17));
+  EXPECT_EQ("[2, 20), [25, 30), [35, 40)", test(2, 19));
+  EXPECT_EQ("[2, 20), [25, 30), [35, 40)", test(2, 20));
+  EXPECT_EQ("[2, 21), [25, 30), [35, 40)", test(2, 21));
+  EXPECT_EQ("[2, 23), [25, 30), [35, 40)", test(2, 23));
+  EXPECT_EQ("[2, 30), [35, 40)", test(2, 25));
+  EXPECT_EQ("[2, 30), [35, 40)", test(2, 27));
+  EXPECT_EQ("[2, 30), [35, 40)", test(2, 29));
+  EXPECT_EQ("[2, 30), [35, 40)", test(2, 30));
+  EXPECT_EQ("[2, 31), [35, 40)", test(2, 31));
+  EXPECT_EQ("[2, 33), [35, 40)", test(2, 33));
+  EXPECT_EQ("[2, 40)", test(2, 35));
+  EXPECT_EQ("[2, 40)", test(2, 37));
+  EXPECT_EQ("[2, 40)", test(2, 39));
+  EXPECT_EQ("[2, 40)", test(2, 40));
+  EXPECT_EQ("[2, 41)", test(2, 41));
+  EXPECT_EQ("[2, 43)", test(2, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:      [   )   )))  )  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(15, 17));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(15, 19));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(15, 20));
+  EXPECT_EQ("[15, 21), [25, 30), [35, 40)", test(15, 21));
+  EXPECT_EQ("[15, 23), [25, 30), [35, 40)", test(15, 23));
+  EXPECT_EQ("[15, 30), [35, 40)", test(15, 25));
+  EXPECT_EQ("[15, 30), [35, 40)", test(15, 27));
+  EXPECT_EQ("[15, 30), [35, 40)", test(15, 29));
+  EXPECT_EQ("[15, 30), [35, 40)", test(15, 30));
+  EXPECT_EQ("[15, 31), [35, 40)", test(15, 31));
+  EXPECT_EQ("[15, 33), [35, 40)", test(15, 33));
+  EXPECT_EQ("[15, 40)", test(15, 35));
+  EXPECT_EQ("[15, 40)", test(15, 37));
+  EXPECT_EQ("[15, 40)", test(15, 39));
+  EXPECT_EQ("[15, 40)", test(15, 40));
+  EXPECT_EQ("[15, 41)", test(15, 41));
+  EXPECT_EQ("[15, 43)", test(15, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:          [   )))  )  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(17, 19));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(17, 20));
+  EXPECT_EQ("[15, 21), [25, 30), [35, 40)", test(17, 21));
+  EXPECT_EQ("[15, 23), [25, 30), [35, 40)", test(17, 23));
+  EXPECT_EQ("[15, 30), [35, 40)", test(17, 25));
+  EXPECT_EQ("[15, 30), [35, 40)", test(17, 27));
+  EXPECT_EQ("[15, 30), [35, 40)", test(17, 29));
+  EXPECT_EQ("[15, 30), [35, 40)", test(17, 30));
+  EXPECT_EQ("[15, 31), [35, 40)", test(17, 31));
+  EXPECT_EQ("[15, 33), [35, 40)", test(17, 33));
+  EXPECT_EQ("[15, 40)", test(17, 35));
+  EXPECT_EQ("[15, 40)", test(17, 37));
+  EXPECT_EQ("[15, 40)", test(17, 39));
+  EXPECT_EQ("[15, 40)", test(17, 40));
+  EXPECT_EQ("[15, 41)", test(17, 41));
+  EXPECT_EQ("[15, 43)", test(17, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:              [))  )  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(19, 20));
+  EXPECT_EQ("[15, 21), [25, 30), [35, 40)", test(19, 21));
+  EXPECT_EQ("[15, 23), [25, 30), [35, 40)", test(19, 23));
+  EXPECT_EQ("[15, 30), [35, 40)", test(19, 25));
+  EXPECT_EQ("[15, 30), [35, 40)", test(19, 27));
+  EXPECT_EQ("[15, 30), [35, 40)", test(19, 29));
+  EXPECT_EQ("[15, 30), [35, 40)", test(19, 30));
+  EXPECT_EQ("[15, 31), [35, 40)", test(19, 31));
+  EXPECT_EQ("[15, 33), [35, 40)", test(19, 33));
+  EXPECT_EQ("[15, 40)", test(19, 35));
+  EXPECT_EQ("[15, 40)", test(19, 37));
+  EXPECT_EQ("[15, 40)", test(19, 39));
+  EXPECT_EQ("[15, 40)", test(19, 40));
+  EXPECT_EQ("[15, 41)", test(19, 41));
+  EXPECT_EQ("[15, 43)", test(19, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:               [)  )  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 21), [25, 30), [35, 40)", test(20, 21));
+  EXPECT_EQ("[15, 23), [25, 30), [35, 40)", test(20, 23));
+  EXPECT_EQ("[15, 30), [35, 40)", test(20, 25));
+  EXPECT_EQ("[15, 30), [35, 40)", test(20, 27));
+  EXPECT_EQ("[15, 30), [35, 40)", test(20, 29));
+  EXPECT_EQ("[15, 30), [35, 40)", test(20, 30));
+  EXPECT_EQ("[15, 31), [35, 40)", test(20, 31));
+  EXPECT_EQ("[15, 33), [35, 40)", test(20, 33));
+  EXPECT_EQ("[15, 40)", test(20, 35));
+  EXPECT_EQ("[15, 40)", test(20, 37));
+  EXPECT_EQ("[15, 40)", test(20, 39));
+  EXPECT_EQ("[15, 40)", test(20, 40));
+  EXPECT_EQ("[15, 41)", test(20, 41));
+  EXPECT_EQ("[15, 43)", test(20, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                [  )  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [21, 23), [25, 30), [35, 40)", test(21, 23));
+  EXPECT_EQ("[15, 20), [21, 30), [35, 40)", test(21, 25));
+  EXPECT_EQ("[15, 20), [21, 30), [35, 40)", test(21, 27));
+  EXPECT_EQ("[15, 20), [21, 30), [35, 40)", test(21, 29));
+  EXPECT_EQ("[15, 20), [21, 30), [35, 40)", test(21, 30));
+  EXPECT_EQ("[15, 20), [21, 31), [35, 40)", test(21, 31));
+  EXPECT_EQ("[15, 20), [21, 33), [35, 40)", test(21, 33));
+  EXPECT_EQ("[15, 20), [21, 40)", test(21, 35));
+  EXPECT_EQ("[15, 20), [21, 40)", test(21, 37));
+  EXPECT_EQ("[15, 20), [21, 40)", test(21, 39));
+  EXPECT_EQ("[15, 20), [21, 40)", test(21, 40));
+  EXPECT_EQ("[15, 20), [21, 41)", test(21, 41));
+  EXPECT_EQ("[15, 20), [21, 43)", test(21, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                   [  )   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [23, 30), [35, 40)", test(23, 25));
+  EXPECT_EQ("[15, 20), [23, 30), [35, 40)", test(23, 27));
+  EXPECT_EQ("[15, 20), [23, 30), [35, 40)", test(23, 29));
+  EXPECT_EQ("[15, 20), [23, 30), [35, 40)", test(23, 30));
+  EXPECT_EQ("[15, 20), [23, 31), [35, 40)", test(23, 31));
+  EXPECT_EQ("[15, 20), [23, 33), [35, 40)", test(23, 33));
+  EXPECT_EQ("[15, 20), [23, 40)", test(23, 35));
+  EXPECT_EQ("[15, 20), [23, 40)", test(23, 37));
+  EXPECT_EQ("[15, 20), [23, 40)", test(23, 39));
+  EXPECT_EQ("[15, 20), [23, 40)", test(23, 40));
+  EXPECT_EQ("[15, 20), [23, 41)", test(23, 41));
+  EXPECT_EQ("[15, 20), [23, 43)", test(23, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                      [   )  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(25, 27));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(25, 29));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(25, 30));
+  EXPECT_EQ("[15, 20), [25, 31), [35, 40)", test(25, 31));
+  EXPECT_EQ("[15, 20), [25, 33), [35, 40)", test(25, 33));
+  EXPECT_EQ("[15, 20), [25, 40)", test(25, 35));
+  EXPECT_EQ("[15, 20), [25, 40)", test(25, 37));
+  EXPECT_EQ("[15, 20), [25, 40)", test(25, 39));
+  EXPECT_EQ("[15, 20), [25, 40)", test(25, 40));
+  EXPECT_EQ("[15, 20), [25, 41)", test(25, 41));
+  EXPECT_EQ("[15, 20), [25, 43)", test(25, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                          [  )))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(27, 29));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(27, 30));
+  EXPECT_EQ("[15, 20), [25, 31), [35, 40)", test(27, 31));
+  EXPECT_EQ("[15, 20), [25, 33), [35, 40)", test(27, 33));
+  EXPECT_EQ("[15, 20), [25, 40)", test(27, 35));
+  EXPECT_EQ("[15, 20), [25, 40)", test(27, 37));
+  EXPECT_EQ("[15, 20), [25, 40)", test(27, 39));
+  EXPECT_EQ("[15, 20), [25, 40)", test(27, 40));
+  EXPECT_EQ("[15, 20), [25, 41)", test(27, 41));
+  EXPECT_EQ("[15, 20), [25, 43)", test(27, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                             [))  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(29, 30));
+  EXPECT_EQ("[15, 20), [25, 31), [35, 40)", test(29, 31));
+  EXPECT_EQ("[15, 20), [25, 33), [35, 40)", test(29, 33));
+  EXPECT_EQ("[15, 20), [25, 40)", test(29, 35));
+  EXPECT_EQ("[15, 20), [25, 40)", test(29, 37));
+  EXPECT_EQ("[15, 20), [25, 40)", test(29, 39));
+  EXPECT_EQ("[15, 20), [25, 40)", test(29, 40));
+  EXPECT_EQ("[15, 20), [25, 41)", test(29, 41));
+  EXPECT_EQ("[15, 20), [25, 43)", test(29, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                              [)  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 31), [35, 40)", test(30, 31));
+  EXPECT_EQ("[15, 20), [25, 33), [35, 40)", test(30, 33));
+  EXPECT_EQ("[15, 20), [25, 40)", test(30, 35));
+  EXPECT_EQ("[15, 20), [25, 40)", test(30, 37));
+  EXPECT_EQ("[15, 20), [25, 40)", test(30, 39));
+  EXPECT_EQ("[15, 20), [25, 40)", test(30, 40));
+  EXPECT_EQ("[15, 20), [25, 41)", test(30, 41));
+  EXPECT_EQ("[15, 20), [25, 43)", test(30, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                               [  )  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [31, 33), [35, 40)", test(31, 33));
+  EXPECT_EQ("[15, 20), [25, 30), [31, 40)", test(31, 35));
+  EXPECT_EQ("[15, 20), [25, 30), [31, 40)", test(31, 37));
+  EXPECT_EQ("[15, 20), [25, 30), [31, 40)", test(31, 39));
+  EXPECT_EQ("[15, 20), [25, 30), [31, 40)", test(31, 40));
+  EXPECT_EQ("[15, 20), [25, 30), [31, 41)", test(31, 41));
+  EXPECT_EQ("[15, 20), [25, 30), [31, 43)", test(31, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                                  [  )   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [33, 40)", test(33, 35));
+  EXPECT_EQ("[15, 20), [25, 30), [33, 40)", test(33, 37));
+  EXPECT_EQ("[15, 20), [25, 30), [33, 40)", test(33, 39));
+  EXPECT_EQ("[15, 20), [25, 30), [33, 40)", test(33, 40));
+  EXPECT_EQ("[15, 20), [25, 30), [33, 41)", test(33, 41));
+  EXPECT_EQ("[15, 20), [25, 30), [33, 43)", test(33, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                                     [   )  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(35, 37));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(35, 39));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(35, 40));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 41)", test(35, 41));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 43)", test(35, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                                         [  ))) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(37, 39));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(37, 40));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 41)", test(37, 41));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 43)", test(37, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                                            [)) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40)", test(39, 40));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 41)", test(39, 41));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 43)", test(39, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                                             [) )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 41)", test(40, 41));
+  EXPECT_EQ("[15, 20), [25, 30), [35, 43)", test(40, 43));
+
+  // initial setup:         [15    20)      [25   30)      [35   35)
+  // insertion points:                                              [ )
+  EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
 }
 
 } // namespace Envoy
