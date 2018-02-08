@@ -85,7 +85,7 @@ static void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
 
     // Note: To a certain extent this is benchmarking the performance of xxhash as well as
-    // std::unordered_map. However, it should be roughly equivilant to the work done when
+    // std::unordered_map. However, it should be roughly equivalent to the work done when
     // comparing to different hashing algorithms such as Maglev.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_.value(
@@ -106,8 +106,8 @@ static void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
       variance += std::pow(pair.second - mean, 2);
     }
     variance /= hit_counter.size();
+    const double stddev = std::sqrt(variance);
 
-    double stddev = std::sqrt(variance);
     state.counters["mean_hits"] = mean;
     state.counters["stddev_hits"] = stddev;
     state.counters["relative_stddev_hits"] = (stddev / mean);
