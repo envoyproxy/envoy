@@ -70,6 +70,7 @@ handle_failure() {
   fi
   echo "in '$CURRENT_TEST'"
   echo FAIL.
+  exit 1
 }
 
 # The heapchecker outputs some data to stderr on every execution.  This gets intermingled
@@ -94,6 +95,7 @@ JSON_TEST_ARRAY=()
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v4only" ]]; then
   HOT_RESTART_JSON_V4="${TEST_TMPDIR}"/hot_restart_v4.json
+  echo building ${HOT_RESTART_JSON_V4} ...
   cat "${TEST_RUNDIR}"/test/config/integration/server.json |
     sed -e "s#{{ upstream_. }}#0#g" | \
     sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
@@ -153,15 +155,15 @@ do
   echo fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ...
   ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version 2>&1)
-  check [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]
+  check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for hot-restart-version mismatch when max-obj-name-len differs
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 2>&1)
-  check [[ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]]
+  check [ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for hot-start-version mismatch when max-stats differs
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stats 12345 2>&1)
-  check [[ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]]
+  check [ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]
 
   enableHeapCheck
 
