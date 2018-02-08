@@ -26,12 +26,13 @@ const uint64_t GzipHeaderValue = 16;
 const char ZeroQvalueString[] = "q=0";
 
 // Default content types will be used if any is provided by the user.
-const std::unordered_set<std::string> defaultContentEncoding() {
-  CONSTRUCT_ON_FIRST_USE(std::unordered_set<std::string>,
+const std::vector<std::string>& defaultContentEncoding() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,
                          {"text/html", "text/plain", "text/css", "application/javascript",
                           "application/json", "image/svg+xml", "text/xml",
                           "application/xhtml+xml"});
 }
+
 } // namespace
 
 GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip)
@@ -75,11 +76,11 @@ Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressio
   }
 }
 
-std::unordered_set<std::string>
+StringUtil::CaseUnorderedSet
 GzipFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
-  // This is only called once by the constructor.
-  return types.empty() ? defaultContentEncoding()
-                       : std::unordered_set<std::string>(types.cbegin(), types.cend());
+  return types.empty() ? StringUtil::CaseUnorderedSet(defaultContentEncoding().begin(),
+                                                      defaultContentEncoding().end())
+                       : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
 }
 
 uint64_t GzipFilterConfig::contentLengthUint(Protobuf::uint32 length) {
@@ -152,8 +153,8 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
 bool GzipFilter::hasCacheControlNoTransform(HeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
-    return StringUtil::findToken(cache_control->value().c_str(), ",",
-                                 Http::Headers::get().CacheControlValues.NoTransform.c_str());
+    return StringUtil::caseFindToken(cache_control->value().c_str(), ",",
+                                     Http::Headers::get().CacheControlValues.NoTransform.c_str());
   }
 
   return false;
@@ -169,24 +170,22 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
 
   if (accept_encoding) {
     bool is_wildcard = false; // true if found and not followed by `q=0`.
-
     for (const auto token : StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",",
                                                    false /* keep_empty */)) {
       const auto value = StringUtil::trim(StringUtil::cropRight(token, ";"));
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        return (q_value != ZeroQvalueString);
+        return !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
       // If value is the identity coding, just check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Identity) {
-        return (q_value != ZeroQvalueString);
+        return !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = (q_value != ZeroQvalueString);
+        is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
     }
-
     // if neither identity nor gzip codings are present, we return the wildcard.
     return is_wildcard;
   }
@@ -218,8 +217,8 @@ bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
 
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   return (transfer_encoding &&
-          StringUtil::findToken(transfer_encoding->value().c_str(), ",",
-                                Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
+          StringUtil::caseFindToken(transfer_encoding->value().c_str(), ",",
+                                    Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
 }
 
 bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
@@ -230,8 +229,10 @@ bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
          // twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().c_str(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
-      if (trimmed_value == Http::Headers::get().TransferEncodingValues.Gzip ||
-          trimmed_value == Http::Headers::get().TransferEncodingValues.Deflate) {
+      if (StringUtil::caseCompare(trimmed_value,
+                                  Http::Headers::get().TransferEncodingValues.Gzip) ||
+          StringUtil::caseCompare(trimmed_value,
+                                  Http::Headers::get().TransferEncodingValues.Deflate)) {
         return false;
       }
     }

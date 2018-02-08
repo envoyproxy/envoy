@@ -171,6 +171,10 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransform) {
     TestHeaderMapImpl headers = {{"cache-control", "no-transform"}};
     EXPECT_TRUE(hasCacheControlNoTransform(headers));
   }
+  {
+    TestHeaderMapImpl headers = {{"cache-control", "No-Transform"}};
+    EXPECT_TRUE(hasCacheControlNoTransform(headers));
+  }
 }
 
 // Verifies that compression is skipped when cache-control header has no-tranform value.
@@ -267,6 +271,14 @@ TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
     TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;Q=.5, br"}};
+    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"accept-encoding", "identity;Q=0"}};
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+  }
 }
 
 // Verifies that compression is skipped when accept-encoding header is not allowed.
@@ -295,9 +307,12 @@ TEST_F(GzipFilterTest, isMinimumContentLength) {
     TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "Chunked"}};
+    EXPECT_TRUE(isMinimumContentLength(headers));
+  }
 
   setUpFilter(R"EOF({"content_length": 500})EOF");
-
   {
     TestHeaderMapImpl headers = {{"content-length", "501"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
@@ -360,6 +375,10 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
+    TestHeaderMapImpl headers = {{"content-type", "Application/XHTML+XML"}};
+    EXPECT_TRUE(isContentTypeAllowed(headers));
+  }
+  {
     TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
     EXPECT_FALSE(isContentTypeAllowed(headers));
   }
@@ -376,7 +395,8 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
     {
       "content_type": [
         "text/html",
-        "xyz/svg+xml"
+        "xyz/svg+xml",
+        "Test/INSENSITIVE"
       ]
     }
   )EOF");
@@ -396,6 +416,10 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
   {
     TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
     EXPECT_FALSE(isContentTypeAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"content-type", "test/insensitive"}};
+    EXPECT_TRUE(isContentTypeAllowed(headers));
   }
 }
 
@@ -508,7 +532,15 @@ TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
     EXPECT_TRUE(isTransferEncodingAllowed(headers));
   }
   {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "Chunked"}};
+    EXPECT_TRUE(isTransferEncodingAllowed(headers));
+  }
+  {
     TestHeaderMapImpl headers = {{"transfer-encoding", "deflate"}};
+    EXPECT_FALSE(isTransferEncodingAllowed(headers));
+  }
+  {
+    TestHeaderMapImpl headers = {{"transfer-encoding", "Deflate"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {

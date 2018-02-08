@@ -19,6 +19,7 @@ namespace Http {
  * Configuration for the gzip filter.
  */
 class GzipFilterConfig {
+
 public:
   GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
 
@@ -28,7 +29,8 @@ public:
   Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategy() const {
     return compression_strategy_;
   }
-  const std::unordered_set<std::string>& contentTypeValues() const { return content_type_values_; }
+
+  const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
   uint64_t memoryLevel() const { return memory_level_; }
@@ -40,7 +42,7 @@ private:
       envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level);
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
       envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
-  static std::unordered_set<std::string>
+  static StringUtil::CaseUnorderedSet
   contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
   static uint64_t contentLengthUint(Protobuf::uint32 length);
@@ -54,12 +56,11 @@ private:
   int32_t memory_level_;
   int32_t window_bits_;
 
-  std::unordered_set<std::string> content_type_values_;
+  StringUtil::CaseUnorderedSet content_type_values_;
 
   bool disable_on_etag_header_;
   bool remove_accept_encoding_header_;
 };
-
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
 
 /**
