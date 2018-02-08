@@ -56,8 +56,9 @@ build-recipe = cd "$(THIRDPARTY_SRC)" && \
 FORCE:
 
 # Capture $(ENV_STR) deps to retrigger build when they change.
+.PRECIOUS: $(THIRDPARTY_DEPS)/%.dep.env
 $(THIRDPARTY_DEPS)/%.dep.env: FORCE
-	@[ "$(cat $@)" != "$(ENV_STR)" ] && echo "$(ENV_STR)" > $@
+	@[ "$$(cat $@)" != "$(ENV_STR)" ] && echo "$(ENV_STR)" > $@ || echo "No need to rebuild $@"
 
 $(THIRDPARTY_DEPS)/%.dep: $(RECIPES)/%.sh $(THIRDPARTY_DEPS)/%.dep.env
 	@+$(call build-recipe,)
