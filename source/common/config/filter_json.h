@@ -185,7 +185,6 @@ public:
    */
   static void translateSquashConfig(const Json::Object& json_config,
                                     envoy::config::filter::http::squash::v2::Squash& proto_config);
-
 };
 } // namespace Config
 } // namespace Envoy

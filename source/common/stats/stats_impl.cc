@@ -89,11 +89,12 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
   }
 }
 
-std::string TagExtractorImpl::extractTag(const std::string& tag_extracted_name,
-                                         std::vector<Tag>& tags) const {
+bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
+                                  IntervalSet<size_t>& remove_characters) const {
+
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (std::regex_search(tag_extracted_name, match, regex_) && match.size() > 1) {
+  if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
     // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
     const auto& remove_subexpr = match[1];
 
@@ -108,11 +109,13 @@ std::string TagExtractorImpl::extractTag(const std::string& tag_extracted_name,
     tag.name_ = name_;
     tag.value_ = value_subexpr.str();
 
-    // Reconstructs the tag_extracted_name without remove_subexpr.
-    return std::string(match.prefix().first, remove_subexpr.first)
-        .append(remove_subexpr.second, match.suffix().second);
+    // Determines which characters to remove from stat_name to elide remove_subexpr.
+    std::string::size_type start = remove_subexpr.first - stat_name.begin();
+    std::string::size_type end = remove_subexpr.second - stat_name.begin();
+    remove_characters.insert(start, end);
+    return true;
   }
-  return tag_extracted_name;
+  return false;
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
@@ -149,14 +152,15 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& 
   }
 }
 
-std::string TagProducerImpl::produceTags(const std::string& name, std::vector<Tag>& tags) const {
+std::string TagProducerImpl::produceTags(const std::string& stat_name,
+                                         std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
 
-  std::string tag_extracted_name = name;
+  IntervalSetImpl<size_t> remove_characters;
   for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
-    tag_extracted_name = tag_extractor->extractTag(tag_extracted_name, tags);
+    tag_extractor->extractTag(stat_name, tags, remove_characters);
   }
-  return tag_extracted_name;
+  return StringUtil::removeCharacters(stat_name, remove_characters);
 }
 
 // Roughly estimate the size of the vectors.

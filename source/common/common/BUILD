@@ -125,6 +125,8 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
+        ":assert_lib",
+        "//include/envoy/common:interval_set_interface",
         "//include/envoy/common:time_interface",
         "//source/common/common:hash_lib",
     ],

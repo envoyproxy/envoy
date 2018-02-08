@@ -17,6 +17,8 @@ public:
   static uint64_t xxHash64(absl::string_view input) { return XXH64(input.data(), input.size(), 0); }
 
   /**
+   * TODO(gsagula): extend xxHash to handle case-insensitive.
+   *
    * Return 64-bit hash representation of string ingnoring case.
    * See djb2 (http://www.cse.yorku.ca/~oz/hash.html) for more details.
    * @param input supplies the string view.

@@ -9,10 +9,13 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/internal/memutil.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 
@@ -273,6 +276,26 @@ bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,
 
 uint64_t StringUtil::CaseInsensitiveHash::operator()(absl::string_view key) const {
   return HashUtil::djb2CaseInsensitiveHash(key);
+}
+
+std::string StringUtil::removeCharacters(const absl::string_view& str,
+                                         const IntervalSet<size_t>& remove_characters) {
+  std::string ret;
+  size_t pos = 0;
+  const auto intervals = remove_characters.toVector();
+  std::vector<absl::string_view> pieces;
+  pieces.reserve(intervals.size());
+  for (const auto& interval : intervals) {
+    if (interval.first != pos) {
+      ASSERT(interval.second <= str.size());
+      pieces.push_back(str.substr(pos, interval.first - pos));
+    }
+    pos = interval.second;
+  }
+  if (pos != str.size()) {
+    pieces.push_back(str.substr(pos));
+  }
+  return absl::StrJoin(pieces, "");
 }
 
 bool Primes::isPrime(uint32_t x) {
