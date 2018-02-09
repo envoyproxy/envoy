@@ -45,31 +45,31 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
   switch (options_.mode()) {
-    case Server::Mode::Serve: {
+  case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
-      if (hot_restart) {
-        restarter_.reset(new Server::HotRestartImpl(options_));
-      }
-#endif
-      if (!hot_restart) {
-        restarter_.reset(new Server::HotRestartNopImpl());
-      }
-
-      Stats::RawStatData::configure(options_);
-      tls_.reset(new ThreadLocal::InstanceImpl);
-      Thread::BasicLockable& log_lock = restarter_->logLock();
-      Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-      auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-      Logger::Registry::initialize(options_.logLevel(), log_lock);
-
-      stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
-      server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
-                                             *restarter_, *stats_store_, access_log_lock,
-                                             component_factory_, *tls_));
-      break;
+    if (hot_restart) {
+      restarter_.reset(new Server::HotRestartImpl(options_));
     }
-    case Server::Mode::Validate:
-      break;
+#endif
+    if (!hot_restart) {
+      restarter_.reset(new Server::HotRestartNopImpl());
+    }
+
+    Stats::RawStatData::configure(options_);
+    tls_.reset(new ThreadLocal::InstanceImpl);
+    Thread::BasicLockable& log_lock = restarter_->logLock();
+    Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
+    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+    Logger::Registry::initialize(options_.logLevel(), log_lock);
+
+    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
+    server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
+                                           *restarter_, *stats_store_, access_log_lock,
+                                           component_factory_, *tls_));
+    break;
+  }
+  case Server::Mode::Validate:
+    break;
   }
 }
 
@@ -77,13 +77,13 @@ MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 bool MainCommonBase::run() {
   switch (options_.mode()) {
-    case Server::Mode::Serve:
-      server_->run();
-      return true;
-    case Server::Mode::Validate: {
-      auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-      return Server::validateConfig(options_, local_address, component_factory_);
-    }
+  case Server::Mode::Serve:
+    server_->run();
+    return true;
+  case Server::Mode::Validate: {
+    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+    return Server::validateConfig(options_, local_address, component_factory_);
+  }
   }
   throw EnvoyException(fmt::format("Invalid server mode: {}", int(options_.mode())));
   return false;
