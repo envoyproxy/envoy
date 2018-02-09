@@ -17,15 +17,20 @@ class BufferSource {
 public:
   virtual ~BufferSource() {}
 
+  struct StreamBuffer {
+    Buffer::Instance& buffer;
+    bool end_stream;
+  };
+
   /**
    * Fetch the read buffer for the source.
    */
-  virtual Buffer::Instance& getReadBuffer() PURE;
+  virtual StreamBuffer getReadBuffer() PURE;
 
   /**
    * Fetch the write buffer for the source.
    */
-  virtual Buffer::Instance& getWriteBuffer() PURE;
+  virtual StreamBuffer getWriteBuffer() PURE;
 };
 
 /**

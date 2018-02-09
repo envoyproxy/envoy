@@ -510,7 +510,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
       data.add(&segment[0], segment.size());
     }
 
-    client_->write(data);
+    client_->write(data, false);
   }
 }
 

@@ -86,7 +86,7 @@ then
 fi
 
 # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout b904b8ce9cabafb485e6b6fae1d0fd9e33ddfcc1)
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout 59a7fe50c1e13e9d18005c76224fdafdec31de74)
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # Also setup some space for building Envoy standalone.

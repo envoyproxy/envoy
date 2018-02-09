@@ -102,7 +102,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     if (data_to_write > 0) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      transport_socket_->doWrite(*write_buffer_);
+      transport_socket_->doWrite(*write_buffer_, true);
     }
 
     closeSocket(ConnectionEvent::LocalClose);
@@ -111,7 +111,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     ASSERT(type == ConnectionCloseType::FlushWrite);
     close_with_flush_ = true;
     read_enabled_ = false;
-    file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+    file_event_->setEnabled(Event::FileReadyType::Write |
+                            (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
   }
 }
 
@@ -190,11 +191,37 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     return;
   }
 
-  if (read_buffer_size == 0) {
+  if (read_buffer_size == 0 && !read_end_stream_) {
     return;
   }
 
+  if (read_end_stream_) {
+    // read() on a raw socket will repeatedly return 0 (EOF) once EOF has
+    // occurred, so filter out the repeats so that filters don't have
+    // to handle repeats.
+    //
+    // I don't know of any cases where this actually happens (we should stop
+    // reading the socket after EOF), but this check guards against any bugs
+    // in ConnectionImpl or strangeness in the OS events (epoll, kqueue, etc)
+    // and maintains the guarantee for filters.
+    if (read_end_stream_raised_) {
+      // No further data can be delivered after end_stream
+      ASSERT(read_buffer_size == 0);
+      return;
+    }
+    read_end_stream_raised_ = true;
+  }
+
   filter_manager_.onRead();
+}
+
+void ConnectionImpl::enableHalfClose(bool enabled) {
+  // This code doesn't correctly ensure that EV_CLOSE isn't set if reading is disabled
+  // when enabling half-close. This could be fixed, but isn't needed right now, so just
+  // ASSERT that it doesn't happen.
+  ASSERT(!enabled || read_enabled_);
+
+  enable_half_close_ = enabled;
 }
 
 void ConnectionImpl::readDisable(bool disable) {
@@ -205,12 +232,9 @@ void ConnectionImpl::readDisable(bool disable) {
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
   // we are not gaurenteed to get notified, so even if the remote has closed, we may not know
-  // until we try to write. Further note that currently we don't correctly handle half closed
-  // TCP connections in the sense that we assume that a remote FIN means the remote intends a
+  // until we try to write. Further note that currently we optionally don't correctly handle half
+  // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
-  //
-  // TODO(mattklein123): Potentially support half-closed TCP connections. It's unclear if this is
-  // required for any scenarios in which Envoy will be used (I don't know of any).
   if (disable) {
     if (!read_enabled_) {
       ++read_disable_count_;
@@ -218,7 +242,10 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(read_enabled_);
     read_enabled_ = false;
-    if (detect_early_close_) {
+
+    // If half-close semantics are enabled, we never want early close notifications; we
+    // always want to read all avaiable data, even if the other side has closed.
+    if (detect_early_close_ && !enable_half_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {
       file_event_->setEnabled(Event::FileReadyType::Write);
@@ -258,11 +285,23 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
 }
 
-void ConnectionImpl::write(Buffer::Instance& data) {
+void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!end_stream || enable_half_close_);
+
+  if (write_end_stream_) {
+    // It is an API violation to write more data after writing end_stream, but a duplicate
+    // end_stream with no data is harmless. This catches misuse of the API that could result in data
+    // being lost.
+    ASSERT(data.length() == 0 && end_stream);
+
+    return;
+  }
+
   // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
   //       path, so we just pass around the buffer passed to us in this function. If we ever support
   //       buffer/restart/continue on the write path this needs to get more complicated.
   current_write_buffer_ = &data;
+  current_write_end_stream_ = end_stream;
   FilterStatus status = filter_manager_.onWrite();
   current_write_buffer_ = nullptr;
 
@@ -270,8 +309,9 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     return;
   }
 
-  if (data.length() > 0) {
-    ENVOY_CONN_LOG(trace, "writing {} bytes", *this, data.length());
+  write_end_stream_ = end_stream;
+  if (data.length() > 0 || end_stream) {
+    ENVOY_CONN_LOG(trace, "writing {} bytes, end_stream {}", *this, data.length(), end_stream);
     // TODO(mattklein123): All data currently gets moved from the source buffer to the write buffer.
     // This can lead to inefficient behavior if writing a bunch of small chunks. In this case, it
     // would likely be more efficient to copy data below a certain size. VERY IMPORTANT: If this is
@@ -379,14 +419,23 @@ void ConnectionImpl::onReadReady() {
   IoResult result = transport_socket_->doRead(read_buffer_);
   uint64_t new_buffer_size = read_buffer_.length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
-  if (result.bytes_processed_ != 0) {
+
+  // If this connection doesn't have half-close semantics, translate end_stream into
+  // a connection close.
+  if ((!enable_half_close_ && result.end_stream_read_)) {
+    result.end_stream_read_ = false;
+    result.action_ = PostIoAction::Close;
+  }
+
+  read_end_stream_ |= result.end_stream_read_;
+  if (result.bytes_processed_ != 0 || result.end_stream_read_) {
     // Skip onRead if no bytes were processed. For instance, if the connection was closed without
     // producing more data.
     onRead(new_buffer_size);
   }
 
   // The read callback may have already closed the connection.
-  if (result.action_ == PostIoAction::Close) {
+  if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
   }
@@ -418,7 +467,8 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  IoResult result = transport_socket_->doWrite(*write_buffer_);
+  IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
+  ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
@@ -427,7 +477,7 @@ void ConnectionImpl::onWriteReady() {
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if (close_with_flush_ && new_buffer_size == 0) {
+  } else if ((close_with_flush_ && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
@@ -465,6 +515,11 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
   ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
                                            connection_stats_->write_total_,
                                            connection_stats_->write_current_);
+}
+
+bool ConnectionImpl::bothSidesHalfClosed() {
+  // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport yet.
+  return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
