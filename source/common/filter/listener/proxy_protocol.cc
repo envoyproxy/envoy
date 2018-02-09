@@ -110,7 +110,7 @@ void Instance::onReadWorker() {
       throw EnvoyException("failed to read proxy protocol");
     }
 
-    socket.setLocalAddress(local_address);
+    socket.setLocalAddress(local_address, false);
     socket.setRemoteAddress(remote_address);
   }
 
