@@ -32,6 +32,7 @@ public:
   const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  void waitForContinueHeaders();
   void waitForHeaders();
   void waitForBodyData(uint64_t size);
   void waitForEndStream();
@@ -58,6 +59,7 @@ private:
   std::string body_;
   uint64_t body_data_waiting_length_{};
   bool waiting_for_reset_{};
+  bool waiting_for_continue_headers_{};
   bool waiting_for_headers_{};
   bool saw_reset_{};
   Http::StreamResetReason reset_reason_{};

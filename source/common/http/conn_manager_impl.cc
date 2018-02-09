@@ -792,6 +792,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
+  ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
   has_continue_headers_ = true;
 
@@ -1271,8 +1272,13 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { comm
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
     HeaderMapPtr&& headers) {
-  parent_.continue_headers_ = std::move(headers);
-  parent_.encode100ContinueHeaders(nullptr, *parent_.continue_headers_);
+  // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue
+  // here. This avoids the potential situation where Envoy strips Expect: 100-Continue and sends a
+  // 100-Continue, then proxies a duplicate 100 Continue from upstream.
+  if (parent_.connection_manager_.config_.proxy100Continue()) {
+    parent_.continue_headers_ = std::move(headers);
+    parent_.encode100ContinueHeaders(nullptr, *parent_.continue_headers_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPtr&& headers,
