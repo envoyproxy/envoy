@@ -17,6 +17,7 @@
 namespace Envoy {
 
 TEST(MainCommon, ConstructDestruct) {
+  // TODO(jmarantz): I think we may need to hack the config file to pick an unused port.
   std::string config_file =
       Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") + "/configs/google_com_proxy.json";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
@@ -27,8 +28,8 @@ TEST(MainCommon, LegacyMain) {
   // Testing the legacy path is difficult because if we give it a valid config, it will
   // never exit. So just give it an empty config and let it fail.
   int argc = 1;
-  std::unique_ptr<char> envoy_static(strdup("envoy-static"));
-  char* argv[] = {envoy_static.get(), nullptr};
+  std::string envoy_static("envoy-static");
+  char* argv[] = {&(envoy_static[0]), nullptr};
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
