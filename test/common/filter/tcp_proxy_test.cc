@@ -441,6 +441,7 @@ public:
             .WillOnce(SaveArg<0>(&upstream_read_filter_));
         EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
             .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
+        EXPECT_CALL(*upstream_connections_.at(i), enableHalfClose(true));
       }
     }
 
@@ -457,6 +458,7 @@ public:
 
     filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(connections >= 1 ? Network::FilterStatus::Continue
                                : Network::FilterStatus::StopIteration,
@@ -489,18 +491,40 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
 
-TEST_F(TcpProxyTest, UpstreamDisconnect) {
+// Tests that half-closes are proxied and don't themselves cause any connection to be closed.
+TEST_F(TcpProxyTest, HalfCloseProxy) {
   setup(1);
 
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
+  EXPECT_CALL(*upstream_connections_.at(0), close(_)).Times(0);
+
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), true));
+  filter_->onData(buffer, true);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), true));
+  upstream_read_filter_->onData(response, true);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(*upstream_connections_.at(0), close(_));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(TcpProxyTest, UpstreamDisconnect) {
+  setup(1);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -595,14 +619,14 @@ TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(*upstream_connections_.at(0), readDisable(true));
   filter_callbacks_.connection_.runHighWatermarkCallbacks();
@@ -617,14 +641,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -634,14 +658,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl response("world");
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
-  upstream_read_filter_->onData(response);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
@@ -651,8 +675,8 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer)));
-  filter_->onData(buffer);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
@@ -684,7 +708,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   Buffer::OwnedImpl buffer("hello");
-  filter_->onData(buffer);
+  filter_->onData(buffer, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*connect_timers_.at(0), disableTimer());
@@ -730,11 +754,11 @@ TEST_F(TcpProxyTest, IdleTimeout) {
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  filter_->onData(buffer);
+  filter_->onData(buffer, false);
 
   buffer.add("hello2");
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  upstream_read_filter_->onData(buffer);
+  upstream_read_filter_->onData(buffer, false);
 
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
@@ -810,9 +834,9 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
 
   raiseEventUpstreamConnected(0);
   Buffer::OwnedImpl buffer("a");
-  filter_->onData(buffer);
+  filter_->onData(buffer, false);
   Buffer::OwnedImpl response("bb");
-  upstream_read_filter_->onData(response);
+  upstream_read_filter_->onData(response, false);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -903,6 +927,27 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
   EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
   EXPECT_EQ(1U, config_->stats().idle_timeout_.value());
+}
+
+// Tests that upstream flush will close a connection if it reads data from the upstream
+// connection after the downstream connection is closed (nowhere to send it).
+TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  // Send some bytes; no timeout configured so this should be a no-op (not a crash).
+  Buffer::OwnedImpl buffer("a");
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  upstream_read_filter_->onData(buffer, false);
 }
 
 class TcpProxyRoutingTest : public testing::Test {

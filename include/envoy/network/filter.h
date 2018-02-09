@@ -31,9 +31,10 @@ public:
   /**
    * Called when data is to be written on the connection.
    * @param data supplies the buffer to be written which may be modified.
+   * @param end_stream supplies whether this is the last byte to write on the connection.
    * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual FilterStatus onWrite(Buffer::Instance& data) PURE;
+  virtual FilterStatus onWrite(Buffer::Instance& data, bool end_stream) PURE;
 };
 
 typedef std::shared_ptr<WriteFilter> WriteFilterSharedPtr;
@@ -80,9 +81,11 @@ public:
   /**
    * Called when data is read on the connection.
    * @param data supplies the read data which may be modified.
+   * @param end_stream supplies whether this is the last byte on the connection. This will only
+   *        be set if the connection has half-close semantics enabled.
    * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual FilterStatus onData(Buffer::Instance& data) PURE;
+  virtual FilterStatus onData(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Called when a connection is first established. Filters should do one time long term processing

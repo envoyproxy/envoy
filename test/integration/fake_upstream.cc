@@ -180,6 +180,12 @@ void FakeConnectionBase::readDisable(bool disable) {
   connection_.dispatcher().post([this, disable]() -> void { connection_.readDisable(disable); });
 }
 
+void FakeConnectionBase::enableHalfClose(bool enable) {
+  std::unique_lock<std::mutex> lock(lock_);
+  RELEASE_ASSERT(!disconnected_);
+  connection_.dispatcher().post([this, enable]() -> void { connection_.enableHalfClose(enable); });
+}
+
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
   std::unique_lock<std::mutex> lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder));
@@ -213,6 +219,23 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   ASSERT(disconnected_);
 }
 
+void FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events) {
+  std::unique_lock<std::mutex> lock(lock_);
+  while (!half_closed_) {
+    connection_event_.wait(lock);
+    // The default behavior of waitForHalfClose is to assume the test cleanly
+    // calls waitForData, waitForNewStream, etc. to handle all events on the
+    // connection. If the caller explicitly notes that other events should be
+    // ignored, continue looping until a disconnect is detected. Otherwise fall
+    // through and hit the assert below.
+    if (!ignore_spurious_events) {
+      break;
+    }
+  }
+
+  ASSERT(half_closed_);
+}
+
 FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
                                                    bool ignore_spurious_events) {
   std::unique_lock<std::mutex> lock(lock_);
@@ -239,7 +262,7 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dis
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   Network::SocketPtr{new Network::UdsListenSocket(uds_path)}, type) {
+                   Network::SocketPtr{new Network::UdsListenSocket(uds_path)}, type, false) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
@@ -251,9 +274,9 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version)
+                           Network::Address::IpVersion version, bool enable_half_close)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   makeTcpListenSocket(port, version), type) {
+                   makeTcpListenSocket(port, version), type, enable_half_close) {
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
@@ -261,18 +284,21 @@ FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, FakeHttpConnection::Type type,
                            Network::Address::IpVersion version)
-    : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type) {
+    : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
+                   false) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                           Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type)
+                           Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
+                           bool enable_half_close)
     : http_type_(type), transport_socket_factory_(std::move(transport_socket_factory)),
       socket_(std::move(listen_socket)), api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      allow_unexpected_disconnects_(false), listener_(*this) {
+      allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close),
+      listener_(*this) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
 }
@@ -366,6 +392,7 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
   connection->initialize();
   new_connections_.pop_front();
   connection->readDisable(false);
+  connection->enableHalfClose(enable_half_close_);
   return connection;
 }
 
@@ -378,17 +405,19 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   return data_;
 }
 
-void FakeRawConnection::write(const std::string& data) {
-  connection_.dispatcher().post([data, this]() -> void {
+void FakeRawConnection::write(const std::string& data, bool end_stream) {
+  connection_.dispatcher().post([data, end_stream, this]() -> void {
     Buffer::OwnedImpl to_write(data);
-    connection_.write(to_write);
+    connection_.write(to_write, end_stream);
   });
 }
 
-Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data) {
+Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
+                                                            bool end_stream) {
   std::unique_lock<std::mutex> lock(parent_.lock_);
   ENVOY_LOG(debug, "got {} bytes", data.length());
   parent_.data_.append(TestUtility::bufferToString(data));
+  parent_.half_closed_ = end_stream;
   data.drain(data.length());
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;
