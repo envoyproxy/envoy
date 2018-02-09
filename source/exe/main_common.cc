@@ -117,13 +117,13 @@ OptionsImpl* MainCommon::computeOptions(int argc, const char** argv, bool hot_re
 // TODO(jmarantz): Remove this when all callers are removed. At that time, MainCommonBase
 // and MainCommon can be merged. The current theory is that only Google calls this.
 int main_common(OptionsImpl& options) {
-#if ENVOY_HOT_RESTART
-  MainCommonBase main_common(options, true);
-#else
-  MainCommonBase main_common(options, false);
-#endif
   try {
-    main_common.run();
+#if ENVOY_HOT_RESTART
+    MainCommonBase main_common(options, true);
+#else
+    MainCommonBase main_common(options, false);
+#endif
+    return main_common.run() ? 0 : 1;
   } catch (EnvoyException& e) {
     return 1;
   }
