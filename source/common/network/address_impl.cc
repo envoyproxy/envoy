@@ -208,7 +208,6 @@ Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only) : InstanceB
 Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0) {}
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : InstanceBase(Type::Ip) {
-  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
   ip_.ipv6_.address_.sin6_family = AF_INET6;
   ip_.ipv6_.address_.sin6_port = htons(port);
   if (!address.empty()) {

@@ -36,7 +36,7 @@ public:
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
-  Network::IoResult doWrite(Buffer::Instance& write_buffer) override;
+  Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::Connection* ssl() override { return this; }
   const Ssl::Connection* ssl() const override { return this; }
@@ -46,6 +46,7 @@ public:
 private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
+  void shutdownSsl();
   std::string getUriSanFromCertificate(X509* cert);
   std::string getSubjectFromCertificate(X509* cert) const;
 
@@ -53,6 +54,7 @@ private:
   ContextImpl& ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
+  bool shutdown_sent_{};
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
 };

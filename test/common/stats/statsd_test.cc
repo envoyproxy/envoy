@@ -59,7 +59,7 @@ TEST_F(TcpStatsdSinkTest, EmptyFlush) {
 
   sink_->beginFlush();
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual("")));
+  EXPECT_CALL(*connection_, write(BufferStringEqual(""), _));
   sink_->endFlush();
 }
 
@@ -77,7 +77,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 
   expectCreateConnection();
   EXPECT_CALL(*connection_,
-              write(BufferStringEqual("envoy.test_counter:1|c\nenvoy.test_gauge:2|g\n")));
+              write(BufferStringEqual("envoy.test_counter:1|c\nenvoy.test_gauge:2|g\n"), _));
   sink_->endFlush();
 
   connection_->runHighWatermarkCallbacks();
@@ -90,7 +90,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 
   NiceMock<MockHistogram> timer;
   timer.name_ = "test_timer";
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n")));
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n"), _));
   sink_->onHistogramComplete(timer, 5);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -109,13 +109,14 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   }
 
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(_)).WillOnce(Invoke([](Buffer::Instance& buffer) -> void {
-    std::string compare;
-    for (int i = 0; i < 2000; i++) {
-      compare += "envoy.test_counter:1|c\n";
-    }
-    EXPECT_EQ(compare, TestUtility::bufferToString(buffer));
-  }));
+  EXPECT_CALL(*connection_, write(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) -> void {
+        std::string compare;
+        for (int i = 0; i < 2000; i++) {
+          compare += "envoy.test_counter:1|c\n";
+        }
+        EXPECT_EQ(compare, TestUtility::bufferToString(buffer));
+      }));
   sink_->endFlush();
 }
 
@@ -138,7 +139,7 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   sink_->beginFlush();
   sink_->flushCounter(counter, 1);
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n")));
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"), _));
   sink_->endFlush();
 
   // Raise and make sure we don't write and kill connection.

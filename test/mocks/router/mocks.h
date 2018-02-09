@@ -189,6 +189,19 @@ public:
                      const std::vector<MetadataMatchCriterionConstSharedPtr>&());
 };
 
+class MockPathMatchCriterion : public PathMatchCriterion {
+public:
+  MockPathMatchCriterion();
+  ~MockPathMatchCriterion();
+
+  // Router::PathMatchCriterion
+  MOCK_CONST_METHOD0(matchType, PathMatchType());
+  MOCK_CONST_METHOD0(matcher, const std::string&());
+
+  PathMatchType type_;
+  std::string matcher_;
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -229,6 +242,7 @@ public:
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
+  testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
 };
 
 class MockDecorator : public Decorator {
@@ -269,6 +283,7 @@ public:
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
+  std::string name_{"fake_config"};
 };
 
 class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {

@@ -223,7 +223,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
 
   Buffer::OwnedImpl output(framehd, FRAME_HEADER_SIZE);
   output.move(pending_send_data_, length);
-  parent_.connection_.write(output);
+  parent_.connection_.write(output, false);
   return 0;
 }
 
@@ -495,7 +495,7 @@ int ConnectionImpl::onInvalidFrame(int error_code) {
 ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   ENVOY_CONN_LOG(trace, "send data: bytes={}", connection_, length);
   Buffer::OwnedImpl buffer(data, length);
-  connection_.write(buffer);
+  connection_.write(buffer, false);
   return length;
 }
 

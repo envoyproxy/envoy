@@ -135,7 +135,7 @@ private:
     CodecReadFilter(CodecClient& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       parent_.onData(data);
       return Network::FilterStatus::StopIteration;
     }
