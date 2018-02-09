@@ -281,7 +281,7 @@ public:
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 
-class RawStatData;
+struct RawStatData;
 
 /**
  * Abstract interface for allocating a RawStatData.
