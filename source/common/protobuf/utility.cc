@@ -7,6 +7,21 @@
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
+namespace ProtobufPercentHelper {
+
+uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value) {
+  ASSERT(default_value >= 0 && default_value <= max_value);
+  UNREFERENCED_PARAMETER(max_value);
+  return default_value;
+}
+
+uint64_t convertPercent(double percent, uint64_t max_value) {
+  // Checked by schema.
+  ASSERT(percent >= 0.0 && percent <= 100.0);
+  return max_value * (percent / 100.0);
+}
+
+} // namespace ProtobufPercentHelper
 
 MissingFieldException::MissingFieldException(const std::string& field_name,
                                              const Protobuf::Message& message)

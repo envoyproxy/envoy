@@ -30,7 +30,8 @@ class RingHashLoadBalancer : public LoadBalancerBase,
 public:
   RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
-                       const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config);
+                       const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+                       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }

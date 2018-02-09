@@ -15,8 +15,10 @@ namespace Upstream {
 RingHashLoadBalancer::RingHashLoadBalancer(
     PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
-    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config)
-    : LoadBalancerBase(priority_set, stats, runtime, random), config_(config),
+    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+
+    : LoadBalancerBase(priority_set, stats, runtime, random, common_config), config_(config),
       factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 void RingHashLoadBalancer::initialize() {
@@ -190,7 +192,7 @@ void RingHashLoadBalancer::refresh() {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     uint32_t priority = host_set->priority();
     (*per_priority_state)[priority].reset(new PerPriorityState);
-    if (isGlobalPanic(*host_set, runtime_)) {
+    if (isGlobalPanic(*host_set)) {
       (*per_priority_state)[priority]->current_ring_ =
           std::make_shared<Ring>(config_, host_set->hosts());
       (*per_priority_state)[priority]->global_panic_ = true;

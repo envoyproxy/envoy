@@ -5,11 +5,15 @@
 #include <chrono>
 #include <cstdint>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include "envoy/common/interval_set.h"
 #include "envoy/common/time.h"
+
+#include "common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 
@@ -254,6 +258,15 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
+
+  /**
+   * Removes all the character indices from str contained in the interval-set.
+   * @param str the string containing the characters to be removed.
+   * @param remove_characters the set of character-intervals.
+   * @return std::string the string with the desired characters removed.
+   */
+  static std::string removeCharacters(const absl::string_view& str,
+                                      const IntervalSet<size_t>& remove_characters);
 };
 
 /**
@@ -286,6 +299,60 @@ public:
    */
   static std::regex parseRegex(const std::string& regex,
                                std::regex::flag_type flags = std::regex::optimize);
+};
+
+/**
+ * Maintains sets of numeric intervals. As new intervals are added, existing ones in the
+ * set are combined so that no overlapping intervals remain in the representation.
+ *
+ * Value can be any type that is comparable with <, ==, and >.
+ */
+template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
+public:
+  // Interval is a pair of Values.
+  typedef typename IntervalSet<Value>::Interval Interval;
+
+  void insert(Value left, Value right) override {
+    if (left == right) {
+      return;
+    }
+    ASSERT(left < right);
+
+    // There 3 cases where we'll decide the [left, right) is disjoint with the
+    // current contents, and just need to insert. But we'll structure the code
+    // to search for where existing interval(s) needs to be merged, and fall back
+    // to the disjoint insertion case.
+    if (!intervals_.empty()) {
+      const auto left_pos = intervals_.lower_bound(Interval(left, left));
+      if (left_pos != intervals_.end() && (right >= left_pos->first)) {
+        // upper_bound is exclusive, and we want to be inclusive.
+        auto right_pos = intervals_.upper_bound(Interval(right, right));
+        if (right_pos != intervals_.begin()) {
+          --right_pos;
+          if (right_pos->second >= left) {
+            // Both bounds overlap, with one or more existing intervals.
+            left = std::min(left_pos->first, left);
+            right = std::max(right_pos->second, right);
+            ++right_pos; // erase is non-inclusive on upper bound.
+            intervals_.erase(left_pos, right_pos);
+          }
+        }
+      }
+    }
+    intervals_.insert(Interval(left, right));
+  }
+
+  std::vector<Interval> toVector() const override {
+    return std::vector<Interval>(intervals_.begin(), intervals_.end());
+  }
+
+  void clear() override { intervals_.clear(); }
+
+private:
+  struct Compare {
+    bool operator()(const Interval& a, const Interval& b) const { return a.second < b.first; }
+  };
+  std::set<Interval, Compare> intervals_; // Intervals do not overlap or abut.
 };
 
 } // namespace Envoy
