@@ -268,7 +268,9 @@ public:
     config.set_target_uri(fake_upstream_->localAddress()->asString());
     config.set_stat_prefix("fake_cluster");
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
-    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stats_store_, config);
+    GoogleGenericStubFactory stub_factory;
+    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
+                                                   stats_store_, config);
 #else
     NOT_REACHED;
 #endif

@@ -8,6 +8,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "grpc++/generic/generic_stub.h"
 #include "grpc++/grpc++.h"
@@ -104,11 +105,52 @@ struct GoogleAsyncClientStats {
   std::array<Stats::Counter*, Status::GrpcStatus::MaximumValid + 1> streams_closed_;
 };
 
+// Interface to allow the gRPC stub to be mocked out by tests.
+class GoogleStub {
+public:
+  virtual ~GoogleStub() {}
+
+  // See grpc::PrepareCall().
+  virtual std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
+  PrepareCall(grpc::ClientContext* context, const grpc::string& method,
+              grpc::CompletionQueue* cq) PURE;
+};
+
+class GoogleGenericStub : public GoogleStub {
+public:
+  GoogleGenericStub(std::shared_ptr<grpc::Channel> channel) : stub_(channel) {}
+
+  std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
+  PrepareCall(grpc::ClientContext* context, const grpc::string& method,
+              grpc::CompletionQueue* cq) override {
+    return stub_.PrepareCall(context, method, cq);
+  }
+
+private:
+  grpc::GenericStub stub_;
+};
+
+// Interface to allow the gRPC stub creation to be mocked out by tests.
+class GoogleStubFactory {
+public:
+  virtual ~GoogleStubFactory() {}
+
+  // Create a stub from a given channel.
+  virtual std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) PURE;
+};
+
+class GoogleGenericStubFactory : public GoogleStubFactory {
+public:
+  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) override {
+    return std::make_shared<GoogleGenericStub>(channel);
+  }
+};
+
 // Google gRPC C++ client library implementation of Grpc::AsyncClient.
 class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-                        Stats::Scope& scope,
+                        GoogleStubFactory& stub_factory, Stats::Scope& scope,
                         const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
   ~GoogleAsyncClientImpl() override;
 
@@ -126,7 +168,7 @@ private:
   // This is shared with child streams, so that they can cleanup independent of
   // the client if it gets destructed. The streams need to wait for their tags
   // to drain from the CQ.
-  std::shared_ptr<grpc::GenericStub> stub_;
+  std::shared_ptr<GoogleStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
   Stats::Scope& scope_;
@@ -217,7 +259,7 @@ private:
   Event::Dispatcher& dispatcher_;
   // We hold a ref count on the stub_ to allow the stream to wait for its tags
   // to drain from the CQ on cleanup.
-  std::shared_ptr<grpc::GenericStub> stub_;
+  std::shared_ptr<GoogleStub> stub_;
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
   const Optional<std::chrono::milliseconds>& timeout_;

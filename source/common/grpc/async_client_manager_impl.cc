@@ -51,9 +51,10 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
 
 AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 #ifdef ENVOY_GOOGLE_GRPC
+  GoogleGenericStubFactory stub_factory;
   return std::make_unique<GoogleAsyncClientImpl>(
-      tls_.dispatcher(), google_tls_slot_.getTyped<GoogleAsyncClientThreadLocal>(), *scope_,
-      config_);
+      tls_.dispatcher(), google_tls_slot_.getTyped<GoogleAsyncClientThreadLocal>(), stub_factory,
+      *scope_, config_);
 #else
   return nullptr;
 #endif
