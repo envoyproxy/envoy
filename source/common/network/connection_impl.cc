@@ -284,8 +284,9 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
   ASSERT(!end_stream || enable_half_close_);
 
   if (write_end_stream_) {
-    // It is an API violation to write more data after writing end_stream,
-    // but a duplicate end_stream with no data is ok.
+    // It is an API violation to write more data after writing end_stream, but a duplicate
+    // end_stream with no data is harmless. This catches misuse of the API that could result in data
+    // being lost.
     ASSERT(data.length() == 0 && end_stream);
 
     return;
