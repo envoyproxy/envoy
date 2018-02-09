@@ -187,6 +187,100 @@ BENCHMARK(BM_MaglevLoadBalancerChooseHost)
     ->Args({500, 100000})
     ->Unit(benchmark::kMillisecond);
 
+void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
+  for (auto _ : state) {
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t min_ring_size = state.range(1);
+    const uint64_t hosts_to_lose = state.range(2);
+    const uint64_t keys_to_simulate = state.range(3);
+
+    RingHashTester tester(num_hosts, min_ring_size);
+    tester.ring_hash_lb_->initialize();
+    LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create();
+    std::vector<HostConstSharedPtr> hosts;
+    TestLoadBalancerContext context;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts.push_back(lb->chooseHost(&context));;
+    }
+
+    RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
+    tester2.ring_hash_lb_->initialize();
+    lb = tester2.ring_hash_lb_->factory()->create();
+    std::vector<HostConstSharedPtr> hosts2;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts2.push_back(lb->chooseHost(&context));;
+    }
+
+    ASSERT(hosts.size() == hosts2.size());
+    uint64_t num_different_hosts = 0;
+    for (uint64_t i = 0; i < hosts.size(); i++) {
+      if (hosts[i]->address()->asString() != hosts2[i]->address()->asString()) {
+        num_different_hosts++;
+      }
+    }
+
+    state.counters["percent_different"] =
+      (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+    state.counters["host_loss_over_N_optimal"] =
+      (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
+  }
+}
+BENCHMARK(BM_RingHashLoadBalancerHostLoss)
+    ->Args({500, 256000, 1, 10000})
+    ->Args({500, 256000, 2, 10000})
+    ->Args({500, 256000, 3, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
+  for (auto _ : state) {
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t hosts_to_lose = state.range(1);
+    const uint64_t keys_to_simulate = state.range(2);
+
+    BaseTester tester(num_hosts);
+    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    std::vector<HostConstSharedPtr> hosts;
+    TestLoadBalancerContext context;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts.push_back(table.chooseHost(&context));;
+    }
+
+    BaseTester tester2(num_hosts - hosts_to_lose);
+    MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
+    std::vector<HostConstSharedPtr> hosts2;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts2.push_back(table2.chooseHost(&context));;
+    }
+
+    ASSERT(hosts.size() == hosts2.size());
+    uint64_t num_different_hosts = 0;
+    for (uint64_t i = 0; i < hosts.size(); i++) {
+      if (hosts[i]->address()->asString() != hosts2[i]->address()->asString()) {
+        num_different_hosts++;
+      }
+    }
+
+    state.counters["percent_different"] =
+      (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+    state.counters["host_loss_over_N_optimal"] =
+      (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
+  }
+}
+BENCHMARK(BM_MaglevLoadBalancerHostLoss)
+    ->Args({500, 1, 10000})
+    ->Args({500, 2, 10000})
+    ->Args({500, 3, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
