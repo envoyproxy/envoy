@@ -39,31 +39,35 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 }
 
 MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
-#ifdef ENVOY_HOT_RESTART
-  if (hot_restart) {
-    restarter_.reset(new Server::HotRestartImpl(options_));
-  }
-#endif
-  if (!hot_restart) {
-    restarter_.reset(new Server::HotRestartNopImpl());
-  }
-
   ares_library_init(ARES_LIB_INIT_ALL);
-  Stats::RawStatData::configure(options_);
-  Thread::BasicLockable& log_lock = restarter_->logLock();
-  Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
   Event::Libevent::Global::initialize();
-  auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-  Logger::Registry::initialize(options_.logLevel(), log_lock);
+
   switch (options_.mode()) {
-  case Server::Mode::Serve:
-    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
-    server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
-                                           *restarter_, *stats_store_, access_log_lock,
-                                           component_factory_, tls_));
-    break;
-  case Server::Mode::Validate:
-    break;
+    case Server::Mode::Serve: {
+#ifdef ENVOY_HOT_RESTART
+      if (hot_restart) {
+        restarter_.reset(new Server::HotRestartImpl(options_));
+      }
+#endif
+      if (!hot_restart) {
+        restarter_.reset(new Server::HotRestartNopImpl());
+      }
+
+      Stats::RawStatData::configure(options_);
+      tls_.reset(new ThreadLocal::InstanceImpl);
+      Thread::BasicLockable& log_lock = restarter_->logLock();
+      Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
+      auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+      Logger::Registry::initialize(options_.logLevel(), log_lock);
+
+      stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
+      server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
+                                             *restarter_, *stats_store_, access_log_lock,
+                                             component_factory_, *tls_));
+      break;
+    }
+    case Server::Mode::Validate:
+      break;
   }
 }
 

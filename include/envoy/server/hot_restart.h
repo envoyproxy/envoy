@@ -87,12 +87,12 @@ public:
   virtual Thread::BasicLockable& logLock() PURE;
 
   /**
-   * Returns a lock for access logs.
+   * @return Thread::BasicLockable& a lock for access logs.
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
 
   /**
-   * Returns an allocator for stats.
+   * @returns an allocator for stats.
    */
   virtual Stats::RawStatDataAllocator& stats_allocator() PURE;
 };

@@ -77,7 +77,6 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
 
 InstanceImpl::~InstanceImpl() {
   terminate();
-  restarter_.shutdown();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
@@ -389,6 +388,7 @@ void InstanceImpl::terminate() {
   }
   handler_.reset();
   thread_local_.shutdownThread();
+  restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
 }

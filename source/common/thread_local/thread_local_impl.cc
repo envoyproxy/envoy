@@ -16,6 +16,7 @@ thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
 InstanceImpl::~InstanceImpl() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(shutdown_);
   thread_local_data_.data_.clear();
 }
 
