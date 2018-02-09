@@ -82,7 +82,7 @@ public:
   virtual std::string version() PURE;
 
   /**
-   * Returns a lock for logging.
+   * @return Thread::BasicLockable& a lock for logging.
    */
   virtual Thread::BasicLockable& logLock() PURE;
 
