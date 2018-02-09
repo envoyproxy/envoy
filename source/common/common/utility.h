@@ -8,6 +8,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/interval_set.h"
@@ -170,7 +171,7 @@ public:
    * string views; default = true.
    * @return true if found and false otherwise.
    *
-   * E.g,
+   * E.g.,
    *
    * findToken("A=5; b", "=;", "5")   . true
    * findToken("A=5; b", "=;", "A=5") . false
@@ -182,16 +183,59 @@ public:
                         absl::string_view token, bool trim_whitespace = true);
 
   /**
+   * Look up for a token in a delimiter-separated string view ignoring case
+   * sensitivity.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
+   * @param token supplies the lookup string view.
+   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
+   * string views; default = true.
+   * @return true if found a string that is semantically the same and false otherwise.
+   *
+   * E.g.,
+   *
+   * findToken("hello; world", ";", "HELLO")   . true
+   */
+  static bool caseFindToken(absl::string_view source, absl::string_view delimiters,
+                            absl::string_view key_token, bool trim_whitespace = true);
+
+  /**
+   * Compare one string view with another string view ignoring case sensitivity.
+   * @param lhs supplies the first string view.
+   * @param rhs supplies the second string view.
+   * @return true if strings are semantically the same and false otherwise.
+   *
+   * E.g.,
+   *
+   * findToken("hello; world", ";", "HELLO")   . true
+   */
+  static bool caseCompare(absl::string_view lhs, absl::string_view rhs);
+
+  /**
    * Crop characters from a string view starting at the first character of the matched
    * delimiter string view until the end of the source string view.
    * @param source supplies the string view to be processed.
    * @param delimiter supplies the string view that delimits the starting point for deletion.
-   * @param trim_whitespace remove leading and trailing whitespaces from each of the split
-   * string views; default = true.
    * @return sub-string of the string view if any.
+   *
+   * E.g.,
+   *
+   * cropRight("foo ; ; ; ; ; ; ", ";") == "foo "
    */
-  static absl::string_view cropRight(absl::string_view source, absl::string_view delimiters,
-                                     bool trim_whitespace = true);
+  static absl::string_view cropRight(absl::string_view source, absl::string_view delimiters);
+
+  /**
+   * Crop characters from a string view starting at the first character of the matched
+   * delimiter string view until the begining of the source string view.
+   * @param source supplies the string view to be processed.
+   * @param delimiter supplies the string view that delimits the starting point for deletion.
+   * @return sub-string of the string view if any.
+   *
+   * E.g.,
+   *
+   * cropLeft("foo ; ; ; ; ; ", ";") == " ; ; ; ; "
+   */
+  static absl::string_view cropLeft(absl::string_view source, absl::string_view delimiters);
 
   /**
    * Split a delimiter-separated string view.
@@ -258,6 +302,31 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
+
+  /**
+   * Callable struct that returns the result of string comparison ignoring case.
+   * @param lhs supplies the first string view.
+   * @param rhs supplies the second string view.
+   * @return true if strings are semantically the same and false otherwise.
+   */
+  struct CaseInsensitiveCompare {
+    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
+  };
+
+  /**
+   * Callable struct that returns the hash representation of a case-insensitive string_view input.
+   * @param key supplies the string view.
+   * @return uint64_t hash representation of the supplied string view.
+   */
+  struct CaseInsensitiveHash {
+    uint64_t operator()(absl::string_view key) const;
+  };
+
+  /**
+   * Definition of unordered set of case-insensitive std::string.
+   */
+  typedef std::unordered_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
+      CaseUnorderedSet;
 
   /**
    * Removes all the character indices from str contained in the interval-set.

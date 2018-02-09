@@ -46,7 +46,7 @@ public:
 private:
   bool inflateNext();
 
-  uint64_t chunk_size_;
+  const uint64_t chunk_size_;
   bool initialized_;
 
   std::unique_ptr<unsigned char[]> chunk_char_ptr_;
