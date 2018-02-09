@@ -211,6 +211,10 @@ private:
   GoogleAsyncTag finish_tag_{*this, GoogleAsyncTag::Operation::Finish};
 
   GoogleAsyncClientImpl& parent_;
+  GoogleAsyncClientThreadLocal& tls_;
+  // Latch our own version of this reference, so that completionThread() doesn't
+  // try and access via parent_, which might not exist in teardown.
+  Event::Dispatcher& dispatcher_;
   // We hold a ref count on the stub_ to allow the stream to wait for its tags
   // to drain from the CQ on cleanup.
   std::shared_ptr<grpc::GenericStub> stub_;

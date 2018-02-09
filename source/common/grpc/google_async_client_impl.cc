@@ -40,11 +40,9 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
     ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
-    {
-      std::unique_lock<std::mutex> lock(stream.completed_ops_lock_);
-      stream.completed_ops_.emplace_back(op, ok);
-    }
-    stream.parent_.dispatcher_.post([&stream] { stream.onCompletedOp(); });
+    std::unique_lock<std::mutex> lock(stream.completed_ops_lock_);
+    stream.completed_ops_.emplace_back(op, ok);
+    stream.dispatcher_.post([&stream] { stream.onCompletedOp(); });
   }
   ENVOY_LOG(debug, "completionThread exiting");
 }
@@ -112,8 +110,8 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                                              const Protobuf::MethodDescriptor& service_method,
                                              AsyncStreamCallbacks& callbacks,
                                              const Optional<std::chrono::milliseconds>& timeout)
-    : parent_(parent), stub_(parent_.stub_), service_method_(service_method), callbacks_(callbacks),
-      timeout_(timeout) {}
+    : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
+      service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -207,7 +205,11 @@ void GoogleAsyncStreamImpl::writeQueued() {
 
 void GoogleAsyncStreamImpl::onCompletedOp() {
   std::unique_lock<std::mutex> lock(completed_ops_lock_);
-  while (!completed_ops_.empty()) {
+  // Process at most one event here, so that we don't destroy ourselves until
+  // either all events have drained from the dispatcher or the dispatcher is no
+  // longer live and we're doing an explicit drain from
+  // ~GoogleAsyncClientThreadLocal().
+  if (!completed_ops_.empty()) {
     GoogleAsyncTag::Operation op;
     bool ok;
     std::tie(op, ok) = completed_ops_.front();
@@ -342,8 +344,8 @@ void GoogleAsyncStreamImpl::metadataTranslate(
 
 void GoogleAsyncStreamImpl::deferredDelete() {
   ENVOY_LOG(debug, "Deferred delete");
-  parent_.tls_.unregisterStream(this);
-  parent_.dispatcher_.deferredDelete(std::unique_ptr<GoogleAsyncStreamImpl>(this));
+  tls_.unregisterStream(this);
+  dispatcher_.deferredDelete(std::unique_ptr<GoogleAsyncStreamImpl>(this));
 }
 
 void GoogleAsyncStreamImpl::cleanup() {
