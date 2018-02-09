@@ -27,7 +27,7 @@ GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   ENVOY_LOG(debug, "Joined completionThread");
   // Ensure that we have cleaned up all orphan streams, now that CQ is gone.
   while (!streams_.empty()) {
-    (*streams_.begin())->onCompletedOp();
+    (*streams_.begin())->onCompletedOps();
   }
 }
 
@@ -41,8 +41,14 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
     ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
     std::unique_lock<std::mutex> lock(stream.completed_ops_lock_);
+    // It's an invariant that there must only be one pending post for arbitrary
+    // length completed_ops_, otherwise we can race in stream destruction, where
+    // we process multiple events in onCompletedOps() but have only partially
+    // consumed the posts on the dispatcher.
+    if (stream.completed_ops_.empty()) {
+      stream.dispatcher_.post([&stream] { stream.onCompletedOps(); });
+    }
     stream.completed_ops_.emplace_back(op, ok);
-    stream.dispatcher_.post([&stream] { stream.onCompletedOp(); });
   }
   ENVOY_LOG(debug, "completionThread exiting");
 }
@@ -68,7 +74,6 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(
 }
 
 GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
-  ENVOY_LOG(debug, "GoogleAsyncClientImpl destruct");
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
   }
@@ -205,13 +210,9 @@ void GoogleAsyncStreamImpl::writeQueued() {
   ENVOY_LOG(trace, "Write op dispatched");
 }
 
-void GoogleAsyncStreamImpl::onCompletedOp() {
+void GoogleAsyncStreamImpl::onCompletedOps() {
   std::unique_lock<std::mutex> lock(completed_ops_lock_);
-  // Process at most one event here, so that we don't destroy ourselves until
-  // either all events have drained from the dispatcher or the dispatcher is no
-  // longer live and we're doing an explicit drain from
-  // ~GoogleAsyncClientThreadLocal().
-  if (!completed_ops_.empty()) {
+  while (!completed_ops_.empty()) {
     GoogleAsyncTag::Operation op;
     bool ok;
     std::tie(op, ok) = completed_ops_.front();

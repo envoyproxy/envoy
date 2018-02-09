@@ -203,7 +203,7 @@ protected:
 private:
   // Process queued events in completed_ops_ with handleOpCompletion() on
   // GoogleAsyncClient silo thread.
-  void onCompletedOp();
+  void onCompletedOps();
   // Handle Operation completion on GoogleAsyncClient silo thread. This is posted by
   // GoogleAsyncClientThreadLocal::completionThread() when a message is received on cq_.
   void handleOpCompletion(GoogleAsyncTag::Operation op, bool ok);
