@@ -196,6 +196,9 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   }
 
   if (read_end_stream_) {
+    // read() on a raw socket will repeatedly return 0 (EOF) once EOF has
+    // occurred, so filter out the repeats so that filters don't have
+    // to handle repeats.
     if (read_end_stream_raised_) {
       // No further data can be delivered after end_stream
       ASSERT(read_buffer_size == 0);
