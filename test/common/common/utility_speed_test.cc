@@ -147,6 +147,53 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
 }
 BENCHMARK(BM_FindTokenValueNoSplit);
 
+static void BM_IntervalSetInsert17(benchmark::State& state) {
+  for (auto _ : state) {
+    Envoy::IntervalSetImpl<size_t> interval_set;
+    interval_set.insert(7, 10);
+    interval_set.insert(-2, -1);
+    interval_set.insert(22, 23);
+    interval_set.insert(8, 15);
+    interval_set.insert(5, 12);
+    interval_set.insert(3, 3);
+    interval_set.insert(3, 4);
+    interval_set.insert(2, 4);
+    interval_set.insert(3, 6);
+    interval_set.insert(18, 19);
+    interval_set.insert(16, 17);
+    interval_set.insert(19, 20);
+    interval_set.insert(3, 6);
+    interval_set.insert(3, 20);
+    interval_set.insert(3, 22);
+    interval_set.insert(-2, 23);
+    interval_set.insert(-3, 24);
+  }
+}
+BENCHMARK(BM_IntervalSetInsert17);
+
+static void BM_IntervalSet4ToVector(benchmark::State& state) {
+  Envoy::IntervalSetImpl<size_t> interval_set;
+  interval_set.insert(7, 10);
+  interval_set.insert(-2, -1);
+  interval_set.insert(22, 23);
+  interval_set.insert(8, 15);
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(interval_set.toVector());
+  }
+}
+BENCHMARK(BM_IntervalSet4ToVector);
+
+static void BM_IntervalSet50ToVector(benchmark::State& state) {
+  Envoy::IntervalSetImpl<size_t> interval_set;
+  for (size_t i = 0; i < 100; i += 2) {
+    interval_set.insert(i, i + 1);
+  }
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(interval_set.toVector());
+  }
+}
+BENCHMARK(BM_IntervalSet50ToVector);
+
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   benchmark::Initialize(&argc, argv);

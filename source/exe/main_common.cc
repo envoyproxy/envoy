@@ -12,6 +12,7 @@
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
+#include "server/proto_descriptors.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
 
@@ -41,6 +42,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
   switch (options_.mode()) {
     case Server::Mode::Serve: {
@@ -75,13 +77,13 @@ MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 bool MainCommonBase::run() {
   switch (options_.mode()) {
-  case Server::Mode::Serve:
-    server_->run();
-    return true;
-  case Server::Mode::Validate: {
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_);
-  }
+    case Server::Mode::Serve:
+      server_->run();
+      return true;
+    case Server::Mode::Validate: {
+      auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+      return Server::validateConfig(options_, local_address, component_factory_);
+    }
   }
   throw EnvoyException(fmt::format("Invalid server mode: {}", int(options_.mode())));
   return false;

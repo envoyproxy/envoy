@@ -302,6 +302,9 @@ TEST_F(CorsFilterTest, EncodeWithAllowCredentialsTrue) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
+  Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.encode100ContinueHeaders(continue_headers));
+
   Http::TestHeaderMapImpl response_headers{};
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));

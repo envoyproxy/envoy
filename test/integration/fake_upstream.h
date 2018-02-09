@@ -43,6 +43,7 @@ public:
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
   bool complete() { return end_stream_; }
+  void encode100ContinueHeaders(const Http::HeaderMapImpl& headers);
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
@@ -99,6 +100,7 @@ public:
   }
 
   // Http::StreamDecoder
+  void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;

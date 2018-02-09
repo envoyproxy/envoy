@@ -423,31 +423,6 @@ TEST_F(Http1ServerConnectionImplTest, HeadRequestResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 5\r\n\r\n", output);
 }
 
-TEST_F(Http1ServerConnectionImplTest, ExpectContinueResponse) {
-  initialize();
-
-  NiceMock<Http::MockStreamDecoder> decoder;
-  Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder) -> Http::StreamDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
-
-  std::string output;
-  ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
-
-  TestHeaderMapImpl expected_headers{
-      {"content-length", "100"}, {":path", "/"}, {":method", "POST"}};
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
-
-  Buffer::OwnedImpl buffer(
-      "POST / HTTP/1.1\r\nExpect: 100-continue\r\ncontent-length: 100\r\n\r\n");
-  codec_->dispatch(buffer);
-  EXPECT_EQ(0U, buffer.length());
-  EXPECT_EQ("HTTP/1.1 100 Continue\r\n\r\n", output);
-}
-
 TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
   initialize();
 
@@ -634,6 +609,25 @@ TEST_F(Http1ClientConnectionImplTest, 204Response) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 204 OK\r\nContent-Length: 20\r\n\r\n");
+  codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, 100Response) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl initial_response("HTTP/1.1 100 Continue\r\n\r\n");
+  codec_->dispatch(initial_response);
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
   codec_->dispatch(response);
 }
 

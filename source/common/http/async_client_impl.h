@@ -242,6 +242,9 @@ private:
   void continueDecoding() override { NOT_IMPLEMENTED; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
+  // The async client won't pause if sending an Expect: 100-Continue so simply
+  // swallows any incoming encode100Continue.
+  void encode100ContinueHeaders(HeaderMapPtr&&) override {}
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;

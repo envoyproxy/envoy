@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -41,19 +42,22 @@ public:
   virtual std::string name() const PURE;
 
   /**
-   * Returns a modified name with the tag removed and added to the tags vector. If the tag is not
-   * represented in the name, the tags vector will remain unmodified and the return value will be a
-   * copy of name. The portion removed from the name may be different than the value put into
-   * the tag vector for readability purposes. Note: The extraction process is expected to be run
-   * iteratively. For a list of TagExtractors, the original name is expected to be passed into
-   * extractTag for the first, and then each iteration after the modified name returned from the
-   * previous iteration should be passed in. The same vector should be passed into each successive
-   * call for updating.
-   * @param name name from which the tag will be extracted if found to exist.
+   * Finds tags for stat_name and adds them to the tags vector. If the tag is not
+   * represented in the name, the tags vector will remain unmodified. Also finds the
+   * character indexes for the tags in stat_name and adds them to remove_characters (an
+   * in/out arg). Returns true if a tag-match was found. The characters removed from the
+   * name may be different from the values put into the tag vector for readability
+   * purposes. Note: The extraction process is expected to be run iteratively, aggregating
+   * the character intervals to be removed from the name after all the tag extractions are
+   * complete. This approach simplifies the tag searching process because without mutations,
+   * the tag extraction will be order independent, apart from the order of the tag array.
+   * @param stat_name name from which the tag will be extracted if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the name.
-   * @return std::string modified name with the tag removed.
+   * @param remove_characters set of intervals of character-indices to be removed from name.
+   * @return bool indicates whether a tag was found in the name.
    */
-  virtual std::string extractTag(const std::string& name, std::vector<Tag>& tags) const PURE;
+  virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
+                          IntervalSet<size_t>& remove_characters) const PURE;
 };
 
 typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;

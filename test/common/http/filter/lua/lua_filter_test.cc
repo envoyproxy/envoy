@@ -646,6 +646,11 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  // No lua hooks for 100-continue
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("100"))).Times(0);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(continue_headers));
+
   TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("200")));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));

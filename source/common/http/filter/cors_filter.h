@@ -25,6 +25,9 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
+  FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+    return FilterHeadersStatus::Continue;
+  }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return FilterDataStatus::Continue;

@@ -20,6 +20,10 @@ public:
    * Mutates request headers in various ways. This functionality is broken out because of its
    * complexity for ease of testing. See the method itself for detailed comments on what
    * mutations are performed.
+   *
+   * Note this function may be called twice on the response path if there are
+   * 100-Continue headers.
+   *
    * @return the final trusted remote address. This depends on various settings and the
    *         existence of the x-forwarded-for header. Again see the method for more details.
    */

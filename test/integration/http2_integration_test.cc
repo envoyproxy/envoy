@@ -104,6 +104,10 @@ TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
+TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
+
+TEST_P(Http2IntegrationTest, EnvoyProxying100Continue) { testEnvoyProxying100Continue(); }
+
 TEST_P(Http2IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
 TEST_P(Http2IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
