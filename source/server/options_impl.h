@@ -46,6 +46,7 @@ public:
   const std::string& serviceZone() override { return service_zone_; }
   uint64_t maxStats() override { return max_stats_; }
   uint64_t maxObjNameLength() override { return max_obj_name_length_; }
+  bool hotRestartDisabled() override { return hot_restart_disabled_; }
 
 private:
   uint64_t base_id_;
@@ -66,6 +67,7 @@ private:
   Server::Mode mode_;
   uint64_t max_stats_;
   uint64_t max_obj_name_length_;
+  bool hot_restart_disabled_;
 };
 
 /**
