@@ -50,7 +50,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
-  uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
+  const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
   if (config.useRemoteAddress()) {
     single_xff_address = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by

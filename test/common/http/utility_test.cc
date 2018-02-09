@@ -129,8 +129,7 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     const std::string first_address = "192.0.2.10";
     const std::string second_address = "192.0.2.1";
     const std::string third_address = "10.0.0.1";
-    TestHeaderMapImpl request_headers{
-        {"x-forwarded-for", first_address + ", " + second_address + ", " + third_address}};
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
     EXPECT_FALSE(ret.single_address_);
