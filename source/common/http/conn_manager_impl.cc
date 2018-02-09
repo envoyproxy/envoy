@@ -461,6 +461,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // and sends the 100-Continue directly to the encoder.
     chargeStats(continueHeader());
     response_encoder_->encode100ContinueHeaders(continueHeader());
+    // Remove the Expect header so it won't be handled again downstream.
+    request_headers_->removeExpect();
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(

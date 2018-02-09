@@ -29,10 +29,11 @@ protected:
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
-  static bool isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime);
+  bool isGlobalPanic(const HostSet& host_set);
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                   Runtime::RandomGenerator& random);
+                   Runtime::RandomGenerator& random,
+                   const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the per_priority_load_;
   const HostSet& chooseHostSet();
@@ -42,6 +43,7 @@ protected:
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  const uint32_t default_healthy_panic_percent_;
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
 
@@ -64,7 +66,8 @@ protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
   ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                             ClusterStats& stats, Runtime::Loader& runtime,
-                            Runtime::RandomGenerator& random);
+                            Runtime::RandomGenerator& random,
+                            const envoy::api::v2::Cluster::CommonLbConfig& common_config);
   ~ZoneAwareLoadBalancerBase();
 
   /**
@@ -140,8 +143,10 @@ class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random)
-      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
+                         Runtime::RandomGenerator& random,
+                         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                                  common_config) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -167,7 +172,8 @@ class LeastRequestLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase 
 public:
   LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                            ClusterStats& stats, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random);
+                           Runtime::RandomGenerator& random,
+                           const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -184,8 +190,10 @@ class RandomLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random)
-      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {}
+                     Runtime::RandomGenerator& random,
+                     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                                  common_config) {}
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
