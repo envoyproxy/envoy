@@ -399,6 +399,12 @@ public:
   virtual const Http::Http2Settings& http2Settings() const PURE;
 
   /**
+   * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
+   *         load balancers for this cluster.
+   */
+  virtual const envoy::api::v2::Cluster::CommonLbConfig& lbConfig() const PURE;
+
+  /**
    * @return the type of load balancing that the cluster should use.
    */
   virtual LoadBalancerType lbType() const PURE;

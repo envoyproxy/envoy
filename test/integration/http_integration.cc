@@ -756,8 +756,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   // The continue headers should arrive immediately.
   response_->waitForContinueHeaders();
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+
+  // Send the rest of the request.
   codec_client_->sendData(*request_encoder_, 10, true);
   upstream_request_->waitForEndStream(*dispatcher_);
+  // Verify the Expect header is stripped.
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect) == nullptr);
+
   if (additional_continue_from_upstream) {
     // Make sure if upstream sends an 100-Continue Envoy doesn't send its own and proxy the one
     // from upstream!
