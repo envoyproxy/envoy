@@ -15,7 +15,7 @@ namespace Envoy {
 class ProdComponentFactory : public Server::ComponentFactory {
 public:
   // Server::DrainManagerFactory
-  Server::DrainManagerPtr createDrainManager(Server::Instance& server);
+  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override;
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override;
 };
