@@ -15,6 +15,14 @@ jobs:
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
+   debug:
+     docker:
+       - image: *envoy-build-image
+     resource_class: xlarge
+     working_directory: /source
+     steps:
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.debug
    asan:
      docker:
        - image: *envoy-build-image
@@ -104,6 +112,7 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+      - debug
       - asan
       - tsan
       - ipv6_tests
