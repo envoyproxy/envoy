@@ -96,7 +96,7 @@ public:
    *        actually different when passing restored as 'true'.
    */
   virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                               bool restored = false) PURE;
+                               bool restored) PURE;
 
   /**
    * Set the remote address of the socket.

@@ -16,16 +16,17 @@ struct SupportedCommands {
   static const std::vector<std::string>& simpleCommands() {
     CONSTRUCT_ON_FIRST_USE(
         std::vector<std::string>, "append", "bitcount", "bitfield", "bitpos", "decr", "decrby",
-        "dump", "expire", "expireat", "geoadd", "geodist", "geohash", "geopos", "get", "getbit",
-        "getrange", "getset", "hdel", "hexists", "hget", "hgetall", "hincrby", "hincrbyfloat",
-        "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx", "hstrlen", "hvals", "incr",
-        "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lpop", "lpush", "lpushx", "lrange",
-        "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat", "psetex", "pttl", "restore",
-        "rpop", "rpush", "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange",
-        "sismember", "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type",
-        "zadd", "zcard", "zcount", "zincrby", "zlexcount", "zrange", "zrangebylex", "zrangebyscore",
-        "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "zrevrange",
-        "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+        "dump", "expire", "expireat", "geoadd", "geodist", "geohash", "geopos", "georadius_ro",
+        "georadiusbymember_ro", "get", "getbit", "getrange", "getset", "hdel", "hexists", "hget",
+        "hgetall", "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset",
+        "hsetnx", "hstrlen", "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen",
+        "lpop", "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire",
+        "pexpireat", "psetex", "pttl", "restore", "rpop", "rpush", "rpushx", "sadd", "scard", "set",
+        "setbit", "setex", "setnx", "setrange", "sismember", "smembers", "spop", "srandmember",
+        "srem", "sscan", "strlen", "ttl", "type", "zadd", "zcard", "zcount", "zincrby", "zlexcount",
+        "zrange", "zrangebylex", "zrangebyscore", "zrank", "zrem", "zremrangebylex",
+        "zremrangebyrank", "zremrangebyscore", "zrevrange", "zrevrangebylex", "zrevrangebyscore",
+        "zrevrank", "zscan", "zscore");
   }
 
   /**
