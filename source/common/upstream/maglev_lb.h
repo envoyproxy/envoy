@@ -11,11 +11,12 @@ namespace Upstream {
  * section 3.4. Specifically, the algorithm shown in pseudocode listening 1 is implemented
  * with a fixed table size of 65537. This is the recommended table size in section 5.3.
  */
-class MaglevTable {
+class MaglevTable : public LoadBalancer {
 public:
   MaglevTable(const HostVector& hosts);
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context);
+  // Upstream::LoadBalancer
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
   struct TableBuildEntry {
