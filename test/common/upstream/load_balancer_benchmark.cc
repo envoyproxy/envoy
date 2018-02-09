@@ -202,7 +202,8 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_.value(
           HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hosts.push_back(lb->chooseHost(&context));;
+      hosts.push_back(lb->chooseHost(&context));
+      ;
     }
 
     RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
@@ -212,7 +213,8 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_.value(
           HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hosts2.push_back(lb->chooseHost(&context));;
+      hosts2.push_back(lb->chooseHost(&context));
+      ;
     }
 
     ASSERT(hosts.size() == hosts2.size());
@@ -224,9 +226,9 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     }
 
     state.counters["percent_different"] =
-      (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+        (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
     state.counters["host_loss_over_N_optimal"] =
-      (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
+        (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
   }
 }
 BENCHMARK(BM_RingHashLoadBalancerHostLoss)
@@ -248,7 +250,8 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_.value(
           HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hosts.push_back(table.chooseHost(&context));;
+      hosts.push_back(table.chooseHost(&context));
+      ;
     }
 
     BaseTester tester2(num_hosts - hosts_to_lose);
@@ -257,7 +260,8 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_.value(
           HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hosts2.push_back(table2.chooseHost(&context));;
+      hosts2.push_back(table2.chooseHost(&context));
+      ;
     }
 
     ASSERT(hosts.size() == hosts2.size());
@@ -269,9 +273,9 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     }
 
     state.counters["percent_different"] =
-      (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+        (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
     state.counters["host_loss_over_N_optimal"] =
-      (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
+        (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerHostLoss)
@@ -279,7 +283,6 @@ BENCHMARK(BM_MaglevLoadBalancerHostLoss)
     ->Args({500, 2, 10000})
     ->Args({500, 3, 10000})
     ->Unit(benchmark::kMillisecond);
-
 
 } // namespace
 } // namespace Upstream
