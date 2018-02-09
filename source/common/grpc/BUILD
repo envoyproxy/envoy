@@ -76,7 +76,10 @@ envoy_cc_library(
     name = "google_async_client_lib",
     srcs = ["google_async_client_impl.cc"],
     hdrs = ["google_async_client_impl.h"],
-    external_deps = ["grpc"],
+    external_deps = [
+        "abseil_base",
+        "grpc",
+    ],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/thread_local:thread_local_interface",

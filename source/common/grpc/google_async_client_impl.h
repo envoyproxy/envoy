@@ -10,6 +10,7 @@
 #include "common/common/thread.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/base/thread_annotations.h"
 #include "grpc++/generic/generic_stub.h"
 #include "grpc++/grpc++.h"
 
@@ -284,7 +285,8 @@ private:
   uint32_t inflight_tags_{};
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
-  std::list<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops_;
+  std::list<std::pair<GoogleAsyncTag::Operation, bool>>
+      completed_ops_ GUARDED_BY(completed_ops_lock_);
   std::mutex completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
