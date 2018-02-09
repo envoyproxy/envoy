@@ -1,8 +1,10 @@
 #include "exe/main_common.h"
 
 #include "server/options_impl.h"
-#include "gtest/gtest.h"
+
 #include "test/test_common/environment.h"
+
+#include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -23,7 +25,7 @@ TEST(MainCommon, ConstructDestruct) {
 
 TEST(MainCommon, LegacyMain) {
   // Testing the legacy path is difficult because if we give it a valid config, it will
-  // never exit.  So just give it an empty config and let it fail.
+  // never exit. So just give it an empty config and let it fail.
   int argc = 1;
   std::unique_ptr<char> envoy_static(strdup("envoy-static"));
   char* argv[] = {envoy_static.get(), nullptr};
@@ -37,8 +39,8 @@ TEST(MainCommon, LegacyMain) {
   // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
   const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb =
       [](uint64_t max_num_stats, uint64_t max_stat_name_len) {
-    return Envoy::Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
-  };
+        return Envoy::Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
+      };
 #else
   const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
     return "disabled";
