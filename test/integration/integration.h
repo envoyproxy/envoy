@@ -29,7 +29,6 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
-  const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   void waitForHeaders();
@@ -38,7 +37,6 @@ public:
   void waitForReset();
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
@@ -50,7 +48,6 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  Http::HeaderMapPtr continue_headers_;
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   bool waiting_for_end_stream_{};

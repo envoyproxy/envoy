@@ -186,7 +186,6 @@ private:
     void onTimeout() override;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override {
       if (end_stream) {
@@ -448,7 +447,6 @@ private:
     void onTimeout() override;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&&) override;
