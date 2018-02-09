@@ -230,10 +230,6 @@ public:
       fake_connection_->close();
       fake_connection_->waitForDisconnect();
     }
-    // Shutdown Google gRPC client TLS. This will force all CQs to drain. We
-    // then kick the dispatcher to ensure all orphan streams are scheduled for
-    // cleanup.
-    google_tls_.reset();
   }
 
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
@@ -356,7 +352,9 @@ public:
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
+#ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
+#endif
   AsyncClientPtr grpc_client_;
   Event::TimerPtr timeout_timer_;
   const TestMetadata empty_metadata_;
