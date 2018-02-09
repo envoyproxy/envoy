@@ -100,7 +100,6 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
-  bool proxy100Continue() const override { return proxy_100_continue_; }
 
   static const std::string DEFAULT_SERVER_STRING;
 
@@ -129,7 +128,6 @@ private:
   bool generate_request_id_;
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
-  const bool proxy_100_continue_;
 };
 
 } // namespace Configuration

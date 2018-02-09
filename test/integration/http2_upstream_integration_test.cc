@@ -88,10 +88,6 @@ TEST_P(Http2UpstreamIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyProxying100Continue) { testEnvoyProxying100Continue(); }
-
 TEST_P(Http2UpstreamIntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }

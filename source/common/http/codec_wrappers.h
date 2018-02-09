@@ -11,10 +11,6 @@ namespace Http {
 class StreamDecoderWrapper : public StreamDecoder {
 public:
   // StreamDecoder
-  void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
-    inner_.decode100ContinueHeaders(std::move(headers));
-  }
-
   void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
     if (end_stream) {
       onPreDecodeComplete();
@@ -64,10 +60,6 @@ protected:
 class StreamEncoderWrapper : public StreamEncoder {
 public:
   // StreamEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override {
-    inner_.encode100ContinueHeaders(headers);
-  }
-
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
     inner_.encodeHeaders(headers, end_stream);
     if (end_stream) {

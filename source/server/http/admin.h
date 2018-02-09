@@ -86,7 +86,6 @@ public:
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
-  bool proxy100Continue() const override { return false; }
 
 private:
   /**
