@@ -1,3 +1,5 @@
+#ifndef ENVOY_CONFIG_COVERAGE
+
 #include "exe/main_common.h"
 
 #include "server/options_impl.h"
@@ -18,8 +20,8 @@ namespace Envoy {
 
 TEST(MainCommon, ConstructDestruct) {
   // TODO(jmarantz): I think we may need to hack the config file to pick an unused port.
-  std::string config_file =
-      Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") + "/configs/google_com_proxy.json";
+  std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
+                            "/configs/google_com_proxy_port_0.json";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
   MainCommon main_common(3, argv, false);
 }
@@ -65,3 +67,4 @@ TEST(MainCommon, LegacyMain) {
 }
 
 } // namespace Envoy
+#endif // ENVOY_CONFIG_COVERAGE
