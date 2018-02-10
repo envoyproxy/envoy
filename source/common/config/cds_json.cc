@@ -33,6 +33,9 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
   const std::string hc_type = json_health_check.getString("type");
   if (hc_type == "http") {
     health_check.mutable_http_health_check()->set_path(json_health_check.getString("path"));
+    if (json_health_check.hasObject("host")) {
+      health_check.mutable_http_health_check()->set_host(json_health_check.getString("host"));
+    }
     if (json_health_check.hasObject("service_name")) {
       health_check.mutable_http_health_check()->set_service_name(
           json_health_check.getString("service_name"));

@@ -1415,6 +1415,7 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
         "exclusiveMinimum" : true
       },
       "path" : {"type" : "string"},
+      "host" : {"type" : "string"},
       "send" : {
         "type" : "array",
         "items" : {"$ref" : "#/definitions/health_check_bytes"}

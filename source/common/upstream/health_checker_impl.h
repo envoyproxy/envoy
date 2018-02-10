@@ -232,6 +232,7 @@ private:
   }
 
   const std::string path_;
+  const std::string host_name_;
   Optional<std::string> service_name_;
 };
 

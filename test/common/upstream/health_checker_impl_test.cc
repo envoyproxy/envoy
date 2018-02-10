@@ -209,7 +209,8 @@ public:
       "interval_jitter_ms": 1000,
       "unhealthy_threshold": 2,
       "healthy_threshold": 2,
-      "path": "/healthcheck"
+      "path": "/healthcheck",
+      "host": "hello"
     }
     )EOF";
 
