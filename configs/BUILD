@@ -34,11 +34,6 @@ genrule(
 )
 
 filegroup(
-    name = "google_com_proxy",
-    srcs = ["google_com_proxy.json"],
-)
-
-filegroup(
     name = "google_com_proxy_port_0",
     srcs = ["google_com_proxy_port_0.json"],
 )
