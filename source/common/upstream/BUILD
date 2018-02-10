@@ -218,6 +218,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "maglev_lb_lib",
+    srcs = ["maglev_lb.cc"],
+    hdrs = ["maglev_lb.h"],
+    deps = [
+        ":load_balancer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],

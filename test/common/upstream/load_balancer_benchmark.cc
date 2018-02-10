@@ -1,4 +1,5 @@
 #include "common/runtime/runtime_impl.h"
+#include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -9,10 +10,11 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
-class RingHashTester {
+class BaseTester {
 public:
-  RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) {
+  BaseTester(uint64_t num_hosts) {
     HostSet& host_set = priority_set_.getOrCreateHostSet(0);
 
     HostVector hosts;
@@ -22,15 +24,21 @@ public:
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
     host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, hosts, {});
+  }
 
+  PrioritySetImpl priority_set_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+};
+
+class RingHashTester : public BaseTester {
+public:
+  RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
     ring_hash_lb_.reset(new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_,
                                                  common_config_});
   }
 
-  PrioritySetImpl priority_set_;
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
   NiceMock<Runtime::MockLoader> runtime_;
@@ -40,7 +48,7 @@ public:
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
 };
 
-static void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
+void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -61,6 +69,21 @@ BENCHMARK(BM_RingHashLoadBalancerBuildRing)
     ->Args({500, 256000})
     ->Unit(benchmark::kMillisecond);
 
+void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
+  for (auto _ : state) {
+    state.PauseTiming();
+    const uint64_t num_hosts = state.range(0);
+    BaseTester tester(num_hosts);
+    state.ResumeTiming();
+    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+  }
+}
+BENCHMARK(BM_MaglevLoadBalancerBuildTable)
+    ->Arg(100)
+    ->Arg(200)
+    ->Arg(500)
+    ->Unit(benchmark::kMillisecond);
+
 class TestLoadBalancerContext : public LoadBalancerContext {
 public:
   // Upstream::LoadBalancerContext
@@ -71,7 +94,27 @@ public:
   Optional<uint64_t> hash_key_;
 };
 
-static void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
+void computeHitStats(benchmark::State& state,
+                     const std::unordered_map<std::string, uint64_t>& hit_counter) {
+  double mean = 0;
+  for (const auto& pair : hit_counter) {
+    mean += pair.second;
+  }
+  mean /= hit_counter.size();
+
+  double variance = 0;
+  for (const auto& pair : hit_counter) {
+    variance += std::pow(pair.second - mean, 2);
+  }
+  variance /= hit_counter.size();
+  const double stddev = std::sqrt(variance);
+
+  state.counters["mean_hits"] = mean;
+  state.counters["stddev_hits"] = stddev;
+  state.counters["relative_stddev_hits"] = (stddev / mean);
+}
+
+void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
     // Do not time the creation of the ring.
     state.PauseTiming();
@@ -87,7 +130,9 @@ static void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
 
     // Note: To a certain extent this is benchmarking the performance of xxhash as well as
     // std::unordered_map. However, it should be roughly equivalent to the work done when
-    // comparing to different hashing algorithms such as Maglev.
+    // comparing different hashing algorithms.
+    // TODO(mattklein123): When Maglev is a real load balancer, further share code with the
+    //                     other test.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_.value(
           HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
@@ -96,22 +141,7 @@ static void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
     state.PauseTiming();
-    double mean = 0;
-    for (const auto& pair : hit_counter) {
-      mean += pair.second;
-    }
-    mean /= hit_counter.size();
-
-    double variance = 0;
-    for (const auto& pair : hit_counter) {
-      variance += std::pow(pair.second - mean, 2);
-    }
-    variance /= hit_counter.size();
-    const double stddev = std::sqrt(variance);
-
-    state.counters["mean_hits"] = mean;
-    state.counters["stddev_hits"] = stddev;
-    state.counters["relative_stddev_hits"] = (stddev / mean);
+    computeHitStats(state, hit_counter);
     state.ResumeTiming();
   }
 }
@@ -124,6 +154,137 @@ BENCHMARK(BM_RingHashLoadBalancerChooseHost)
     ->Args({500, 256000, 100000})
     ->Unit(benchmark::kMillisecond);
 
+void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) {
+    // Do not time the creation of the table.
+    state.PauseTiming();
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t keys_to_simulate = state.range(1);
+    BaseTester tester(num_hosts);
+    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    std::unordered_map<std::string, uint64_t> hit_counter;
+    TestLoadBalancerContext context;
+    state.ResumeTiming();
+
+    // Note: To a certain extent this is benchmarking the performance of xxhash as well as
+    // std::unordered_map. However, it should be roughly equivalent to the work done when
+    // comparing different hashing algorithms.
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hit_counter[table.chooseHost(&context)->address()->asString()] += 1;
+    }
+
+    // Do not time computation of mean, standard deviation, and relative standard deviation.
+    state.PauseTiming();
+    computeHitStats(state, hit_counter);
+    state.ResumeTiming();
+  }
+}
+BENCHMARK(BM_MaglevLoadBalancerChooseHost)
+    ->Args({100, 100000})
+    ->Args({200, 100000})
+    ->Args({500, 100000})
+    ->Unit(benchmark::kMillisecond);
+
+void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
+  for (auto _ : state) {
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t min_ring_size = state.range(1);
+    const uint64_t hosts_to_lose = state.range(2);
+    const uint64_t keys_to_simulate = state.range(3);
+
+    RingHashTester tester(num_hosts, min_ring_size);
+    tester.ring_hash_lb_->initialize();
+    LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create();
+    std::vector<HostConstSharedPtr> hosts;
+    TestLoadBalancerContext context;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts.push_back(lb->chooseHost(&context));
+      ;
+    }
+
+    RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
+    tester2.ring_hash_lb_->initialize();
+    lb = tester2.ring_hash_lb_->factory()->create();
+    std::vector<HostConstSharedPtr> hosts2;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts2.push_back(lb->chooseHost(&context));
+      ;
+    }
+
+    ASSERT(hosts.size() == hosts2.size());
+    uint64_t num_different_hosts = 0;
+    for (uint64_t i = 0; i < hosts.size(); i++) {
+      if (hosts[i]->address()->asString() != hosts2[i]->address()->asString()) {
+        num_different_hosts++;
+      }
+    }
+
+    state.counters["percent_different"] =
+        (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+    state.counters["host_loss_over_N_optimal"] =
+        (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
+  }
+}
+BENCHMARK(BM_RingHashLoadBalancerHostLoss)
+    ->Args({500, 256000, 1, 10000})
+    ->Args({500, 256000, 2, 10000})
+    ->Args({500, 256000, 3, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
+  for (auto _ : state) {
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t hosts_to_lose = state.range(1);
+    const uint64_t keys_to_simulate = state.range(2);
+
+    BaseTester tester(num_hosts);
+    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    std::vector<HostConstSharedPtr> hosts;
+    TestLoadBalancerContext context;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts.push_back(table.chooseHost(&context));
+      ;
+    }
+
+    BaseTester tester2(num_hosts - hosts_to_lose);
+    MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
+    std::vector<HostConstSharedPtr> hosts2;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      context.hash_key_.value(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      hosts2.push_back(table2.chooseHost(&context));
+      ;
+    }
+
+    ASSERT(hosts.size() == hosts2.size());
+    uint64_t num_different_hosts = 0;
+    for (uint64_t i = 0; i < hosts.size(); i++) {
+      if (hosts[i]->address()->asString() != hosts2[i]->address()->asString()) {
+        num_different_hosts++;
+      }
+    }
+
+    state.counters["percent_different"] =
+        (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+    state.counters["host_loss_over_N_optimal"] =
+        (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
+  }
+}
+BENCHMARK(BM_MaglevLoadBalancerHostLoss)
+    ->Args({500, 1, 10000})
+    ->Args({500, 2, 10000})
+    ->Args({500, 3, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+} // namespace
 } // namespace Upstream
 } // namespace Envoy
 

@@ -241,6 +241,7 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/upstream:utility_lib",

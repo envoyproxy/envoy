@@ -11,10 +11,14 @@ namespace Envoy {
 class HashUtil {
 public:
   /**
-   * Return 64-bit hash with seed of 0 from the xxHash algorithm.
+   * Return 64-bit hash from the xxHash algorithm.
+   * @param input supplies the string view to hash.
+   * @param seed supplies the hash seed which defaults to 0.
    * See https://github.com/Cyan4973/xxHash for details.
    */
-  static uint64_t xxHash64(absl::string_view input) { return XXH64(input.data(), input.size(), 0); }
+  static uint64_t xxHash64(absl::string_view input, uint64_t seed = 0) {
+    return XXH64(input.data(), input.size(), seed);
+  }
 
   /**
    * TODO(gsagula): extend xxHash to handle case-insensitive.
