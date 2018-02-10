@@ -1,4 +1,5 @@
-#ifndef ENVOY_CONFIG_COVERAGE
+#if 0
+//#ifndef ENVOY_CONFIG_COVERAGE   -- this does not appear to be set in CI coverage runs.
 
 #include "exe/main_common.h"
 
