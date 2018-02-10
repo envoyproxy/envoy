@@ -116,11 +116,11 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion v
   return Network::Utility::getIpv6LoopbackAddress();
 }
 
-Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) {
+Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, bool v4_compat) {
   if (version == Address::IpVersion::v4) {
     return Network::Utility::getIpv4AnyAddress();
   }
-  return Network::Utility::getIpv6AnyAddress();
+  return Network::Utility::getIpv6AnyAddress(!v4_compat);
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {

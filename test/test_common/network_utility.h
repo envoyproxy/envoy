@@ -75,7 +75,8 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(const Address::IpVer
  * @param version the IP version of the any address.
  * @returns the any address for the specified IP version.
  */
-Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version);
+Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,
+                                              bool v4_compat = false);
 
 /**
  * This function tries to create a socket of type IpVersion version and bind to it. If
