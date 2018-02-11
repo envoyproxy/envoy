@@ -1,4 +1,4 @@
-#if !ENVOY_CONFIG_COVERAGE
+#ifndef ENVOY_CONFIG_COVERAGE
 
 #include "exe/main_common.h"
 
@@ -68,4 +68,4 @@ TEST(MainCommon, LegacyMain) {
 
 } // namespace Envoy
 
-#endif // !ENVOY_CONFIG_COVERAGE
+#endif // ENVOY_CONFIG_COVERAGE
