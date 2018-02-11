@@ -138,7 +138,7 @@ public:
 
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& stats_allocator() override { return stats_allocator_; }
+  Stats::RawStatDataAllocator& statsAllocator() override { return stats_allocator_; }
 
 private:
   Thread::MutexBasicLockable log_lock_;

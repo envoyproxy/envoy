@@ -22,8 +22,6 @@
 
 #include "ares.h"
 
-#include <pthread.h>
-
 namespace Envoy {
 
 Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instance& server) {
@@ -62,7 +60,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     Logger::Registry::initialize(options_.logLevel(), log_lock);
 
-    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->stats_allocator()));
+    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->statsAllocator()));
     server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
                                            *restarter_, *stats_store_, access_log_lock,
                                            component_factory_, *tls_));
@@ -85,14 +83,14 @@ bool MainCommonBase::run() {
     return Server::validateConfig(options_, local_address, component_factory_);
   }
   }
-  throw EnvoyException(fmt::format("Invalid server mode: {}", int(options_.mode())));
-  return false;
+  NOT_REACHED;
 }
 
 MainCommon::MainCommon(int argc, const char** argv, bool hot_restart)
     : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}
 
-OptionsImpl* MainCommon::computeOptions(int argc, const char** argv, bool hot_restart) {
+std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, const char** argv,
+                                                        bool hot_restart) {
   OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
     return "disabled";
   };
@@ -108,8 +106,8 @@ OptionsImpl* MainCommon::computeOptions(int argc, const char** argv, bool hot_re
   // Hot-restart should not be specified if the support is not compiled in.
   RELEASE_ASSERT(!hot_restart);
 #endif
-  return new OptionsImpl(argc, const_cast<char**>(argv), hot_restart_version_cb,
-                         spdlog::level::info);
+  return std::make_unique<OptionsImpl>(argc, const_cast<char**>(argv), hot_restart_version_cb,
+                                       spdlog::level::info);
 }
 
 // Legacy implementation of main_common.

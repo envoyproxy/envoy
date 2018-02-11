@@ -43,7 +43,8 @@ public:
   bool run() { return base_.run(); }
 
 private:
-  static Envoy::OptionsImpl* computeOptions(int argc, const char** argv, bool hot_restart);
+  static std::unique_ptr<Envoy::OptionsImpl> computeOptions(int argc, const char** argv,
+                                                            bool hot_restart);
 
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs;

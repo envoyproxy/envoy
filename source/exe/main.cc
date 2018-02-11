@@ -10,21 +10,20 @@
  * after setting up command line options.
  */
 int main(int argc, const char** argv) {
-  try {
 #ifdef ENVOY_HOT_RESTART
-    Envoy::MainCommon main_common(argc, argv, true);
+  bool enable_hot_restart = true;
 #else
-    Envoy::MainCommon main_common(argc, argv, false);
+  bool enable_hot_restart = false;
 #endif
-    return main_common.run() ? 0 : 1;
+  std::unique_ptr<Envoy::MainCommon> main_common;
+  try {
+    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, enable_hot_restart);
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
-    std::cerr << "MalformedArgvException: " << e.what() << std::endl;
     return EXIT_FAILURE;
   } catch (const Envoy::EnvoyException& e) {
-    std::cerr << "EnvoyException: " << e.what() << std::endl;
     return EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
+  return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
