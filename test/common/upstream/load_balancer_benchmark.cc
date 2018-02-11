@@ -163,16 +163,17 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     BaseTester tester(num_hosts);
     MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
     std::unordered_map<std::string, uint64_t> hit_counter;
-    TestLoadBalancerContext context;
     state.ResumeTiming();
 
     // Note: To a certain extent this is benchmarking the performance of xxhash as well as
     // std::unordered_map. However, it should be roughly equivalent to the work done when
     // comparing different hashing algorithms.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hit_counter[table.chooseHost(&context)->address()->asString()] += 1;
+      hit_counter[table
+                      .chooseHost(HashUtil::xxHash64(
+                          absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))))
+                      ->address()
+                      ->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
@@ -246,22 +247,17 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     BaseTester tester(num_hosts);
     MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
     std::vector<HostConstSharedPtr> hosts;
-    TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hosts.push_back(table.chooseHost(&context));
-      ;
+      hosts.push_back(table.chooseHost(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)))));
     }
 
     BaseTester tester2(num_hosts - hosts_to_lose);
     MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
-      hosts2.push_back(table2.chooseHost(&context));
-      ;
+      hosts2.push_back(table2.chooseHost(
+          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)))));
     }
 
     ASSERT(hosts.size() == hosts2.size());

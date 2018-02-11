@@ -468,30 +468,43 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
                             "cannot create an EDS cluster without an EDS config");
 }
 
+class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
+public:
+  void doTest(LoadBalancerType lb_type) {
+    const std::string json =
+        fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
+
+    std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+    cluster1->info_->name_ = "cluster_0";
+    cluster1->info_->lb_type_ = lb_type;
+
+    InSequence s;
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+    ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+    create(parseBootstrapFromJson(json));
+
+    EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+
+    cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
+        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
+    cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
+        cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
+    cluster1->initialize_callback_();
+    EXPECT_EQ(cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
+              cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+  }
+};
+
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
-TEST_F(ClusterManagerImplTest, RingHashLoadBalancerThreadAwareUpdate) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
+TEST_F(ClusterManagerImplThreadAwareLbTest, RingHashLoadBalancerThreadAwareUpdate) {
+  doTest(LoadBalancerType::RingHash);
+}
 
-  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
-  cluster1->info_->name_ = "cluster_0";
-  cluster1->info_->lb_type_ = LoadBalancerType::RingHash;
-
-  InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
-  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  create(parseBootstrapFromJson(json));
-
-  EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
-
-  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
-  cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
-      cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
-  cluster1->initialize_callback_();
-  EXPECT_EQ(cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
-            cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+// Test that the cluster manager correctly re-creates the worker local LB when there is a host
+// set change.
+TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate) {
+  doTest(LoadBalancerType::Maglev);
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
