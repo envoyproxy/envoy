@@ -125,9 +125,9 @@ int main_common(OptionsImpl& options) {
 #endif
     return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
   } catch (EnvoyException& e) {
-    return 1;
+    return EXIT_FAILURE;
   }
-  return 0;
+  return EXIT_SUCCESS;
 }
 
 } // namespace Envoy
