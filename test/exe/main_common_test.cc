@@ -62,14 +62,14 @@ TEST(MainCommon, LegacyMain) {
     options = std::make_unique<Envoy::OptionsImpl>(argc, argv, hot_restart_version_cb,
                                                    spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
-    return_code = 0;
+    return_code = EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
-    return_code = 1;
+    return_code = EXIT_FAILURE;
   }
   if (return_code == -1) {
     return_code = Envoy::main_common(*options);
   }
-  EXPECT_EQ(1, return_code);
+  EXPECT_EQ(EXIT_FAILURE, return_code);
 }
 
 } // namespace Envoy
