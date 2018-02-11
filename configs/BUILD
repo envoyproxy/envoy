@@ -35,5 +35,5 @@ genrule(
 
 filegroup(
     name = "google_com_proxy_port_0",
-    srcs = ["google_com_proxy_port_0.json"],
+    srcs = ["google_com_proxy_port_0.v2.yaml"],
 )

@@ -27,7 +27,7 @@ namespace Envoy {
 TEST(MainCommon, ConstructDestruct) {
   // TODO(jmarantz): I think we may need to hack the config file to pick an unused port.
   std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
-                            "/configs/google_com_proxy_port_0.json";
+                            "/configs/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
   MainCommon main_common(3, argv, false);
 }
