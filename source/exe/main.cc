@@ -22,7 +22,7 @@ int main(int argc, const char** argv) {
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
   try {
-    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, enable_hot_restart, true);
+    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, enable_hot_restart);
   } catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
@@ -32,6 +32,6 @@ int main(int argc, const char** argv) {
   }
 
   // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
-  // show up as a core-dumps for easier diagnosis.
+  // show up as a core-dumps for easier diagnostis.
   return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

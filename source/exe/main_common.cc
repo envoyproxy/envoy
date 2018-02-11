@@ -86,14 +86,8 @@ bool MainCommonBase::run() {
   NOT_REACHED;
 }
 
-MainCommon::MainCommon(int argc, const char** argv, bool hot_restart, bool handle_signals)
-    : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {
-#ifdef ENVOY_HANDLE_SIGNALS
-  if (handle_signals) {
-    handle_sigs_ = std::make_unique<Envoy::SignalAction>();
-  }
-#endif
-}
+MainCommon::MainCommon(int argc, const char** argv, bool hot_restart)
+    : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}
 
 std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, const char** argv,
                                                         bool hot_restart) {
