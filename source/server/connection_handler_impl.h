@@ -28,7 +28,8 @@ namespace Server {
   COUNTER  (downstream_cx_total)                                                                   \
   COUNTER  (downstream_cx_destroy)                                                                 \
   GAUGE    (downstream_cx_active)                                                                  \
-  HISTOGRAM(downstream_cx_length_ms)
+  HISTOGRAM(downstream_cx_length_ms)                                                               \
+  COUNTER  (no_filter_chain_match)
 // clang-format on
 
 /**

@@ -173,7 +173,7 @@ void Filter::parseClientHello(const void* data, size_t len) {
   case SSL_ERROR_SSL:
     if (clienthello_success_) {
       config_->stats().tls_found_.inc();
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().SSL);
+      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().TLS);
     } else {
       config_->stats().tls_not_found_.inc();
     }
