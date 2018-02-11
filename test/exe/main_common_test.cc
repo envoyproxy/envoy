@@ -1,3 +1,9 @@
+// MainCommonTest works fine in coverage tests, but it appears to break SignalsTest when
+// run in the same process. It appears that MainCommon doesn't completely clean up after
+// itself, possibly due to a bug in SignalAction. So for now, we can test MainCommon
+// but can't measure its test coverage.
+//
+// TODO(issues/2580): Fix coverage tests when MainCommonTest is enabled.
 #ifndef ENVOY_CONFIG_COVERAGE
 
 #include "exe/main_common.h"

@@ -18,13 +18,13 @@ int main(int argc, const char** argv) {
 #endif
     return main_common.run() ? 0 : 1;
   } catch (const Envoy::NoServingException& e) {
-    return 0;
+    return EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
     std::cerr << "MalformedArgvException: " << e.what() << std::endl;
-    return 1;
+    return EXIT_FAILURE;
   } catch (const Envoy::EnvoyException& e) {
     std::cerr << "EnvoyException: " << e.what() << std::endl;
-    return 1;
+    return EXIT_FAILURE;
   }
-  return 0;
+  return EXIT_SUCCESS;
 }

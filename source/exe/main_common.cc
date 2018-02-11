@@ -123,7 +123,7 @@ int main_common(OptionsImpl& options) {
 #else
     MainCommonBase main_common(options, false);
 #endif
-    return main_common.run() ? 0 : 1;
+    return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
   } catch (EnvoyException& e) {
     return 1;
   }
