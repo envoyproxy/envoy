@@ -19,6 +19,9 @@ GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   // This is also required to satisfy the contract that once Shutdown is called,
   // streams no longer queue any additional tags.
   for (auto it = streams_.begin(); it != streams_.end();) {
+    // resetStream() may result in immediate unregisterStream() and erase(),
+    // which would invalidate the iterator for the current element, so make sure
+    // we point to the next one first.
     (*it++)->resetStream();
   }
   cq_.Shutdown();
@@ -45,6 +48,10 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     // length completed_ops_, otherwise we can race in stream destruction, where
     // we process multiple events in onCompletedOps() but have only partially
     // consumed the posts on the dispatcher.
+    // TODO(htuch): This may result in unbounded processing on the silo thread
+    // in onCompletedOps() in extreme cases, when we emplace_back() in
+    // completionThread() at a high rate, consider bounding the length of such
+    // sequences if this behavior becomes an issue.
     if (stream.completed_ops_.empty()) {
       stream.dispatcher_.post([&stream] { stream.onCompletedOps(); });
     }
@@ -348,6 +355,11 @@ void GoogleAsyncStreamImpl::metadataTranslate(
 void GoogleAsyncStreamImpl::deferredDelete() {
   ENVOY_LOG(debug, "Deferred delete");
   tls_.unregisterStream(this);
+  // We only get here following cleanup(), which has performed a
+  // remoteFromList(), resulting in self-ownership of the object's memory.
+  // Hence, it is safe here to create a unique_ptr to this and transfer
+  // ownership to dispatcher_.deferredDelete(). After this call, no further
+  // methods may be invoked on this object.
   dispatcher_.deferredDelete(std::unique_ptr<GoogleAsyncStreamImpl>(this));
 }
 

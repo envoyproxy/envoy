@@ -255,7 +255,9 @@ private:
   GoogleAsyncClientImpl& parent_;
   GoogleAsyncClientThreadLocal& tls_;
   // Latch our own version of this reference, so that completionThread() doesn't
-  // try and access via parent_, which might not exist in teardown.
+  // try and access via parent_, which might not exist in teardown. We assume
+  // that the dispatcher lives longer than completionThread() life, which should
+  // hold for the expected server object lifetimes.
   Event::Dispatcher& dispatcher_;
   // We hold a ref count on the stub_ to allow the stream to wait for its tags
   // to drain from the CQ on cleanup.
@@ -284,7 +286,7 @@ private:
   uint32_t inflight_tags_{};
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
-  std::list<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops_;
+  std::deque<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops_;
   std::mutex completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
