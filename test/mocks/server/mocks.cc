@@ -47,7 +47,11 @@ MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
 }
 MockGuardDog::~MockGuardDog() {}
 
-MockHotRestart::MockHotRestart() {}
+MockHotRestart::MockHotRestart() {
+  ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
+  ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
+  ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));
+}
 MockHotRestart::~MockHotRestart() {}
 
 MockListenerComponentFactory::MockListenerComponentFactory()
