@@ -9,11 +9,11 @@
 
 #include "envoy/common/exception.h"
 
-#include "absl/strings/ascii.h"
-#include "absl/strings/match.h"
-
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Stats {
@@ -224,23 +224,22 @@ std::string TagProducerImpl::produceTags(const std::string& stat_name,
   IntervalSetImpl<size_t> remove_characters;
   forEachExtractorMatching(
       stat_name, [&remove_characters, &tags, stat_name](const TagExtractorPtr& tag_extractor) {
-      tag_extractor->extractTag(stat_name, tags, remove_characters);
-    });
+        tag_extractor->extractTag(stat_name, tags, remove_characters);
+      });
   return StringUtil::removeCharacters(stat_name, remove_characters);
 }
 
 // This re-implmentation of produceTags exists purely for testing that the order in
 // which we apply the extractors does not matter to the end result, assuming we don't
-// care aobut tag-order.  This is in large part correct by design because stat_name
+// care aobut tag-order. This is in large part correct by design because stat_name
 // is not mutated until all the extraction is done.
 std::string TagProducerImpl::produceTagsReverseForTesting(const std::string& stat_name,
                                                           std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   std::list<const TagExtractor*> extractors;
-  forEachExtractorMatching(
-      stat_name, [&extractors](const TagExtractorPtr& tag_extractor) {
-        extractors.push_back(tag_extractor.get());
-      });
+  forEachExtractorMatching(stat_name, [&extractors](const TagExtractorPtr& tag_extractor) {
+    extractors.push_back(tag_extractor.get());
+  });
 
   IntervalSetImpl<size_t> remove_characters;
   for (auto p = extractors.rbegin(); p != extractors.rend(); ++p) {

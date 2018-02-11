@@ -65,7 +65,7 @@ public:
 
   /**
    * Finds a prefix string associated with the matching criteria owned by the
-   * extractor.  This is used to reduce the number of extractors required for
+   * extractor. This is used to reduce the number of extractors required for
    * processing each stat, by pulling the first "."-separated token on the tag.
    *
    * If a prefix cannot be extracted, an empty string_view is returned, and the

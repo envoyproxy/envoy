@@ -76,12 +76,12 @@ private:
   void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
   void addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
                             std::unordered_set<std::string>& names);
-  void forEachExtractorMatching(
-      const std::string& stat_name, std::function<void(const TagExtractorPtr&)> f) const;
+  void forEachExtractorMatching(const std::string& stat_name,
+                                std::function<void(const TagExtractorPtr&)> f) const;
 
   std::vector<TagExtractorPtr> tag_extractors_without_prefix_;
 
-  // Maps a prefix word extracted out of a regex to a vector of TagExtractors.  Note that
+  // Maps a prefix word extracted out of a regex to a vector of TagExtractors. Note that
   // the storage for the prefix string is owned by the TagExtractor, which
   std::unordered_map<absl::string_view, std::vector<TagExtractorPtr>, StringViewHash>
       tag_extractor_prefix_map_;
