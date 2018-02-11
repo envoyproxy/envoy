@@ -200,7 +200,6 @@ private:
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
-  std::mutex terminate_mutex_;
   bool terminated_;
 };
 

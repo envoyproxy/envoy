@@ -362,13 +362,10 @@ void InstanceImpl::run() {
 }
 
 void InstanceImpl::terminate() {
-  {
-    std::unique_lock<std::mutex> lock(terminate_mutex_);
-    if (terminated_) {
-      return;
-    }
-    terminated_ = true;
+  if (terminated_) {
+    return;
   }
+  terminated_ = true;
 
   // Before starting to shutdown anything else, stop slot destruction updates.
   thread_local_.shutdownGlobalThreading();
