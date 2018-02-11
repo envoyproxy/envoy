@@ -10,6 +10,10 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
 
+namespace absl {
+class string_view;
+}
+
 namespace Envoy {
 namespace Event {
 class Dispatcher;
@@ -58,6 +62,20 @@ public:
    */
   virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                           IntervalSet<size_t>& remove_characters) const PURE;
+
+  /**
+   * Finds a prefix string associated with the matching criteria owned by the
+   * extractor.  This is used to reduce the number of extractors required for
+   * processing each stat, by pulling the first "."-separated token on the tag.
+   *
+   * If a prefix cannot be extracted, an empty string_view is returned, and the
+   * matcher must be applied on all inputs.
+   *
+   * The storage for the prefix is owned by the TagExtractor.
+   *
+   * @return absl::string_view returnsthe prefix, or an empty string_view if none was found.
+   */
+  virtual absl::string_view prefixToken() const PURE;
 };
 
 typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;

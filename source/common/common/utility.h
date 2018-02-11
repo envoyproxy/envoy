@@ -14,6 +14,7 @@
 #include "envoy/common/time.h"
 
 #include "common/common/assert.h"
+#include "common/common/hash.h"
 
 #include "absl/strings/string_view.h"
 
@@ -353,6 +354,10 @@ private:
     bool operator()(const Interval& a, const Interval& b) const { return a.second < b.first; }
   };
   std::set<Interval, Compare> intervals_; // Intervals do not overlap or abut.
+};
+
+struct StringViewHash {
+  std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
 };
 
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <string>
 
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/stats/stats_macros.h"
@@ -122,23 +123,14 @@ TEST(TagExtractorTest, BadRegex) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester() {
-    const auto& tag_names = Config::TagNames::get();
+  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v2::StatsConfig()) {}
 
-    for (const std::pair<std::string, std::string>& name_and_regex : tag_names.name_regex_pairs_) {
-      tag_extractors_.emplace_back(TagExtractorImpl::createTagExtractor(name_and_regex.first, ""));
-    }
-  }
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
                  const std::vector<Tag>& expected_tags) {
 
     // Test forward iteration through the regexes
     std::vector<Tag> tags;
-    IntervalSetImpl<size_t> remove_characters;
-    for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
-      tag_extractor->extractTag(stat_name, tags, remove_characters);
-    }
-    std::string tag_extracted_name = StringUtil::removeCharacters(stat_name, remove_characters);
+    const std::string tag_extracted_name = tag_extractors_.produceTags(stat_name, tags);
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
       return lhs.name_ == rhs.name_ && lhs.value_ == rhs.value_;
@@ -152,11 +144,8 @@ public:
 
     // Reverse iteration through regexes to ensure ordering invariance
     std::vector<Tag> rev_tags;
-    IntervalSetImpl<size_t> rev_remove_characters;
-    for (auto it = tag_extractors_.rbegin(); it != tag_extractors_.rend(); ++it) {
-      (*it)->extractTag(stat_name, rev_tags, rev_remove_characters);
-    }
-    std::string rev_tag_extracted_name = StringUtil::removeCharacters(stat_name, remove_characters);
+    const std::string rev_tag_extracted_name =
+        tag_extractors_.produceTagsReverseForTesting(stat_name, rev_tags);
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);
     ASSERT_EQ(expected_tags.size(), rev_tags.size())
@@ -170,7 +159,7 @@ public:
                        stat_name);
   }
 
-  std::vector<TagExtractorPtr> tag_extractors_;
+  TagProducerImpl tag_extractors_;
 };
 
 TEST(TagExtractorTest, DefaultTagExtractors) {
