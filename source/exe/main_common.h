@@ -39,7 +39,7 @@ protected:
 
 class MainCommon {
 public:
-  MainCommon(int argc, const char** argv, bool hot_restart);
+  MainCommon(int argc, const char** argv, bool hot_restart, bool handle_signals);
   bool run() { return base_.run(); }
 
 private:
@@ -47,7 +47,7 @@ private:
                                                             bool hot_restart);
 
 #ifdef ENVOY_HANDLE_SIGNALS
-  Envoy::SignalAction handle_sigs;
+  std::unique_ptr<Envoy::SignalAction> handle_sigs_;
 #endif
 
   std::unique_ptr<Envoy::OptionsImpl> options_;

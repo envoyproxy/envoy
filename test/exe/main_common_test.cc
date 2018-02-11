@@ -1,11 +1,3 @@
-// MainCommonTest works fine in coverage tests, but it appears to break SignalsTest when
-// run in the same process. It appears that MainCommon doesn't completely clean up after
-// itself, possibly due to a bug in SignalAction. So for now, we can test MainCommon
-// but can't measure its test coverage.
-//
-// TODO(issues/2580): Fix coverage tests when MainCommonTest is enabled.
-#ifndef ENVOY_CONFIG_COVERAGE
-
 #include "exe/main_common.h"
 
 #include "server/options_impl.h"
@@ -29,7 +21,7 @@ TEST(MainCommon, ConstructDestruct) {
   std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                             "/test/config/integration/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
-  MainCommon main_common(3, argv, false);
+  MainCommon main_common(3, argv, false, false);
 }
 
 TEST(MainCommon, LegacyMain) {
@@ -39,9 +31,17 @@ TEST(MainCommon, LegacyMain) {
   std::string envoy_static("envoy-static");
   char* argv[] = {&(envoy_static[0]), nullptr};
 
+  // MainCommonTest works fine in coverage tests, but it appears to break SignalsTest when
+  // run in the same process. It appears that MainCommon doesn't completely clean up after
+  // itself, possibly due to a bug in SignalAction. So for now, we can test MainCommon
+  // but can't measure its test coverage.
+  //
+  // TODO(issues/2580): Fix coverage tests when MainCommonTest is enabled.
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
+#ifndef ENVOY_CONFIG_COVERAGE
   Envoy::SignalAction handle_sigs;
+#endif
 #endif
 
 #ifdef ENVOY_HOT_RESTART
@@ -73,5 +73,3 @@ TEST(MainCommon, LegacyMain) {
 }
 
 } // namespace Envoy
-
-#endif // ENVOY_CONFIG_COVERAGE
