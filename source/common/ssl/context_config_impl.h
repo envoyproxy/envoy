@@ -50,10 +50,6 @@ public:
 protected:
   ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config);
 
-  static const std::string readDataSource(const envoy::api::v2::core::DataSource& source,
-                                          bool allow_empty);
-  static const std::string getDataSourcePath(const envoy::api::v2::core::DataSource& source);
-
 private:
   static unsigned
   tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
