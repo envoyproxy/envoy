@@ -34,7 +34,9 @@ void Instance::callCheck() {
 
 Network::FilterStatus Instance::onData(Buffer::Instance&) {
   if (status_ == Status::NotStarted) {
-    // If the ssl handshake was not done and data is the next event!
+    // If there was no ssl handshake there will be no event Network::ConnectionEvent::Connected
+    // and onData() will be the first event into the filter.
+    // Therefore, if the authorization service hasn not been invoked then we must do so now.
     callCheck();
   }
   return status_ == Status::Calling ? Network::FilterStatus::StopIteration
@@ -47,11 +49,11 @@ Network::FilterStatus Instance::onNewConnection() {
 }
 
 void Instance::onEvent(Network::ConnectionEvent event) {
-  // Make sure that any pending request in the client is cancelled. This will be NOP if the
-  // request already completed.
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (status_ == Status::Calling) {
+      // Make sure that any pending request in the client is cancelled. This will be NOP if the
+      // request already completed.
       client_->cancel();
       config_->stats().active_.dec();
     }
@@ -59,6 +61,7 @@ void Instance::onEvent(Network::ConnectionEvent event) {
     // SSL connection is post TCP newConnection. Therefore the ext_authz check in onEvent.
     // if the ssl handshake was successful then it will invoke the
     // Network::ConnectionEvent::Connected.
+    // Thus invoke the authorization service check if not done yet.
     if (status_ == Status::NotStarted) {
       callCheck();
     }
@@ -78,11 +81,11 @@ void Instance::onComplete(CheckStatus status) {
     config_->stats().error_.inc();
     break;
   case CheckStatus::Denied:
-    config_->stats().unauthz_.inc();
+    config_->stats().denied_.inc();
     break;
   }
 
-  // We fail open if there is an error contacting the service.
+  // Fail open only if configured to do so and if the check status was a error.
   if (status == CheckStatus::Denied || (status == CheckStatus::Error && !config_->failOpen())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

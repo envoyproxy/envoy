@@ -21,11 +21,10 @@ NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
     FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
-  ASSERT(proto_config.grpc_service().has_envoy_grpc());
   ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty());
 
-  ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(new ExtAuthz::TcpFilter::Config(
-      proto_config, context.scope(), context.runtime(), context.clusterManager()));
+  ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(
+      new ExtAuthz::TcpFilter::Config(proto_config, context.scope()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [ grpc_service = proto_config.grpc_service(), &context, ext_authz_config,

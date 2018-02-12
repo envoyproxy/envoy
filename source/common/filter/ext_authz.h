@@ -26,7 +26,7 @@ namespace TcpFilter {
 #define ALL_TCP_EXT_AUTHZ_STATS(COUNTER, GAUGE)         \
   COUNTER(total)                                        \
   COUNTER(error)                                        \
-  COUNTER(unauthz)                                      \
+  COUNTER(denied)                                      \
   COUNTER(ok)                                           \
   COUNTER(cx_closed)                                    \
   GAUGE  (active)
@@ -44,25 +44,17 @@ struct InstanceStats {
  */
 class Config {
 public:
-  // TBD(saumoh): Take care of grpc service != envoy_grpc()
-  Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope,
-         Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-      : stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime), cm_(cm),
-        cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
+  Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope)
+      : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()) {}
 
-  Runtime::Loader& runtime() { return runtime_; }
-  std::string cluster() { return cluster_name_; }
-  Upstream::ClusterManager& cm() { return cm_; }
   const InstanceStats& stats() { return stats_; }
   bool failOpen() const { return failure_mode_allow_; }
+  void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
-  Runtime::Loader& runtime_;
-  Upstream::ClusterManager& cm_;
-  std::string cluster_name_;
   bool failure_mode_allow_;
 };
 

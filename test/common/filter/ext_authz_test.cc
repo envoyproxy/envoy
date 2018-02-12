@@ -48,7 +48,7 @@ public:
 
     envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
     MessageUtil::loadFromJson(json, proto_config);
-    config_.reset(new Config(proto_config, stats_store_, runtime_, cm_));
+    config_.reset(new Config(proto_config, stats_store_));
     client_ = new MockClient();
     filter_.reset(new Instance(config_, ClientPtr{client_}));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -66,8 +66,6 @@ public:
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   ConfigSharedPtr config_;
   MockClient* client_;
   std::unique_ptr<Instance> filter_;
@@ -92,7 +90,7 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
                ProtoValidationException);
 }
 
-TEST_F(ExtAuthzFilterTest, OK) {
+TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -103,9 +101,14 @@ TEST_F(ExtAuthzFilterTest, OK) {
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
+  // Confirm that the invocation of onData does increment the active and total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_, continueReading());
@@ -117,10 +120,13 @@ TEST_F(ExtAuthzFilterTest, OK) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
-TEST_F(ExtAuthzFilterTest, Denied) {
+TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -131,8 +137,14 @@ TEST_F(ExtAuthzFilterTest, Denied) {
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
+  // Confirm that the invocation of onData does increment the active and total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -142,7 +154,9 @@ TEST_F(ExtAuthzFilterTest, Denied) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.unauthz").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
@@ -157,11 +171,19 @@ TEST_F(ExtAuthzFilterTest, OKWithSSLConnect) {
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
   // Called by SSL when the handshake is done.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
+  // Confirm that the invocation of Connected event increment the active or total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
+  // Confirm that the invocation of onData did NOT increment the active or total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_, continueReading());
@@ -173,7 +195,10 @@ TEST_F(ExtAuthzFilterTest, OKWithSSLConnect) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
 TEST_F(ExtAuthzFilterTest, DeniedWithSSLConnect) {
@@ -187,10 +212,19 @@ TEST_F(ExtAuthzFilterTest, DeniedWithSSLConnect) {
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
   // Called by SSL when the handshake is done.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
+  // Confirm that the invocation of Connected event increment the active or total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
+  // Confirm that the invocation of onData did NOT increment the active or total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -200,7 +234,9 @@ TEST_F(ExtAuthzFilterTest, DeniedWithSSLConnect) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.unauthz").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
@@ -226,11 +262,40 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.unauthz").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
-TEST_F(ExtAuthzFilterTest, Error) {
+TEST_F(ExtAuthzFilterTest, FailClose) {
+  InSequence s;
+  // Explicitily set the failure_mode_allow to false.
+  config_->setFailModeAllow(false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(WithArgs<0>(
+          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  request_callbacks_->onComplete(CheckStatus::Error);
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Test to verify that when callback to the authorization service is completed the filter
+// does not invoke Cancel when the event RemoteClose occurs.
+TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -253,9 +318,14 @@ TEST_F(ExtAuthzFilterTest, Error) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
-TEST_F(ExtAuthzFilterTest, Disconnect) {
+// Test to verify that Cancel is invoked when a RemoteClose event occurs and a call
+// to the authorization service was in progress.
+TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -272,8 +342,14 @@ TEST_F(ExtAuthzFilterTest, Disconnect) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
+// Test to verify that on stack response from the authorization service does NOT
+// result in calling cancel.
 TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   InSequence s;
 
@@ -293,7 +369,10 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
 } // namespace TcpFilter
