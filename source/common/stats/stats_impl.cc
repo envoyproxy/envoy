@@ -70,31 +70,22 @@ TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& r
       regex_(RegexUtil::parseRegex(regex)) {}
 
 std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
-  absl::string_view::size_type start_pos = absl::StartsWith(regex, "^") ? 1 : 0;
-  for (absl::string_view::size_type i = start_pos; i < regex.size(); ++i) {
-    if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
-      if (i > start_pos) {
-        std::string prefix{regex.substr(0, i)};
-        if ((regex.substr(i, 2) == "\\.") || (regex.substr(i, 5) == "(?=\\.")) {
-          prefix += ".";
+  std::string prefix;
+  if (absl::StartsWith(regex, "^")) {
+    for (absl::string_view::size_type i = 1; i < regex.size(); ++i) {
+      if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
+        if (i > 1) {
+          bool last_char = i == regex.size() - 1;
+          if ((!last_char && (regex[i] == '\\') && (regex[i + 1] == '.')) ||
+              (last_char && (regex[i] == '$'))) {
+            prefix.append(regex.data() + 1, i - 1);
+          }
         }
-        return prefix;
+        break;
       }
-      break;
     }
   }
-  return "";
-}
-
-absl::string_view TagExtractorImpl::prefixToken() const {
-  if (absl::StartsWith(prefix_, "^")) {
-    std::string::size_type dot = prefix_.find('.');
-    if (dot != std::string::npos) {
-      // Remove the leading ^ and trailing .
-      return absl::string_view(prefix_.data() + 1, prefix_.size() - 2);
-    }
-  }
-  return absl::string_view(nullptr, 0);
+  return prefix;
 }
 
 TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,

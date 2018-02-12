@@ -362,6 +362,21 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {fault_connection_manager, fault_downstream_cluster});
 }
 
+static absl::string_view extractRegexPrefix(const std::string& regex) {
+  TagExtractorPtr tag_extractor = TagExtractorImpl::createTagExtractor("foo", regex);
+  return tag_extractor->prefixToken();
+}
+
+TEST(TagExtractorTest, ExtractRegexPrefix) {
+  EXPECT_EQ("", extractRegexPrefix("^prefix(foo)."));
+  EXPECT_EQ("prefix", extractRegexPrefix("^prefix\\.foo"));
+  EXPECT_EQ("", extractRegexPrefix("^notACompleteToken"));   //
+  EXPECT_EQ("onlyToken", extractRegexPrefix("^onlyToken$")); //
+  EXPECT_EQ("", extractRegexPrefix("(prefix)"));
+  EXPECT_EQ("", extractRegexPrefix("^(prefix)"));
+  EXPECT_EQ("", extractRegexPrefix("prefix(foo)"));
+}
+
 TEST(TagProducerTest, CheckConstructor) {
   envoy::config::metrics::v2::StatsConfig stats_config;
 

@@ -41,11 +41,11 @@ public:
   std::string name() const override { return name_; }
   bool extractTag(const std::string& tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
-  absl::string_view prefixToken() const override;
-
-  static std::string extractRegexPrefix(absl::string_view regex);
+  absl::string_view prefixToken() const override { return prefix_; }
 
 private:
+  static std::string extractRegexPrefix(absl::string_view regex);
+
   const std::string name_;
   const std::string prefix_;
   const std::regex regex_;
@@ -70,19 +70,19 @@ public:
 private:
   friend class DefaultTagRegexTester;
 
-  std::string produceTagsReverseForTesting(const std::string& metric_name,
-                                           std::vector<Tag>& tags) const;
-
   void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
   void addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
                             std::unordered_set<std::string>& names);
   void forEachExtractorMatching(const std::string& stat_name,
                                 std::function<void(const TagExtractorPtr&)> f) const;
+  std::string produceTagsReverseForTesting(const std::string& metric_name,
+                                           std::vector<Tag>& tags) const;
 
   std::vector<TagExtractorPtr> tag_extractors_without_prefix_;
 
   // Maps a prefix word extracted out of a regex to a vector of TagExtractors. Note that
-  // the storage for the prefix string is owned by the TagExtractor, which
+  // the storage for the prefix string is owned by the TagExtractor, which, depending on
+  // implementation, may need make a copy of the prefix.
   std::unordered_map<absl::string_view, std::vector<TagExtractorPtr>, StringViewHash>
       tag_extractor_prefix_map_;
   std::vector<Tag> default_tags_;
