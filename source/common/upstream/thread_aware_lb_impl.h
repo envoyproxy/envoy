@@ -11,7 +11,7 @@ class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareL
 public:
   /**
    * Base class for a hashing load balancer implemented for use in a thread aware load balancer.
-   * TODO(mattklein123): Currently only RingHash and Maglev use the thread aware laod balancer.
+   * TODO(mattklein123): Currently only RingHash and Maglev use the thread aware load balancer.
    *                     The hash is pre-computed prior to getting to the real load balancer for
    *                     use in priority selection. In the future we likely we will want to pass
    *                     through the full load balancer context in case a future implementation

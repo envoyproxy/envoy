@@ -48,6 +48,11 @@ public:
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
 };
 
+uint64_t hashInt(uint64_t i) {
+  // Hack to hash an integer.
+  return HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)));
+}
+
 void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
@@ -134,8 +139,7 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     // TODO(mattklein123): When Maglev is a real load balancer, further share code with the
     //                     other test.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      context.hash_key_.value(hashInt(i));
       hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
     }
 
@@ -169,11 +173,7 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     // std::unordered_map. However, it should be roughly equivalent to the work done when
     // comparing different hashing algorithms.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hit_counter[table
-                      .chooseHost(HashUtil::xxHash64(
-                          absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))))
-                      ->address()
-                      ->asString()] += 1;
+      hit_counter[table.chooseHost(hashInt(i))->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
@@ -201,10 +201,8 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      context.hash_key_.value(hashInt(i));
       hosts.push_back(lb->chooseHost(&context));
-      ;
     }
 
     RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
@@ -212,10 +210,8 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     lb = tester2.ring_hash_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i))));
+      context.hash_key_.value(hashInt(i));
       hosts2.push_back(lb->chooseHost(&context));
-      ;
     }
 
     ASSERT(hosts.size() == hosts2.size());
@@ -248,16 +244,14 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
     std::vector<HostConstSharedPtr> hosts;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hosts.push_back(table.chooseHost(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)))));
+      hosts.push_back(table.chooseHost(hashInt(i)));
     }
 
     BaseTester tester2(num_hosts - hosts_to_lose);
     MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      hosts2.push_back(table2.chooseHost(
-          HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)))));
+      hosts2.push_back(table2.chooseHost(hashInt(i)));
     }
 
     ASSERT(hosts.size() == hosts2.size());
