@@ -396,7 +396,6 @@ TEST(StaticClusterImplTest, AltStatName) {
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
                             false);
   cluster.initialize([] {});
-  
   // Increment a stat and verify it is emitted with alt_stat_name
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats.counter("cluster.staticcluster_stats.upstream_rq_total").value());
