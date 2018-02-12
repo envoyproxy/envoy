@@ -209,10 +209,31 @@ public:
       "interval_jitter_ms": 1000,
       "unhealthy_threshold": 2,
       "healthy_threshold": 2,
-      "path": "/healthcheck",
-      "host": "hello"
+      "path": "/healthcheck"
     }
     )EOF";
+
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
+  void setupServiceValidationWithCustomHostValueHC(const std::string &host) {
+    std::string json = fmt::format(R"EOF(
+    {{
+      "type": "http",
+      "timeout_ms": 1000,
+      "interval_ms": 1000,
+      "service_name": "locations",
+      "interval_jitter_ms": 1000,
+      "unhealthy_threshold": 2,
+      "healthy_threshold": 2,
+      "path": "/healthcheck",
+      "host": "{0}"
+    }}
+    )EOF", host);
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
                                                         dispatcher_, runtime_, random_));
@@ -427,6 +448,37 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  Optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, true, false, health_checked_cluster);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
+  std::string host = "www.envoyproxy.io";
+  setupServiceValidationWithCustomHostValueHC(host);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+    .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
+      EXPECT_TRUE(headers.Host());
+      EXPECT_EQ(headers.Host()->value().c_str(), std::string(host));
+    }));
   health_checker_->start();
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
