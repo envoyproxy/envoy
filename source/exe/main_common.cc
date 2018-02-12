@@ -86,11 +86,10 @@ bool MainCommonBase::run() {
   NOT_REACHED;
 }
 
-MainCommon::MainCommon(int argc, const char** argv, bool hot_restart)
+MainCommon::MainCommon(int argc, char** argv, bool hot_restart)
     : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}
 
-std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, const char** argv,
-                                                        bool hot_restart) {
+std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, char** argv, bool hot_restart) {
   OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
     return "disabled";
   };
@@ -106,8 +105,7 @@ std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, const char** a
   // Hot-restart should not be specified if the support is not compiled in.
   RELEASE_ASSERT(!hot_restart);
 #endif
-  return std::make_unique<OptionsImpl>(argc, const_cast<char**>(argv), hot_restart_version_cb,
-                                       spdlog::level::info);
+  return std::make_unique<OptionsImpl>(argc, argv, hot_restart_version_cb, spdlog::level::info);
 }
 
 // Legacy implementation of main_common.

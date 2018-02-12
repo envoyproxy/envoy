@@ -39,11 +39,11 @@ protected:
 
 class MainCommon {
 public:
-  MainCommon(int argc, const char** argv, bool hot_restart);
+  MainCommon(int argc, char** argv, bool hot_restart);
   bool run() { return base_.run(); }
 
 private:
-  static std::unique_ptr<Envoy::OptionsImpl> computeOptions(int argc, const char** argv,
+  static std::unique_ptr<Envoy::OptionsImpl> computeOptions(int argc, char** argv,
                                                             bool hot_restart);
 
 #ifdef ENVOY_HANDLE_SIGNALS

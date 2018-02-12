@@ -29,15 +29,14 @@ TEST(MainCommon, ConstructDestruct) {
   std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                             "/test/config/integration/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
-  MainCommon main_common(3, argv, false);
+  MainCommon main_common(3, const_cast<char**>(argv), false);
 }
 
 TEST(MainCommon, LegacyMain) {
   // Testing the legacy path is difficult because if we give it a valid config, it will
   // never exit. So just give it an empty config and let it fail.
   int argc = 1;
-  std::string envoy_static("envoy-static");
-  char* argv[] = {&(envoy_static[0]), nullptr};
+  const char* argv[] = {"envoy_static", nullptr};
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
@@ -59,8 +58,8 @@ TEST(MainCommon, LegacyMain) {
   std::unique_ptr<Envoy::OptionsImpl> options;
   int return_code = -1;
   try {
-    options = std::make_unique<Envoy::OptionsImpl>(argc, argv, hot_restart_version_cb,
-                                                   spdlog::level::info);
+    options = std::make_unique<Envoy::OptionsImpl>(argc, const_cast<char**>(argv),
+                                                   hot_restart_version_cb, spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
     return_code = EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {

@@ -9,11 +9,11 @@
  * deployment such as initializing signal handling. It calls main_common
  * after setting up command line options.
  */
-int main(int argc, const char** argv) {
+int main(int argc, char** argv) {
 #ifdef ENVOY_HOT_RESTART
-  bool enable_hot_restart = true;
+  constexpr bool enable_hot_restart = true;
 #else
-  bool enable_hot_restart = false;
+  constexpr bool enable_hot_restart = false;
 #endif
 
   std::unique_ptr<Envoy::MainCommon> main_common;
