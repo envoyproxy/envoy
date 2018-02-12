@@ -28,7 +28,9 @@ MockOptions::MockOptions(const std::string& config_path)
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));
   ON_CALL(*this, maxStats()).WillByDefault(Return(1000));
   ON_CALL(*this, maxObjNameLength()).WillByDefault(Return(150));
-  ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
+  ON_CALL(*this, hotRestartDisabled()).WillByDefault(Invoke([this] {
+    return hot_restart_disabled_;
+  }));
 }
 MockOptions::~MockOptions() {}
 
