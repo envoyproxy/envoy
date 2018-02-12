@@ -401,8 +401,18 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       // if local is not complete.
       if (!stream->deferred_reset_.valid()) {
         if (!stream->waiting_for_non_informational_headers_) {
-          ASSERT(stream->remote_end_stream_);
-          stream->decoder_->decodeTrailers(std::move(stream->headers_));
+          if (!stream->remote_end_stream_) {
+            // This indicates we have received more headers frames than Envoy
+            // supports. Even if this is valid HTTP (something like 103 early hints) fail here
+            // rather than trying to push unexpected headers through the Envoy pipeline as that
+            // will likely result in Envoy crashing.
+            // It would be cleaner to reset the stream rather than reset the/ entire connection but
+            // it's also slightly more dangerous so currently we err on the side of safety.
+            stats_.too_many_header_frames_.inc();
+            throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
+          } else {
+            stream->decoder_->decodeTrailers(std::move(stream->headers_));
+          }
         } else {
           ASSERT(!nghttp2_session_check_server_session(session_));
           stream->waiting_for_non_informational_headers_ = false;
