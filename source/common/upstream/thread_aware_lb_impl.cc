@@ -17,29 +17,30 @@ void ThreadAwareLoadBalancerBase::initialize() {
 }
 
 void ThreadAwareLoadBalancerBase::refresh() {
-  auto per_priority_state = std::make_shared<std::vector<PerPriorityStatePtr>>(
+  auto per_priority_state_vector = std::make_shared<std::vector<PerPriorityStatePtr>>(
       priority_set_.hostSetsPerPriority().size());
   auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
 
   // Note that we only compute global panic on host set refresh. Given that the runtime setting will
   // rarely change, this is a reasonable compromise to avoid creating extra rings when we only
   // need to create one per priority level.
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
-    (*per_priority_state)[priority].reset(new PerPriorityState);
+    (*per_priority_state_vector)[priority].reset(new PerPriorityState);
+    const auto& per_priority_state = (*per_priority_state_vector)[priority];
     if (isGlobalPanic(*host_set)) {
-      (*per_priority_state)[priority]->current_lb_ = createLoadBalancer(host_set->hosts());
-      (*per_priority_state)[priority]->global_panic_ = true;
+      per_priority_state->current_lb_ = createLoadBalancer(host_set->hosts());
+      per_priority_state->global_panic_ = true;
     } else {
-      (*per_priority_state)[priority]->current_lb_ = createLoadBalancer(host_set->healthyHosts());
-      (*per_priority_state)[priority]->global_panic_ = false;
+      per_priority_state->current_lb_ = createLoadBalancer(host_set->healthyHosts());
+      per_priority_state->global_panic_ = false;
     }
   }
 
   {
     std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
     factory_->per_priority_load_ = per_priority_load;
-    factory_->per_priority_state_ = per_priority_state;
+    factory_->per_priority_state_ = per_priority_state_vector;
   }
 }
 
