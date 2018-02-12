@@ -1820,8 +1820,8 @@ TEST_F(GrpcHealthCheckerImplTest, Success) {
                   headers.ContentType()->value().c_str());
         EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.Path()->value().c_str());
         EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.Scheme()->value().c_str());
-        EXPECT_TRUE(headers.Method());
-        EXPECT_TRUE(headers.Host());
+        EXPECT_NE(nullptr, headers.Method());
+        EXPECT_NE(nullptr, headers.Host());
       }));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
