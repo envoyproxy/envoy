@@ -3,10 +3,6 @@
 #include "common/common/empty_string.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "grpc++/channel.h"
-#include "grpc++/create_channel.h"
-#include "grpc++/security/credentials.h"
-
 namespace Envoy {
 namespace Grpc {
 
@@ -65,13 +61,11 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(
     GoogleStubFactory& stub_factory, Stats::Scope& scope,
     const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.stat_prefix()), scope_(scope) {
-  // TODO(htuch): add support for SSL, OAuth2, GCP, etc. credentials.
-  std::shared_ptr<grpc::ChannelCredentials> creds = grpc::InsecureChannelCredentials();
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::Channel> channel = CreateChannel(config.target_uri(), creds);
+  std::shared_ptr<grpc::Channel> channel = createChannel(config);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_.counter("streams_total");

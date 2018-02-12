@@ -163,6 +163,9 @@ public:
                      AsyncStreamCallbacks& callbacks) override;
 
 private:
+  static std::shared_ptr<grpc::Channel>
+  createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
+
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of
