@@ -142,6 +142,7 @@ envoy_cc_library(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -213,6 +214,15 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "maglev_lb_lib",
+    srcs = ["maglev_lb.cc"],
+    hdrs = ["maglev_lb.h"],
+    deps = [
+        ":load_balancer_lib",
     ],
 )
 

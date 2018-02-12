@@ -42,6 +42,9 @@ public:
                      AsyncStreamCallbacks& callbacks) override;
 
 private:
+  static std::shared_ptr<grpc::Channel>
+  createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
+
   Event::Dispatcher& dispatcher_;
   std::unique_ptr<grpc::GenericStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;

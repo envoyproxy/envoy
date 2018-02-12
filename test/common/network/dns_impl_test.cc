@@ -61,7 +61,7 @@ private:
     ReadFilter(TestDnsServerQuery& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       onDataInternal(data);
       return Network::FilterStatus::StopIteration;
     }
@@ -173,7 +173,7 @@ private:
             }
           }
         }
-        parent_.connection_->write(write_buffer_);
+        parent_.connection_->write(write_buffer_, false);
 
         // Reset query state, time for the next one.
         buffer_.drain(size_);

@@ -754,6 +754,8 @@ void HttpIntegrationTest::testEnvoyHandling100Continue() {
                                        *response_);
   waitForNextUpstreamRequest();
 
+  // Verify the Expect header is stripped.
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect) == nullptr);
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());

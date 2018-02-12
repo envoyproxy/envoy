@@ -100,7 +100,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
-  client_->write(initial_data);
+  client_->write(initial_data, false);
   client_->connect();
 }
 
@@ -113,10 +113,11 @@ void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType:
 WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
-Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data) {
+Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool end_stream) {
   data_.append(TestUtility::bufferToString(data));
   data.drain(data.length());
-  if (!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) {
+  read_end_stream_ = end_stream;
+  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) || end_stream) {
     data_to_wait_for_.clear();
     dispatcher_.exit();
   }

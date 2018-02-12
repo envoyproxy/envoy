@@ -9,6 +9,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -35,8 +36,12 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
 }
 
 LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random)
-    : stats_(stats), runtime_(runtime), random_(random), priority_set_(priority_set) {
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    : stats_(stats), runtime_(runtime), random_(random),
+      default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+          common_config, healthy_panic_threshold, 100, 50)),
+      priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority());
   }
@@ -95,11 +100,11 @@ const HostSet& LoadBalancerBase::chooseHostSet() {
   return *priority_set_.hostSetsPerPriority()[priority];
 }
 
-ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(const PrioritySet& priority_set,
-                                                     const PrioritySet* local_priority_set,
-                                                     ClusterStats& stats, Runtime::Loader& runtime,
-                                                     Runtime::RandomGenerator& random)
-    : LoadBalancerBase(priority_set, stats, runtime, random),
+ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
       local_priority_set_(local_priority_set) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
@@ -257,9 +262,9 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set, Runtime::Loader& runtime) {
-  uint64_t global_panic_threshold =
-      std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
+bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
+  uint64_t global_panic_threshold = std::min<uint64_t>(
+      100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
   double healthy_percent = host_set.hosts().size() == 0
                                ? 0
                                : 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
@@ -339,7 +344,7 @@ const HostVector& ZoneAwareLoadBalancerBase::hostsToUse() {
   const HostSet& host_set = chooseHostSet();
 
   // If the selected host set has insufficient healthy hosts, return all hosts.
-  if (isGlobalPanic(host_set, runtime_)) {
+  if (isGlobalPanic(host_set)) {
     stats_.lb_healthy_panic_.inc();
     return host_set.hosts();
   }
@@ -356,7 +361,7 @@ const HostVector& ZoneAwareLoadBalancerBase::hostsToUse() {
     return host_set.healthyHosts();
   }
 
-  if (isGlobalPanic(localHostSet(), runtime_)) {
+  if (isGlobalPanic(localHostSet())) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
@@ -375,11 +380,12 @@ HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
   return hosts_to_use[rr_index_++ % hosts_to_use.size()];
 }
 
-LeastRequestLoadBalancer::LeastRequestLoadBalancer(const PrioritySet& priority_set,
-                                                   const PrioritySet* local_priority_set,
-                                                   ClusterStats& stats, Runtime::Loader& runtime,
-                                                   Runtime::RandomGenerator& random)
-    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random) {
+LeastRequestLoadBalancer::LeastRequestLoadBalancer(
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                                common_config) {
   priority_set.addMemberUpdateCb(
       [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         if (last_host_) {

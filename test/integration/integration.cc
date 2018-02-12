@@ -115,7 +115,8 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
                                            MockBufferFactory& factory, uint32_t port,
-                                           Network::Address::IpVersion version)
+                                           Network::Address::IpVersion version,
+                                           bool enable_half_close)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _))
@@ -134,6 +135,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
+  connection_->enableHalfClose(enable_half_close);
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
@@ -155,17 +157,26 @@ void IntegrationTcpClient::waitForDisconnect() {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationTcpClient::write(const std::string& data) {
+void IntegrationTcpClient::waitForHalfClose() {
+  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader_->readLastByte());
+}
+
+void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
+
+void IntegrationTcpClient::write(const std::string& data, bool end_stream) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));
-  EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
+  if (!data.empty()) {
+    EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
+  }
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
-  connection_->write(buffer);
-  while (client_write_buffer_->bytes_written() != bytes_expected) {
+  connection_->write(buffer, end_stream);
+  do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  }
+  } while (client_write_buffer_->bytes_written() != bytes_expected);
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -197,10 +208,13 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
 }
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
-  return dispatcher_->createClientConnection(
+  Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+
+  connection->enableHalfClose(enable_half_close_);
+  return connection;
 }
 
 void BaseIntegrationTest::initialize() {
@@ -216,7 +230,8 @@ void BaseIntegrationTest::createUpstreams() {
   if (autonomous_upstream_) {
     fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
   } else {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
   }
 }
 
@@ -258,8 +273,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{
-      new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port, version_)};
+  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port,
+                                                          version_, enable_half_close_)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

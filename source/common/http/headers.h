@@ -15,6 +15,7 @@ namespace Http {
 class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
+  const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
@@ -27,6 +28,7 @@ public:
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
+  const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ContentLength{"content-length"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
@@ -53,6 +55,7 @@ public:
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
   const LowerCaseString EnvoyDecoratorOperation{"x-envoy-decorator-operation"};
+  const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
@@ -63,6 +66,7 @@ public:
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString KeepAlive{"keep-alive"};
+  const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
   const LowerCaseString Origin{"origin"};
@@ -79,6 +83,7 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString Vary{"vary"};
   const LowerCaseString XB3TraceId{"x-b3-traceid"};
   const LowerCaseString XB3SpanId{"x-b3-spanid"};
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
@@ -98,6 +103,7 @@ public:
 
   struct {
     const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
+    const std::string NoTransform{"no-transform"};
   } CacheControlValues;
 
   struct {
@@ -156,6 +162,8 @@ public:
 
   struct {
     const std::string Chunked{"chunked"};
+    const std::string Deflate{"deflate"};
+    const std::string Gzip{"gzip"};
   } TransferEncodingValues;
 
   struct {
@@ -183,6 +191,21 @@ public:
     const std::string Http11String{"HTTP/1.1"};
     const std::string Http2String{"HTTP/2"};
   } ProtocolStrings;
+
+  struct {
+    const std::string Gzip{"gzip"};
+    const std::string Identity{"identity"};
+    const std::string Wildcard{"*"};
+  } AcceptEncodingValues;
+
+  struct {
+    const std::string Gzip{"gzip"};
+  } ContentEncodingValues;
+
+  struct {
+    const std::string AcceptEncoding{"Accept-Encoding"};
+    const std::string Wildcard{"*"};
+  } VaryValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;

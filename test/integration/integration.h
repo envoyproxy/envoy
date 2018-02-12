@@ -71,12 +71,14 @@ typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
 class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
-                       Network::Address::IpVersion version);
+                       Network::Address::IpVersion version, bool enable_half_close = false);
 
   void close();
   void waitForData(const std::string& data);
   void waitForDisconnect();
-  void write(const std::string& data);
+  void waitForHalfClose();
+  void readDisable(bool disabled);
+  void write(const std::string& data, bool end_stream = false);
   const std::string& data() { return payload_reader_->data(); }
 
 private:
@@ -183,6 +185,8 @@ protected:
 
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+
+  bool enable_half_close_{false};
 
 private:
   // The codec type for the client-to-Envoy connection
