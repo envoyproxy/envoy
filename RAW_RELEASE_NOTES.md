@@ -28,6 +28,7 @@ final version.
 * Added support for listening for both IPv4 and IPv6 when binding to ::.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
+* Added Maglev consistent hash load balancer.
 * Improved TCP proxy to correctly proxy TCP half-close.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
@@ -61,3 +62,4 @@ final version.
 * Added support for abstract unix domain sockets on linux. The abstract
   namespace can be used by prepending '@' to a socket path.
 * Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
+* Added support for trusting additional hops in the X-Forwarded-For request header.

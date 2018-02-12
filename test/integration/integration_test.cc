@@ -115,10 +115,18 @@ TEST_P(IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
-TEST_P(IntegrationTest, EnvoyProxying100Continue) { testEnvoyProxying100Continue(); }
+TEST_P(IntegrationTest, EnvoyHandlingDuplicate100Continues) { testEnvoyHandling100Continue(true); }
 
-TEST_P(IntegrationTest, EnvoyProxying100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(true);
+TEST_P(IntegrationTest, EnvoyProxyingEarly100Continue) { testEnvoyProxying100Continue(true); }
+
+TEST_P(IntegrationTest, EnvoyProxyingLate100Continue) { testEnvoyProxying100Continue(false); }
+
+TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
+  testEnvoyProxying100Continue(true, true);
+}
+
+TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
+  testEnvoyProxying100Continue(false, true);
 }
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }

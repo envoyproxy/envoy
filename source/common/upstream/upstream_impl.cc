@@ -172,6 +172,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     }
     lb_type_ = LoadBalancerType::OriginalDst;
     break;
+  case envoy::api::v2::Cluster::MAGLEV:
+    lb_type_ = LoadBalancerType::Maglev;
+    break;
   default:
     NOT_REACHED;
   }
