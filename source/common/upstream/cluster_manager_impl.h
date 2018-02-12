@@ -175,6 +175,7 @@ public:
   bool removePrimaryCluster(const std::string& cluster) override;
   void shutdown() override {
     cds_api_.reset();
+    ads_mux_.reset();
     primary_clusters_.clear();
   }
 

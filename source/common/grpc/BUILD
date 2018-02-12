@@ -82,6 +82,7 @@ envoy_cc_library(
     external_deps = ["grpc"],
     deps = [
         "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_lib",
