@@ -53,6 +53,7 @@ public:
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
+  MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
   MOCK_CONST_METHOD0(setCurrentClientCertDetails,
                      const std::vector<Http::ClientCertDetailsType>&());

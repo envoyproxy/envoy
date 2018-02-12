@@ -50,9 +50,22 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
+  const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
   if (config.useRemoteAddress()) {
-    final_remote_address = connection.remoteAddress();
     single_xff_address = request_headers.ForwardedFor() == nullptr;
+    // If there are any trusted proxies in front of this Envoy instance (as indicated by
+    // the xff_num_trusted_hops configuration option), get the trusted client address
+    // from the XFF before we append to XFF.
+    if (xff_num_trusted_hops > 0) {
+      final_remote_address =
+          Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops - 1).address_;
+    }
+    // If there aren't any trusted proxies in front of this Envoy instance, or there
+    // are but they didn't populate XFF properly, the trusted client address is the
+    // source address of the immediate downstream's connection to us.
+    if (final_remote_address == nullptr) {
+      final_remote_address = connection.remoteAddress();
+    }
     if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
@@ -64,7 +77,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
     final_remote_address = ret.address_;
     single_xff_address = ret.single_address_;
   }
@@ -140,9 +153,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   // If we are an external request, AND we are "using remote address" (see above), we set
   // x-envoy-external-address since this is our first ingress point into the trusted network.
-  if (edge_request && connection.remoteAddress()->type() == Network::Address::Type::Ip) {
+  if (edge_request && final_remote_address->type() == Network::Address::Type::Ip) {
     request_headers.insertEnvoyExternalAddress().value(
-        connection.remoteAddress()->ip()->addressAsString());
+        final_remote_address->ip()->addressAsString());
   }
 
   // Generate x-request-id for all edge requests, or if there is none.

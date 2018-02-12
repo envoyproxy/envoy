@@ -245,6 +245,12 @@ public:
   virtual bool useRemoteAddress() PURE;
 
   /**
+   * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for
+   *         the purposes of XFF processing.
+   */
+  virtual uint32_t xffNumTrustedHops() const PURE;
+
+  /**
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
   virtual ForwardClientCertType forwardClientCert() PURE;
