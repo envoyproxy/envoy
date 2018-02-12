@@ -362,12 +362,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {fault_connection_manager, fault_downstream_cluster});
 }
 
-static absl::string_view extractRegexPrefix(const std::string& regex) {
-  TagExtractorPtr tag_extractor = TagExtractorImpl::createTagExtractor("foo", regex);
-  return tag_extractor->prefixToken();
-}
-
 TEST(TagExtractorTest, ExtractRegexPrefix) {
+  TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
+  auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
+    tag_extractor = TagExtractorImpl::createTagExtractor("foo", regex);
+    return tag_extractor->prefixToken();
+  };
+
   EXPECT_EQ("", extractRegexPrefix("^prefix(foo)."));
   EXPECT_EQ("prefix", extractRegexPrefix("^prefix\\.foo"));
   EXPECT_EQ("", extractRegexPrefix("^notACompleteToken"));   //
