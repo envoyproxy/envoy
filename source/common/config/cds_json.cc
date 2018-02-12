@@ -102,7 +102,9 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   const std::string name = json_cluster.getString("name");
   Utility::checkObjNameLength("Invalid cluster name", name);
   cluster.set_name(name);
-
+  if (json_cluster.hasObject("alt_stat_name")) {
+    cluster.set_alt_stat_name(json_cluster.getString("alt_stat_name"));
+  }
   const std::string string_type = json_cluster.getString("type");
   auto set_dns_hosts = [&json_cluster, &cluster] {
     const auto hosts = json_cluster.getObjectArray("hosts");
