@@ -6,9 +6,9 @@ namespace Upstream {
 MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_size_(table_size) {
   // TODO(mattklein123): The Maglev table must have a size that is a prime number for the algorithm
   // to work. Currently, the table size is not user configurable. In the future, if the table size
-  // is made user configurable, we will need proper error checking that that the user cannot
-  // configure a size that is not prime (the result is going to be an infinite loop with some
-  // inputs which is not good!).
+  // is made user configurable, we will need proper error checking that the user cannot configure a
+  // size that is not prime (the result is going to be an infinite loop with some inputs which is
+  // not good!).
   ASSERT(Primes::isPrime(table_size));
   if (hosts.empty()) {
     return;
