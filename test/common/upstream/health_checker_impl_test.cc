@@ -448,6 +448,12 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+    .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
+      EXPECT_TRUE(headers.Host());
+      EXPECT_EQ(headers.Host()->value().c_str(), std::string("fake_cluster"));
+      EXPECT_EQ(headers.Path()->value().c_str(), std::string("/healthcheck"));
+    }));
   health_checker_->start();
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
@@ -478,6 +484,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
     .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
       EXPECT_TRUE(headers.Host());
       EXPECT_EQ(headers.Host()->value().c_str(), std::string(host));
+      EXPECT_EQ(headers.Path()->value().c_str(), std::string("/healthcheck"));
     }));
   health_checker_->start();
 
