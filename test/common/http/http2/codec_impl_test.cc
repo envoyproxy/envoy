@@ -204,7 +204,9 @@ TEST_P(Http2CodecImplTest, Invalid103) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(early_hint_headers, false);
 
-  EXPECT_THROW(response_encoder_->encodeHeaders(early_hint_headers, false), CodecProtocolException);
+  EXPECT_THROW_WITH_MESSAGE(response_encoder_->encodeHeaders(early_hint_headers, false),
+                            CodecProtocolException, "Unexpected 'trailers' with no end stream.");
+  EXPECT_EQ(1, stats_store_.counter("http2.too_many_header_frames").value());
 };
 
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {

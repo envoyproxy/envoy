@@ -406,6 +406,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
             // supports. Even if this is valid HTTP (something like 103 early hints) fail here
             // rather than trying to push unexpected headers through the Envoy pipeline as that
             // will likely result in Envoy crashing.
+            // It would be cleaner to reset the stream rather than reset the/ entire connection but
+            // it's also slightly more dangerous so currently we err on the side of safety.
+            stats_.too_many_header_frames_.inc();
             throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
           } else {
             stream->decoder_->decodeTrailers(std::move(stream->headers_));
