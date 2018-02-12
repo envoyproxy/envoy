@@ -22,7 +22,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
   auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
 
   // Note that we only compute global panic on host set refresh. Given that the runtime setting will
-  // rarely change, this is a reasonable compromise to avoid creating extra rings when we only
+  // rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
   // need to create one per priority level.
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
@@ -60,10 +60,11 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   const uint64_t h = hash.valid() ? hash.value() : random_.random();
 
   const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
-  if ((*per_priority_state_)[priority]->global_panic_) {
+  const auto& per_priority_state = (*per_priority_state_)[priority];
+  if (per_priority_state->global_panic_) {
     stats_.lb_healthy_panic_.inc();
   }
-  return (*per_priority_state_)[priority]->current_lb_->chooseHost(h);
+  return per_priority_state->current_lb_->chooseHost(h);
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
