@@ -24,17 +24,23 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls)
-    : cm_(cm), tls_(tls) {}
+    : cm_(cm), tls_(tls) {
+#ifdef ENVOY_GOOGLE_GRPC
+  google_tls_slot_ = tls.allocateSlot();
+  google_tls_slot_->set(
+      [](Event::Dispatcher&) { return std::make_shared<GoogleAsyncClientThreadLocal>(); });
+#endif
+}
 
 AsyncClientPtr AsyncClientFactoryImpl::create() {
   return std::make_unique<AsyncClientImpl>(cm_, cluster_name_);
 }
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
-    ThreadLocal::Instance& tls, Stats::Scope& scope,
+    ThreadLocal::Instance& tls, ThreadLocal::Slot& google_tls_slot, Stats::Scope& scope,
     const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
-    : tls_(tls), scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))),
-      config_(config) {
+    : tls_(tls), google_tls_slot_(google_tls_slot),
+      scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))), config_(config) {
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(scope_);
@@ -45,7 +51,10 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
 
 AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 #ifdef ENVOY_GOOGLE_GRPC
-  return std::make_unique<GoogleAsyncClientImpl>(tls_.dispatcher(), *scope_, config_);
+  GoogleGenericStubFactory stub_factory;
+  return std::make_unique<GoogleAsyncClientImpl>(
+      tls_.dispatcher(), google_tls_slot_.getTyped<GoogleAsyncClientThreadLocal>(), stub_factory,
+      *scope_, config_);
 #else
   return nullptr;
 #endif
@@ -58,7 +67,8 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcSe
   case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
     return std::make_unique<AsyncClientFactoryImpl>(cm_, grpc_service.envoy_grpc().cluster_name());
   case envoy::api::v2::core::GrpcService::kGoogleGrpc:
-    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, scope, grpc_service.google_grpc());
+    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope,
+                                                          grpc_service.google_grpc());
   default:
     NOT_REACHED;
   }
