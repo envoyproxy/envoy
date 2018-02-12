@@ -10,7 +10,7 @@ namespace Envoy {
 namespace ProtobufPercentHelper {
 
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value) {
-  ASSERT(default_value >= 0 && default_value <= max_value);
+  ASSERT(default_value <= max_value);
   UNREFERENCED_PARAMETER(max_value);
   return default_value;
 }

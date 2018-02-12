@@ -77,7 +77,7 @@ public:
 
   // Network::ReadFilter
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
-  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 
   // Network::ConnectionCallbacks

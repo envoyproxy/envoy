@@ -27,8 +27,9 @@ public:
   /**
    * Enum values used to set compression level during initialization.
    * best: gives best compression.
-   * speed: gives best.
-   * standard: gives normal compression. (default)
+   * speed: gives best performance.
+   * standard: requests a default compromise between speed and compression. (default) @see zlib
+   * manual.
    */
   enum class CompressionLevel : int64_t {
     Best = 9,
@@ -41,7 +42,7 @@ public:
    * filtered: used for data produced by a filter. (or predictor) @see Z_FILTERED (zlib manual)
    * huffman: used to enforce Huffman encoding. @see RFC 1951
    * rle: used to limit match distances to one. (Run-length encoding)
-   * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY (zlib manual)
+   * standard: used for normal data. (default) @see Z_DEFAULT_STRATEGY in zlib manual.
    */
   enum class CompressionStrategy : uint64_t {
     Filtered = 1,

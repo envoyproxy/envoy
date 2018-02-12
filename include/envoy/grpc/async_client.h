@@ -151,8 +151,7 @@ public:
   /**
    * Called when the remote closes or an error occurs on the gRPC stream. The stream is
    * considered remotely closed after this invocation and no further callbacks will be
-   * invoked. A non-Ok status implies that stream is also locally closed and that no
-   * further stream operations are permitted.
+   * invoked. In addition, no further stream operations are permitted.
    * @param status the gRPC status.
    * @param message the gRPC status message or empty string if not present.
    */

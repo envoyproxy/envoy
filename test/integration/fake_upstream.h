@@ -180,10 +180,11 @@ public:
   ~FakeConnectionBase() { ASSERT(initialized_); }
   void close();
   void readDisable(bool disable);
-  // By default waitForDisconnect assumes the next event is a disconnect and
-  // fails an assert if an unexpected event occurs. If a caller truly wishes to
-  // wait until disconnect, set ignore_spurious_events = true.
+  // By default waitForDisconnect and waitForHalfClose assume the next event is a disconnect and
+  // fails an assert if an unexpected event occurs. If a caller truly wishes to wait until
+  // disconnect, set ignore_spurious_events = true.
   void waitForDisconnect(bool ignore_spurious_events = false);
+  void waitForHalfClose(bool ignore_spurious_events = false);
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -195,6 +196,7 @@ public:
     connection_wrapper_->set_parented();
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
+  void enableHalfClose(bool enabled);
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
@@ -205,6 +207,7 @@ protected:
   std::mutex lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
+  bool half_closed_{};
   bool initialized_{false};
 
 private:
@@ -237,7 +240,7 @@ private:
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       parent_.codec_->dispatch(data);
       return Network::FilterStatus::StopIteration;
     }
@@ -262,14 +265,14 @@ public:
   }
 
   std::string waitForData(uint64_t num_bytes);
-  void write(const std::string& data);
+  void write(const std::string& data, bool end_stream = false);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeRawConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override;
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override;
 
     FakeRawConnection& parent_;
   };
@@ -285,7 +288,8 @@ typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
 class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::FilterChainFactory {
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
-  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version);
+  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
+               bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version);
   ~FakeUpstream();
@@ -312,7 +316,8 @@ protected:
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-               Network::SocketPtr&& connection, FakeHttpConnection::Type type);
+               Network::SocketPtr&& connection, FakeHttpConnection::Type type,
+               bool enable_half_close);
 
   class FakeListener : public Network::ListenerConfig {
   public:
@@ -351,6 +356,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_; // Guarded by lock_
   bool allow_unexpected_disconnects_;
+  const bool enable_half_close_;
   FakeListener listener_;
 };
 } // namespace Envoy

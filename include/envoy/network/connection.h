@@ -101,6 +101,13 @@ public:
   virtual void addBytesSentCallback(BytesSentCb cb) PURE;
 
   /**
+   * Enable half-close semantics on this connection. Reading a remote half-close
+   * will not fully close the connection. This is off by default.
+   * @param enabled Whether to set half-close semantics as enabled or disabled.
+   */
+  virtual void enableHalfClose(bool enabled) PURE;
+
+  /**
    * Close the connection.
    */
   virtual void close(ConnectionCloseType type) PURE;
@@ -187,8 +194,12 @@ public:
   /**
    * Write data to the connection. Will iterate through downstream filters with the buffer if any
    * are installed.
+   * @param data Supplies the data to write to the connection.
+   * @param end_stream If true, this indicates that this is the last write to the connection. If
+   *        end_stream is true, the connection is half-closed. This may only be set to true if
+   *        enableHalfClose(true) has been set on this connection.
    */
-  virtual void write(Buffer::Instance& data) PURE;
+  virtual void write(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Set a soft limit on the size of buffers for the connection.

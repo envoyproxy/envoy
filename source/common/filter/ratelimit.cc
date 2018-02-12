@@ -30,7 +30,7 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
                                    POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-Network::FilterStatus Instance::onData(Buffer::Instance&) {
+Network::FilterStatus Instance::onData(Buffer::Instance&, bool) {
   return status_ == Status::Calling ? Network::FilterStatus::StopIteration
                                     : Network::FilterStatus::Continue;
 }
