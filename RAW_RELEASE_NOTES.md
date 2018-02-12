@@ -28,6 +28,7 @@ final version.
 * Added support for listening for both IPv4 and IPv6 when binding to ::.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
+* Added Maglev consistent hash load balancer.
 * Improved TCP proxy to correctly proxy TCP half-close.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
