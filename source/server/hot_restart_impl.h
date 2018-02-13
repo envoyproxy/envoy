@@ -120,9 +120,6 @@ class HotRestartImpl : public HotRestart,
 public:
   HotRestartImpl(Options& options);
 
-  Thread::BasicLockable& logLock() { return log_lock_; }
-  Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
-
   // Server::HotRestart
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address) override;
@@ -132,6 +129,9 @@ public:
   void terminateParent() override;
   void shutdown() override;
   std::string version() override;
+  Thread::BasicLockable& logLock() override { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  Stats::RawStatDataAllocator& statsAllocator() override { return *this; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
