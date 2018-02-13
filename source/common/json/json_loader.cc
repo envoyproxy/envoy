@@ -746,19 +746,10 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
   } catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
   } catch (...) {
-    // When testing, I found this triggered when attempt to parse the
-    // contents of test/config/integration/server_ads.yaml, yielding
-    // this message:
-    //     Unexpected YAML exception:
-    //     N4YAML18TypedBadConversionINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE
-    // While this particular exception is now handled above, it
-    // appears that there's no complete list of exceptions that can be
-    // thrown in this YAML parser. The rest of Envoy doesn't deal well with
-    // unexpected exceptions, due to complex interlock between
-    // structures during construction. Constructing a Server::InstanceImpl requires
-    // an already-constructed Stats::ThreadLocalStoreImpl. But an uncaught exception thrown
-    // between their construction causes an assert in
-    // ThreadLocalStoreImpl's destructor.
+    // There is a potentially wide space of exceptions thrown by the YAML parser,
+    // and enumerating them all may be difficult. Envoy doesn't work well with
+    // unhandled exceptions, so we capture them and record the exception name in
+    // the Envoy Exception text.
     std::exception_ptr p = std::current_exception();
     throw EnvoyException(std::string("Unexpected YAML exception: ") +
                          p.__cxa_exception_type()->name());

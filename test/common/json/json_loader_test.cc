@@ -447,12 +447,6 @@ TEST(JsonLoaderTest, YamlObject) {
 
 TEST(JsonLoaderTest, BadYamlException) {
   std::string bad_yaml = R"EOF(
-dynamic_resources:
-  lds_config: {ads: {}}
-  cds_config: {ads: {}}
-  ads_config:
-    api_type: GRPC
-    cluster_name: [ads_cluster]
 static_resources:
   clusters:
   - name: ads_cluster
