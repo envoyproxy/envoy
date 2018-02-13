@@ -270,23 +270,10 @@ Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
   return any;
 }
 
-// There is no portable way to initialize sockaddr_in6 with a static initializer, do it with a
-// helper function instead
-static sockaddr_in6& v6any_() {
-  static sockaddr_in6 v6any = {};
-  v6any.sin6_family = AF_INET6;
-  v6any.sin6_addr = in6addr_any;
-
-  return v6any;
-}
-
-Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress(bool v6only) {
+Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
   // Initialized on first call in a thread-safe manner.
-  static sockaddr_in6 v6any = v6any_();
-  static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(v6any, false));
-  static Address::InstanceConstSharedPtr any_v6only(new Address::Ipv6Instance(v6any, true));
-
-  return v6only ? any_v6only : any;
+  static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+  return any;
 }
 
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,

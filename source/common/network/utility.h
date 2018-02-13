@@ -146,12 +146,11 @@ public:
   static Address::InstanceConstSharedPtr getIpv4AnyAddress();
 
   /**
-   * @param v6only a boolean to determine how to set the IPV6_V6ONLY socket option.
    * @return Address::InstanceConstSharedPtr an address that represents the IPv6 wildcard address
    *         (i.e. "::"). Used during binding to indicate that incoming connections to any local
    *         IPv6 address are to be accepted.
    */
-  static Address::InstanceConstSharedPtr getIpv6AnyAddress(bool v6only = true);
+  static Address::InstanceConstSharedPtr getIpv6AnyAddress();
 
   /**
    * @param address IP address instance.

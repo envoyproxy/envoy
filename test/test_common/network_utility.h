@@ -73,6 +73,9 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(const Address::IpVer
 /**
  * Returns the any address for the specified IP version.
  * @param version the IP version of the any address.
+ * @param v4_compat determines whether a v4-mapped addresses bound to a socket listening on the
+ *        returned ANY address are to be treated as IPv4 or IPv6 addresses. Defaults to 'false',
+ *        has no effect with IPv4 ANY address.
  * @returns the any address for the specified IP version.
  */
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,

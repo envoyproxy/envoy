@@ -116,11 +116,26 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion v
   return Network::Utility::getIpv6LoopbackAddress();
 }
 
+// There is no portable way to initialize sockaddr_in6 with a static initializer, do it with a
+// helper function instead
+static sockaddr_in6& v6any_() {
+  static sockaddr_in6 v6any = {};
+  v6any.sin6_family = AF_INET6;
+  v6any.sin6_addr = in6addr_any;
+
+  return v6any;
+}
+
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, bool v4_compat) {
   if (version == Address::IpVersion::v4) {
     return Network::Utility::getIpv4AnyAddress();
   }
-  return Network::Utility::getIpv6AnyAddress(!v4_compat);
+  if (v4_compat) {
+    static sockaddr_in6 v6any = v6any_();
+    static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(v6any, false));
+    return any;
+  }
+  return Network::Utility::getIpv6AnyAddress();
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {
