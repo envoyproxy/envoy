@@ -447,17 +447,6 @@ TEST(JsonLoaderTest, YamlObject) {
 
 TEST(JsonLoaderTest, BadYamlException) {
   std::string bad_yaml = R"EOF(
-static_resources:
-  clusters:
-  - name: ads_cluster
-    connect_timeout: { seconds: 5 }
-    type: STATIC
-    hosts:
-    - socket_address:
-        address: {{ ntop_ip_loopback_address }}
-        port_value: {{ ads_upstream }}
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
 admin:
   access_log_path: /dev/null
   address:
