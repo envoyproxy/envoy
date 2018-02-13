@@ -43,7 +43,7 @@ TEST(ShadowWriterImplTest, All) {
 
   // Failure case
   message.reset(new Http::RequestMessageImpl());
-  message->headers().insertHost().value(std::string("cluster2"));
+  message->headers().insertHost().value(std::string("cluster2:8000"));
   EXPECT_CALL(cm, httpAsyncClientForCluster("bar")).WillOnce(ReturnRef(cm.async_client_));
   EXPECT_CALL(cm.async_client_,
               send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(10))))
@@ -51,7 +51,7 @@ TEST(ShadowWriterImplTest, All) {
           Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message, inner_message);
-            EXPECT_STREQ("cluster2-shadow", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("cluster2-shadow:8000", message->headers().Host()->value().c_str());
             callback = &callbacks;
             return &request;
           }));
