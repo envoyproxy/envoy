@@ -1,5 +1,5 @@
 admin:
-  access_log_path: /tmp/admin_access.log
+  access_log_path: /dev/null
   address:
     socket_address: { address: 0.0.0.0, port_value: 0 }
 
@@ -22,8 +22,6 @@ static_resources:
               routes:
               - match: { prefix: "/" }
                 route: { host_rewrite: www.google.com, cluster: service_google }
-          http_filters:
-          - name: envoy.router
   clusters:
   - name: service_google
     connect_timeout: 0.25s
@@ -32,4 +30,3 @@ static_resources:
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
-    tls_context: { sni: www.google.com }

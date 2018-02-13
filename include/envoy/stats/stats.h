@@ -291,10 +291,10 @@ public:
   virtual ~RawStatDataAllocator() {}
 
   /**
-   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no more
-   *         memory available for stats. The allocator may return a reference counted data location
-   *         by name if one already exists with the same name. This is used for intra-process
-   *         scope swapping as well as inter-process hot restart.
+   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
+   *         more memory available for stats. The allocator should return a reference counted
+   *         data location by name if one already exists with the same name. This is used for
+   *         intra-process scope swapping as well as inter-process hot restart.
    */
   virtual RawStatData* alloc(const std::string& name) PURE;
 
