@@ -745,14 +745,13 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
     throw EnvoyException(e.what());
   } catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (...) {
+  } catch (std::exception& e) {
     // There is a potentially wide space of exceptions thrown by the YAML parser,
     // and enumerating them all may be difficult. Envoy doesn't work well with
     // unhandled exceptions, so we capture them and record the exception name in
     // the Envoy Exception text.
     std::exception_ptr p = std::current_exception();
-    throw EnvoyException(std::string("Unexpected YAML exception: ") +
-                         p.__cxa_exception_type()->name());
+    throw EnvoyException(std::string("Unexpected YAML exception: ") + e.what());
   }
 }
 

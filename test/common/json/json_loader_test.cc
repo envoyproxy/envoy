@@ -465,6 +465,8 @@ admin:
   }
   EXPECT_TRUE(exception_caught);
   EXPECT_TRUE(exception_text.find("bad conversion") != std::string::npos) << exception_text;
+  EXPECT_TRUE(exception_text.find("Unexpected YAML exception") == std::string::npos)
+      << exception_text;
 }
 
 } // namespace Json
