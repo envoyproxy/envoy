@@ -743,6 +743,27 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
     return parseYamlNode(YAML::Load(yaml));
   } catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
+  } catch (YAML::BadConversion& e) {
+    throw EnvoyException(e.what());
+  } catch (...) {
+    // When testing, I found this triggered when attempt to parse the
+    // contents of test/config/integration/server_ads.yaml, yielding
+    // this message:
+    //     Unexpected YAML exception:
+    //     N4YAML18TypedBadConversionINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE
+    // While this particular exception is now handled above, it
+    // appears that there's no complete list of exceptions that can be
+    // thrown in JSON.  The rest of Envoy doesn't deal well with
+    // unexpected exceptions, due to complex interlock between
+    // structures during construction.  In particular,
+    // Server::InstanceImpl and Stats::ThreadLocalStoreImpl.  You need
+    // to construct a Stats::ThreadLocalStoreImpl before constructing
+    // a Server::InstanceImpl, but an uncaught exception thrown
+    // between their construction causes an assert in
+    // ThreadLocalStoreImpl's destructor.
+    std::exception_ptr p = std::current_exception();
+    throw EnvoyException(std::string("Unexpected YAML exception: ") +
+                         p.__cxa_exception_type()->name());
   }
 }
 

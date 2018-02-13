@@ -445,5 +445,45 @@ TEST(JsonLoaderTest, YamlObject) {
   }
 }
 
+TEST(JsonLoaderTest, BadYamlException) {
+  std::string bad_yaml = R"EOF(
+dynamic_resources:
+  lds_config: {ads: {}}
+  cds_config: {ads: {}}
+  ads_config:
+    api_type: GRPC
+    cluster_name: [ads_cluster]
+static_resources:
+  clusters:
+  - name: ads_cluster
+    connect_timeout: { seconds: 5 }
+    type: STATIC
+    hosts:
+    - socket_address:
+        address: {{ ntop_ip_loopback_address }}
+        port_value: {{ ads_upstream }}
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+)EOF";
+
+  bool exception_caught = false;
+  std::string exception_text;
+  try {
+    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString(bad_yaml);
+  } catch (const EnvoyException& e) {
+    exception_caught = true;
+    exception_text = e.what();
+  }
+  EXPECT_TRUE(exception_caught);
+  EXPECT_TRUE(exception_text.find("bad conversion") != std::string::npos)
+      << exception_text;
+}
+
 } // namespace Json
 } // namespace Envoy
