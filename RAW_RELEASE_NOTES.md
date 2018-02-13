@@ -63,3 +63,5 @@ final version.
   namespace can be used by prepending '@' to a socket path.
 * Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
 * Added support for trusting additional hops in the X-Forwarded-For request header.
+* Added setting host header value for http health check request.
+
