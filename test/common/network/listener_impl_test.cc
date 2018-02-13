@@ -156,7 +156,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 
 // Test for the correct behavior when a listener is configured with an ANY address that allows
 // receiving IPv4 connections on an IPv6 socket. In this case the address instances of both
-// local and remove addresses of the connection should be IPv4 instances, as the connection really
+// local and remote addresses of the connection should be IPv4 instances, as the connection really
 // is an IPv4 connection.
 TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   Stats::IsolatedStoreImpl stats_store;
