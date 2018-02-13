@@ -49,6 +49,12 @@ envoy::api::v2::core::HealthCheck parseHealthCheckFromJson(const std::string& js
   return health_check;
 }
 
+envoy::api::v2::core::HealthCheck parseHealthCheckFromYaml(const std::string& yaml_string) {
+  envoy::api::v2::core::HealthCheck health_check;
+  MessageUtil::loadFromYaml(yaml_string, health_check);
+  return health_check;
+}
+
 envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
   envoy::api::v2::core::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
@@ -221,22 +227,20 @@ public:
   }
 
   void setupServiceValidationWithCustomHostValueHC(const std::string& host) {
-    std::string json = fmt::format(R"EOF(
-    {{
-      "type": "http",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "service_name": "locations",
-      "interval_jitter_ms": 1000,
-      "unhealthy_threshold": 2,
-      "healthy_threshold": 2,
-      "path": "/healthcheck",
-      "host": "{0}"
-    }}
+    std::string yaml = fmt::format(R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      host: {0}
     )EOF",
                                    host);
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -473,6 +477,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   std::string host = "www.envoyproxy.io";
   setupServiceValidationWithCustomHostValueHC(host);
+  // requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
