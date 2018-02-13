@@ -1,7 +1,8 @@
 #include "common/config/datasource.h"
 
-#include "common/common/fmt.h"
 #include "common/filesystem/filesystem_impl.h"
+
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Config {
