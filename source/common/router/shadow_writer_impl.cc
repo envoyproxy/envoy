@@ -14,9 +14,9 @@ namespace Router {
 
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& request,
                               std::chrono::milliseconds timeout) {
-  // Switch authority to add a shadow postfix. This allows upstream logging to make a more sense.
   ASSERT(request->headers().Host()->value().c_str() != "");
 
+  // Switch authority to add a shadow postfix. This allows upstream logging to make a more sense.
   if (absl::StrContains(request->headers().Host()->value().c_str(), ":")) {
     auto parts = StringUtil::splitToken(request->headers().Host()->value().c_str(), ":");
     ASSERT(parts.size() == 2);
