@@ -17,8 +17,11 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& req
   auto parts = StringUtil::splitToken(request->headers().Host()->value().c_str(), ":");
   ASSERT(parts.size() > 0 && parts.size() <= 2);
 
-  request->headers().Host()->value(parts.size() == 2 ? absl::StrJoin(parts, "-shadow:")
-                                                     : absl::StrJoin(parts, "") + "-shadow");
+  request->headers().Host()->value(
+      parts.size() == 2
+          ? absl::StrJoin(parts, "-shadow:")
+          : absl::StrJoin(
+                std::forward_as_tuple(request->headers().Host()->value().c_str(), "-shadow"), ""));
 
   // Configuration should guarantee that cluster exists before calling here. This is basically
   // fire and forget. We don't handle cancelling.
