@@ -753,12 +753,10 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
     //     N4YAML18TypedBadConversionINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE
     // While this particular exception is now handled above, it
     // appears that there's no complete list of exceptions that can be
-    // thrown in JSON.  The rest of Envoy doesn't deal well with
+    // thrown in this YAML parser. The rest of Envoy doesn't deal well with
     // unexpected exceptions, due to complex interlock between
-    // structures during construction.  In particular,
-    // Server::InstanceImpl and Stats::ThreadLocalStoreImpl.  You need
-    // to construct a Stats::ThreadLocalStoreImpl before constructing
-    // a Server::InstanceImpl, but an uncaught exception thrown
+    // structures during construction. Constructing a Server::InstanceImpl requires
+    // an already-constructed Stats::ThreadLocalStoreImpl. But an uncaught exception thrown
     // between their construction causes an assert in
     // ThreadLocalStoreImpl's destructor.
     std::exception_ptr p = std::current_exception();
