@@ -121,6 +121,7 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/redis:conn_pool_lib",
+        "//source/common/router:router_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
     ],
 )

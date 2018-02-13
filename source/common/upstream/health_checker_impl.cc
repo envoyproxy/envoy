@@ -24,6 +24,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/redis/conn_pool_impl.h"
+#include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
 namespace Envoy {
@@ -723,6 +724,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       parent_.service_method_.name());
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
+  Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
