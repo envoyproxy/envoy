@@ -534,6 +534,7 @@ LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) 
   // /0 will match all IP addresses.
   if (ip_prefixes_[address].length_ == 0) {
     return_vector.push_back(ip_prefixes_[address].tag_);
+    // TODO(ccaraman): When nested prefixes are supported, should the /0 case be handled better.
     return return_vector;
   }
 
@@ -543,7 +544,7 @@ LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) 
   if (extractBits<IpType, address_size>(0, ip_prefixes_[address].length_, bitmask) == 0) {
     return_vector.push_back(ip_prefixes_[address].tag_);
   }
-  // TODO(ccaraman) : Search through the nested prefix structure.
+  // TODO(ccaraman): Search through the nested prefix structure.
   return return_vector;
 }
 
