@@ -17,12 +17,12 @@
 // reporting methods should be called via macro, whch will also compile to
 // nothing when not enabled.
 
-#define PERF_OPERATION(perf_var) PerfOperation(perf_var)
+#define PERF_OPERATION(perf_var) Envoy::PerfOperation(perf_var)
 #define PERF_REPORT(perf, category, description) \
   do { perf.report(category, description); } while (false)
-#define PERF_DUMP() PerfAnnotationContext::dump()
-#define PERF_TO_STRING() PerfAnnotationContext::toString()
-#define PERF_CLEAR() PerfAnnotationContext::clear()
+#define PERF_DUMP() Envoy::PerfAnnotationContext::dump()
+#define PERF_TO_STRING() Envoy::PerfAnnotationContext::toString()
+#define PERF_CLEAR() Envoy::PerfAnnotationContext::clear()
 
 #define PERF_THREAD_SAFE 1
 

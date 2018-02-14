@@ -42,6 +42,11 @@ config_setting(
     values = {"define": "google_grpc=disabled"},
 )
 
+config_setting(
+    name = "perf_annotation",
+    values = {"define": "perf_annotation=enabled"},
+)
+
 cc_proto_library(
     name = "grpc_health_proto",
     deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
@@ -50,6 +55,11 @@ cc_proto_library(
 config_setting(
     name = "enable_exported_symbols",
     values = {"define": "exported_symbols=enabled"},
+)
+
+config_setting(
+    name = "enable_perf_annotation",
+    values = {"define": "perf_annotation=enabled"},
 )
 
 config_setting(

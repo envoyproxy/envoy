@@ -29,6 +29,7 @@ def envoy_copts(repository, test = False):
         "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
         "//conditions:default": [],
     }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
+        envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
         envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
 
 # Compute the final linkopts based on various options.
@@ -404,6 +405,12 @@ def envoy_select_hot_restart(xs, repository = ""):
         repository + "//bazel:disable_hot_restart": [],
         "@bazel_tools//tools/osx:darwin": [],
         "//conditions:default": xs,
+    })
+
+def envoy_select_perf_annotation(xs):
+    return select({
+        "@envoy//bazel:enable_perf_annotation": xs,
+        "//conditions:default": [],
     })
 
 # Selects the given values if Google gRPC is enabled in the current build.

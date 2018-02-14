@@ -43,7 +43,7 @@ void PerfAnnotationContext::report(std::chrono::nanoseconds duration, absl::stri
 // TODO(jmarantz): Consider hooking up perf information-dump into admin console, if
 // we find a performance problem we want to annotate with a live server.
 void PerfAnnotationContext::dump() {
-  std::cout << toString();
+  std::cout << toString() << std::endl;
 }
 
 std::string PerfAnnotationContext::toString() {
