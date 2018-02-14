@@ -98,8 +98,10 @@ private:
   void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
 
   /**
-   * Adds the names of all default extractors into a string-set for dup-detection
-   * against new stat names specified in the configuration.
+   * Adds all default extractors from well_known_names.cc into the
+   * collection. Returns a set of names of all default extractors
+   * into a string-set for dup-detection against new stat names
+   * specified in the configuration.
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
    * @return names std::unordered_set<std::string> the set of names to populate
    */

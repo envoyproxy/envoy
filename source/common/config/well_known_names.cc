@@ -101,11 +101,7 @@ TagNameValues::TagNameValues() {
 }
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex) {
-  // Descriptor& descriptor = descriptor_map_[name];
-  descriptor_vec_.emplace_back();
-  Descriptor& descriptor = descriptor_vec_.back();
-  descriptor.name = name;
-  descriptor.regex = regex;
+  descriptor_vec_.emplace_back(Descriptor(name, regex));
 }
 
 } // namespace Config

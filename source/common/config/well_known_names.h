@@ -228,8 +228,10 @@ public:
    * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
    */
   struct Descriptor {
-    std::string name;
-    std::string regex;
+    Descriptor(const std::string& name_arg, const std::string& regex_arg)
+        : name(name_arg), regex(regex_arg) {}
+    const std::string name;
+    const std::string regex;
   };
 
   // Cluster name tag
@@ -288,9 +290,7 @@ public:
 private:
   void addRegex(const std::string& name, const std::string& regex);
 
-  // Mapping from the names above to their respective regex strings.
-  // std::unordered_map<std::string, Descriptor> descriptor_map_;
-  // std::vector<const Descriptor* /* owned by descriptor_map_ */> descriptor_vec_;
+  // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;
 };
 

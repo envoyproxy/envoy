@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <list>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -75,7 +74,7 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
     for (absl::string_view::size_type i = 1; i < regex.size(); ++i) {
       if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
         if (i > 1) {
-          bool last_char = i == regex.size() - 1;
+          const bool last_char = i == regex.size() - 1;
           if ((!last_char && (regex[i] == '\\') && (regex[i + 1] == '.')) ||
               (last_char && (regex[i] == '$'))) {
             prefix.append(regex.data() + 1, i - 1);
@@ -182,7 +181,7 @@ void TagProducerImpl::addExtractorsMatching(absl::string_view name) {
 }
 
 void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
-  absl::string_view prefix = extractor->prefixToken();
+  const absl::string_view prefix = extractor->prefixToken();
   if (prefix.empty()) {
     tag_extractors_without_prefix_.emplace_back(std::move(extractor));
   } else {
@@ -196,27 +195,27 @@ void TagProducerImpl::forEachExtractorMatching(
   for (const TagExtractorPtr& tag_extractor : tag_extractors_without_prefix_) {
     f(tag_extractor);
   }
-  std::string::size_type dot = stat_name.find('.');
+  const std::string::size_type dot = stat_name.find('.');
   if (dot != std::string::npos) {
-    absl::string_view token = absl::string_view(stat_name.data(), dot);
-    auto p = tag_extractor_prefix_map_.find(token);
-    if (p != tag_extractor_prefix_map_.end()) {
-      for (const TagExtractorPtr& tag_extractor : p->second) {
+    const absl::string_view token = absl::string_view(stat_name.data(), dot);
+    const auto iter = tag_extractor_prefix_map_.find(token);
+    if (iter != tag_extractor_prefix_map_.end()) {
+      for (const TagExtractorPtr& tag_extractor : iter->second) {
         f(tag_extractor);
       }
     }
   }
 }
 
-std::string TagProducerImpl::produceTags(const std::string& stat_name,
+std::string TagProducerImpl::produceTags(const std::string& metric_name,
                                          std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;
   forEachExtractorMatching(
-      stat_name, [&remove_characters, &tags, stat_name](const TagExtractorPtr& tag_extractor) {
-        tag_extractor->extractTag(stat_name, tags, remove_characters);
+      metric_name, [&remove_characters, &tags, metric_name](const TagExtractorPtr& tag_extractor) {
+        tag_extractor->extractTag(metric_name, tags, remove_characters);
       });
-  return StringUtil::removeCharacters(stat_name, remove_characters);
+  return StringUtil::removeCharacters(metric_name, remove_characters);
 }
 
 void TagProducerImpl::reserveResources(const envoy::config::metrics::v2::StatsConfig& config) {
