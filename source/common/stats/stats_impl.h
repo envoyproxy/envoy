@@ -97,12 +97,12 @@ private:
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
    * @return names std::unordered_set<std::string> the set of names to populate
    */
-  std::unordered_set<std::string> addDefaultExtractors(
-      const envoy::config::metrics::v2::StatsConfig& config);
+  std::unordered_set<std::string>
+  addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling
-   * callback f for each one.  This is broken out this way to reduce code redundancy
+   * callback f for each one. This is broken out this way to reduce code redundancy
    * during testing, where we want to verify that extraction is order-independent.
    * See DefaultTagRegexTester::produceTagsReverse in test/common/stats/stats_impl_test.cc.
    * @param stat_name const std::string& the stat name.

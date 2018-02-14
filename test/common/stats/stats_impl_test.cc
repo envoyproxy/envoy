@@ -167,16 +167,17 @@ public:
    * @param tags std::vector a set of Stats::Tag.
    */
   std::string produceTagsReverse(const std::string& stat_name, std::vector<Tag>& tags) const {
-    //tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
-    std::list<const TagExtractor*> extractors;
-    tag_extractors_.forEachExtractorMatching(stat_name, [&extractors](
-        const TagExtractorPtr& tag_extractor) {
-                                               extractors.push_back(tag_extractor.get());
+    // Note: one discrepency between this and TagProducerImpl::produceTags is that this
+    // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
+    // for this test, however.
+    std::list<const TagExtractor*> extractors; // Note push-front is used to reverse order.
+    tag_extractors_.forEachExtractorMatching(stat_name,
+                                             [&extractors](const TagExtractorPtr& tag_extractor) {
+                                               extractors.push_front(tag_extractor.get());
                                              });
 
     IntervalSetImpl<size_t> remove_characters;
-    for (auto p = extractors.rbegin(); p != extractors.rend(); ++p) {
-      const TagExtractor* tag_extractor = *p;
+    for (const TagExtractor* tag_extractor : extractors) {
       tag_extractor->extractTag(stat_name, tags, remove_characters);
     }
     return StringUtil::removeCharacters(stat_name, remove_characters);

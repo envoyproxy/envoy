@@ -223,8 +223,8 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v2::StatsCo
   default_tags_.reserve(config.stats_tags().size());
 }
 
-std::unordered_set<std::string> TagProducerImpl::addDefaultExtractors(
-    const envoy::config::metrics::v2::StatsConfig& config) {
+std::unordered_set<std::string>
+TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config) {
   std::unordered_set<std::string> names;
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
