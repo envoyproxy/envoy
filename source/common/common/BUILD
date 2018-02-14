@@ -129,7 +129,6 @@ envoy_cc_library(
         ":hash_lib",
         "//include/envoy/common:interval_set_interface",
         "//include/envoy/common:time_interface",
-        "//source/common/common:hash_lib",
     ],
 )
 
