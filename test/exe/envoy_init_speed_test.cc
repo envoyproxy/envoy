@@ -12,8 +12,15 @@
  * after setting up command line options.
  */
 int main(int argc, char** argv) {
+  // TODO(jmarantz,): remove this hack when #2576 lands.
 #ifdef ENVOY_HOT_RESTART
-  constexpr bool enable_hot_restart = true;
+  bool enable_hot_restart = true;
+  if ((argc > 1) && (strcmp(argv[1], "--disable_hot_restart") == 0)) {
+    enable_hot_restart = false;
+    memmove(&argv[1], &argv[2], (argc - 2) * sizeof(char*));
+    --argc;
+    argv[argc] = nullptr;
+  }
 #else
   constexpr bool enable_hot_restart = false;
 #endif
