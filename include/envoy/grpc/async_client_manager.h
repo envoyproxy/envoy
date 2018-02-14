@@ -23,7 +23,8 @@ public:
 typedef std::unique_ptr<AsyncClientFactory> AsyncClientFactoryPtr;
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
-// Grpc::AsyncClientFactory instances.
+// Grpc::AsyncClientFactory instances. All manufactured Grpc::AsyncClients must
+// be destroyed before the AsyncClientManager can be safely destructed.
 class AsyncClientManager {
 public:
   virtual ~AsyncClientManager() {}

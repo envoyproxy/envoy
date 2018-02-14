@@ -126,12 +126,21 @@ TEST(HttpUtility, parseHttp2Settings) {
 
 TEST(HttpUtility, getLastAddressFromXFF) {
   {
-    const std::string first_address = "34.0.0.1";
-    const std::string second_address = "10.0.0.1";
-    TestHeaderMapImpl request_headers{
-        {"x-forwarded-for", fmt::format("{0}, {0}, {1}", first_address, second_address)}};
+    const std::string first_address = "192.0.2.10";
+    const std::string second_address = "192.0.2.1";
+    const std::string third_address = "10.0.0.1";
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+    ret = Utility::getLastAddressFromXFF(request_headers, 1);
     EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+    ret = Utility::getLastAddressFromXFF(request_headers, 2);
+    EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+    ret = Utility::getLastAddressFromXFF(request_headers, 3);
+    EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {

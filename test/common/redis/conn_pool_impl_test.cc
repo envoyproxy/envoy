@@ -141,7 +141,7 @@ TEST_F(RedisClientImplTest, Basic) {
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response2));
   }));
-  upstream_read_filter_->onData(fake_data);
+  upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -185,7 +185,7 @@ TEST_F(RedisClientImplTest, Cancel) {
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response2));
   }));
-  upstream_read_filter_->onData(fake_data);
+  upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -268,7 +268,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  upstream_read_filter_->onData(fake_data);
+  upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_protocol_error_.value());
 }

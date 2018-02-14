@@ -720,9 +720,12 @@ TEST(ClusterMetadataTest, Metadata) {
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
+    lb_policy: MAGLEV
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
   )EOF";
 
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
@@ -730,6 +733,8 @@ TEST(ClusterMetadataTest, Metadata) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
+  EXPECT_EQ(0.3, cluster.info()->lbConfig().healthy_panic_threshold().value());
+  EXPECT_EQ(LoadBalancerType::Maglev, cluster.info()->lbType());
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

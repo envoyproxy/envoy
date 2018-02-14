@@ -144,8 +144,10 @@ void CreateCheckRequest::setHttpRequest(
   auto mutable_headers = httpreq.mutable_headers();
   headers.iterate(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
-        Envoy::Protobuf::Map<::std::string, ::std::string>* mutable_headers =
-            static_cast<Envoy::Protobuf::Map<::std::string, ::std::string>*>(ctx);
+        Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*
+            mutable_headers = static_cast<
+                Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*>(
+                ctx);
         (*mutable_headers)[e.key().getString()] = e.value().getString();
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },

@@ -55,7 +55,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
-  connection_->write(encoder_buffer_);
+  connection_->write(encoder_buffer_, false);
 
   // Only boost the op timeout if:
   // - We are not already connected. Otherwise, we are governed by the connect timeout and the timer

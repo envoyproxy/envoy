@@ -121,6 +121,8 @@ public:
   const std::string GRPC_JSON_TRANSCODER = "envoy.grpc_json_transcoder";
   // GRPC web filter
   const std::string GRPC_WEB = "envoy.grpc_web";
+  // Gzip filter
+  const std::string ENVOY_GZIP = "envoy.gzip";
   // IP tagging filter
   const std::string IP_TAGGING = "envoy.ip_tagging";
   // Rate limit filter

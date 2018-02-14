@@ -81,7 +81,7 @@ void Config::createRequest(Http::Message& request) {
   request.headers().insertPath().value(Path);
 }
 
-Network::FilterStatus Instance::onData(Buffer::Instance&) {
+Network::FilterStatus Instance::onData(Buffer::Instance&, bool) {
   return Network::FilterStatus::Continue;
 }
 
