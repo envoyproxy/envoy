@@ -18,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+        "//source/common/common:perf_annotation_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",

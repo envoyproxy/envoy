@@ -1,3 +1,7 @@
+#ifndef ENVOY_PERF_ANNOTATION
+#define ENVOY_PERF_ANNOTATION
+#endif
+
 #include "common/common/perf_annotation.h"
 
 #include <chrono>
@@ -8,7 +12,6 @@
 #include "absl/strings/str_cat.h"
 #include "common/common/utility.h"
 
-#ifdef ENVOY_PERF_ANNOTATION
 namespace Envoy {
 
 PerfOperation::PerfOperation() :
@@ -30,21 +33,40 @@ void PerfAnnotationContext::report(std::chrono::nanoseconds duration, absl::stri
                                    absl::string_view description) {
   std::string key = absl::StrCat(category, " / ", description);
   {
+#if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
+#endif
     duration_map_[key] += duration;
   }
 }
 
-// TODO(jmarantz): hook up perf information-dump into admin console.
+// TODO(jmarantz): Consider hooking up perf information-dump into admin console, if
+// we find a performance problem we want to annotate with a live server.
 void PerfAnnotationContext::dump() {
+  std::cout << toString();
+}
+
+std::string PerfAnnotationContext::toString() {
   PerfAnnotationContext* context = getOrCreate();
+  std::string out;
+#if PERF_THREAD_SAFE
   std::unique_lock<std::mutex> lock(context->mutex_);
+#endif
   for (const auto& p : context->duration_map_) {
     std::chrono::nanoseconds duration = p.second;
-    std::cout << std::to_string(
-        std::chrono::duration_cast<std::chrono::microseconds>(duration).count())
-              << ": " << p.first << std::endl;
+    absl::StrAppend(&out, std::to_string(
+        std::chrono::duration_cast<std::chrono::microseconds>(duration).count()),
+                    ": ", p.first, "\n");
   }
+  return out;
+}
+
+void PerfAnnotationContext::clear() {
+  PerfAnnotationContext* context = getOrCreate();
+#if PERF_THREAD_SAFE
+  std::unique_lock<std::mutex> lock(context->mutex_);
+#endif
+  context->duration_map_.clear();
 }
 
 PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {
@@ -53,5 +75,3 @@ PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {
 }
 
 }  // namespace Envoy
-
-#endif

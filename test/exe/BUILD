@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -15,6 +16,17 @@ sh_test(
     # NOTE: In some environments, ASAN causes dynamic linking no matter what, so don't run this
     # test when doing ASAN.
     tags = ["no_asan"],
+)
+
+envoy_cc_binary(
+    name = "envoy_init_speed_test",
+    srcs = ["envoy_init_speed_test.cc"],
+    deps = [
+        "//source/exe:envoy_main_common_lib",
+        "//source/exe:extra_protocol_proxies_lib",
+        "//source/server/config/http:lightstep_lib",
+        "//source/server/config/http:zipkin_lib",
+    ],
 )
 
 sh_test(

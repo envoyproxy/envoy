@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef ENVOY_PERF_ANNOTATION
+
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -14,11 +16,15 @@
 // and PerfOperation, but all methods will inline to nothing.  Further, the
 // reporting methods should be called via macro, whch will also compile to
 // nothing when not enabled.
-//
-//     #define ENVOY_PERF_ANNOTATION
-//
-// TODO(jmarantz): in a follow-up PR I will integratrate the setting of
-// this flag into the build system like ENVOY_HOT_RESTART.
+
+#define PERF_OPERATION(perf_var) PerfOperation(perf_var)
+#define PERF_REPORT(perf, category, description) \
+  do { perf.report(category, description); } while (false)
+#define PERF_DUMP() PerfAnnotationContext::dump()
+#define PERF_TO_STRING() PerfAnnotationContext::toString()
+#define PERF_CLEAR() PerfAnnotationContext::clear()
+
+#define PERF_THREAD_SAFE 1
 
 namespace Envoy {
 
@@ -28,14 +34,17 @@ namespace Envoy {
  */
 class PerfAnnotationContext {
  public:
-#ifdef ENVOY_PERF_ANNOTATION
-
   /**
    * Reports time consumed by a category and description, which are just
    * joined together in the library with " / ".
    */
   void report(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
+
+  /**
+   * Renders the aggregated statistics as a string.
+   */
+  static std::string toString();
 
   /**
    * Dumps aggregated statistics (if any) to stdout.
@@ -47,6 +56,11 @@ class PerfAnnotationContext {
    */
   static PerfAnnotationContext* getOrCreate();
 
+  /**
+   * Clears out all aggregated statistics.
+   */
+  static void clear();
+
  private:
   /**
    * PerfAnnotationContext construction should be done via getOrCreate().
@@ -56,15 +70,8 @@ class PerfAnnotationContext {
   typedef std::map<std::string, std::chrono::nanoseconds> DurationMap;
 
   DurationMap duration_map_;  // Maps "$category / $description" to the duration.
+#if PERF_THREAD_SAFE
   std::mutex mutex_;
-
-#else
-
-  static void dump() {}
-
- private:
-  PerfAnnotationContext() {}
-
 #endif
 };
 
@@ -82,31 +89,27 @@ class PerfAnnotationContext {
  */
 class PerfOperation {
  public:
-
-#ifdef ENVOY_PERF_ANNOTATION
-
-#define PERF_REPORT(perf, category, description) \
-  do { perf.report(category, description); } while (false)
-
   PerfOperation();
 
   /**
    * Report an event relative to the operation in progress.  Note report can be called
    * multiple times on a single PerfOperation, with distinct category/description combinations.
    */
-   void report(absl::string_view category, absl::string_view description);
+  void report(absl::string_view category, absl::string_view description);
 
  private:
   SystemTime start_time_;
   PerfAnnotationContext* context_;
-
-#else
-
-#define PERF_REPORT(perf, category, description) do { } while (false)
-
-  PerfOperation() {}
-
-#endif
 };
 
 }  // namespace Envoy
+
+#else
+
+#define PERF_OPERATION(perf_var) do { } while (false)
+#define PERF_REPORT(perf, category, description) do { } while (false)
+#define PERF_DUMP() do { } while (false)
+#define PERF_TO_STRING() ""
+#define PERF_CLEAR() do { } while (false)
+
+#endif
