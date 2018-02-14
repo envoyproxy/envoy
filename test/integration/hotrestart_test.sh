@@ -91,7 +91,7 @@ do
   echo "Checking for match of --hot-restart-version and admin /hot_restart_version"
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version mismatch: ${ADMIN_HOT_RESTART_VERSION} != " \
            "${CLI_HOT_RESTART_VERSION}"
@@ -99,7 +99,7 @@ do
   fi
 
   echo "Checking max-obj-name-len"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 --base-id "${BASE_ID}" 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
            "${CLI_HOT_RESTART_VERSION}"
@@ -107,7 +107,7 @@ do
   fi
 
   echo "Checking max-stats"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stats 12345 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stats 12345 --base-id "${BASE_ID}" 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
            "${CLI_HOT_RESTART_VERSION}"
@@ -177,7 +177,7 @@ set +e
 disableHeapCheck
 
 echo "Launching envoy with no parameters. Check the exit value is 1"
-${ENVOY_BIN}
+${ENVOY_BIN} --base_id "${BASE_ID}"
 EXIT_CODE=$?
 # The test should fail if the Envoy binary exits with anything other than 1.
 if [[ $EXIT_CODE -ne 1 ]]; then
