@@ -144,8 +144,7 @@ public:
 
     // Reverse iteration through regexes to ensure ordering invariance
     std::vector<Tag> rev_tags;
-    const std::string rev_tag_extracted_name =
-        tag_extractors_.produceTagsReverseForTesting(stat_name, rev_tags);
+    const std::string rev_tag_extracted_name = produceTagsReverse(stat_name, rev_tags);
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);
     ASSERT_EQ(expected_tags.size(), rev_tags.size())
@@ -157,6 +156,30 @@ public:
         << fmt::format("Stat name '{}' did not produce the expected tags when regexes were run in "
                        "reverse order",
                        stat_name);
+  }
+
+  /**
+   * Reimplements TagProducerImpl::produceTags, but extracts the tags in reverse order.
+   * His helps demonstrate that the order extractors does not matter to the end result,
+   * assuming we don't care about tag-order. This is in large part correct by design because
+   * stat_name is not mutated until all the extraction is done.
+   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
+   * @param tags std::vector a set of Stats::Tag.
+   */
+  std::string produceTagsReverse(const std::string& stat_name, std::vector<Tag>& tags) const {
+    //tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
+    std::list<const TagExtractor*> extractors;
+    tag_extractors_.forEachExtractorMatching(stat_name, [&extractors](
+        const TagExtractorPtr& tag_extractor) {
+                                               extractors.push_back(tag_extractor.get());
+                                             });
+
+    IntervalSetImpl<size_t> remove_characters;
+    for (auto p = extractors.rbegin(); p != extractors.rend(); ++p) {
+      const TagExtractor* tag_extractor = *p;
+      tag_extractor->extractTag(stat_name, tags, remove_characters);
+    }
+    return StringUtil::removeCharacters(stat_name, remove_characters);
   }
 
   TagProducerImpl tag_extractors_;

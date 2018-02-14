@@ -29,10 +29,9 @@ namespace Stats {
 class TagExtractorImpl : public TagExtractor {
 public:
   /**
-   * Creates a tag extractor from the regex provided or looks up a default regex.
-   * @param name name for tag extractor. Used to look up a default tag extractor if regex is empty.
-   * @param regex optional regex expression. Can be specified as an empty string to trigger a
-   * default regex lookup.
+   * Creates a tag extractor from the regex provided. name and regex must be non-empty.
+   * @param name name for tag extractor.
+   * @param regex regex expression.
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex);
@@ -51,6 +50,10 @@ private:
   const std::regex regex_;
 };
 
+/**
+ * Organizes a collection of TagExtractors so that stat-names can be processed without
+ * iterating through all extractors.
+ */
 class TagProducerImpl : public TagProducer {
 public:
   TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
@@ -64,19 +67,49 @@ public:
    */
   std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
 
-  void addExtractor(TagExtractorPtr extractor);
-  void addExtractorsMatching(absl::string_view name);
-
 private:
   friend class DefaultTagRegexTester;
 
+  /**
+   * Adds a TagExtractor to the collection of tags, tracking prefixes to help make
+   * produceTags run efficiently by trying only extractors that have a chance to match.
+   * @param extractor TagExtractorPtr the extractor to add.
+   */
+  void addExtractor(TagExtractorPtr extractor);
+
+  /**
+   * Adds all default extractors matching the specified tag name. In this model,
+   * more than one TagExtractor can be used to generate a given tag. The default
+   * extractors are specified in common/config/well_known_names.cc.
+   * @param name absl::string_view the extractor to add.
+   */
+  void addExtractorsMatching(absl::string_view name);
+
+  /**
+   * Roughly estimate the size of the vectors.
+   * @param config const envoy::config::metrics::v2::StatsConfig& the config.
+   */
   void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
-  void addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
-                            std::unordered_set<std::string>& names);
+
+  /**
+   * Adds the names of all default extractors into a string-set for dup-detection
+   * against new stat names specified in the configuration.
+   * @param config const envoy::config::metrics::v2::StatsConfig& the config.
+   * @return names std::unordered_set<std::string> the set of names to populate
+   */
+  std::unordered_set<std::string> addDefaultExtractors(
+      const envoy::config::metrics::v2::StatsConfig& config);
+
+  /**
+   * Iterates over every tag extractor that might possibly match stat_name, calling
+   * callback f for each one.  This is broken out this way to reduce code redundancy
+   * during testing, where we want to verify that extraction is order-independent.
+   * See DefaultTagRegexTester::produceTagsReverse in test/common/stats/stats_impl_test.cc.
+   * @param stat_name const std::string& the stat name.
+   * @param f std::function<void(const TagExtractorPtr&)> function to call for each extractor.
+   */
   void forEachExtractorMatching(const std::string& stat_name,
                                 std::function<void(const TagExtractorPtr&)> f) const;
-  std::string produceTagsReverseForTesting(const std::string& metric_name,
-                                           std::vector<Tag>& tags) const;
 
   std::vector<TagExtractorPtr> tag_extractors_without_prefix_;
 

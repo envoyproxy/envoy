@@ -356,6 +356,9 @@ private:
   std::set<Interval, Compare> intervals_; // Intervals do not overlap or abut.
 };
 
+/**
+ * Hashing functor for use with unordered_map and unordered_set with string_view as a key.
+ */
 struct StringViewHash {
   std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
 };

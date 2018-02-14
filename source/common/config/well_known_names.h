@@ -281,7 +281,7 @@ public:
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
 
   // Returns the list of descriptors.
-  const std::vector<Descriptor>& descriptor_vec() const { return descriptor_vec_; }
+  const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
 private:
   void addRegex(const std::string& name, const std::string& regex);

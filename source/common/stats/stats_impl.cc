@@ -141,9 +141,8 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
     : TagProducerImpl() {
   // To check name conflict.
-  std::unordered_set<std::string> names;
   reserveResources(config);
-  addDefaultExtractors(config, names);
+  std::unordered_set<std::string> names = addDefaultExtractors(config);
 
   for (const auto& tag_specifier : config.stats_tags()) {
     if (!names.emplace(tag_specifier.tag_name()).second) {
@@ -170,7 +169,7 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& 
 
 void TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
-  for (const auto& desc : Config::TagNames::get().descriptor_vec()) {
+  for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name == name) {
       addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name, desc.regex));
       ++num_found;
@@ -220,39 +219,20 @@ std::string TagProducerImpl::produceTags(const std::string& stat_name,
   return StringUtil::removeCharacters(stat_name, remove_characters);
 }
 
-// This re-implmentation of produceTags exists purely for testing that the order in
-// which we apply the extractors does not matter to the end result, assuming we don't
-// care aobut tag-order. This is in large part correct by design because stat_name
-// is not mutated until all the extraction is done.
-std::string TagProducerImpl::produceTagsReverseForTesting(const std::string& stat_name,
-                                                          std::vector<Tag>& tags) const {
-  tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
-  std::list<const TagExtractor*> extractors;
-  forEachExtractorMatching(stat_name, [&extractors](const TagExtractorPtr& tag_extractor) {
-    extractors.push_back(tag_extractor.get());
-  });
-
-  IntervalSetImpl<size_t> remove_characters;
-  for (auto p = extractors.rbegin(); p != extractors.rend(); ++p) {
-    const TagExtractor* tag_extractor = *p;
-    tag_extractor->extractTag(stat_name, tags, remove_characters);
-  }
-  return StringUtil::removeCharacters(stat_name, remove_characters);
-}
-
-// Roughly estimate the size of the vectors.
 void TagProducerImpl::reserveResources(const envoy::config::metrics::v2::StatsConfig& config) {
   default_tags_.reserve(config.stats_tags().size());
 }
 
-void TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
-                                           std::unordered_set<std::string>& names) {
+std::unordered_set<std::string> TagProducerImpl::addDefaultExtractors(
+    const envoy::config::metrics::v2::StatsConfig& config) {
+  std::unordered_set<std::string> names;
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
-    for (const auto& desc : Config::TagNames::get().descriptor_vec()) {
+    for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       names.emplace(desc.name);
       addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name, desc.regex));
     }
   }
+  return names;
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {

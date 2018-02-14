@@ -73,7 +73,7 @@ public:
    *
    * The storage for the prefix is owned by the TagExtractor.
    *
-   * @return absl::string_view returnsthe prefix, or an empty string_view if none was found.
+   * @return absl::string_view the prefix, or an empty string_view if none was found.
    */
   virtual absl::string_view prefixToken() const PURE;
 };
