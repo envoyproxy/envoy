@@ -456,9 +456,9 @@ admin:
 )EOF";
 
   EXPECT_THROW_WITH_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
-                            "bad conversion");
+                          "bad conversion");
   EXPECT_THROW_WITHOUT_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
-                            "Unexpected YAML exception");
+                             "Unexpected YAML exception");
 }
 
 } // namespace Json
