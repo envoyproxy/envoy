@@ -19,6 +19,7 @@ TEST(PerfAnnotation, testPerfAnnotation) {
   EXPECT_TRUE(report.find("beta / 1\n") != std::string::npos) << report;
   EXPECT_TRUE(report.find("alpha / 2\n") != std::string::npos) << report;
   EXPECT_TRUE(report.find("beta / 3\n") != std::string::npos) << report;
+  PERF_DUMP();
   PERF_CLEAR();
 }
 
