@@ -2,7 +2,7 @@
 
 set -e
 
-# The following functions are borrowed from PageSpeed's system
+# The following functions are borrowed from PageSpeed's system test
 # infrastructure, where are part of a bash system-test helper library.
 # I'm putting them here for this one test to help me debug it, with
 # the thinking that if there's traction for this infrastructure I'll
@@ -120,7 +120,6 @@ fi
 TEST_INDEX=0
 for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
 do
-  start_test validation
   # TODO(jun03): instead of setting the base-id, the validate server should use the nop hot restart
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
