@@ -63,6 +63,10 @@
   NiceMock for mocks whose behavior is not the focus of a test.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
+* [Thread
+  annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
+  such as `GUARDED_BY`, should be used for shared state guarded by
+  locks/mutexes.
 
 # Error handling
 
