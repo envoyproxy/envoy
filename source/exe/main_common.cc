@@ -109,7 +109,7 @@ std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, char** argv, b
 }
 
 std::unique_ptr<MainCommon> MainCommon::create(int argc, char** argv, int& exit_status) {
-  // TODO(jmarantz,): remove this hack when #2576 lands.
+// TODO(jmarantz,): remove this hack when #2576 lands.
 #ifdef ENVOY_HOT_RESTART
   bool enable_hot_restart = true;
   if ((argc > 1) && (strcmp(argv[1], "--disable_hot_restart") == 0)) {

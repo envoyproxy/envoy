@@ -1,6 +1,6 @@
-#include "exe/main_common.h"
-
 #include "common/common/perf_annotation.h"
+
+#include "exe/main_common.h"
 
 // NOLINT(namespace-envoy)
 
@@ -13,8 +13,8 @@
  */
 int main(int argc, char** argv) {
   int exit_status = EXIT_SUCCESS;
-  std::unique_ptr<Envoy::MainCommon> main_common(Envoy::MainCommon::create(
-      argc, argv, exit_status));
+  std::unique_ptr<Envoy::MainCommon> main_common(
+      Envoy::MainCommon::create(argc, argv, exit_status));
   PERF_DUMP();
   return exit_status;
 }

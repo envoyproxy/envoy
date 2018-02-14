@@ -4,30 +4,30 @@
 
 #include "common/common/perf_annotation.h"
 
-#include <chrono>
 #include <unistd.h>
+
+#include <chrono>
 #include <iostream>
 #include <string>
 
-#include "absl/strings/str_cat.h"
 #include "common/common/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 
-PerfOperation::PerfOperation() :
-    start_time_(ProdSystemTimeSource::instance_.currentTime()),
-    context_(PerfAnnotationContext::getOrCreate()) {
-}
+PerfOperation::PerfOperation()
+    : start_time_(ProdSystemTimeSource::instance_.currentTime()),
+      context_(PerfAnnotationContext::getOrCreate()) {}
 
 void PerfOperation::report(absl::string_view category, absl::string_view description) {
   SystemTime end_time = ProdSystemTimeSource::instance_.currentTime();
-  std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(
-      end_time - start_time_);
+  std::chrono::nanoseconds duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_);
   context_->report(duration, category, description);
 }
 
-PerfAnnotationContext::PerfAnnotationContext() {
-}
+PerfAnnotationContext::PerfAnnotationContext() {}
 
 void PerfAnnotationContext::report(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
@@ -42,9 +42,7 @@ void PerfAnnotationContext::report(std::chrono::nanoseconds duration, absl::stri
 
 // TODO(jmarantz): Consider hooking up perf information-dump into admin console, if
 // we find a performance problem we want to annotate with a live server.
-void PerfAnnotationContext::dump() {
-  std::cout << toString() << std::endl;
-}
+void PerfAnnotationContext::dump() { std::cout << toString() << std::endl; }
 
 std::string PerfAnnotationContext::toString() {
   PerfAnnotationContext* context = getOrCreate();
@@ -54,9 +52,10 @@ std::string PerfAnnotationContext::toString() {
 #endif
   for (const auto& p : context->duration_map_) {
     std::chrono::nanoseconds duration = p.second;
-    absl::StrAppend(&out, std::to_string(
-        std::chrono::duration_cast<std::chrono::microseconds>(duration).count()),
-                    ": ", p.first, "\n");
+    absl::StrAppend(
+        &out,
+        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()),
+        ": ", p.first, "\n");
   }
   return out;
 }
@@ -74,4 +73,4 @@ PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {
   return context;
 }
 
-}  // namespace Envoy
+} // namespace Envoy
