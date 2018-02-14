@@ -282,7 +282,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.http_health_check().path()) {
+      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_.value(config.http_health_check().service_name());
   }
@@ -333,7 +333,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host, parent_.cluster_.info()->name()},
+      {Http::Headers::get().Host,
+       parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 

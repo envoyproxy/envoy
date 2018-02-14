@@ -57,7 +57,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "hot_restart_interface",
     hdrs = ["hot_restart.h"],
-    deps = ["//include/envoy/event:dispatcher_interface"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/thread:thread_interface",
+    ],
 )
 
 envoy_cc_library(
