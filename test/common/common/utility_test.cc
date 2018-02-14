@@ -206,14 +206,46 @@ TEST(StringUtil, StringViewTrim) {
   EXPECT_EQ("he llo", StringUtil::trim(" \t\f\v\n\r he llo \t\f\v\n\r"));
 }
 
+TEST(StringUtil, StringViewCaseFindToken) {
+  EXPECT_TRUE(StringUtil::caseFindToken("hello; world", ";", "HELLO"));
+  EXPECT_FALSE(StringUtil::caseFindToken("hello; world", ";", "TEST"));
+  EXPECT_TRUE(StringUtil::caseFindToken("heLLo; world", ";", "hello"));
+  EXPECT_TRUE(StringUtil::caseFindToken("hello; world", ";", "hello"));
+  EXPECT_FALSE(StringUtil::caseFindToken("hello; world", ".", "hello"));
+  EXPECT_TRUE(StringUtil::caseFindToken("", ",", ""));
+  EXPECT_FALSE(StringUtil::caseFindToken("", "", "a"));
+  EXPECT_TRUE(StringUtil::caseFindToken(" ", " ", "", true));
+  EXPECT_FALSE(StringUtil::caseFindToken(" ", " ", "", false));
+  EXPECT_TRUE(StringUtil::caseFindToken("A=5", ".", "A=5"));
+}
+
+TEST(StringUtil, StringViewCaseCompare) {
+  EXPECT_TRUE(StringUtil::caseCompare("HELLO world", "hello world"));
+  EXPECT_TRUE(StringUtil::caseCompare("hello world", "HELLO world"));
+  EXPECT_FALSE(StringUtil::caseCompare("hello world", "hello"));
+  EXPECT_FALSE(StringUtil::caseCompare("hello", "hello world"));
+}
+
 TEST(StringUtil, StringViewCropRight) {
   EXPECT_EQ("hello", StringUtil::cropRight("hello; world\t\f\v\n\r", ";"));
+  EXPECT_EQ("foo ", StringUtil::cropRight("foo ; ; ; ; ; ; ", ";"));
   EXPECT_EQ("", StringUtil::cropRight(";hello world\t\f\v\n\r", ";"));
   EXPECT_EQ(" hel", StringUtil::cropRight(" hello alo\t\f\v\n\r", "lo"));
   EXPECT_EQ("\t\f\v\n\rhe 1", StringUtil::cropRight("\t\f\v\n\rhe 12\t\f\v\n\r", "2"));
   EXPECT_EQ("hello", StringUtil::cropRight("hello alo\t\f\v\n\r", " a"));
-  EXPECT_EQ("hello ", StringUtil::cropRight("hello alo\t\f\v\n\r", "a", false));
+  EXPECT_EQ("hello ", StringUtil::cropRight("hello alo\t\f\v\n\r", "a"));
   EXPECT_EQ("abcd", StringUtil::cropRight("abcd", ";"));
+}
+
+TEST(StringUtil, StringViewCropLeft) {
+  EXPECT_EQ(" world\t\f\v\n\r", StringUtil::cropLeft("hello; world\t\f\v\n\r", ";"));
+  EXPECT_EQ("hello world ", StringUtil::cropLeft(";hello world ", ";"));
+  EXPECT_EQ("\t\f\v\n\ralo", StringUtil::cropLeft("\t\f\v\n\rhello\t\f\v\n\ralo", "lo"));
+  EXPECT_EQ("2\t\f\v\n\r", StringUtil::cropLeft("\t\f\v\n\rhe 12\t\f\v\n\r", "1"));
+  EXPECT_EQ("lo\t\f\v\n\r", StringUtil::cropLeft("hello alo\t\f\v\n\r", " a"));
+  EXPECT_EQ(" ; ; ; ; ", StringUtil::cropLeft("foo ; ; ; ; ; ", ";"));
+  EXPECT_EQ("abcd", StringUtil::cropLeft("abcd", ";"));
+  EXPECT_EQ("", StringUtil::cropLeft("abcd", "abcd"));
 }
 
 TEST(StringUtil, StringViewFindToken) {
@@ -229,6 +261,25 @@ TEST(StringUtil, StringViewFindToken) {
   EXPECT_TRUE(StringUtil::findToken(" ", " ", "", true));
   EXPECT_FALSE(StringUtil::findToken(" ", " ", "", false));
   EXPECT_TRUE(StringUtil::findToken("A=5", ".", "A=5"));
+}
+
+TEST(StringUtil, StringViewCaseInsensitiveHash) {
+  EXPECT_EQ(8972312556107145900U, StringUtil::CaseInsensitiveHash()("hello world"));
+}
+
+TEST(StringUtil, StringViewCaseInsensitiveCompare) {
+  EXPECT_TRUE(StringUtil::CaseInsensitiveCompare()("hello world", "hello world"));
+  EXPECT_TRUE(StringUtil::CaseInsensitiveCompare()("HELLO world", "hello world"));
+  EXPECT_FALSE(StringUtil::CaseInsensitiveCompare()("hello!", "hello world"));
+}
+
+TEST(StringUtil, StringViewCaseUnorderedSet) {
+  StringUtil::CaseUnorderedSet words{"Test", "hello", "WORLD", "Test"};
+  EXPECT_EQ(3, words.size());
+  EXPECT_EQ("Test", *(words.find("test")));
+  EXPECT_EQ("hello", *(words.find("HELLO")));
+  EXPECT_EQ("WORLD", *(words.find("world")));
+  EXPECT_EQ(words.end(), words.find("hello world"));
 }
 
 TEST(StringUtil, StringViewSplit) {

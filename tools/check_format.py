@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
-                     "./bazel-", "./bazel/external")
+                     "./bazel-", "./bazel/external", "./.cache")
 SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 

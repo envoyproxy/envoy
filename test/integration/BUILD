@@ -157,6 +157,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "gzip_filter_integration_test",
+    srcs = [
+        "gzip_filter_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/decompressor:decompressor_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "grpc_json_transcoder_integration_test",
     srcs = [
         "grpc_json_transcoder_integration_test.cc",
@@ -269,6 +280,7 @@ envoy_cc_test_library(
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
+        "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:lua_lib",

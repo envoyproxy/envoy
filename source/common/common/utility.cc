@@ -6,14 +6,15 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
-#include <vector>
 
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/hash.h"
 
 #include "absl/strings/ascii.h"
+#include "absl/strings/internal/memutil.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
@@ -102,25 +103,54 @@ absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtri
 
 bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
                            absl::string_view key_token, bool trim_whitespace) {
-  const std::vector<absl::string_view> tokens = splitToken(source, delimiters, trim_whitespace);
+  const auto tokens = splitToken(source, delimiters, trim_whitespace);
   if (trim_whitespace) {
-    for (auto token : tokens) {
+    for (const auto token : tokens) {
       if (key_token == trim(token)) {
         return true;
       }
     }
     return false;
   }
+
   return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
 }
 
-absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter,
-                                        bool trim_whitespace) {
+bool StringUtil::caseFindToken(absl::string_view source, absl::string_view delimiters,
+                               absl::string_view key_token, bool trim_whitespace) {
+  const auto tokens = splitToken(source, delimiters, trim_whitespace);
+  std::function<bool(absl::string_view)> predicate;
+
+  if (trim_whitespace) {
+    predicate = [&](absl::string_view token) { return caseCompare(key_token, trim(token)); };
+  } else {
+    predicate = [&](absl::string_view token) { return caseCompare(key_token, token); };
+  }
+
+  return std::find_if(tokens.begin(), tokens.end(), predicate) != tokens.end();
+}
+
+bool StringUtil::caseCompare(absl::string_view lhs, absl::string_view rhs) {
+  if (rhs.size() != lhs.size()) {
+    return false;
+  }
+  return absl::strings_internal::memcasecmp(rhs.data(), lhs.data(), rhs.size()) == 0;
+}
+
+absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
   const absl::string_view::size_type pos = source.find(delimiter);
   if (pos != absl::string_view::npos) {
     source.remove_suffix(source.size() - pos);
   }
-  return trim_whitespace ? rtrim(source) : source;
+  return source;
+}
+
+absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_view delimiter) {
+  const absl::string_view::size_type pos = source.find(delimiter);
+  if (pos != absl::string_view::npos) {
+    source.remove_prefix(pos + delimiter.size());
+  }
+  return source;
 }
 
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
@@ -237,6 +267,15 @@ std::string StringUtil::toUpper(absl::string_view s) {
   upper_s.reserve(s.size());
   std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,
+                                                    absl::string_view rhs) const {
+  return StringUtil::caseCompare(lhs, rhs);
+}
+
+uint64_t StringUtil::CaseInsensitiveHash::operator()(absl::string_view key) const {
+  return HashUtil::djb2CaseInsensitiveHash(key);
 }
 
 std::string StringUtil::removeCharacters(const absl::string_view& str,

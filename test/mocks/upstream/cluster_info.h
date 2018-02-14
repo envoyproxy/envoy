@@ -45,6 +45,7 @@ public:
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
+  MOCK_CONST_METHOD0(lbConfig, const envoy::api::v2::Cluster::CommonLbConfig&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
@@ -76,6 +77,7 @@ public:
   envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  envoy::api::v2::Cluster::CommonLbConfig lb_config_;
 };
 
 } // namespace Upstream

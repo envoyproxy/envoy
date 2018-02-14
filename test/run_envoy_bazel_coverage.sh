@@ -34,9 +34,9 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
 "${BAZEL_COVERAGE}" --batch test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} \
-  --cache_test_results=no --cxxopt="--coverage" --linkopt="--coverage" \
-  --define ENVOY_CONFIG_COVERAGE=1 \
-  --test_output=all --strategy=Genrule=standalone --spawn_strategy=standalone
+  --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
+  --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
+  --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=1000
 
 # The Bazel build has a lot of whack in it, in particular generated files, headers from external
 # deps, etc. So, we exclude this from gcov to avoid false reporting of these files in the html and
@@ -84,3 +84,4 @@ if test ${COVERAGE_FAILED} -eq 1; then
 else
     echo Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}
 fi
+echo "HTML coverage report is in ${COVERAGE_DIR}/coverage.html"

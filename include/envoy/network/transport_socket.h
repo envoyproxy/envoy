@@ -28,6 +28,12 @@ struct IoResult {
    * Number of bytes processed by the I/O event.
    */
   uint64_t bytes_processed_;
+
+  /**
+   * True if an end-of-stream was read from a connection. This
+   * can only be true for read operations.
+   */
+  bool end_stream_read_;
 };
 
 /**
@@ -109,9 +115,11 @@ public:
 
   /**
    * @param buffer supplies the buffer to write from
+   * @param end_stream supplies whether this is the end of the stream. If true and all
+   *        data in buffer is written, the connection will be half-closed.
    * @return IoResult the result of the write action.
    */
-  virtual IoResult doWrite(Buffer::Instance& buffer) PURE;
+  virtual IoResult doWrite(Buffer::Instance& buffer, bool end_stream) PURE;
 
   /**
    * Called when underlying transport is established.

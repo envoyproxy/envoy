@@ -28,6 +28,8 @@ final version.
 * Added support for listening for both IPv4 and IPv6 when binding to ::.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
+* Added Maglev consistent hash load balancer.
+* Improved TCP proxy to correctly proxy TCP half-close.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
 * Added restrictions for the backing sources of xDS resources. For filesystem based xDS the file
@@ -45,6 +47,7 @@ final version.
   This change allows scripts loaded with the lua filter to load shared object libraries such as those installed via luarocks.
 * The Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
   overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_GrpcService>`.
+* Added cluster configuration for healthy panic threshold percentage.
 * Added support for more granular weighted cluster routing by allowing the total weight to be specified in configuration.
 * Added support for custom request/response headers with mixed static and dynamic values.
 * Added support for [Squash microservices debugger](https://github.com/solo-io/squash).
@@ -58,3 +61,7 @@ final version.
 * Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
 * Added support for abstract unix domain sockets on linux. The abstract
   namespace can be used by prepending '@' to a socket path.
+* Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
+* Added support for trusting additional hops in the X-Forwarded-For request header.
+* Added setting host header value for http health check request.
+

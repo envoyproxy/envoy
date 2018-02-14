@@ -245,6 +245,12 @@ public:
   virtual bool useRemoteAddress() PURE;
 
   /**
+   * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for
+   *         the purposes of XFF processing.
+   */
+  virtual uint32_t xffNumTrustedHops() const PURE;
+
+  /**
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
   virtual ForwardClientCertType forwardClientCert() PURE;
@@ -310,7 +316,7 @@ public:
   static const HeaderMapImpl& continueHeader();
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 

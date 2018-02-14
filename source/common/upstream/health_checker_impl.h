@@ -232,6 +232,7 @@ private:
   }
 
   const std::string path_;
+  const std::string host_value_;
   Optional<std::string> service_name_;
 };
 
@@ -320,7 +321,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       parent_.onData(data);
       return Network::FilterStatus::StopIteration;
     }

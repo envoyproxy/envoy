@@ -96,6 +96,28 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress)
   EXPECT_EQ(local_address.ip()->addressAsString(), headers.get_(Headers::get().ForwardedFor));
 }
 
+// Verify that we trust Nth address from XFF when using remote address with xff_num_trusted_hops.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("203.0.113.128");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress()->value(), "198.51.100.1");
+}
+
+// Verify that xff_num_trusted_hops works when not using remote address.
+TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+}
+
 // Verify that we don't set user agent when it is already set.
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");

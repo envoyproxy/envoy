@@ -68,7 +68,7 @@ private:
         : parent_(parent), data_callback_(cb) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       data_callback_(*parent_.client_, data);
       data.drain(data.length());
       return Network::FilterStatus::StopIteration;
@@ -132,15 +132,17 @@ public:
   WaitForPayloadReader(Event::Dispatcher& dispatcher);
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
   void set_data_to_wait_for(const std::string& data) { data_to_wait_for_ = data; }
   const std::string& data() { return data_; }
+  bool readLastByte() { return read_end_stream_; }
 
 private:
   Event::Dispatcher& dispatcher_;
   std::string data_to_wait_for_;
   std::string data_;
+  bool read_end_stream_{};
 };
 
 } // namespace Envoy
