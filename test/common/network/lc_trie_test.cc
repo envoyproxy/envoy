@@ -32,9 +32,16 @@ public:
     }
   }
 
-  void expectIPAndTag(const std::vector<std::pair<std::string, std::string>>& test_output) {
+  void
+  expectIPAndTag(const std::vector<std::pair<std::string, std::vector<std::string>>>& test_output) {
     for (const auto& kv : test_output) {
-      EXPECT_EQ(kv.second, trie_->getTag(Utility::parseInternetAddress(kv.first)));
+      EXPECT_EQ(kv.second, trie_->getTags(Utility::parseInternetAddress(kv.first)));
+    }
+  }
+
+  void expectIPAndNoTag(const std::vector<std::string>& test_output) {
+    for (const auto& ip : test_output) {
+      EXPECT_EQ(0, trie_->getTags(Utility::parseInternetAddress(ip)).size());
     }
   }
 
@@ -42,7 +49,6 @@ public:
 };
 
 // TODO(ccaraman): Add a performance and memory benchmark test.
-
 // Use the default constructor values.
 TEST_F(LcTrieTest, IPv4Defaults) {
   std::vector<std::vector<std::string>> cidr_range_strings = {
@@ -64,17 +70,17 @@ TEST_F(LcTrieTest, IPv4Defaults) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"0.0.0.0", "tag_0"},     {"16.0.0.1", "tag_1"},
-      {"40.0.0.255", "tag_2"},  {"64.0.130.0", "tag_3"},
-      {"96.0.0.10", "tag_4"},   {"112.0.0.0", "tag_5"},
-      {"128.0.0.1", "tag_6"},   {"160.0.0.1", "tag_7"},
-      {"164.255.0.0", "tag_8"}, {"168.0.0.0", "tag_9"},
-      {"176.0.0.1", "tag_10"},  {"184.0.0.1", "tag_11"},
-      {"192.0.0.0", "tag_12"},  {"232.0.80.0", "tag_13"},
-      {"233.0.0.1", "tag_14"},  {"::1", ""},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case_hit = {
+      {"0.0.0.0", {"tag_0"}},    {"16.0.0.1", {"tag_1"}},    {"40.0.0.255", {"tag_2"}},
+      {"64.0.130.0", {"tag_3"}}, {"96.0.0.10", {"tag_4"}},   {"112.0.0.0", {"tag_5"}},
+      {"128.0.0.1", {"tag_6"}},  {"160.0.0.1", {"tag_7"}},   {"164.255.0.0", {"tag_8"}},
+      {"168.0.0.0", {"tag_9"}},  {"176.0.0.1", {"tag_10"}},  {"184.0.0.1", {"tag_11"}},
+      {"192.0.0.0", {"tag_12"}}, {"232.0.80.0", {"tag_13"}}, {"233.0.0.1", {"tag_14"}},
   };
-  expectIPAndTag(test_case);
+  expectIPAndTag(test_case_hit);
+
+  std::vector<std::string> test_case_no_hits = {"::1"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 // There was a bug in the C++ port that didn't update the index for the next address in the trie.
@@ -101,17 +107,17 @@ TEST_F(LcTrieTest, RootBranchingFactor) {
   };
   setup(cidr_range_strings, fill_factor, root_branching_factor);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"0.0.0.0", "tag_0"},     {"16.0.0.1", "tag_1"},
-      {"40.0.0.255", "tag_2"},  {"64.0.130.0", "tag_3"},
-      {"96.0.0.10", "tag_4"},   {"112.0.0.0", "tag_5"},
-      {"128.0.0.1", "tag_6"},   {"160.0.0.1", "tag_7"},
-      {"164.255.0.0", "tag_8"}, {"168.0.0.0", "tag_9"},
-      {"176.0.0.1", "tag_10"},  {"184.0.0.1", "tag_11"},
-      {"192.0.0.0", "tag_12"},  {"232.0.80.0", "tag_13"},
-      {"233.0.0.1", "tag_14"},  {"::1", ""},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case_hit = {
+      {"0.0.0.0", {"tag_0"}},    {"16.0.0.1", {"tag_1"}},    {"40.0.0.255", {"tag_2"}},
+      {"64.0.130.0", {"tag_3"}}, {"96.0.0.10", {"tag_4"}},   {"112.0.0.0", {"tag_5"}},
+      {"128.0.0.1", {"tag_6"}},  {"160.0.0.1", {"tag_7"}},   {"164.255.0.0", {"tag_8"}},
+      {"168.0.0.0", {"tag_9"}},  {"176.0.0.1", {"tag_10"}},  {"184.0.0.1", {"tag_11"}},
+      {"192.0.0.0", {"tag_12"}}, {"232.0.80.0", {"tag_13"}}, {"233.0.0.1", {"tag_14"}},
   };
-  expectIPAndTag(test_case);
+  expectIPAndTag(test_case_hit);
+
+  std::vector<std::string> test_case_no_hits = {"::1"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, IPv4AddressSizeBoundaries) {
@@ -122,11 +128,16 @@ TEST_F(LcTrieTest, IPv4AddressSizeBoundaries) {
   };
 
   setup(cidr_range_strings);
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"205.251.192.100", "tag_1"}, {"18.232.0.255", ""},        {"10.255.255.255", "tag_0"},
-      {"52.220.191.10", "tag_1"},   {"10.255.255.254", "tag_2"},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case_hit = {
+      {"205.251.192.100", {"tag_1"}},
+      {"10.255.255.255", {"tag_0"}},
+      {"52.220.191.10", {"tag_1"}},
+      {"10.255.255.254", {"tag_2"}},
   };
-  expectIPAndTag(test_case);
+  expectIPAndTag(test_case_hit);
+
+  std::vector<std::string> test_case_no_hits = {"18.232.0.255"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, IPv4Boundaries) {
@@ -137,9 +148,9 @@ TEST_F(LcTrieTest, IPv4Boundaries) {
   };
 
   setup(cidr_range_strings);
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"10.255.255.255", "tag_0"},
-      {"205.251.192.100", "tag_2"},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"10.255.255.255", {"tag_0"}},
+      {"205.251.192.100", {"tag_2"}},
   };
   expectIPAndTag(test_case);
 }
@@ -151,14 +162,15 @@ TEST_F(LcTrieTest, IPv6) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"2400:ffff:ff00::", ""},
-      {"2406:da00:2000::1", "tag_0"},
-      {"2001:abcd:ef01:2345::1", "tag_1"},
-      {"::1", "tag_0"},
-      {"1.2.3.4", ""},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"2406:da00:2000::1", {"tag_0"}},
+      {"2001:abcd:ef01:2345::1", {"tag_1"}},
+      {"::1", {"tag_0"}},
   };
   expectIPAndTag(test_case);
+
+  std::vector<std::string> test_case_no_hits = {"1.2.3.4", "2400:ffff:ff00::"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, IPv6AddressSizeBoundaries) {
@@ -169,14 +181,16 @@ TEST_F(LcTrieTest, IPv6AddressSizeBoundaries) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"::1", "tag_0"},
-      {"2406:da00:2000::1", "tag_0"},
-      {"2001:abcd:ef01:2345::1", "tag_1"},
-      {"::", "tag_2"},
-      {"::2", ""},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"::1", {"tag_0"}},
+      {"2406:da00:2000::1", {"tag_0"}},
+      {"2001:abcd:ef01:2345::1", {"tag_1"}},
+      {"::", {"tag_2"}},
   };
   expectIPAndTag(test_case);
+
+  std::vector<std::string> test_case_no_hits = {"::2"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, IPv6Boundaries) {
@@ -187,10 +201,10 @@ TEST_F(LcTrieTest, IPv6Boundaries) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"::1", "tag_2"},
-      {"::2", "tag_2"},
-      {"8000::1", "tag_0"},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"::1", {"tag_2"}},
+      {"::2", {"tag_2"}},
+      {"8000::1", {"tag_0"}},
   };
   expectIPAndTag(test_case);
 }
@@ -202,13 +216,16 @@ TEST_F(LcTrieTest, CatchAllIPv4Prefix) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"2001:abcd:ef01:2345::1", "tag_1"},
-      {"1.2.3.4", "tag_0"},
-      {"255.255.255.255", "tag_0"},
-      {"2400:ffff:ff00::", ""},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"2001:abcd:ef01:2345::1", {"tag_1"}},
+      {"1.2.3.4", {"tag_0"}},
+      {"255.255.255.255", {"tag_0"}},
+
   };
   expectIPAndTag(test_case);
+
+  std::vector<std::string> test_case_no_hits = {"2400:ffff:ff00::"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, CatchAllIPv6Prefix) {
@@ -218,13 +235,15 @@ TEST_F(LcTrieTest, CatchAllIPv6Prefix) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"2001:abcd:ef01:2345::1", "tag_0"},
-      {"1.2.3.4", "tag_1"},
-      {"255.255.255.255", ""},
-      {"abcd::343", "tag_0"},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"2001:abcd:ef01:2345::1", {"tag_0"}},
+      {"1.2.3.4", {"tag_1"}},
+      {"abcd::343", {"tag_0"}},
   };
   expectIPAndTag(test_case);
+
+  std::vector<std::string> test_case_no_hits = {"255.255.255.255"};
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, BothIpvVersions) {
@@ -236,12 +255,18 @@ TEST_F(LcTrieTest, BothIpvVersions) {
   };
   setup(cidr_range_strings);
 
-  std::vector<std::pair<std::string, std::string>> test_case = {
-      {"205.251.192.100", "tag_3"},        {"18.232.0.255", ""},     {"10.255.255.255", "tag_2"},
-      {"52.220.191.10", "tag_3"},          {"2400:ffff:ff00::", ""}, {"2406:da00:2000::1", "tag_0"},
-      {"2001:abcd:ef01:2345::1", "tag_1"}, {"::1", "tag_0"},
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"205.251.192.100", {"tag_3"}},        {"10.255.255.255", {"tag_2"}},
+      {"52.220.191.10", {"tag_3"}},          {"2406:da00:2000::1", {"tag_0"}},
+      {"2001:abcd:ef01:2345::1", {"tag_1"}}, {"::1", {"tag_0"}},
   };
   expectIPAndTag(test_case);
+
+  std::vector<std::string> test_case_no_hits = {
+      "18.232.0.255",
+      "2400:ffff:ff00::",
+  };
+  expectIPAndNoTag(test_case_no_hits);
 }
 
 TEST_F(LcTrieTest, NestedPrefixes) {
