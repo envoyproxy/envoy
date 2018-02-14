@@ -475,7 +475,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
-  std::string host = "www.envoyproxy.io";
+  const std::string host = "www.envoyproxy.io";
   setupServiceValidationWithCustomHostValueHC(host);
   // requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
@@ -495,7 +495,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
         EXPECT_TRUE(headers.Path());
         EXPECT_NE(nullptr, headers.Host());
         EXPECT_NE(nullptr, headers.Path());
-        EXPECT_EQ(headers.Host()->value().c_str(), std::string(host));
+        EXPECT_EQ(headers.Host()->value().c_str(), host);
         EXPECT_EQ(headers.Path()->value().c_str(), std::string("/healthcheck"));
       }));
   health_checker_->start();
