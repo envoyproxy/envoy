@@ -43,6 +43,12 @@ public:
   absl::string_view prefixToken() const override { return prefix_; }
 
 private:
+  /**
+   * Examines a regex string, looking for the pattern: ^alphanumerics_with_underscores\.
+   * Returns "alphanumerics_with_underscores" if that pattern is found, empty-string otherwise.
+   * @param regex absl::string_view the regex to scan for prefixes.
+   * @return std::string the prefix, or "" if no prefix found.
+   */
   static std::string extractRegexPrefix(absl::string_view regex);
 
   const std::string name_;
