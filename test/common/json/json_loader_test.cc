@@ -455,18 +455,10 @@ admin:
       port_value: 0
 )EOF";
 
-  bool exception_caught = false;
-  std::string exception_text;
-  try {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString(bad_yaml);
-  } catch (const EnvoyException& e) {
-    exception_caught = true;
-    exception_text = e.what();
-  }
-  EXPECT_TRUE(exception_caught);
-  EXPECT_TRUE(exception_text.find("bad conversion") != std::string::npos) << exception_text;
-  EXPECT_TRUE(exception_text.find("Unexpected YAML exception") == std::string::npos)
-      << exception_text;
+  EXPECT_THROW_WITH_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
+                            "bad conversion");
+  EXPECT_THROW_WITHOUT_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
+                            "Unexpected YAML exception");
 }
 
 } // namespace Json
