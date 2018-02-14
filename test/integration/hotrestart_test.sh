@@ -12,8 +12,6 @@ set -e
 
 CURRENT_TEST="NONE"
 function start_test() {
-  #update_elapsed_time
-  #WGET_ARGS=""
   CURRENT_TEST="$@"
   echo "TEST: $CURRENT_TEST"
 }
@@ -136,6 +134,7 @@ do
   FIRST_SERVER_PID=$BACKGROUND_PID
 
   start_test Updating original config json listener addresses
+  sleep 3
   UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".json
   "${TEST_RUNDIR}"/tools/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
     "-u" "${UPDATED_HOT_RESTART_JSON}"
