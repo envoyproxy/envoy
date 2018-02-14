@@ -10,9 +10,7 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
 
-namespace absl {
-class string_view;
-}
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Event {
