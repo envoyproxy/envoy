@@ -42,6 +42,16 @@ public:
   MainCommon(int argc, char** argv, bool hot_restart);
   bool run() { return base_.run(); }
 
+  /**
+   * Helper method to create a MainCommmon object, trapping on exceptions and
+   * converting them to an exit_status.
+   * @param argc int argument count
+   * @param argv char** arguments
+   * @param int& exit_status the exit status
+   * @return std::unique_ptr<MainCommon> the process execution context
+   */
+  static std::unique_ptr<MainCommon> create(int argc, char** argv, int& exit_status);
+
 private:
   static std::unique_ptr<Envoy::OptionsImpl> computeOptions(int argc, char** argv,
                                                             bool hot_restart);
