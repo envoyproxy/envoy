@@ -6,29 +6,30 @@
 
 namespace Envoy {
 namespace Config {
+namespace DataSource {
 
-std::string DataSource::read(bool allow_empty) const {
-  switch (source_.specifier_case()) {
+std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empty) {
+  switch (source.specifier_case()) {
   case envoy::api::v2::core::DataSource::kFilename:
-    return Filesystem::fileReadToEnd(source_.filename());
+    return Filesystem::fileReadToEnd(source.filename());
   case envoy::api::v2::core::DataSource::kInlineBytes:
-    return source_.inline_bytes();
+    return source.inline_bytes();
   case envoy::api::v2::core::DataSource::kInlineString:
-    return source_.inline_string();
+    return source.inline_string();
   default:
     if (!allow_empty) {
       throw EnvoyException(
-          fmt::format("Unexpected DataSource::specifier_case(): {}", source_.specifier_case()));
+          fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
     }
     return "";
   }
 }
 
-std::string DataSource::getPath() const {
-  return source_.specifier_case() == envoy::api::v2::core::DataSource::kFilename
-             ? source_.filename()
-             : "";
+std::string getPath(const envoy::api::v2::core::DataSource& source) {
+  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename ? source.filename()
+                                                                                : "";
 }
 
+} // namespace DataSource
 } // namespace Config
 } // namespace Envoy

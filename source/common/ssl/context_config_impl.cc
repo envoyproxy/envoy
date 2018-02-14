@@ -41,27 +41,28 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
-      ca_cert_(Config::DataSource(config.validation_context().trusted_ca()).read(true)),
-      ca_cert_path_(Config::DataSource(config.validation_context().trusted_ca()).getPath()),
+      ca_cert_(Config::DataSource::read(config.validation_context().trusted_ca(), true)),
+      ca_cert_path_(Config::DataSource::getPath(config.validation_context().trusted_ca())),
       certificate_revocation_list_(
-          Config::DataSource(config.validation_context().crl()).read(true)),
+          Config::DataSource::read(config.validation_context().crl(), true)),
       certificate_revocation_list_path_(
-          Config::DataSource(config.validation_context().crl()).getPath()),
+          Config::DataSource::getPath(config.validation_context().crl())),
       cert_chain_(
           config.tls_certificates().empty()
               ? ""
-              : Config::DataSource(config.tls_certificates()[0].certificate_chain()).read(true)),
+              : Config::DataSource::read(config.tls_certificates()[0].certificate_chain(), true)),
       cert_chain_path_(
           config.tls_certificates().empty()
               ? ""
-              : Config::DataSource(config.tls_certificates()[0].certificate_chain()).getPath()),
-      private_key_(config.tls_certificates().empty()
-                       ? ""
-                       : Config::DataSource(config.tls_certificates()[0].private_key()).read(true)),
+              : Config::DataSource::getPath(config.tls_certificates()[0].certificate_chain())),
+      private_key_(
+          config.tls_certificates().empty()
+              ? ""
+              : Config::DataSource::read(config.tls_certificates()[0].private_key(), true)),
       private_key_path_(
           config.tls_certificates().empty()
               ? ""
-              : Config::DataSource(config.tls_certificates()[0].private_key()).getPath()),
+              : Config::DataSource::getPath(config.tls_certificates()[0].private_key())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
@@ -124,7 +125,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         switch (config.session_ticket_keys_type_case()) {
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
           for (const auto& datasource : config.session_ticket_keys().keys()) {
-            validateAndAppendKey(ret, Config::DataSource(datasource).read(false));
+            validateAndAppendKey(ret, Config::DataSource::read(datasource, false));
           }
           break;
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:

@@ -16,9 +16,9 @@ GoogleAsyncClientImpl::createChannel(const envoy::api::v2::core::GrpcService::Go
   std::shared_ptr<grpc::ChannelCredentials> creds;
   if (config.has_ssl_credentials()) {
     const grpc::SslCredentialsOptions ssl_creds = {
-        .pem_root_certs = Config::DataSource(config.ssl_credentials().root_certs()).read(true),
-        .pem_private_key = Config::DataSource(config.ssl_credentials().private_key()).read(true),
-        .pem_cert_chain = Config::DataSource(config.ssl_credentials().cert_chain()).read(true),
+        .pem_root_certs = Config::DataSource::read(config.ssl_credentials().root_certs(), true),
+        .pem_private_key = Config::DataSource::read(config.ssl_credentials().private_key(), true),
+        .pem_cert_chain = Config::DataSource::read(config.ssl_credentials().cert_chain(), true),
     };
     creds = grpc::SslCredentials(ssl_creds);
   } else {
