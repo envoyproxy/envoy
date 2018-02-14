@@ -10,7 +10,6 @@
 #include "envoy/network/address.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
@@ -48,14 +47,13 @@ public:
   /**
    * Retrieve the tag associated with the CIDR range that contains `ip_address`. Both IPv4 and IPv6
    * addresses are supported.
-   * TODO(ccaraman): Change to getTags and std::vector<std::string> when nested prefixes are
-   * supported.
    * @param  ip_address supplies the IP address.
-   * @return tag from the CIDR range that contains 'ip_address'. An empty string is returned
-   *             if no prefix contains 'ip_address' or there is no data for the IP version of the
-   *             ip_address.
+   * @return a vector of tags from the CIDR ranges and IP addresses that contains 'ip_address'. An
+   * empty vector is returned if no prefix contains 'ip_address' or there is no data for the IP
+   * version of the ip_address.
    */
-  std::string getTag(const Network::Address::InstanceConstSharedPtr& ip_address) const;
+  std::vector<std::string>
+  getTags(const Network::Address::InstanceConstSharedPtr& ip_address) const;
 
 private:
   /**
@@ -72,6 +70,9 @@ private:
     // By shifting the value to the left by p bits(and back), the bits between 0 and p-1 are zero'd
     // out. Then to get the n bits, shift the IP back by the address_size minus the number of
     // desired bits.
+    if (n == 0) {
+      return IpType(0);
+    }
     return input << p >> (address_size - n);
   }
 
@@ -93,31 +94,6 @@ private:
   // IP addresses are stored in host byte order to simplify
   typedef uint32_t Ipv4;
   typedef absl::uint128 Ipv6;
-
-  // Helper methods to retrieve the string representation of the address in IpPrefix using
-  // inet_ntop. These strings are used in the nested prefixes exception messages.
-  // TODO(ccaraman): Remove once nested prefixes are supported.
-  static std::string toString(const Ipv4& input) {
-    sockaddr_in addr4;
-    addr4.sin_family = AF_INET;
-    addr4.sin_addr.s_addr = htonl(input);
-    addr4.sin_port = htons(0);
-
-    Address::Ipv4Instance address(&addr4);
-    return address.ip()->addressAsString();
-  }
-
-  static std::string toString(const Ipv6& input) {
-    sockaddr_in6 addr6;
-    addr6.sin6_family = AF_INET6;
-    addr6.sin6_port = htons(0);
-
-    // Ipv6 stores the values in host byte order.
-    absl::uint128 ipv6 = Utility::Ip6htonl(input);
-    memcpy(&addr6.sin6_addr.s6_addr, &ipv6, sizeof(absl::uint128));
-    Address::Ipv6Instance address(addr6);
-    return address.ip()->addressAsString();
-  }
 
   /**
    * Structure to hold a CIDR range and the tag associated with it.
@@ -157,7 +133,23 @@ private:
                                    extractBits<IpType, address_size>(0, length_, other.ip_)));
     }
 
+    /**
+     * @param address supplies an IP address to check against this prefix.
+     * @return bool true if this prefix contains the address.
+     */
+    bool contains(const IpType& address) const {
+      return (extractBits<IpType, address_size>(0, length_, ip_) ==
+              extractBits<IpType, address_size>(0, length_, address));
+    }
+
     std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
+
+    void addNestedPrefix(const IpPrefix& other) {
+      if (nested_prefixes_ == nullptr) {
+        nested_prefixes_ = std::make_unique<std::vector<IpPrefix>>();
+      }
+      nested_prefixes_->push_back(other);
+    }
 
     // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
     IpType ip_{0};
@@ -166,6 +158,11 @@ private:
     // TODO(ccaraman): Support more than one tag per entry.
     // Tag for this entry.
     std::string tag_;
+    // Other prefixes nested under this one. If an LC trie lookup matches on this
+    // prefix, the lookup will scan the nested prefixes to see if any of them match,
+    // too. This situation is rare, so to save memory in the common case the
+    // nested_prefixes field is a pointer to a vector rather than an inline vector.
+    std::shared_ptr<std::vector<IpPrefix>> nested_prefixes_;
   };
 
   /**
@@ -198,10 +195,10 @@ private:
     /**
      * Retrieve the tag associated with the CIDR range that contains `ip_address`.
      * @param  ip_address supplies the IP address in host byte order.
-     * @return the tag from the prefix that encompasses the input. An empty string is returned
-     *         if no prefix in the LC Trie exists.
+     * @return a vector of tags from the CIDR ranges and IP addresses that encompasses the input. An
+     * empty vector is returned if the LC Trie is empty.
      */
-    std::string getTag(const IpType& ip_address) const;
+    std::vector<std::string> getTags(const IpType& ip_address) const;
 
   private:
     /**
@@ -228,16 +225,12 @@ private:
       std::sort(tag_data.begin(), tag_data.end());
       ip_prefixes_.push_back(tag_data[0]);
 
-      // Remove duplicate entries and check for nested prefixes.
+      // Set up ip_prefixes_, which should contain the supplied prefixes in sorted order,
+      // but with any nested prefixes encapsulated under their parent prefixes.
       for (size_t i = 1; i < tag_data.size(); ++i) {
-        // TODO(ccaraman): Add support for nested prefixes.
-        if (tag_data[i - 1].isPrefix(tag_data[i])) {
-          throw EnvoyException(fmt::format(
-              "LcTrie does not support nested prefixes. '{0}' is a nested prefix of '{1}'.",
-              tag_data[i].asString(), tag_data[i - 1].asString()));
-        }
-
-        if (tag_data[i - 1] != tag_data[i]) {
+        if (ip_prefixes_[ip_prefixes_.size() - 1].isPrefix(tag_data[i])) {
+          ip_prefixes_[ip_prefixes_.size() - 1].addNestedPrefix(tag_data[i]);
+        } else {
           ip_prefixes_.push_back(tag_data[i]);
         }
       }
@@ -510,9 +503,10 @@ LcTrie::LcTrieInternal<IpType, address_size>::LcTrieInternal(
 }
 
 template <class IpType, uint32_t address_size>
-std::string LcTrie::LcTrieInternal<IpType, address_size>::getTag(const IpType& ip_address) const {
+std::vector<std::string>
+LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) const {
   if (trie_.empty()) {
-    return EMPTY_STRING;
+    return std::vector<std::string>();
   }
 
   LcNode node = trie_[0];
@@ -531,18 +525,23 @@ std::string LcTrie::LcTrieInternal<IpType, address_size>::getTag(const IpType& i
     address = node.address_;
   }
 
-  // /0 will match all IP addresses.
-  if (ip_prefixes_[address].length_ == 0) {
-    return ip_prefixes_[address].tag_;
+  // The prefix table entry ip_prefixes_[address] contains either a single prefix or
+  // a parent prefix with a set of additional prefixes nested under it. In the latter
+  // case, we compare the supplied ip_address against all the prefixes in the entry
+  // and return the union of all the matches' tags.
+  std::unordered_set<std::string> unique_tags;
+  const auto& prefix = ip_prefixes_[address];
+  if (prefix.contains(ip_address)) {
+    unique_tags.insert(prefix.tag_);
+    if (prefix.nested_prefixes_ != nullptr) {
+      for (const auto& nested_prefix : *prefix.nested_prefixes_) {
+        if (nested_prefix.contains(ip_address)) {
+          unique_tags.insert(nested_prefix.tag_);
+        }
+      }
+    }
   }
-
-  // Check the input IP address is within the CIDR range stored in ip_prefixes_[adr] by XOR'ing the
-  // two values and checking that up until the length of the CIDR range the value is 0.
-  IpType bitmask = ip_prefixes_[address].ip_ ^ ip_address;
-  if (extractBits<IpType, address_size>(0, ip_prefixes_[address].length_, bitmask) == 0) {
-    return ip_prefixes_[address].tag_;
-  }
-  return EMPTY_STRING;
+  return std::vector<std::string>(unique_tags.begin(), unique_tags.end());
 }
 
 } // namespace LcTrie
