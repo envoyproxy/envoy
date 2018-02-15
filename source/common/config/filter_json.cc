@@ -212,6 +212,7 @@ void FilterJson::translateHttpConnectionManager(
   proto_config.set_forward_client_cert_details(fcc_details);
   proto_config.mutable_set_current_client_cert_details()->mutable_by()->set_value(true);
   proto_config.mutable_set_current_client_cert_details()->mutable_hash()->set_value(true);
+  proto_config.mutable_set_current_client_cert_details()->mutable_san()->set_value(true);
   for (const std::string& detail :
        json_config.getStringArray("set_current_client_cert_details", true)) {
     if (detail == "By") {
@@ -222,9 +223,7 @@ void FilterJson::translateHttpConnectionManager(
     }
     if (detail == "Subject") {
       proto_config.mutable_set_current_client_cert_details()->mutable_subject()->set_value(true);
-    } else {
-      ASSERT(detail == "SAN");
-      proto_config.mutable_set_current_client_cert_details()->mutable_san()->set_value(true);
+      proto_config.mutable_set_current_client_cert_details()->mutable_san()->set_value(false);
     }
   }
 }
