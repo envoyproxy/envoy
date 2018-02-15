@@ -53,21 +53,21 @@ std::string PerfAnnotationContext::toString() {
   std::unique_lock<std::mutex> lock(context->mutex_);
 #endif
 
-  // The map is from category/description -> [duration, time].  Reverse-sort by duration.
+  // The map is from category/description -> [duration, time]. Reverse-sort by duration.
   std::vector<const DurationCountMap::value_type*> sorted_values;
   sorted_values.reserve(context->duration_count_map_.size());
   for (const auto& iter : context->duration_count_map_) {
     sorted_values.push_back(&iter);
   }
-  std::sort(sorted_values.begin(), sorted_values.end(), [](
-      const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
-              return a->second.first > b->second.first;
-            });
+  std::sort(
+      sorted_values.begin(), sorted_values.end(),
+      [](const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
+        return a->second.first > b->second.first;
+      });
 
-
-  // Organize the report so it lines up in columns.  Note that the widest duration comes first,
+  // Organize the report so it lines up in columns. Note that the widest duration comes first,
   // though that may not be descending order of calls or per_call time, so we need two passes
-  // to compute column widths.  First collect the column headers and their widths.
+  // to compute column widths. First collect the column headers and their widths.
   static const char* headers[] = {"Duration(us)", "# Calls", "per_call(ns)",
                                   "Category / Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
@@ -86,8 +86,11 @@ std::string PerfAnnotationContext::toString() {
     columns[0].push_back(
         std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()));
     columns[1].push_back(std::to_string(count));
-    columns[2].push_back((count == 0) ? "NaN" : std::to_string(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
+    columns[2].push_back(
+        (count == 0)
+            ? "NaN"
+            : std::to_string(
+                  std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
     columns[3].push_back(p->first);
     for (size_t i = 0; i < num_columns; ++i) {
       widths[i] = std::max(widths[i], columns[i].size());

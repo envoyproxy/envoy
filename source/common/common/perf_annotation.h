@@ -19,16 +19,15 @@
 // However, the macros for instrumenting code for performance analysis will expand
 // to nothing.
 
-
 /**
- * Initiates a performance operation, storing its state in perf_var.  A perf_var
+ * Initiates a performance operation, storing its state in perf_var. A perf_var
  * can then be reported multiple times.
  */
 #define PERF_OPERATION(perf_var) Envoy::PerfOperation(perf_var)
 
 /**
- * Records performance data initiated with PERF_OPERATION.  The category and description
- * are joined with in the library, but only if perf is enabled.  This way, any concatenation
+ * Records performance data initiated with PERF_OPERATION. The category and description
+ * are joined with in the library, but only if perf is enabled. This way, any concatenation
  * overhead is skipped when perf-annotation is disabled.
  */
 #define PERF_RECORD(perf, category, description)                                                   \
@@ -37,13 +36,13 @@
   } while (false)
 
 /**
- * Dumps recorded performance data to stdout.  Expands to nothing if not enabled.
+ * Dumps recorded performance data to stdout. Expands to nothing if not enabled.
  */
 #define PERF_DUMP() Envoy::PerfAnnotationContext::dump()
 
 /**
  * Returns the aggregated performance data as a formatted multi-line string, showing a
- * formatted table of values.  Returns "" if perf-annotation is disabled.
+ * formatted table of values. Returns "" if perf-annotation is disabled.
  */
 #define PERF_TO_STRING() Envoy::PerfAnnotationContext::toString()
 
@@ -53,9 +52,9 @@
 #define PERF_CLEAR() Envoy::PerfAnnotationContext::clear()
 
 /**
- * Controls whether performacne collection and reporting is thread safe.  For now,
+ * Controls whether performacne collection and reporting is thread safe. For now,
  * leaving this enabled for predictability across multiiple applications, on the assumption
- * that an uncontended mutex lock has vanishingly small cost.  In the future we may try
+ * that an uncontended mutex lock has vanishingly small cost. In the future we may try
  * to make this system thread-unsafe if mutext contention disturbs the metrics.
  */
 #define PERF_THREAD_SAFE true
@@ -63,8 +62,8 @@
 namespace Envoy {
 
 /**
- * Defines a context for collecting performance data.  Note that this class is
- * fully declared and defined even if ENVOY_PERF_AUTOMATION is off.  We depend on
+ * Defines a context for collecting performance data. Note that this class is
+ * fully declared and defined even if ENVOY_PERF_AUTOMATION is off. We depend on
  * the macros to disable performance collection for production.
  */
 class PerfAnnotationContext {
