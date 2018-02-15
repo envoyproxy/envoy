@@ -381,19 +381,18 @@ TEST(StaticClusterImplTest, AltStatName) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  const std::string json = R"EOF(
-  {
-    "name": "staticcluster",
-    "alt_stat_name": "staticcluster_stats",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "random",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
-  }
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    alt_stat_name: staticcluster_stats
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: 10.0.0.1, port_value: 443 }}]
   )EOF";
 
   NiceMock<MockClusterManager> cm;
-  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
+  StaticClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager, cm,
                             false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name

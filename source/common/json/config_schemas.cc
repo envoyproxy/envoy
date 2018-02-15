@@ -1477,9 +1477,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "string",
         "minLength" : 1
       },
-      "alt_stat_name" : {
-        "type" : "string"
-      },
       "type" : {
         "type" : "string",
         "enum" : ["static", "strict_dns", "logical_dns", "sds", "original_dst"]
