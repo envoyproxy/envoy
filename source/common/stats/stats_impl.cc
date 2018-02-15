@@ -217,7 +217,7 @@ std::string TagProducerImpl::produceTags(const std::string& metric_name,
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;
   forEachExtractorMatching(
-      metric_name, [&remove_characters, &tags, metric_name](const TagExtractorPtr& tag_extractor) {
+      metric_name, [&remove_characters, &tags, &metric_name](const TagExtractorPtr& tag_extractor) {
         tag_extractor->extractTag(metric_name, tags, remove_characters);
       });
   return StringUtil::removeCharacters(metric_name, remove_characters);
