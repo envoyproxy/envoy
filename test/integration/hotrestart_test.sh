@@ -13,6 +13,7 @@ enableHeapCheck () {
   HEAPCHECK=${SAVED_HEAPCHECK}
 }
 
+
 [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
@@ -45,20 +46,29 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
 fi
 
+# Enable this test to work with --runs_per_test
+if [[ -z "${TEST_RANDOM_SEED}" ]]; then
+  BASE_ID=1
+else
+  BASE_ID="${TEST_RANDOM_SEED}"
+fi
+
+echo "Hot restart test using --base-id ${BASE_ID}"
+
 TEST_INDEX=0
 for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
 do
   # Test validation.
   # TODO(jun03): instead of setting the base-id, the validate server should use the nop hot restart
   "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
-      --service-node node --base-id 1
+      --service-node node --base-id "${BASE_ID}"
 
   # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
   # sanity test.
   echo "Starting epoch 0"
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
-      --restart-epoch 0 --base-id 1 --service-cluster cluster --service-node node \
+      --restart-epoch 0 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --admin-address-path "${ADMIN_ADDRESS_PATH_0}" &
 
   FIRST_SERVER_PID=$!
@@ -81,7 +91,7 @@ do
   echo "Checking for match of --hot-restart-version and admin /hot_restart_version"
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version mismatch: ${ADMIN_HOT_RESTART_VERSION} != " \
            "${CLI_HOT_RESTART_VERSION}"
@@ -89,7 +99,7 @@ do
   fi
 
   echo "Checking max-obj-name-len"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-obj-name-len 1234 --base-id "${BASE_ID}" 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
            "${CLI_HOT_RESTART_VERSION}"
@@ -97,7 +107,7 @@ do
   fi
 
   echo "Checking max-stats"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stats 12345 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --max-stats 12345 --base-id "${BASE_ID}" 2>&1)
   if [[ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]]; then
       echo "Hot restart version match when it should mismatch: ${ADMIN_HOT_RESTART_VERSION} == " \
            "${CLI_HOT_RESTART_VERSION}"
@@ -109,7 +119,7 @@ do
   echo "Starting epoch 1"
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
-      --restart-epoch 1 --base-id 1 --service-cluster cluster --service-node node \
+      --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --admin-address-path "${ADMIN_ADDRESS_PATH_1}" &
 
   SECOND_SERVER_PID=$!
@@ -126,7 +136,7 @@ do
   ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin.2."${TEST_INDEX}".address
   echo "Starting epoch 2"
   "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
-      --restart-epoch 2 --base-id 1 --service-cluster cluster --service-node node \
+      --restart-epoch 2 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --admin-address-path "${ADMIN_ADDRESS_PATH_2}" &
 
   THIRD_SERVER_PID=$!
@@ -167,7 +177,7 @@ set +e
 disableHeapCheck
 
 echo "Launching envoy with no parameters. Check the exit value is 1"
-${ENVOY_BIN}
+${ENVOY_BIN} --base_id "${BASE_ID}"
 EXIT_CODE=$?
 # The test should fail if the Envoy binary exits with anything other than 1.
 if [[ $EXIT_CODE -ne 1 ]]; then

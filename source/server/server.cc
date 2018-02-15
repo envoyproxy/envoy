@@ -51,7 +51,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
-      access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
+      access_log_manager_(*api_, *dispatcher_, access_log_lock, store) {
 
   try {
     if (!options.logPath().empty()) {
@@ -70,13 +70,19 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
 
-    terminate();
+    // Invoke shutdown methods called in run().
+    thread_local_.shutdownGlobalThreading();
+    stats_store_.shutdownThreading();
+    thread_local_.shutdownThread();
+
+    // Invoke the shutdown method called in the destructor.
+    restarter_.shutdown();
     throw;
   }
 }
 
 InstanceImpl::~InstanceImpl() {
-  terminate();
+  restarter_.shutdown();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
@@ -358,15 +364,6 @@ void InstanceImpl::run() {
   guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
-  terminate();
-}
-
-void InstanceImpl::terminate() {
-  if (terminated_) {
-    return;
-  }
-  terminated_ = true;
-
   // Before starting to shutdown anything else, stop slot destruction updates.
   thread_local_.shutdownGlobalThreading();
 
@@ -374,21 +371,16 @@ void InstanceImpl::terminate() {
   stats_store_.shutdownThreading();
 
   // Shutdown all the workers now that the main dispatch loop is done.
-  if (listener_manager_.get() != nullptr) {
-    listener_manager_->stopWorkers();
-  }
+  listener_manager_->stopWorkers();
 
   // Only flush if we have not been hot restarted.
   if (stat_flush_timer_) {
     flushStats();
   }
 
-  if (config_.get() != nullptr) {
-    config_->clusterManager().shutdown();
-  }
+  config_->clusterManager().shutdown();
   handler_.reset();
   thread_local_.shutdownThread();
-  restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
 }

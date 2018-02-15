@@ -32,9 +32,7 @@ for details on Bazel's shell extensions.
 
 Dependencies between external libraries can use the standard Bazel dependency
 resolution logic, using the `$(location)` shell extension to resolve paths
-to binaries, libraries, headers, etc. See
-[`bazel/external/lightstep.genrule_cmd`](external/lightstep.genrule_cmd) for
-an example.
+to binaries, libraries, headers, etc.
 
 # Adding external dependencies to Envoy (build recipe)
 
