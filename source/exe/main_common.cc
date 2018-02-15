@@ -67,6 +67,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
     break;
   }
   case Server::Mode::Validate:
+    restarter_.reset(new Server::HotRestartNopImpl());
+    Logger::Registry::initialize(options_.logLevel(), restarter_->logLock());
     break;
   }
 }
