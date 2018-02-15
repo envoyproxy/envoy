@@ -9,6 +9,7 @@
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
