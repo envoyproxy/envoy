@@ -208,13 +208,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         if (!uri_san_local_cert.empty()) {
           client_cert_details.push_back("By=" + uri_san_local_cert);
         }
-      break;
+        break;
       case Http::ClientCertDetailsType::Hash:
         const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
         if (!cert_digest.empty()) {
           client_cert_details.push_back("Hash=" + cert_digest);
         }
-      break;
+        break;
       case Http::ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
