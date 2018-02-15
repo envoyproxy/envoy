@@ -16,6 +16,7 @@ int main(int argc, char** argv) {
   if (main_common.get() == nullptr) {
     return exit_status;
   }
+
   // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
   // show up as a core-dumps for easier diagnostis.
   return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -18,17 +18,6 @@ sh_test(
     tags = ["no_asan"],
 )
 
-envoy_cc_binary(
-    name = "envoy_init_speed_test",
-    srcs = ["envoy_init_speed_test.cc"],
-    deps = [
-        "//source/exe:envoy_main_common_lib",
-        "//source/exe:extra_protocol_proxies_lib",
-        "//source/server/config/http:lightstep_lib",
-        "//source/server/config/http:zipkin_lib",
-    ],
-)
-
 sh_test(
     name = "version_out_test",
     srcs = ["version_out_test.sh"],

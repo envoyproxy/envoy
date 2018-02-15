@@ -36,7 +36,9 @@ void PerfAnnotationContext::report(std::chrono::nanoseconds duration, absl::stri
 #if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
 #endif
-    duration_map_[key] += duration;
+    DurationCount& duration_count = duration_count_map_[key];
+    duration_count.first += duration;
+    ++duration_count.second;
   }
 }
 
@@ -50,12 +52,29 @@ std::string PerfAnnotationContext::toString() {
 #if PERF_THREAD_SAFE
   std::unique_lock<std::mutex> lock(context->mutex_);
 #endif
-  for (const auto& p : context->duration_map_) {
-    std::chrono::nanoseconds duration = p.second;
-    absl::StrAppend(
-        &out,
+  std::vector<const DurationCountMap::value_type*> sorted_values;
+  sorted_values.reserve(context->duration_count_map_.size());
+  for (const auto& iter : context->duration_count_map_) {
+    sorted_values.push_back(&iter);
+  }
+  std::sort(sorted_values.begin(), sorted_values.end(), [](
+      const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
+              return a->second.first > b->second.first;
+            });
+  size_t column_width = 0;
+  for (const auto& p : sorted_values) {
+    const DurationCount& duration_count = p->second;
+    std::chrono::nanoseconds duration = duration_count.first;
+    uint64_t count = duration_count.second;
+    std::string duration_count_str = absl::StrCat(
         std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()),
-        ": ", p.first, "\n");
+        "(", count, ")");
+    if (column_width == 0) {
+      column_width = duration_count_str.size();
+    } else {
+      out.append(column_width - duration_count_str.size(), ' ');
+    }
+    absl::StrAppend(&out, duration_count_str, ": ", p->first, "\n");
   }
   return out;
 }
@@ -65,7 +84,7 @@ void PerfAnnotationContext::clear() {
 #if PERF_THREAD_SAFE
   std::unique_lock<std::mutex> lock(context->mutex_);
 #endif
-  context->duration_map_.clear();
+  context->duration_count_map_.clear();
 }
 
 PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {
