@@ -97,11 +97,6 @@ public:
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override;
 
-  /**
-   * @return bool whether a lock has been established.
-   */
-  bool hasLock() const { return lock_ != nullptr; }
-
 private:
   Thread::BasicLockable* lock_{};
   Filesystem::FileSharedPtr log_file_;
@@ -136,11 +131,6 @@ public:
    * @return const std::vector<Logger>& the installed loggers.
    */
   static const std::vector<Logger>& loggers() { return allLoggers(); }
-
-  /**
-   * @Return bool whether the registry has been initialized.
-   */
-  static bool initialized() { return getSink()->hasLock(); }
 
 private:
   /*
