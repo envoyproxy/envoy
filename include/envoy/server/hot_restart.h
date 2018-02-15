@@ -5,8 +5,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
-#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -80,21 +78,6 @@ public:
    * perform a full or hot restart.
    */
   virtual std::string version() PURE;
-
-  /**
-   * @return Thread::BasicLockable& a lock for logging.
-   */
-  virtual Thread::BasicLockable& logLock() PURE;
-
-  /**
-   * @return Thread::BasicLockable& a lock for access logs.
-   */
-  virtual Thread::BasicLockable& accessLogLock() PURE;
-
-  /**
-   * @returns an allocator for stats.
-   */
-  virtual Stats::RawStatDataAllocator& statsAllocator() PURE;
 };
 
 } // namespace Server

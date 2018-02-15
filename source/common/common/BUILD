@@ -110,6 +110,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "thread_annotations",
+    hdrs = ["thread_annotations.h"],
+    external_deps = ["abseil_base"],
+)
+
+envoy_cc_library(
     name = "thread_lib",
     srcs = ["thread.cc"],
     hdrs = ["thread.h"],
