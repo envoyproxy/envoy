@@ -26,7 +26,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   // Get the local address from the new socket if the listener is listening on IP ANY
   // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
   const Address::InstanceConstSharedPtr& local_address =
-    listener->local_address_ ? listener->local_address_ : listener->getLocalAddress(fd);
+      listener->local_address_ ? listener->local_address_ : listener->getLocalAddress(fd);
   // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
   // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
   // sockaddr_un associated with the client socket when starting from the server socket.
