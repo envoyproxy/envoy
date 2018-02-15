@@ -210,8 +210,8 @@ void FilterJson::translateHttpConnectionManager(
           StringUtil::toUpper(json_config.getString("forward_client_cert", "sanitize")),
           &fcc_details);
   proto_config.set_forward_client_cert_details(fcc_details);
-    proto_config.mutable_set_current_client_cert_details()->mutable_by()->set_value(true);
-    proto_config.mutable_set_current_client_cert_details()->mutable_hash()->set_value(true);
+  proto_config.mutable_set_current_client_cert_details()->mutable_by()->set_value(true);
+  proto_config.mutable_set_current_client_cert_details()->mutable_hash()->set_value(true);
   for (const std::string& detail :
        json_config.getStringArray("set_current_client_cert_details", true)) {
     if (detail == "By") {
