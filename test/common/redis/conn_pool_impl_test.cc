@@ -271,6 +271,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_error_.value());
 }
 
 TEST_F(RedisClientImplTest, ConnectFail) {
@@ -336,6 +337,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   connect_or_op_timer_->callback_();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
 TEST_F(RedisClientImplTest, OpTimeout) {
@@ -358,6 +360,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   connect_or_op_timer_->callback_();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
 }
 
 TEST(RedisClientFactoryImplTest, Basic) {
