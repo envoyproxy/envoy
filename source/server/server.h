@@ -171,7 +171,6 @@ private:
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
-  void terminate();
 
   Options& options_;
   HotRestart& restarter_;
@@ -200,7 +199,6 @@ private:
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
-  bool terminated_;
 };
 
 } // Server
