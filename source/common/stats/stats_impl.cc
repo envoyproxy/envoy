@@ -11,6 +11,9 @@
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -62,7 +65,27 @@ std::string Utility::sanitizeStatsName(const std::string& name) {
 }
 
 TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex)
-    : name_(name), regex_(RegexUtil::parseRegex(regex)) {}
+    : name_(name), prefix_(std::string(extractRegexPrefix(regex))),
+      regex_(RegexUtil::parseRegex(regex)) {}
+
+std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
+  std::string prefix;
+  if (absl::StartsWith(regex, "^")) {
+    for (absl::string_view::size_type i = 1; i < regex.size(); ++i) {
+      if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
+        if (i > 1) {
+          const bool last_char = i == regex.size() - 1;
+          if ((!last_char && (regex[i] == '\\') && (regex[i + 1] == '.')) ||
+              (last_char && (regex[i] == '$'))) {
+            prefix.append(regex.data() + 1, i - 1);
+          }
+        }
+        break;
+      }
+    }
+  }
+  return prefix;
+}
 
 TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
                                                      const std::string& regex) {
@@ -71,22 +94,11 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
     throw EnvoyException("tag_name cannot be empty");
   }
 
-  if (!regex.empty()) {
-    return TagExtractorPtr{new TagExtractorImpl(name, regex)};
-  } else {
-    // Look up the default for that name.
-    const auto& name_regex_pairs = Config::TagNames::get().name_regex_pairs_;
-    auto it = std::find_if(name_regex_pairs.begin(), name_regex_pairs.end(),
-                           [&name](const std::pair<std::string, std::string>& name_regex_pair) {
-                             return name == name_regex_pair.first;
-                           });
-    if (it != name_regex_pairs.end()) {
-      return TagExtractorPtr{new TagExtractorImpl(name, it->second)};
-    } else {
-      throw EnvoyException(fmt::format(
-          "No regex specified for tag specifier and no default regex for name: '{}'", name));
-    }
+  if (regex.empty()) {
+    throw EnvoyException(fmt::format(
+        "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
+  return TagExtractorPtr{new TagExtractorImpl(name, regex)};
 }
 
 bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
@@ -128,62 +140,103 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
     : TagProducerImpl() {
   // To check name conflict.
-  std::unordered_set<std::string> names;
   reserveResources(config);
-  addDefaultExtractors(config, names);
+  std::unordered_set<std::string> names = addDefaultExtractors(config);
 
   for (const auto& tag_specifier : config.stats_tags()) {
-    if (!names.emplace(tag_specifier.tag_name()).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", tag_specifier.tag_name()));
+    const std::string& name = tag_specifier.tag_name();
+    if (!names.emplace(name).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
     }
 
     // If no tag value is found, fallback to default regex to keep backward compatibility.
     if (tag_specifier.tag_value_case() ==
             envoy::config::metrics::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
         tag_specifier.tag_value_case() == envoy::config::metrics::v2::TagSpecifier::kRegex) {
-      tag_extractors_.emplace_back(Stats::TagExtractorImpl::createTagExtractor(
-          tag_specifier.tag_name(), tag_specifier.regex()));
 
+      if (tag_specifier.regex().empty()) {
+        if (addExtractorsMatching(name) == 0) {
+          throw EnvoyException(fmt::format(
+              "No regex specified for tag specifier and no default regex for name: '{}'", name));
+        }
+      } else {
+        addExtractor(Stats::TagExtractorImpl::createTagExtractor(name, tag_specifier.regex()));
+      }
     } else if (tag_specifier.tag_value_case() ==
                envoy::config::metrics::v2::TagSpecifier::kFixedValue) {
-      default_tags_.emplace_back(
-          Stats::Tag{.name_ = tag_specifier.tag_name(), .value_ = tag_specifier.fixed_value()});
+      default_tags_.emplace_back(Stats::Tag{.name_ = name, .value_ = tag_specifier.fixed_value()});
     }
   }
 }
 
-std::string TagProducerImpl::produceTags(const std::string& stat_name,
+int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
+  int num_found = 0;
+  for (const auto& desc : Config::TagNames::get().descriptorVec()) {
+    if (desc.name_ == name) {
+      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_));
+      ++num_found;
+    }
+  }
+  // TODO(jmarantz): Changing the default tag regexes so that more than one regex can
+  // yield the same tag, on the theory that this will reduce regex backtracking. At the
+  // moment, this doesn't happen, so this flow isn't well tested. When we start exploiting
+  // this, and it's tested, we can simply remove this assert.
+  ASSERT(num_found <= 1);
+  return num_found;
+}
+
+void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
+  const absl::string_view prefix = extractor->prefixToken();
+  if (prefix.empty()) {
+    tag_extractors_without_prefix_.emplace_back(std::move(extractor));
+  } else {
+    tag_extractor_prefix_map_[prefix].emplace_back(std::move(extractor));
+  }
+}
+
+void TagProducerImpl::forEachExtractorMatching(
+    const std::string& stat_name, std::function<void(const TagExtractorPtr&)> f) const {
+  IntervalSetImpl<size_t> remove_characters;
+  for (const TagExtractorPtr& tag_extractor : tag_extractors_without_prefix_) {
+    f(tag_extractor);
+  }
+  const std::string::size_type dot = stat_name.find('.');
+  if (dot != std::string::npos) {
+    const absl::string_view token = absl::string_view(stat_name.data(), dot);
+    const auto iter = tag_extractor_prefix_map_.find(token);
+    if (iter != tag_extractor_prefix_map_.end()) {
+      for (const TagExtractorPtr& tag_extractor : iter->second) {
+        f(tag_extractor);
+      }
+    }
+  }
+}
+
+std::string TagProducerImpl::produceTags(const std::string& metric_name,
                                          std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
-
   IntervalSetImpl<size_t> remove_characters;
-  for (const TagExtractorPtr& tag_extractor : tag_extractors_) {
-    tag_extractor->extractTag(stat_name, tags, remove_characters);
-  }
-  return StringUtil::removeCharacters(stat_name, remove_characters);
+  forEachExtractorMatching(
+      metric_name, [&remove_characters, &tags, &metric_name](const TagExtractorPtr& tag_extractor) {
+        tag_extractor->extractTag(metric_name, tags, remove_characters);
+      });
+  return StringUtil::removeCharacters(metric_name, remove_characters);
 }
 
-// Roughly estimate the size of the vectors.
 void TagProducerImpl::reserveResources(const envoy::config::metrics::v2::StatsConfig& config) {
   default_tags_.reserve(config.stats_tags().size());
-
-  if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
-    tag_extractors_.reserve(Config::TagNames::get().name_regex_pairs_.size() +
-                            config.stats_tags().size());
-  } else {
-    tag_extractors_.reserve(config.stats_tags().size());
-  }
 }
 
-void TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
-                                           std::unordered_set<std::string>& names) {
+std::unordered_set<std::string>
+TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config) {
+  std::unordered_set<std::string> names;
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
-    for (const auto& extractor : Config::TagNames::get().name_regex_pairs_) {
-      names.emplace(extractor.first);
-      tag_extractors_.emplace_back(
-          Stats::TagExtractorImpl::createTagExtractor(extractor.first, extractor.second));
+    for (const auto& desc : Config::TagNames::get().descriptorVec()) {
+      names.emplace(desc.name_);
+      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_));
     }
   }
+  return names;
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
