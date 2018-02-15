@@ -403,6 +403,11 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
   EXPECT_EQ("", extractRegexPrefix("prefix(foo)"));
 }
 
+TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
+  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("no such default tag", ""),
+                          EnvoyException, "^No regex specified for tag specifier and no default");
+}
+
 TEST(TagProducerTest, CheckConstructor) {
   envoy::config::metrics::v2::StatsConfig stats_config;
 
