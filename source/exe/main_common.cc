@@ -1,3 +1,5 @@
+#include "exe/main_common.h"
+
 #include <iostream>
 #include <memory>
 
@@ -5,7 +7,6 @@
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
-#include "common/stats/thread_local_store.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
@@ -22,79 +23,107 @@
 #include "ares.h"
 
 namespace Envoy {
-namespace Server {
 
-class ProdComponentFactory : public ComponentFactory {
-public:
-  // Server::DrainManagerFactory
-  DrainManagerPtr createDrainManager(Instance& server) override {
-    return DrainManagerPtr{
-        // The global drain manager only triggers on listener modification, which effectively is
-        // hot restart at the global level. The per-listener drain managers decide whether to
-        // to include /healthcheck/fail status.
-        new DrainManagerImpl(server, envoy::api::v2::Listener_DrainType_MODIFY_ONLY)};
+Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instance& server) {
+  // The global drain manager only triggers on listener modification, which effectively is
+  // hot restart at the global level. The per-listener drain managers decide whether to
+  // to include /healthcheck/fail status.
+  return std::make_unique<Server::DrainManagerImpl>(server,
+                                                    envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+}
+
+Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
+                                                       Server::Configuration::Initial& config) {
+  return Server::InstanceUtil::createRuntime(server, config);
+}
+
+MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
+  ares_library_init(ARES_LIB_INIT_ALL);
+  Event::Libevent::Global::initialize();
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
+
+  switch (options_.mode()) {
+  case Server::Mode::Serve: {
+#ifdef ENVOY_HOT_RESTART
+    if (hot_restart) {
+      restarter_.reset(new Server::HotRestartImpl(options_));
+    }
+#endif
+    if (!hot_restart) {
+      restarter_.reset(new Server::HotRestartNopImpl());
+    }
+
+    Stats::RawStatData::configure(options_);
+    tls_.reset(new ThreadLocal::InstanceImpl);
+    Thread::BasicLockable& log_lock = restarter_->logLock();
+    Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
+    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+    Logger::Registry::initialize(options_.logLevel(), log_lock);
+
+    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->statsAllocator()));
+    server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
+                                           *restarter_, *stats_store_, access_log_lock,
+                                           component_factory_, *tls_));
+    break;
   }
-
-  Runtime::LoaderPtr createRuntime(Server::Instance& server,
-                                   Server::Configuration::Initial& config) override {
-    return Server::InstanceUtil::createRuntime(server, config);
+  case Server::Mode::Validate:
+    break;
   }
-};
+}
 
-} // namespace Server
+MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
-int main_common(OptionsImpl& options) {
-  Stats::RawStatData::configure(options);
+bool MainCommonBase::run() {
+  switch (options_.mode()) {
+  case Server::Mode::Serve:
+    server_->run();
+    return true;
+  case Server::Mode::Validate: {
+    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+    return Server::validateConfig(options_, local_address, component_factory_);
+  }
+  }
+  NOT_REACHED;
+}
+
+MainCommon::MainCommon(int argc, char** argv, bool hot_restart)
+    : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}
+
+std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, char** argv, bool hot_restart) {
+  OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
+    return "disabled";
+  };
 
 #ifdef ENVOY_HOT_RESTART
-  std::unique_ptr<Server::HotRestartImpl> restarter;
-  try {
-    restarter.reset(new Server::HotRestartImpl(options));
-  } catch (Envoy::EnvoyException& e) {
-    std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
-    return 1;
+  if (hot_restart) {
+    // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
+    hot_restart_version_cb = [](uint64_t max_num_stats, uint64_t max_stat_name_len) {
+      return Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
+    };
   }
-
-  Thread::BasicLockable& log_lock = restarter->logLock();
-  Thread::BasicLockable& access_log_lock = restarter->accessLogLock();
-  Stats::RawStatDataAllocator& stats_allocator = *restarter;
 #else
-  std::unique_ptr<Server::HotRestartNopImpl> restarter;
-  restarter.reset(new Server::HotRestartNopImpl());
-
-  Thread::MutexBasicLockable log_lock, access_log_lock;
-  Stats::HeapRawStatDataAllocator stats_allocator;
+  // Hot-restart should not be specified if the support is not compiled in.
+  RELEASE_ASSERT(!hot_restart);
 #endif
+  return std::make_unique<OptionsImpl>(argc, argv, hot_restart_version_cb, spdlog::level::info);
+}
 
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
-  Event::Libevent::Global::initialize();
-  Server::ProdComponentFactory component_factory;
-  auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-  switch (options.mode()) {
-  case Server::Mode::Serve:
-    break;
-  case Server::Mode::Validate:
-    Thread::MutexBasicLockable log_lock;
-    Logger::Registry::initialize(options.logLevel(), log_lock);
-    return Server::validateConfig(options, local_address, component_factory) ? 0 : 1;
-  }
-
-  ares_library_init(ARES_LIB_INIT_ALL);
-
-  Logger::Registry::initialize(options.logLevel(), log_lock);
-  DefaultTestHooks default_test_hooks;
-  ThreadLocal::InstanceImpl tls;
-  Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
+// Legacy implementation of main_common.
+//
+// TODO(jmarantz): Remove this when all callers are removed. At that time, MainCommonBase
+// and MainCommon can be merged. The current theory is that only Google calls this.
+int main_common(OptionsImpl& options) {
   try {
-    Server::InstanceImpl server(options, local_address, default_test_hooks, *restarter, stats_store,
-                                access_log_lock, component_factory, tls);
-    server.run();
-  } catch (const EnvoyException& e) {
-    ares_library_cleanup();
-    return 1;
+#if ENVOY_HOT_RESTART
+    MainCommonBase main_common(options, true);
+#else
+    MainCommonBase main_common(options, false);
+#endif
+    return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
+  } catch (EnvoyException& e) {
+    return EXIT_FAILURE;
   }
-  ares_library_cleanup();
-  return 0;
+  return EXIT_SUCCESS;
 }
 
 } // namespace Envoy
