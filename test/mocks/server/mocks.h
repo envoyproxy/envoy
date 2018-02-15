@@ -14,7 +14,6 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/thread/thread.h"
 
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
@@ -136,14 +135,6 @@ public:
   MOCK_METHOD0(terminateParent, void());
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
-  MOCK_METHOD0(logLock, Thread::BasicLockable&());
-  MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
-  MOCK_METHOD0(statsAllocator, Stats::RawStatDataAllocator&());
-
-private:
-  Thread::MutexBasicLockable log_lock_;
-  Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapRawStatDataAllocator stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {

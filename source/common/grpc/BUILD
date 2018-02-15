@@ -85,6 +85,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
+        "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
