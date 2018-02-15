@@ -13,11 +13,10 @@
 
 // Performance Annotation system, enabled with
 //   bazel --define=perf_annotation=enabled ...
-// which defines ENVOY_PERF_ANNOTATION.  In the absense of that flag,
-// the support classes are built and tested.  However, the supported
+// which defines ENVOY_PERF_ANNOTATION. In the absense of that flag,
+// the support classes are built and tested. However, the supported
 // macros for instrumenting code for performance analysis will expand
 // to nothing.
-
 
 // Defining ENVOY_PERF_ANNOTATION enables collections of named performance
 // statistics during the run, which can be dumped when Envoy terminates.

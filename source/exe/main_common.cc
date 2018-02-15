@@ -44,8 +44,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
   switch (options_.mode()) {
-    case Server::Mode::InitOnly:
-    case Server::Mode::Serve: {
+  case Server::Mode::InitOnly:
+  case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (hot_restart) {
       restarter_.reset(new Server::HotRestartImpl(options_));
@@ -111,37 +111,6 @@ std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, char** argv, b
   RELEASE_ASSERT(!hot_restart);
 #endif
   return std::make_unique<OptionsImpl>(argc, argv, hot_restart_version_cb, spdlog::level::info);
-}
-
-std::unique_ptr<MainCommon> MainCommon::create(int argc, char** argv, int& exit_status) {
-// TODO(jmarantz,): remove this hack when #2576 lands.
-#ifdef ENVOY_HOT_RESTART
-  bool enable_hot_restart = true;
-  if ((argc > 1) && (strcmp(argv[1], "--disable_hot_restart") == 0)) {
-    enable_hot_restart = false;
-    memmove(&argv[1], &argv[2], (argc - 2) * sizeof(char*));
-    --argc;
-    argv[argc] = nullptr;
-  }
-#else
-  constexpr bool enable_hot_restart = false;
-#endif
-
-  std::unique_ptr<Envoy::MainCommon> main_common;
-
-  // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
-  // as needed. Whatever code in the initialization path that fails is expected to log an error
-  // message so the user can diagnose.
-  try {
-    main_common = std::make_unique<Envoy::MainCommon>(argc, argv, enable_hot_restart);
-  } catch (const Envoy::NoServingException& e) {
-    exit_status = EXIT_SUCCESS;
-  } catch (const Envoy::MalformedArgvException& e) {
-    exit_status = EXIT_FAILURE;
-  } catch (const Envoy::EnvoyException& e) {
-    exit_status = EXIT_FAILURE;
-  }
-  return main_common;
 }
 
 // Legacy implementation of main_common.

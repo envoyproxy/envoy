@@ -57,10 +57,11 @@ std::string PerfAnnotationContext::toString() {
   for (const auto& iter : context->duration_count_map_) {
     sorted_values.push_back(&iter);
   }
-  std::sort(sorted_values.begin(), sorted_values.end(), [](
-      const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
-              return a->second.first > b->second.first;
-            });
+  std::sort(
+      sorted_values.begin(), sorted_values.end(),
+      [](const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
+        return a->second.first > b->second.first;
+      });
   size_t column_width = 0;
   for (const auto& p : sorted_values) {
     const DurationCount& duration_count = p->second;
