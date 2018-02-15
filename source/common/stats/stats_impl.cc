@@ -127,10 +127,10 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
     std::string::size_type start = remove_subexpr.first - stat_name.begin();
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
     remove_characters.insert(start, end);
-    PERF_REPORT(perf, "re-match", name_);
+    PERF_RECORD(perf, "re-match", name_);
     return true;
   }
-  PERF_REPORT(perf, "re-miss", name_);
+  PERF_RECORD(perf, "re-miss", name_);
   return false;
 }
 

@@ -14,10 +14,8 @@
 namespace Envoy {
 
 class PerfAnnotationTest : public testing::Test {
- protected:
-  void TearDown() override {
-    PERF_CLEAR();
-  }
+protected:
+  void TearDown() override { PERF_CLEAR(); }
 };
 
 // Tests that the macros produce something in the report that includes the categories
