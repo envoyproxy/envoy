@@ -113,7 +113,13 @@ private:
    * Iterates over every tag extractor that might possibly match stat_name, calling
    * callback f for each one. This is broken out this way to reduce code redundancy
    * during testing, where we want to verify that extraction is order-independent.
+   * The possibly-matching-extractors list is computed by:
+   *   1. Finding the first '.' separated token in stat_name.
+   *   2. Collecting the TagExtractors whose regexes have that same prefix "^prefix\\."
+   *   3. Collecting also the TagExtractors whose regexes don't start with any prefix.
+   * In the future, we may also do substring searches in some cases.
    * See DefaultTagRegexTester::produceTagsReverse in test/common/stats/stats_impl_test.cc.
+   *
    * @param stat_name const std::string& the stat name.
    * @param f std::function<void(const TagExtractorPtr&)> function to call for each extractor.
    */
