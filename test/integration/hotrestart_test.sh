@@ -54,10 +54,7 @@ handle_failure() {
     local line_number="${BASH_LINENO[(( i - 1 ))]}"
     local src="${BASH_SOURCE[$i]}"
     [ -z "$src" ] && src=non_file_source
-    local canonical_dir=$(cd $(dirname "$src") && pwd)
-    local short_dir=${canonical_dir#*/net/instaweb/}
-    local leaf=$(basename "$src")
-    echo "${short_dir}/${leaf}:${line_number}: $func"
+    echo "${src}:${line_number}: $func"
   done
 
   # Note: we print line number after "failed input" so that it doesn't get
