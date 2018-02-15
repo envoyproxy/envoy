@@ -79,9 +79,14 @@ envoy_cc_library(
     deps = [
         ":envoy_main_common_lib",
         ":extra_protocol_proxies_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:options_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:zipkin_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [":sigaction_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -96,10 +101,7 @@ envoy_cc_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:proto_descriptors_lib",
         "//source/server/config_validation:server_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [":sigaction_lib"],
-    }),
+    ],
 )
 
 envoy_cc_library(
