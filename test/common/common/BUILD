@@ -84,10 +84,22 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "perf_annotation_test",
+<<<<<<< HEAD
     srcs = [
         "perf_annotation_disabled_test.cc",
         "perf_annotation_test.cc",
     ],
+=======
+    srcs = ["perf_annotation_test.cc"],
+    deps = [
+        "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "perf_annotation_disabled_test",
+    srcs = ["perf_annotation_disabled_test.cc"],
+>>>>>>> perf-annotation-lib
     deps = [
         "//source/common/common:perf_annotation_lib",
     ],

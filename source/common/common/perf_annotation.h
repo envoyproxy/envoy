@@ -13,46 +13,72 @@
 
 // Performance Annotation system, enabled with
 //   bazel --define=perf_annotation=enabled ...
-// which defines ENVOY_PERF_ANNOTATION. In the absense of that flag,
-// the support classes are built and tested. However, the supported
-// macros for instrumenting code for performance analysis will expand
+// or, in individual .cc files:
+//   #define ENVOY_PERF_ANNOTATION
+// In the absense of such directives, the support classes are built and tested.
+// However, the macros for instrumenting code for performance analysis will expand
 // to nothing.
 
-// Defining ENVOY_PERF_ANNOTATION enables collections of named performance
-// statistics during the run, which can be dumped when Envoy terminates.
-// When not defined, empty class are provided for PerfAnnotationContext
-// and PerfOperation, but all methods will inline to nothing. Further, the
-// reporting methods should be called via macro, whch will also compile to
-// nothing when not enabled.
 
+/**
+ * Initiates a performance operation, storing its state in perf_var.  A perf_var
+ * can then be reported multiple times.
+ */
 #define PERF_OPERATION(perf_var) Envoy::PerfOperation(perf_var)
-#define PERF_REPORT(perf, category, description)                                                   \
+
+/**
+ * Records performance data initiated with PERF_OPERATION.  The category and description
+ * are joined with in the library, but only if perf is enabled.  This way, any concatenation
+ * overhead is skipped when perf-annotation is disabled.
+ */
+#define PERF_RECORD(perf, category, description)                                                   \
   do {                                                                                             \
-    perf.report(category, description);                                                            \
+    perf.record(category, description);                                                            \
   } while (false)
+
+/**
+ * Dumps recorded performance data to stdout.  Expands to nothing if not enabled.
+ */
 #define PERF_DUMP() Envoy::PerfAnnotationContext::dump()
+
+/**
+ * Returns the aggregated performance data as a formatted multi-line string, showing a
+ * formatted table of values.  Returns "" if perf-annotation is disabled.
+ */
 #define PERF_TO_STRING() Envoy::PerfAnnotationContext::toString()
+
+/**
+ * Clears all performance data.
+ */
 #define PERF_CLEAR() Envoy::PerfAnnotationContext::clear()
 
-#define PERF_THREAD_SAFE 1
+/**
+ * Controls whether performacne collection and reporting is thread safe.  For now,
+ * leaving this enabled for predictability across multiiple applications, on the assumption
+ * that an uncontended mutex lock has vanishingly small cost.  In the future we may try
+ * to make this system thread-unsafe if mutext contention disturbs the metrics.
+ */
+#define PERF_THREAD_SAFE true
 
 namespace Envoy {
 
 /**
- * Defines a context for collecting performance data, which compiles but has
- * no cost when ENVOY_PERF_AUTOMATION is not defined.
+ * Defines a context for collecting performance data.  Note that this class is
+ * fully declared and defined even if ENVOY_PERF_AUTOMATION is off.  We depend on
+ * the macros to disable performance collection for production.
  */
 class PerfAnnotationContext {
 public:
   /**
-   * Reports time consumed by a category and description, which are just
+   * Records time consumed by a category and description, which are just
    * joined together in the library with " / ".
    */
-  void report(std::chrono::nanoseconds duration, absl::string_view category,
+  void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
 
   /**
    * Renders the aggregated statistics as a string.
+   * @return std::string the performance data as a formatted string.
    */
   static std::string toString();
 
@@ -63,6 +89,7 @@ public:
 
   /**
    * Thread-safe lazy-initialization of a PerfAnnotationContext on first use.
+   * @return PerfAnnotationContext* the context.
    */
   static PerfAnnotationContext* getOrCreate();
 
@@ -92,11 +119,8 @@ private:
  * f() {
  *   PerfOperation perf_op;
  *   computeIntensiveWork();
- *   PERF_REPORT(perf_op, "category", "description");
+ *   perf_op.record("category", "description");
  * }
- *
- * When ENVOY_PERF_ANNOTATION is not defined,, these statements will inline-optimize
- * away to nothing.
  */
 class PerfOperation {
 public:
@@ -105,8 +129,10 @@ public:
   /**
    * Report an event relative to the operation in progress. Note report can be called
    * multiple times on a single PerfOperation, with distinct category/description combinations.
+   * @param category absl::string_view the name of a category for the recording.
+   * @param category absl::string_view the name of description for the recording.
    */
-  void report(absl::string_view category, absl::string_view description);
+  void record(absl::string_view category, absl::string_view description);
 
 private:
   SystemTime start_time_;
@@ -117,10 +143,13 @@ private:
 
 #else
 
+// Macros that expand to nothing when performance collection is disabled. These are contrived to
+// work syntactically as a C++ statement (e.g. if (foo) PERF_RECORD(...) else PERF_RECORD(...)).
+
 #define PERF_OPERATION(perf_var)                                                                   \
   do {                                                                                             \
   } while (false)
-#define PERF_REPORT(perf, category, description)                                                   \
+#define PERF_RECORD(perf, category, description)                                                   \
   do {                                                                                             \
   } while (false)
 #define PERF_DUMP()                                                                                \

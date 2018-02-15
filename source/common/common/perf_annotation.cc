@@ -20,16 +20,16 @@ PerfOperation::PerfOperation()
     : start_time_(ProdSystemTimeSource::instance_.currentTime()),
       context_(PerfAnnotationContext::getOrCreate()) {}
 
-void PerfOperation::report(absl::string_view category, absl::string_view description) {
+void PerfOperation::record(absl::string_view category, absl::string_view description) {
   SystemTime end_time = ProdSystemTimeSource::instance_.currentTime();
   std::chrono::nanoseconds duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_);
-  context_->report(duration, category, description);
+  context_->record(duration, category, description);
 }
 
 PerfAnnotationContext::PerfAnnotationContext() {}
 
-void PerfAnnotationContext::report(std::chrono::nanoseconds duration, absl::string_view category,
+void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
   std::string key = absl::StrCat(category, " / ", description);
   {
@@ -52,30 +52,56 @@ std::string PerfAnnotationContext::toString() {
 #if PERF_THREAD_SAFE
   std::unique_lock<std::mutex> lock(context->mutex_);
 #endif
+
+  // The map is from category/description -> [duration, time].  Reverse-sort by duration.
   std::vector<const DurationCountMap::value_type*> sorted_values;
   sorted_values.reserve(context->duration_count_map_.size());
   for (const auto& iter : context->duration_count_map_) {
     sorted_values.push_back(&iter);
   }
-  std::sort(
-      sorted_values.begin(), sorted_values.end(),
-      [](const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
-        return a->second.first > b->second.first;
-      });
-  size_t column_width = 0;
+  std::sort(sorted_values.begin(), sorted_values.end(), [](
+      const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
+              return a->second.first > b->second.first;
+            });
+
+
+  // Organize the report so it lines up in columns.  Note that the widest duration comes first,
+  // though that may not be descending order of calls or per_call time, so we need two passes
+  // to compute column widths.  First collect the column headers and their widths.
+  static const char* headers[] = {"Duration(us)", "# Calls", "per_call(ns)",
+                                  "Category / Description"};
+  constexpr int num_columns = ARRAY_SIZE(headers);
+  size_t widths[num_columns];
+  std::vector<std::string> columns[num_columns];
+  for (size_t i = 0; i < num_columns; ++i) {
+    columns[i].push_back(headers[i]);
+    widths[i] = strlen(headers[i]);
+  }
+
+  // Compute all the column strings and their max widths.
   for (const auto& p : sorted_values) {
     const DurationCount& duration_count = p->second;
     std::chrono::nanoseconds duration = duration_count.first;
     uint64_t count = duration_count.second;
-    std::string duration_count_str = absl::StrCat(
-        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()),
-        "(", count, ")");
-    if (column_width == 0) {
-      column_width = duration_count_str.size();
-    } else {
-      out.append(column_width - duration_count_str.size(), ' ');
+    columns[0].push_back(
+        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()));
+    columns[1].push_back(std::to_string(count));
+    columns[2].push_back((count == 0) ? "NaN" : std::to_string(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
+    columns[3].push_back(p->first);
+    for (size_t i = 0; i < num_columns; ++i) {
+      widths[i] = std::max(widths[i], columns[i].size());
     }
-    absl::StrAppend(&out, duration_count_str, ": ", p->first, "\n");
+  }
+
+  // Write out the table.
+  for (size_t row = 0; row < columns[0].size(); ++row) {
+    for (size_t i = 0; i < num_columns; ++i) {
+      // Right-justify by appending the number of spaces needed to bring it inline with the largest.
+      const std::string& str = columns[i][row];
+      out.append(widths[i] - str.size(), ' ');
+      absl::StrAppend(&out, str, (i == num_columns - 1) ? "\n" : "  ");
+    }
   }
   return out;
 }

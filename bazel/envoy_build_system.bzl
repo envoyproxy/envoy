@@ -407,11 +407,13 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+
 def envoy_select_perf_annotation(xs):
     return select({
         "@envoy//bazel:enable_perf_annotation": xs,
         "//conditions:default": [],
-    })
+   })
+
 
 # Selects the given values if Google gRPC is enabled in the current build.
 def envoy_select_google_grpc(xs, repository = ""):

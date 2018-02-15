@@ -29,10 +29,9 @@ namespace Stats {
 class TagExtractorImpl : public TagExtractor {
 public:
   /**
-   * Creates a tag extractor from the regex provided or looks up a default regex.
-   * @param name name for tag extractor. Used to look up a default tag extractor if regex is empty.
-   * @param regex optional regex expression. Can be specified as an empty string to trigger a
-   * default regex lookup.
+   * Creates a tag extractor from the regex provided. name and regex must be non-empty.
+   * @param name name for tag extractor.
+   * @param regex regex expression.
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex);
@@ -41,12 +40,26 @@ public:
   std::string name() const override { return name_; }
   bool extractTag(const std::string& tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
+  absl::string_view prefixToken() const override { return prefix_; }
 
 private:
+  /**
+   * Examines a regex string, looking for the pattern: ^alphanumerics_with_underscores\.
+   * Returns "alphanumerics_with_underscores" if that pattern is found, empty-string otherwise.
+   * @param regex absl::string_view the regex to scan for prefixes.
+   * @return std::string the prefix, or "" if no prefix found.
+   */
+  static std::string extractRegexPrefix(absl::string_view regex);
+
   const std::string name_;
+  const std::string prefix_;
   const std::regex regex_;
 };
 
+/**
+ * Organizes a collection of TagExtractors so that stat-names can be processed without
+ * iterating through all extractors.
+ */
 class TagProducerImpl : public TagProducer {
 public:
   TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
@@ -61,11 +74,65 @@ public:
   std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
 
 private:
-  void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
-  void addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config,
-                            std::unordered_set<std::string>& names);
+  friend class DefaultTagRegexTester;
 
-  std::vector<TagExtractorPtr> tag_extractors_;
+  /**
+   * Adds a TagExtractor to the collection of tags, tracking prefixes to help make
+   * produceTags run efficiently by trying only extractors that have a chance to match.
+   * @param extractor TagExtractorPtr the extractor to add.
+   */
+  void addExtractor(TagExtractorPtr extractor);
+
+  /**
+   * Adds all default extractors matching the specified tag name. In this model,
+   * more than one TagExtractor can be used to generate a given tag. The default
+   * extractors are specified in common/config/well_known_names.cc.
+   * @param name absl::string_view the extractor to add.
+   * @return int the number of matching extractors.
+   */
+  int addExtractorsMatching(absl::string_view name);
+
+  /**
+   * Roughly estimate the size of the vectors.
+   * @param config const envoy::config::metrics::v2::StatsConfig& the config.
+   */
+  void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
+
+  /**
+   * Adds all default extractors from well_known_names.cc into the
+   * collection. Returns a set of names of all default extractors
+   * into a string-set for dup-detection against new stat names
+   * specified in the configuration.
+   * @param config const envoy::config::metrics::v2::StatsConfig& the config.
+   * @return names std::unordered_set<std::string> the set of names to populate
+   */
+  std::unordered_set<std::string>
+  addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config);
+
+  /**
+   * Iterates over every tag extractor that might possibly match stat_name, calling
+   * callback f for each one. This is broken out this way to reduce code redundancy
+   * during testing, where we want to verify that extraction is order-independent.
+   * The possibly-matching-extractors list is computed by:
+   *   1. Finding the first '.' separated token in stat_name.
+   *   2. Collecting the TagExtractors whose regexes have that same prefix "^prefix\\."
+   *   3. Collecting also the TagExtractors whose regexes don't start with any prefix.
+   * In the future, we may also do substring searches in some cases.
+   * See DefaultTagRegexTester::produceTagsReverse in test/common/stats/stats_impl_test.cc.
+   *
+   * @param stat_name const std::string& the stat name.
+   * @param f std::function<void(const TagExtractorPtr&)> function to call for each extractor.
+   */
+  void forEachExtractorMatching(const std::string& stat_name,
+                                std::function<void(const TagExtractorPtr&)> f) const;
+
+  std::vector<TagExtractorPtr> tag_extractors_without_prefix_;
+
+  // Maps a prefix word extracted out of a regex to a vector of TagExtractors. Note that
+  // the storage for the prefix string is owned by the TagExtractor, which, depending on
+  // implementation, may need make a copy of the prefix.
+  std::unordered_map<absl::string_view, std::vector<TagExtractorPtr>, StringViewHash>
+      tag_extractor_prefix_map_;
   std::vector<Tag> default_tags_;
 };
 
