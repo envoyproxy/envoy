@@ -270,17 +270,17 @@ void ConnectionImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::raiseEvent(ConnectionEvent event) {
-  for (ConnectionCallbacks* callback : callbacks_) {
-    // TODO(mattklein123): If we close while raising a connected event we should not raise further
-    // connected events.
-    callback->onEvent(event);
-  }
   // We may have pending data in the write buffer on transport handshake
   // completion, which may also have completed in the context of onReadReady(),
   // where no check of the write buffer is made. Provide an opportunity to flush
   // here. If connection write is not ready, this is harmless.
   if (event == ConnectionEvent::Connected && write_buffer_->length() > 0) {
     onWriteReady();
+  }
+  for (ConnectionCallbacks* callback : callbacks_) {
+    // TODO(mattklein123): If we close while raising a connected event we should not raise further
+    // connected events.
+    callback->onEvent(event);
   }
 }
 

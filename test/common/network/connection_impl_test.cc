@@ -1145,13 +1145,13 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   // in the write buffer, we should see a doWrite with this data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
     transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
-    return IoResult{PostIoAction::KeepOpen, 100, false};
+    return IoResult{PostIoAction::KeepOpen, 0, false};
   }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 100, false}));
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
-  file_ready_cb_(Event::FileReadyType::Read);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {
