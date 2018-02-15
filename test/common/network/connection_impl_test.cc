@@ -1137,7 +1137,7 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   Buffer::OwnedImpl buffer(val);
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 100, false}));
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(buffer, false);
 
   // A read event happens, resulting in handshake completion and
