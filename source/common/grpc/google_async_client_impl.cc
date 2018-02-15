@@ -56,16 +56,17 @@ void GoogleAsyncClientThreadLocal::completionThread() {
   ENVOY_LOG(debug, "completionThread exiting");
 }
 
-GoogleAsyncClientImpl::GoogleAsyncClientImpl(
-    Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-    GoogleStubFactory& stub_factory, Stats::Scope& scope,
-    const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
-    : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.stat_prefix()), scope_(scope) {
+GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
+                                             GoogleAsyncClientThreadLocal& tls,
+                                             GoogleStubFactory& stub_factory, Stats::Scope& scope,
+                                             const envoy::api::v2::core::GrpcService& config)
+    : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
+      initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::Channel> channel = createChannel(config);
+  std::shared_ptr<grpc::Channel> channel = createChannel(config.google_grpc());
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_.counter("streams_total");
@@ -134,6 +135,10 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
                                       gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
                        : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
+  // Fill service-wide initial metadata.
+  for (const auto& header_value : parent_.initial_metadata_) {
+    ctxt_.AddMetadata(header_value.key(), header_value.value());
+  }
   // Due to the different HTTP header implementations, we effectively double
   // copy headers here.
   Http::HeaderMapImpl initial_metadata;
