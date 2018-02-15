@@ -201,16 +201,20 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
   // the XFCC header.
   if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward ||
       config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
-    const std::string uri_san_local_cert = connection.ssl()->uriSanLocalCertificate();
-    if (!uri_san_local_cert.empty()) {
-      client_cert_details.push_back("By=" + uri_san_local_cert);
-    }
-    const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
-    if (!cert_digest.empty()) {
-      client_cert_details.push_back("Hash=" + cert_digest);
-    }
     for (const auto& detail : config.setCurrentClientCertDetails()) {
       switch (detail) {
+      case Http::ClientCertDetailsType::By:
+        const std::string uri_san_local_cert = connection.ssl()->uriSanLocalCertificate();
+        if (!uri_san_local_cert.empty()) {
+          client_cert_details.push_back("By=" + uri_san_local_cert);
+        }
+      break;
+      case Http::ClientCertDetailsType::Hash:
+        const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
+        if (!cert_digest.empty()) {
+          client_cert_details.push_back("Hash=" + cert_digest);
+        }
+      break;
       case Http::ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
