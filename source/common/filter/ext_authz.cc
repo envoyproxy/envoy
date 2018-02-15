@@ -13,14 +13,13 @@ namespace ExtAuthz {
 namespace TcpFilter {
 
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
-  std::string final_prefix = fmt::format("ext_authz.{}.", name);
+  const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 void Instance::callCheck() {
-  envoy::service::auth::v2::CheckRequest request;
-  CreateCheckRequest::createTcpCheck(filter_callbacks_, request);
+  CheckRequestUtils::createTcpCheck(filter_callbacks_, checkRequest_);
 
   status_ = Status::Calling;
   filter_callbacks_->connection().readDisable(true);
@@ -28,7 +27,7 @@ void Instance::callCheck() {
   config_->stats().total_.inc();
 
   calling_check_ = true;
-  client_->check(*this, request, Tracing::NullSpan::instance());
+  client_->check(*this, checkRequest_, Tracing::NullSpan::instance());
   calling_check_ = false;
 }
 
