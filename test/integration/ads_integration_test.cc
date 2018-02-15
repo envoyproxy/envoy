@@ -23,6 +23,7 @@
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
+using testing::IsSubstring;
 
 namespace Envoy {
 namespace {
@@ -64,7 +65,7 @@ public:
   AssertionResult
   compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
                           const std::vector<std::string>& expected_resource_names,
-                          const Protobuf::int32 expected_error_code = 0,
+                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = std::string()) {
     envoy::api::v2::DiscoveryRequest discovery_request;
     ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
@@ -79,12 +80,8 @@ public:
                                                discovery_request.error_detail().code(),
                                                expected_error_code);
     }
-    if (discovery_request.error_detail().message().find(expected_error_message) ==
-        std::string::npos) {
-      return AssertionFailure() << fmt::format("error_message {} does not contain expected {}",
-                                               discovery_request.error_detail().message(),
-                                               expected_error_message);
-    }
+    EXPECT_TRUE(
+        IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
     const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
                                                   discovery_request.resource_names().cend());
     if (expected_resource_names != resource_names) {
@@ -304,10 +301,7 @@ TEST_P(AdsIntegrationTest, Failure) {
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().ClusterLoadAssignment,
                                                  {buildCluster("cluster_0")}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Cluster, "1", {}, Grpc::Status::GrpcStatus::Internal,
-      fmt::format("{} does not match {}", Config::TypeUrl::get().ClusterLoadAssignment,
-                  Config::TypeUrl::get().Cluster)));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"},
                               Grpc::Status::GrpcStatus::Internal,
@@ -317,10 +311,7 @@ TEST_P(AdsIntegrationTest, Failure) {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
 
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"},
-                              Grpc::Status::GrpcStatus::Internal,
-                              fmt::format("{} does not match {}", Config::TypeUrl::get().Cluster,
-                                          Config::TypeUrl::get().ClusterLoadAssignment)));
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().Listener, {buildRouteConfig("listener_0", "route_config_0")}, "1");
 
@@ -337,10 +328,7 @@ TEST_P(AdsIntegrationTest, Failure) {
                                                   {buildListener("route_config_0", "cluster_0")},
                                                   "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Listener, "1", {}, Grpc::Status::GrpcStatus::Internal,
-      fmt::format("{} does not match {}", Config::TypeUrl::get().RouteConfiguration,
-                  Config::TypeUrl::get().Listener)));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"},
                               Grpc::Status::GrpcStatus::Internal,
@@ -351,10 +339,7 @@ TEST_P(AdsIntegrationTest, Failure) {
       "1");
 
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"},
-                              Grpc::Status::GrpcStatus::Internal,
-                              fmt::format("{} does not match {}", Config::TypeUrl::get().Listener,
-                                          Config::TypeUrl::get().RouteConfiguration)));
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
