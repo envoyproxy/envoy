@@ -37,7 +37,9 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
+MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart)
+    : options_(options),
+      local_address_(Network::Utility::getLocalAddress(options_.localAddressIpVersion())) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
@@ -57,17 +59,18 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
     tls_.reset(new ThreadLocal::InstanceImpl);
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     Logger::Registry::initialize(options_.logLevel(), log_lock);
-
     stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->statsAllocator()));
-    server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
+    server_.reset(new Server::InstanceImpl(options_, local_address_, default_test_hooks_,
                                            *restarter_, *stats_store_, access_log_lock,
                                            component_factory_, *tls_));
     break;
   }
-  case Server::Mode::Validate:
+  case Server::Mode::Validate: {
+    restarter_.reset(new Server::HotRestartNopImpl());
+    Logger::Registry::initialize(options_.logLevel(), restarter_->logLock());
     break;
+  }
   }
 }
 
@@ -79,8 +82,7 @@ bool MainCommonBase::run() {
     server_->run();
     return true;
   case Server::Mode::Validate: {
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_);
+    return Server::validateConfig(options_, local_address_, component_factory_);
   }
   }
   NOT_REACHED;
