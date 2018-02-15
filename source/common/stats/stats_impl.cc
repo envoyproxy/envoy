@@ -144,40 +144,40 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& 
   std::unordered_set<std::string> names = addDefaultExtractors(config);
 
   for (const auto& tag_specifier : config.stats_tags()) {
-    if (!names.emplace(tag_specifier.tag_name()).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", tag_specifier.tag_name()));
+    const std::string& name = tag_specifier.tag_name();
+    if (!names.emplace(name).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
     }
 
     // If no tag value is found, fallback to default regex to keep backward compatibility.
     if (tag_specifier.tag_value_case() ==
             envoy::config::metrics::v2::TagSpecifier::TAG_VALUE_NOT_SET ||
         tag_specifier.tag_value_case() == envoy::config::metrics::v2::TagSpecifier::kRegex) {
+
       if (tag_specifier.regex().empty()) {
-        addExtractorsMatching(tag_specifier.tag_name());
+        if (addExtractorsMatching(name) == 0) {
+          throw EnvoyException(fmt::format(
+              "No regex specified for tag specifier and no default regex for name: '{}'", name));
+        }
       } else {
-        addExtractor(Stats::TagExtractorImpl::createTagExtractor(tag_specifier.tag_name(),
-                                                                 tag_specifier.regex()));
+        addExtractor(Stats::TagExtractorImpl::createTagExtractor(name, tag_specifier.regex()));
       }
     } else if (tag_specifier.tag_value_case() ==
                envoy::config::metrics::v2::TagSpecifier::kFixedValue) {
-      default_tags_.emplace_back(
-          Stats::Tag{.name_ = tag_specifier.tag_name(), .value_ = tag_specifier.fixed_value()});
+      default_tags_.emplace_back(Stats::Tag{.name_ = name, .value_ = tag_specifier.fixed_value()});
     }
   }
 }
 
-void TagProducerImpl::addExtractorsMatching(absl::string_view name) {
+int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
-    if (desc.name == name) {
-      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name, desc.regex));
+    if (desc.name_ == name) {
+      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_));
       ++num_found;
     }
   }
-  if (num_found == 0) {
-    throw EnvoyException(fmt::format(
-        "No regex specified for tag specifier and no default regex for name: '{}'", name));
-  }
+  return num_found;
 }
 
 void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
@@ -227,8 +227,8 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
   std::unordered_set<std::string> names;
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
-      names.emplace(desc.name);
-      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name, desc.regex));
+      names.emplace(desc.name_);
+      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_));
     }
   }
   return names;

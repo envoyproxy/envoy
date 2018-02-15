@@ -228,10 +228,9 @@ public:
    * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
    */
   struct Descriptor {
-    Descriptor(const std::string& name_arg, const std::string& regex_arg)
-        : name(name_arg), regex(regex_arg) {}
-    const std::string name;
-    const std::string regex;
+    Descriptor(const std::string& name, const std::string& regex) : name_(name), regex_(regex) {}
+    const std::string name_;
+    const std::string regex_;
   };
 
   // Cluster name tag

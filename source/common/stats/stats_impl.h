@@ -88,8 +88,9 @@ private:
    * more than one TagExtractor can be used to generate a given tag. The default
    * extractors are specified in common/config/well_known_names.cc.
    * @param name absl::string_view the extractor to add.
+   * @return int the number of matching extractors.
    */
-  void addExtractorsMatching(absl::string_view name);
+  int addExtractorsMatching(absl::string_view name);
 
   /**
    * Roughly estimate the size of the vectors.
