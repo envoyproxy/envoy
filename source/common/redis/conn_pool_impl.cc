@@ -35,8 +35,8 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
   host->cluster().stats().upstream_cx_total_.inc();
-  host->cluster().stats().upstream_cx_active_.inc();
   host->stats().cx_total_.inc();
+  host->cluster().stats().upstream_cx_active_.inc();
   host->stats().cx_active_.inc();
   connect_or_op_timer_->enableTimer(host->cluster().connectTimeout());
 }
@@ -74,8 +74,10 @@ void ClientImpl::onConnectOrOpTimeout() {
   putOutlierEvent(Upstream::Outlier::Result::TIMEOUT);
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
+    host_->stats().rq_timeout_.inc();
   } else {
     host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+    host_->stats().cx_connect_fail_.inc();
   }
 
   connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -87,6 +89,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
   } catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
+    host_->stats().rq_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
@@ -158,8 +161,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
     : parent_(parent), callbacks_(callbacks) {
   parent.host_->cluster().stats().upstream_rq_total_.inc();
-  parent.host_->cluster().stats().upstream_rq_active_.inc();
   parent.host_->stats().rq_total_.inc();
+  parent.host_->cluster().stats().upstream_rq_active_.inc();
   parent.host_->stats().rq_active_.inc();
 }
 
