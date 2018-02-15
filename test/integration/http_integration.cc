@@ -741,34 +741,47 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
 }
 
-void HttpIntegrationTest::testEnvoyHandling100Continue() {
+void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream) {
   initialize();
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                               {":path", "/dynamo/url"},
-                                                               {":scheme", "http"},
-                                                               {":authority", "host"},
-                                                               {"expect", "100-continue"}},
-                                       *response_);
-  waitForNextUpstreamRequest();
+  request_encoder_ =
+      &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                           {":path", "/dynamo/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"expect", "100-continue"}},
+                                   *response_);
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  // The continue headers should arrive immediately.
+  response_->waitForContinueHeaders();
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
 
+  // Send the rest of the request.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  upstream_request_->waitForEndStream(*dispatcher_);
   // Verify the Expect header is stripped.
   EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect) == nullptr);
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  if (additional_continue_from_upstream) {
+    // Make sure if upstream sends an 100-Continue Envoy doesn't send its own and proxy the one
+    // from upstream!
+    upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+  }
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(12, true);
+
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
   ASSERT(response_->continue_headers() != nullptr);
   EXPECT_STREQ("100", response_->continue_headers()->Status()->value().c_str());
-
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
-void HttpIntegrationTest::testEnvoyProxying100Continue(bool with_encoder_filter) {
+void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
+                                                       bool with_encoder_filter) {
   if (with_encoder_filter) {
-    // Because 100-continue only affects encoder filters, make sure it plays well
-    // with one.
+    // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.cors");
     config_helper_.addConfigModifier(
         [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
@@ -789,16 +802,34 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool with_encoder_filter)
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  request_encoder_ =
+      &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/dynamo/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"expect", "100-continue"}},
+                                   *response_);
 
-  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                               {":path", "/dynamo/url"},
-                                                               {":scheme", "http"},
-                                                               {":authority", "host"},
-                                                               {"expect", "100-continue"}},
-                                       *response_);
-  waitForNextUpstreamRequest();
+  // Wait for the request headers to be received upstream.
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
 
-  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+  if (continue_before_upstream_complete) {
+    // This case tests sending on 100-Continue headers before the client has sent all the
+    // request data.
+    upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+    response_->waitForContinueHeaders();
+  }
+  // Send all of the request data and wait for it to be received upstream.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  upstream_request_->waitForEndStream(*dispatcher_);
+
+  if (!continue_before_upstream_complete) {
+    // This case tests forwarding 100-Continue after the client has sent all data.
+    upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+    response_->waitForContinueHeaders();
+  }
+  // Now send the rest of the response.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response_->waitForEndStream();
   EXPECT_TRUE(response_->complete());

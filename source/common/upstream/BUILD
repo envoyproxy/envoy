@@ -121,6 +121,7 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/redis:conn_pool_lib",
+        "//source/common/router:router_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
     ],
 )
@@ -218,11 +219,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "thread_aware_lb_lib",
+    srcs = ["thread_aware_lb_impl.cc"],
+    hdrs = ["thread_aware_lb_impl.h"],
+    deps = [
+        ":load_balancer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "maglev_lb_lib",
     srcs = ["maglev_lb.cc"],
     hdrs = ["maglev_lb.h"],
     deps = [
-        ":load_balancer_lib",
+        ":thread_aware_lb_lib",
     ],
 )
 
@@ -231,10 +241,7 @@ envoy_cc_library(
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
     deps = [
-        ":load_balancer_lib",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/upstream:load_balancer_interface",
-        "//source/common/common:assert_lib",
+        ":thread_aware_lb_lib",
         "//source/common/common:logger_lib",
     ],
 )
@@ -291,6 +298,7 @@ envoy_cc_library(
     hdrs = ["subset_lb.h"],
     deps = [
         ":load_balancer_lib",
+        ":maglev_lb_lib",
         ":ring_hash_lb_lib",
         ":upstream_lib",
         "//include/envoy/runtime:runtime_interface",

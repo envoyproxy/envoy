@@ -235,6 +235,7 @@ public:
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
+  uint32_t xffNumTrustedHops() const override { return 0; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
@@ -243,7 +244,7 @@ public:
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
-  bool proxy100Continue() const override { return false; }
+  bool proxy100Continue() const override { return proxy_100_continue_; }
 
   NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -278,6 +279,7 @@ public:
   bool streaming_filter_{false};
   Stats::IsolatedStoreImpl fake_listener_stats_;
   ConnectionManagerListenerStats listener_stats_;
+  bool proxy_100_continue_ = false;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockStreamEncoder response_encoder_;
@@ -348,6 +350,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
+  proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
 
   // Store the basic request encoder during filter chain setup.
@@ -400,7 +403,32 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxyingDisabled) {
+  proxy_100_continue_ = false;
+  setup(false, "envoy-custom-server", false);
+  setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
+
+  // Akin to 100ContinueResponseWithEncoderFilters below, but with
+  // proxy_100_continue_ false. Verify the filters do not get the 100 continue
+  // headers.
+  EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_)).Times(0);
+  EXPECT_CALL(*encoder_filters_[1], encode100ContinueHeaders(_)).Times(0);
+  EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_)).Times(0);
+  HeaderMapPtr continue_headers{new TestHeaderMapImpl{{":status", "100"}}};
+  decoder_filters_[0]->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
+  proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();
@@ -423,6 +451,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
+  proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder();
   sendReqestHeadersAndData();

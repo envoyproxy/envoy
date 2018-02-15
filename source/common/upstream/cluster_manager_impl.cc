@@ -28,6 +28,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
@@ -444,6 +445,10 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
         primary_cluster_reference.prioritySet(), primary_cluster_reference.info()->stats(),
         runtime_, random_, primary_cluster_reference.info()->lbRingHashConfig(),
         primary_cluster_reference.info()->lbConfig());
+  } else if (primary_cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
+    cluster_entry_it->second.thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
+        primary_cluster_reference.prioritySet(), primary_cluster_reference.info()->stats(),
+        runtime_, random_, primary_cluster_reference.info()->lbConfig());
   }
 
   cm_stats_.total_clusters_.set(primary_clusters_.size());
@@ -706,7 +711,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                                            parent.parent_.random_, cluster->lbConfig()));
       break;
     }
-    case LoadBalancerType::RingHash: {
+    case LoadBalancerType::RingHash:
+    case LoadBalancerType::Maglev: {
       ASSERT(lb_factory_ != nullptr);
       lb_ = lb_factory_->create();
       break;

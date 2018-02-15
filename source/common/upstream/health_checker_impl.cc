@@ -24,6 +24,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/redis/conn_pool_impl.h"
+#include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
 namespace Envoy {
@@ -281,7 +282,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.http_health_check().path()) {
+      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_.value(config.http_health_check().service_name());
   }
@@ -332,7 +333,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host, parent_.cluster_.info()->name()},
+      {Http::Headers::get().Host,
+       parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
@@ -723,6 +725,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       parent_.service_method_.name());
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
+  Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 

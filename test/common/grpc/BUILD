@@ -56,6 +56,19 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "google_async_client_impl_test",
+    srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/proto:helloworld_proto",
+    ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
+)
+
 envoy_cc_test_library(
     name = "grpc_client_integration_lib",
     hdrs = ["grpc_client_integration.h"],

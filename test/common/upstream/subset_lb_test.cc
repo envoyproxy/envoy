@@ -733,6 +733,8 @@ TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRingHash) {
   doLbTypeTest(LoadBalancerType::RingHash);
 }
 
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesMaglev) { doLbTypeTest(LoadBalancerType::Maglev); }
+
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));

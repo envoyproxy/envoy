@@ -152,8 +152,9 @@ protected:
   void testGrpcRetry();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
-  void testEnvoyHandling100Continue();
-  void testEnvoyProxying100Continue(bool with_encoder_filter = false);
+  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false);
+  void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
+                                    bool with_encoder_filter = false);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

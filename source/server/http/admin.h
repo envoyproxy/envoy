@@ -76,6 +76,7 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
+  uint32_t xffNumTrustedHops() const override { return 0; }
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }

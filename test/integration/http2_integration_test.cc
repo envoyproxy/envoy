@@ -106,7 +106,13 @@ TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
-TEST_P(Http2IntegrationTest, EnvoyProxying100Continue) { testEnvoyProxying100Continue(); }
+TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
+  testEnvoyHandling100Continue(true);
+}
+
+TEST_P(Http2IntegrationTest, EnvoyProxyingEarly100Continue) { testEnvoyProxying100Continue(true); }
+
+TEST_P(Http2IntegrationTest, EnvoyProxyingLate100Continue) { testEnvoyProxying100Continue(false); }
 
 TEST_P(Http2IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
