@@ -40,7 +40,7 @@ public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls);
 
   // Grpc::AsyncClientManager
-  AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
+  AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
                                               Stats::Scope& scope) override;
 
 private:

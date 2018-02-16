@@ -64,14 +64,13 @@ AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 }
 
 AsyncClientFactoryPtr
-AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
+AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
                                               Stats::Scope& scope) {
-  switch (grpc_service.target_specifier_case()) {
+  switch (config.target_specifier_case()) {
   case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, grpc_service);
+    return std::make_unique<AsyncClientFactoryImpl>(cm_, config);
   case envoy::api::v2::core::GrpcService::kGoogleGrpc:
-    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope,
-                                                          grpc_service);
+    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope, config);
   default:
     NOT_REACHED;
   }

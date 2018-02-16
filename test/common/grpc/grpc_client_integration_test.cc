@@ -240,7 +240,7 @@ public:
     }
   }
 
-  void fillServerWideInitialMetadata(envoy::api::v2::core::GrpcService& config) {
+  void fillServiceWideInitialMetadata(envoy::api::v2::core::GrpcService& config) {
     for (const auto& item : service_wide_initial_metadata_) {
       auto* header_value = config.add_initial_metadata();
       header_value->set_key(item.first.get());
@@ -275,7 +275,7 @@ public:
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
-    fillServerWideInitialMetadata(config);
+    fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config);
   }
 
@@ -284,7 +284,7 @@ public:
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri(fake_upstream_->localAddress()->asString());
     google_grpc->set_stat_prefix("fake_cluster");
-    fillServerWideInitialMetadata(config);
+    fillServiceWideInitialMetadata(config);
     return config;
   }
 
