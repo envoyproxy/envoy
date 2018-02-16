@@ -441,6 +441,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
+  const std::string host = "fake_cluster";
+  const std::string path = "/healthcheck";
   setupServiceValidationHC();
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
@@ -459,8 +461,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
         EXPECT_TRUE(headers.Path());
         EXPECT_NE(nullptr, headers.Host());
         EXPECT_NE(nullptr, headers.Path());
-        EXPECT_EQ(headers.Host()->value().c_str(), std::string("fake_cluster"));
-        EXPECT_EQ(headers.Path()->value().c_str(), std::string("/healthcheck"));
+        EXPECT_EQ(headers.Host()->value().c_str(), host);
+        EXPECT_EQ(headers.Path()->value().c_str(), path);
       }));
   health_checker_->start();
 
@@ -475,7 +477,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
-  std::string host = "www.envoyproxy.io";
+  const std::string host = "www.envoyproxy.io";
+  const std::string path = "/healthcheck";
   setupServiceValidationWithCustomHostValueHC(host);
   // requires non-empty `service_name` in config.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
@@ -495,8 +498,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
         EXPECT_TRUE(headers.Path());
         EXPECT_NE(nullptr, headers.Host());
         EXPECT_NE(nullptr, headers.Path());
-        EXPECT_EQ(headers.Host()->value().c_str(), std::string(host));
-        EXPECT_EQ(headers.Path()->value().c_str(), std::string("/healthcheck"));
+        EXPECT_EQ(headers.Host()->value().c_str(), host);
+        EXPECT_EQ(headers.Path()->value().c_str(), path);
       }));
   health_checker_->start();
 

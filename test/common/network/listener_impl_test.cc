@@ -154,5 +154,52 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
+// Test for the correct behavior when a listener is configured with an ANY address that allows
+// receiving IPv4 connections on an IPv6 socket. In this case the address instances of both
+// local and remote addresses of the connection should be IPv4 instances, as the connection really
+// is an IPv4 connection.
+TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_, true), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+
+  ASSERT_TRUE(socket.localAddress()->ip()->isAnyAddress());
+
+  // Do not redirect since use_original_dst is false.
+  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, true);
+
+  auto listener_address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
+  auto local_dst_address = Network::Utility::getAddressWithPort(
+      *Network::Utility::getCanonicalIpv4LoopbackAddress(), socket.localAddress()->ip()->port());
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
+      local_dst_address, Network::Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->connect();
+
+  EXPECT_CALL(listener, getLocalAddress(_))
+      .WillOnce(Invoke(
+          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+
+  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+        Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
+        listener_callbacks.onNewConnection(std::move(new_connection));
+      }));
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        EXPECT_EQ(conn->localAddress()->ip()->version(), conn->remoteAddress()->ip()->version());
+        EXPECT_EQ(*conn->localAddress(), *local_dst_address);
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
 } // namespace Network
 } // namespace Envoy

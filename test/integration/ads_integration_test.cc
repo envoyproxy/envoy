@@ -9,10 +9,14 @@
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
+#include "common/ssl/context_config_impl.h"
+#include "common/ssl/context_manager_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -33,7 +37,7 @@ dynamic_resources:
     api_type: GRPC
 static_resources:
   clusters:
-    name: ads_cluster
+    name: dummy_cluster
     connect_timeout: { seconds: 5 }
     type: STATIC
     hosts:
@@ -57,6 +61,29 @@ public:
   void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_));
+  }
+
+  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h2");
+    auto* tls_cert = common_tls_context->add_tls_certificates();
+    tls_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+    tls_cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    Ssl::ServerContextConfigImpl cfg(tls_context);
+
+    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
+                                                         std::vector<std::string>{}, true,
+                                                         context_manager_, *upstream_stats_store);
   }
 
   AssertionResult compareDiscoveryRequest(const std::string& expected_type_url,
@@ -172,17 +199,34 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      setGrpcService(
-          *bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services(),
-          "ads_cluster", fake_upstreams_.back()->localAddress());
+      auto* grpc_service =
+          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+      auto* context = ads_cluster->mutable_tls_context();
+      auto* validation_context =
+          context->mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      validation_context->add_verify_subject_alt_name("foo.lyft.com");
+      if (clientType() == Grpc::ClientType::GoogleGrpc) {
+        auto* google_grpc = grpc_service->mutable_google_grpc();
+        auto* ssl_creds = google_grpc->mutable_ssl_credentials();
+        ssl_creds->mutable_root_certs()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      }
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
   }
 
+  Runtime::MockLoader runtime_;
+  Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };

@@ -9,6 +9,9 @@
 #include "common/http/http2/conn_pool.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/ssl/context_config_impl.h"
+#include "common/ssl/context_manager_impl.h"
+#include "common/ssl/ssl_socket.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -205,8 +208,13 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        fake_upstream_(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, ipVersion())) {
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+
+  virtual void initialize() {
+    if (fake_upstream_ == nullptr) {
+      fake_upstream_ =
+          std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2, ipVersion());
+    }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
       grpc_client_ = createAsyncClientImpl();
@@ -237,7 +245,9 @@ public:
   AsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         dispatcher_, fake_upstream_->localAddress(), nullptr,
-        std::make_unique<Network::RawBufferSocket>(), nullptr);
+        std::move(async_client_transport_socket_), nullptr);
+    ON_CALL(*mock_cluster_info_, connectTimeout())
+        .WillByDefault(Return(std::chrono::milliseconds(1000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
     EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
@@ -258,15 +268,19 @@ public:
     return std::make_unique<AsyncClientImpl>(cm_, fake_cluster_name_);
   }
 
-  AsyncClientPtr createGoogleAsyncClientImpl() {
-#ifdef ENVOY_GOOGLE_GRPC
+  virtual envoy::api::v2::core::GrpcService::GoogleGrpc createGoogleGrpcConfig() {
     envoy::api::v2::core::GrpcService::GoogleGrpc config;
     config.set_target_uri(fake_upstream_->localAddress()->asString());
     config.set_stat_prefix("fake_cluster");
+    return config;
+  }
+
+  AsyncClientPtr createGoogleAsyncClientImpl() {
+#ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
-                                                   stats_store_, config);
+                                                   stats_store_, createGoogleGrpcConfig());
 #else
     NOT_REACHED;
 #endif
@@ -360,6 +374,7 @@ public:
   const TestMetadata empty_metadata_;
 
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
+  Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
   const std::string fake_cluster_name_{"fake_cluster"};
   Upstream::MockClusterManager cm_;
   Upstream::MockClusterInfo* mock_cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
@@ -387,6 +402,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, GrpcClientIntegrationTest,
 
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -397,6 +413,7 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
 
 // Validate that a client destruction with open streams cleans up appropriately.
 TEST_P(GrpcClientIntegrationTest, ClientDestruct) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   grpc_client_.reset();
@@ -404,6 +421,7 @@ TEST_P(GrpcClientIntegrationTest, ClientDestruct) {
 
 // Validate that a simple request-reply unary RPC works.
 TEST_P(GrpcClientIntegrationTest, BasicRequest) {
+  initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
@@ -411,6 +429,7 @@ TEST_P(GrpcClientIntegrationTest, BasicRequest) {
 
 // Validate that multiple streams work.
 TEST_P(GrpcClientIntegrationTest, MultiStream) {
+  initialize();
   auto stream_0 = createStream(empty_metadata_);
   auto stream_1 = createStream(empty_metadata_);
   stream_0->sendRequest();
@@ -424,6 +443,7 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
 
 // Validate that multiple request-reply unary RPCs works.
 TEST_P(GrpcClientIntegrationTest, MultiRequest) {
+  initialize();
   auto request_0 = createRequest(empty_metadata_);
   auto request_1 = createRequest(empty_metadata_);
   request_1->sendReply();
@@ -433,6 +453,7 @@ TEST_P(GrpcClientIntegrationTest, MultiRequest) {
 
 // Validate that a non-200 HTTP status results in the expected gRPC error.
 TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
+  initialize();
   for (const auto http_response_status : {400, 401, 403, 404, 429, 431}) {
     auto stream = createStream(empty_metadata_);
     const Http::TestHeaderMapImpl reply_headers{{":status", std::to_string(http_response_status)}};
@@ -450,6 +471,7 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
 
 // Validate that a non-200 HTTP status results in fallback to grpc-status.
 TEST_P(GrpcClientIntegrationTest, GrpcStatusFallback) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   const Http::TestHeaderMapImpl reply_headers{
       {":status", "404"},
@@ -464,6 +486,7 @@ TEST_P(GrpcClientIntegrationTest, GrpcStatusFallback) {
 
 // Validate that a HTTP-level reset is handled as an INTERNAL gRPC error.
 TEST_P(GrpcClientIntegrationTest, HttpReset) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   dispatcher_helper_.runDispatcher();
@@ -476,6 +499,7 @@ TEST_P(GrpcClientIntegrationTest, HttpReset) {
 // Validate that a reply with bad gRPC framing (compressed frames with Envoy
 // client) is handled as an INTERNAL gRPC error.
 TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
+  initialize();
   // Only testing behavior of Envoy client, since Google client handles
   // compressed frames.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
@@ -491,6 +515,7 @@ TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
 
 // Validate that a reply with bad protobuf is handled as an INTERNAL gRPC error.
 TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -504,6 +529,7 @@ TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
 // Validate that an out-of-range gRPC status is handled as an INVALID_CODE gRPC
 // error.
 TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {
+  initialize();
   // TODO(htuch): there is an UBSAN issue with Google gRPC client library
   // handling of out-of-range status codes, see
   // https://circleci.com/gh/envoyproxy/envoy/20234?utm_campaign=vcs-integration-link&utm_medium=referral&utm_source=github-build-link
@@ -522,6 +548,7 @@ TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {
 
 // Validate that a missing gRPC status is handled as an UNKNOWN gRPC error.
 TEST_P(GrpcClientIntegrationTest, MissingGrpcStatus) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
@@ -535,6 +562,7 @@ TEST_P(GrpcClientIntegrationTest, MissingGrpcStatus) {
 
 // Validate that a reply terminated without trailers is handled as a gRPC error.
 TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -552,6 +580,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
 
 // Validate that send client initial metadata works.
 TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
+  initialize();
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
@@ -563,6 +592,7 @@ TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
 
 // Validate that send client initial metadata works.
 TEST_P(GrpcClientIntegrationTest, RequestClientInitialMetadata) {
+  initialize();
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
@@ -574,6 +604,7 @@ TEST_P(GrpcClientIntegrationTest, RequestClientInitialMetadata) {
 
 // Validate that receiving server initial metadata works.
 TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   const TestMetadata initial_metadata = {
@@ -588,6 +619,7 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
 
 // Validate that receiving server trailing metadata works.
 TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -602,6 +634,7 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
 
 // Validate that a trailers-only response is handled for streams.
 TEST_P(GrpcClientIntegrationTest, StreamTrailersOnly) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_, true);
   dispatcher_helper_.runDispatcher();
@@ -610,6 +643,7 @@ TEST_P(GrpcClientIntegrationTest, StreamTrailersOnly) {
 // Validate that a trailers-only response is handled for requests, where it is
 // an error.
 TEST_P(GrpcClientIntegrationTest, RequestTrailersOnly) {
+  initialize();
   auto request = createRequest(empty_metadata_);
   const Http::TestHeaderMapImpl reply_headers{{":status", "200"}, {"grpc-status", "0"}};
   EXPECT_CALL(*request->child_span_, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "0"));
@@ -623,6 +657,7 @@ TEST_P(GrpcClientIntegrationTest, RequestTrailersOnly) {
 
 // Validate that a trailers RESOURCE_EXHAUSTED reply is handled.
 TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
@@ -634,6 +669,7 @@ TEST_P(GrpcClientIntegrationTest, ResourceExhaustedError) {
 
 // Validate that we can continue to receive after a local close.
 TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest(true);
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -644,6 +680,7 @@ TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
 
 // Validate that reset() doesn't explode on a half-closed stream (local).
 TEST_P(GrpcClientIntegrationTest, ResetAfterCloseLocal) {
+  initialize();
   auto stream = createStream(empty_metadata_);
   stream->grpc_stream_->closeStream();
   stream->fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
@@ -654,6 +691,7 @@ TEST_P(GrpcClientIntegrationTest, ResetAfterCloseLocal) {
 
 // Validate that request cancel() works.
 TEST_P(GrpcClientIntegrationTest, CancelRequest) {
+  initialize();
   auto request = createRequest(empty_metadata_);
   EXPECT_CALL(*request->child_span_,
               setTag(Tracing::Tags::get().STATUS, Tracing::Tags::get().CANCELED));
@@ -661,6 +699,106 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
   request->grpc_request_->cancel();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   request->fake_stream_->waitForReset();
+}
+
+// SSL connection credential validation tests.
+class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
+public:
+  void TearDown() override {
+    // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
+    // doesn't like dangling contexts at destruction.
+    fake_upstream_.reset();
+    client_connection_.reset();
+    mock_cluster_info_->transport_socket_factory_.reset();
+  }
+
+  virtual envoy::api::v2::core::GrpcService::GoogleGrpc createGoogleGrpcConfig() override {
+    auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
+    auto* ssl_creds = config.mutable_ssl_credentials();
+    ssl_creds->mutable_root_certs()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    if (use_client_cert_) {
+      ssl_creds->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+      ssl_creds->mutable_cert_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+    }
+    return config;
+  }
+
+  void initialize() override {
+    envoy::api::v2::auth::UpstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    auto* validation_context = common_tls_context->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    if (use_client_cert_) {
+      auto* tls_cert = common_tls_context->add_tls_certificates();
+      tls_cert->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+      tls_cert->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+    }
+    Ssl::ClientContextConfigImpl cfg(tls_context);
+
+    mock_cluster_info_->transport_socket_factory_ =
+        std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, stats_store_);
+    ON_CALL(*mock_cluster_info_, transportSocketFactory())
+        .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
+    async_client_transport_socket_ =
+        mock_cluster_info_->transport_socket_factory_->createTransportSocket();
+    fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
+                                                    FakeHttpConnection::Type::HTTP2, ipVersion());
+
+    GrpcClientIntegrationTest::initialize();
+  }
+
+  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h2");
+    auto* tls_cert = common_tls_context->add_tls_certificates();
+    tls_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+    tls_cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    if (use_client_cert_) {
+      tls_context.mutable_require_client_certificate()->set_value(true);
+      auto* validation_context = common_tls_context->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    }
+    Ssl::ServerContextConfigImpl cfg(tls_context);
+
+    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
+                                                         std::vector<std::string>{}, true,
+                                                         context_manager_, *upstream_stats_store);
+  }
+
+  bool use_client_cert_{};
+  Ssl::ContextManagerImpl context_manager_{runtime_};
+};
+
+// Parameterize the loopback test server socket address and gRPC client type.
+INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate that a simple request-reply unary RPC works with SSL.
+TEST_P(GrpcSslClientIntegrationTest, BasicSslRequest) {
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a simple request-reply unary RPC works with SSL + client certs.
+TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
+  use_client_cert_ = true;
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
 }
 
 } // namespace
