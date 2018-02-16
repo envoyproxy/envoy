@@ -73,10 +73,10 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   stream_->sendMessage(request, false);
 
-  //clear error_detail if any after the request is sent.
-      if (api_state_[type_url].request_.has_error_detail()) {
-      api_state_[type_url].request_.clear_error_detail();
-    }
+  // clear error_detail if any after the request is sent.
+  if (api_state_[type_url].request_.has_error_detail()) {
+    api_state_[type_url].request_.clear_error_detail();
+  }
 }
 
 void GrpcMuxImpl::handleFailure() {
