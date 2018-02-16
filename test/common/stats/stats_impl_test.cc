@@ -396,6 +396,7 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 
   EXPECT_EQ("", extractRegexPrefix("^prefix(foo)."));
   EXPECT_EQ("prefix", extractRegexPrefix("^prefix\\.foo"));
+  EXPECT_EQ("prefix_optional", extractRegexPrefix("^prefix_optional(?=\\.)"));
   EXPECT_EQ("", extractRegexPrefix("^notACompleteToken"));   //
   EXPECT_EQ("onlyToken", extractRegexPrefix("^onlyToken$")); //
   EXPECT_EQ("", extractRegexPrefix("(prefix)"));
