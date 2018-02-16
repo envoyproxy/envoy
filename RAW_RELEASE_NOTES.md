@@ -8,6 +8,7 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added support for specifying alternate stats name while emitting stats for clusters.
 * Added support for inline delivery of TLS certificates and private keys.
 * Added gRPC healthcheck based on [grpc.health.v1.Health](https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto) service.
 * Added Metrics Service implementation.
