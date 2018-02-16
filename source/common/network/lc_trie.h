@@ -146,7 +146,7 @@ private:
 
     void addNestedPrefix(const IpPrefix& other) {
       if (nested_prefixes_ == nullptr) {
-        nested_prefixes_ = std::make_unique<std::vector<IpPrefix>>();
+        nested_prefixes_ = std::make_shared<std::vector<IpPrefix>>();
       }
       nested_prefixes_->push_back(other);
     }
@@ -529,6 +529,7 @@ LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) 
   // a parent prefix with a set of additional prefixes nested under it. In the latter
   // case, we compare the supplied ip_address against all the prefixes in the entry
   // and return the union of all the matches' tags.
+  // TODO(ccaraman): determine whether there's a more optimal way to handle "/0" prefixes.
   std::unordered_set<std::string> unique_tags;
   const auto& prefix = ip_prefixes_[address];
   if (prefix.contains(ip_address)) {
