@@ -16,6 +16,8 @@ jobs:
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
+       - store_artifacts:
+          path: /tmp/envoy-dist
    asan:
      docker:
        - image: *envoy-build-image
