@@ -93,17 +93,22 @@ std::string PerfAnnotationContext::toString() {
                   std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
     columns[3].push_back(p->first);
     for (size_t i = 0; i < num_columns; ++i) {
-      widths[i] = std::max(widths[i], columns[i].size());
+      widths[i] = std::max(widths[i], columns[i].back().size());
     }
   }
 
   // Write out the table.
   for (size_t row = 0; row < columns[0].size(); ++row) {
     for (size_t i = 0; i < num_columns; ++i) {
-      // Right-justify by appending the number of spaces needed to bring it inline with the largest.
       const std::string& str = columns[i][row];
-      out.append(widths[i] - str.size(), ' ');
-      absl::StrAppend(&out, str, (i == num_columns - 1) ? "\n" : "  ");
+      // Right-justify all but last column by appending the number of spaces needed to bring
+      // it inline with the largest.
+      if (i != (num_columns - 1)) {
+        out.append(widths[i] - str.size(), ' ');
+        absl::StrAppend(&out, str, "  ");
+      } else {
+        absl::StrAppend(&out, str, "\n");
+      }
     }
   }
   return out;
