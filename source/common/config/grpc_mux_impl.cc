@@ -72,6 +72,11 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   stream_->sendMessage(request, false);
+
+  // clear error_detail after the request is sent if it exists.
+  if (api_state_[type_url].request_.has_error_detail()) {
+    api_state_[type_url].request_.clear_error_detail();
+  }
 }
 
 void GrpcMuxImpl::handleFailure() {
@@ -179,6 +184,9 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     for (auto watch : api_state_[type_url].watches_) {
       watch->callbacks_.onConfigUpdateFailed(&e);
     }
+    ::google::rpc::Status* error_detail = api_state_[type_url].request_.mutable_error_detail();
+    error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
+    error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   sendDiscoveryRequest(type_url);
