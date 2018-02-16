@@ -137,6 +137,11 @@ public:
    * router/cluster/listener.
    */
   virtual uint64_t maxObjNameLength() PURE;
+
+  /**
+   * @return bool indicating whether the hot restart functionality has been disabled via cli flags.
+   */
+  virtual bool hotRestartDisabled() PURE;
 };
 
 } // namespace Server

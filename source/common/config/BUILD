@@ -86,6 +86,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "datasource_lib",
+    srcs = ["datasource.cc"],
+    hdrs = ["datasource.h"],
+    deps = [
+        "//source/common/filesystem:filesystem_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_json_lib",
     srcs = ["filter_json.cc"],
     hdrs = ["filter_json.h"],

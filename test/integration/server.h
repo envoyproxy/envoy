@@ -53,6 +53,7 @@ public:
   const std::string& serviceZone() override { return service_zone_; }
   uint64_t maxStats() override { return 16384; }
   uint64_t maxObjNameLength() override { return 60; }
+  bool hotRestartDisabled() override { return false; }
 
 private:
   const std::string config_path_;

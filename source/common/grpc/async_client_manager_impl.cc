@@ -43,6 +43,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
       scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))), config_(config) {
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
+  UNREFERENCED_PARAMETER(google_tls_slot_);
   UNREFERENCED_PARAMETER(scope_);
   UNREFERENCED_PARAMETER(config_);
   throw EnvoyException("Google C++ gRPC client is not linked");
