@@ -46,9 +46,9 @@ TEST_F(PerfAnnotationTest, testFormat) {
   context->record(std::chrono::microseconds{200}, "gamma", "2");
   std::string report = context->toString();
   EXPECT_EQ("Duration(us)  # Calls  per_call(ns)  Category / Description\n"
-            "        4000        4       1000000               alpha / 1\n"
-            "         200        1        200000               gamma / 2\n"
-            "          90        3         30000                beta / 3\n",
+            "        4000        4       1000000  alpha / 1\n"
+            "         200        1        200000  gamma / 2\n"
+            "          90        3         30000  beta / 3\n",
             context->toString());
 }
 
