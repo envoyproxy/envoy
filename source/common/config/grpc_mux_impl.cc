@@ -146,14 +146,11 @@ void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
-
   if (api_state_.count(type_url) == 0) {
     ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
     return;
   }
-
   try {
-
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
     // We have to walk all watches (and need an efficient map as a result) to
