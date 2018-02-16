@@ -22,7 +22,6 @@ void Instance::callCheck() {
   CheckRequestUtils::createTcpCheck(filter_callbacks_, checkRequest_);
 
   status_ = Status::Calling;
-  filter_callbacks_->connection().readDisable(true);
   config_->stats().active_.inc();
   config_->stats().total_.inc();
 
@@ -33,9 +32,8 @@ void Instance::callCheck() {
 
 Network::FilterStatus Instance::onData(Buffer::Instance&) {
   if (status_ == Status::NotStarted) {
-    // If there was no ssl handshake there will be no event Network::ConnectionEvent::Connected
-    // and onData() will be the first event into the filter.
-    // Therefore, if the authorization service hasn not been invoked then we must do so now.
+    // By waiting to invoke the check at onData() the call to authorization service will have
+    // sufficient information to fillout the checkRequest_.
     callCheck();
   }
   return status_ == Status::Calling ? Network::FilterStatus::StopIteration
@@ -43,7 +41,7 @@ Network::FilterStatus Instance::onData(Buffer::Instance&) {
 }
 
 Network::FilterStatus Instance::onNewConnection() {
-  // Wait till the next event occurs.
+  // Wait till onData() happens.
   return Network::FilterStatus::Continue;
 }
 
@@ -56,20 +54,11 @@ void Instance::onEvent(Network::ConnectionEvent event) {
       client_->cancel();
       config_->stats().active_.dec();
     }
-  } else {
-    // SSL connection is post TCP newConnection. Therefore the ext_authz check in onEvent.
-    // if the ssl handshake was successful then it will invoke the
-    // Network::ConnectionEvent::Connected.
-    // Thus invoke the authorization service check if not done yet.
-    if (status_ == Status::NotStarted) {
-      callCheck();
-    }
   }
 }
 
 void Instance::onComplete(CheckStatus status) {
   status_ = Status::Complete;
-  filter_callbacks_->connection().readDisable(false);
   config_->stats().active_.dec();
 
   switch (status) {
