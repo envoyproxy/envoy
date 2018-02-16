@@ -12,6 +12,7 @@ jobs:
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.release
+       - run: ci/do_circle_ci.sh github_release
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
