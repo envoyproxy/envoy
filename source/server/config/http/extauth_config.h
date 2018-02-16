@@ -20,7 +20,8 @@ public:
   std::string name() override { return "extauth"; }
 
   HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config,
-                                          const std::string& stats_prefix, FactoryContext& context);
+                                          const std::string& stats_prefix,
+                                          FactoryContext& context) override;
 };
 
 } // namespace Configuration
