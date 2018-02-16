@@ -72,6 +72,11 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   stream_->sendMessage(request, false);
+
+  //clear error_detail if any after the request is sent.
+      if (api_state_[type_url].request_.has_error_detail()) {
+      api_state_[type_url].request_.clear_error_detail();
+    }
 }
 
 void GrpcMuxImpl::handleFailure() {
@@ -148,9 +153,6 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
   }
 
   try {
-    if (api_state_[type_url].request_.has_error_detail()) {
-      api_state_[type_url].request_.clear_error_detail();
-    }
 
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.

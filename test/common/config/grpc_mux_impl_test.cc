@@ -45,7 +45,7 @@ public:
   void expectSendMessage(const std::string& type_url,
                          const std::vector<std::string>& resource_names, const std::string& version,
                          const Protobuf::int32 error_code = Grpc::Status::GrpcStatus::Ok,
-                         const std::string& error_message = std::string()) {
+                         const std::string& error_message = "") {
     envoy::api::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     for (const auto& resource : resource_names) {
@@ -166,13 +166,10 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     }));
 
     expectSendMessage("foo", {"x", "y"}, "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("{} does not match {} type URL is DiscoveryResponse {}", "bar",
-                                  "foo", invalid_response->DebugString()));
+                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }
-  expectSendMessage("foo", {}, "", Grpc::Status::GrpcStatus::Internal,
-                    fmt::format("{} does not match {} type URL is DiscoveryResponse {}", "bar",
-                                "foo", invalid_response->DebugString()));
+  expectSendMessage("foo", {}, "");
 }
 
 // Validate behavior when watches has an unknown resource name.
