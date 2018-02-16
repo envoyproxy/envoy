@@ -47,8 +47,8 @@ function publish_github_release() {
   chmod +x /usr/local/bin/ghrelease
 
   if [[ -n "${TAG:-}" ]]; then
-      ghrelease release --tag "${TAG:-}" --user taion809 --repo envoy-build-tests --name "${TAG:-}"
-      ghrelease upload --tag "${TAG:-}" --user taion809 --repo envoy-build-tests --name "envoy-linux-amd64" --file "${ENVOY_SRCDIR}/build_release_stripped/envoy"
+      ghrelease release --tag "${TAG:-}" --name "${TAG:-}"
+      ghrelease upload --tag "${TAG:-}" --name "envoy-linux-amd64" --file "${ENVOY_SRCDIR}/build_release_stripped/envoy"
   fi
 }
 
@@ -191,8 +191,22 @@ elif [[ "$1" == "github_release" ]]; then
       exit 0
   fi
 
-  if [[ -z "${GITHUB_TOKEN}" ]]; then
+  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
       echo "environment variable GITHUB_TOKEN unset; cannot continue with publishing."
+      
+      # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
+      exit 0
+  fi
+
+  if [[ -z "${GITHUB_USER:-}" ]]; then
+      echo "environment variable GITHUB_USERNAME unset; cannot continue with publishing."
+      
+      # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
+      exit 0
+  fi
+
+  if [[ -z "${GITHUB_REPO:-}" ]]; then
+      echo "environment variable GITHUB_USERNAME unset; cannot continue with publishing."
       
       # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
       exit 0
