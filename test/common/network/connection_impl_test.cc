@@ -842,6 +842,10 @@ public:
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
+    EXPECT_CALL(*transport_socket_, setTransportSocketCallbacks(_))
+        .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
+          transport_socket_callbacks_ = &callbacks;
+        }));
     connection_.reset(
         new ConnectionImpl(dispatcher_, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
                            TransportSocketPtr(transport_socket_), true));
@@ -861,9 +865,10 @@ public:
   std::unique_ptr<ConnectionImpl> connection_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockConnectionCallbacks> callbacks_;
-  NiceMock<MockTransportSocket>* transport_socket_;
+  MockTransportSocket* transport_socket_;
   Event::MockFileEvent* file_event_;
   Event::FileReadyCb file_ready_cb_;
+  TransportSocketCallbacks* transport_socket_callbacks_;
 };
 
 // Test that BytesSentCb is invoked at the correct times
@@ -1120,6 +1125,33 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
       .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write));
   connection_->write(buffer, true);
+}
+
+// Validate that when the transport signals ConnectionEvent::Connected, that we
+// check for pending write buffer content.
+TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
+  InSequence s;
+
+  // Queue up some data in write buffer, simulating what happens in SSL handshake.
+  const std::string val("some data");
+  Buffer::OwnedImpl buffer(val);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  connection_->write(buffer, false);
+
+  // A read event happens, resulting in handshake completion and
+  // raiseEvent(Network::ConnectionEvent::Connected). Since we have data queued
+  // in the write buffer, we should see a doWrite with this data.
+  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
+    transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    return IoResult{PostIoAction::KeepOpen, 0, false};
+  }));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

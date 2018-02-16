@@ -75,6 +75,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(
 }
 
 GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
+  ENVOY_LOG(debug, "Client teardown, resetting streams");
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
   }

@@ -10,6 +10,7 @@
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
@@ -28,6 +29,7 @@ MockOptions::MockOptions(const std::string& config_path)
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));
   ON_CALL(*this, maxStats()).WillByDefault(Return(1000));
   ON_CALL(*this, maxObjNameLength()).WillByDefault(Return(150));
+  ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
 }
 MockOptions::~MockOptions() {}
 
@@ -47,7 +49,11 @@ MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
 }
 MockGuardDog::~MockGuardDog() {}
 
-MockHotRestart::MockHotRestart() {}
+MockHotRestart::MockHotRestart() {
+  ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
+  ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
+  ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));
+}
 MockHotRestart::~MockHotRestart() {}
 
 MockListenerComponentFactory::MockListenerComponentFactory()

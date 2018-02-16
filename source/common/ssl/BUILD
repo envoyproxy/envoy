@@ -34,6 +34,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/config:tls_context_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
