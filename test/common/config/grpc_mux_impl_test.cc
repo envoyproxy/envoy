@@ -166,7 +166,8 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     }));
 
     expectSendMessage("foo", {"x", "y"}, "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",invalid_response->DebugString()));
+                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
+                                  invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
   }
   expectSendMessage("foo", {}, "");
