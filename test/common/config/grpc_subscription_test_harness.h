@@ -47,7 +47,7 @@ public:
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
-    expectSendMessage(cluster_names, version, Grpc::Status::GrpcStatus::Ok, std::string());
+    expectSendMessage(cluster_names, version, Grpc::Status::GrpcStatus::Ok, "");
   }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names, const std::string& version,
