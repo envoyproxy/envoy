@@ -78,7 +78,6 @@ MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 bool MainCommonBase::run() {
   switch (options_.mode()) {
   case Server::Mode::Serve:
-    exit(0);
     server_->run();
     return true;
   case Server::Mode::Validate: {

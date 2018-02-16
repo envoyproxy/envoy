@@ -68,10 +68,6 @@ TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& r
     : name_(name), prefix_(std::string(extractRegexPrefix(regex))),
       regex_(RegexUtil::parseRegex(regex)) {}
 
-static bool regexStartsWithDot(absl::string_view regex) {
-  return absl::StartsWith(regex, "\\.") || absl::StartsWith(regex, "(?=\\.)");
-}
-
 std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
   std::string prefix;
   if (absl::StartsWith(regex, "^")) {
@@ -79,7 +75,7 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
       if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
         if (i > 1) {
           const bool last_char = i == regex.size() - 1;
-          if ((!last_char && regexStartsWithDot(regex.substr(i))) ||
+          if ((!last_char && (regex[i] == '\\') && (regex[i + 1] == '.')) ||
               (last_char && (regex[i] == '$'))) {
             prefix.append(regex.data() + 1, i - 1);
           }
