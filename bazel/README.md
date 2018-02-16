@@ -31,6 +31,7 @@ On Ubuntu, run the following commands:
  apt-get install libtool
  apt-get install cmake
  apt-get install realpath
+ apt-get install clang-format-5.0
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
@@ -53,9 +54,10 @@ Envoy compiles and passes tests with the version of clang installed by XCode 8.3
 Apple LLVM version 8.1.0 (clang-802.0.42).
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
-and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
-4. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
-5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files. 
+4. `go get github.com/bazelbuild/buildtools/buildifier` to install buildifier
+5. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
+6. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 
