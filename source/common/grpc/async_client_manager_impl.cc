@@ -10,15 +10,16 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
-                                               const std::string& cluster_name)
-    : cm_(cm), cluster_name_(cluster_name) {
+                                               const envoy::api::v2::core::GrpcService& config)
+    : cm_(cm), config_(config) {
+  const std::string& cluster_name = config.envoy_grpc().cluster_name();
   auto clusters = cm_.clusters();
-  const auto& it = clusters.find(cluster_name_);
+  const auto& it = clusters.find(cluster_name);
   if (it == clusters.end()) {
-    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name_));
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
   }
   if (it->second.get().info()->addedViaApi()) {
-    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name_));
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
   }
 }
 
@@ -33,14 +34,15 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
 }
 
 AsyncClientPtr AsyncClientFactoryImpl::create() {
-  return std::make_unique<AsyncClientImpl>(cm_, cluster_name_);
+  return std::make_unique<AsyncClientImpl>(cm_, config_);
 }
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, ThreadLocal::Slot& google_tls_slot, Stats::Scope& scope,
-    const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
+    const envoy::api::v2::core::GrpcService& config)
     : tls_(tls), google_tls_slot_(google_tls_slot),
-      scope_(scope.createScope(fmt::format("grpc.{}.", config.stat_prefix()))), config_(config) {
+      scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
+      config_(config) {
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(google_tls_slot_);
@@ -62,14 +64,13 @@ AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 }
 
 AsyncClientFactoryPtr
-AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
+AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
                                               Stats::Scope& scope) {
-  switch (grpc_service.target_specifier_case()) {
+  switch (config.target_specifier_case()) {
   case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, grpc_service.envoy_grpc().cluster_name());
+    return std::make_unique<AsyncClientFactoryImpl>(cm_, config);
   case envoy::api::v2::core::GrpcService::kGoogleGrpc:
-    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope,
-                                                          grpc_service.google_grpc());
+    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope, config);
   default:
     NOT_REACHED;
   }

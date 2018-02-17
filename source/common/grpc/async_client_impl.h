@@ -14,7 +14,7 @@ class AsyncStreamImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const std::string& remote_cluster_name);
+  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::api::v2::core::GrpcService& config);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -28,6 +28,7 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
+  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
 
   friend class AsyncRequestImpl;
