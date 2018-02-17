@@ -24,8 +24,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::_;
 
 namespace Envoy {
