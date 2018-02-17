@@ -6,15 +6,18 @@
 #include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
 #include "common/dynamo/dynamo_filter.h"
+#include "common/protobuf/utility.h"
 
 #include "server/config/access_log/file_access_log.h"
 #include "server/config/network/client_ssl_auth.h"
+#include "server/config/network/ext_authz.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
 #include "server/config/network/tcp_proxy.h"
 
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -22,6 +25,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Invoke;
 using testing::_;
 
 namespace Envoy {
@@ -44,9 +48,12 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy redis_proto;
   TcpProxyConfigFactory tcp_proxy_factory;
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_proto;
+  ExtAuthzConfigFactory ext_authz_factory;
+  envoy::config::filter::network::ext_authz::v2::ExtAuthz ext_authz_proto;
   const std::vector<std::pair<NamedNetworkFilterConfigFactory&, Protobuf::Message&>> filter_cases =
       {
           {client_ssl_auth_factory, client_ssl_auth_proto},
+          {ext_authz_factory, ext_authz_proto},
           {hcm_factory, hcm_proto},
           {mongo_factory, mongo_proto},
           {rate_limit_factory, rate_limit_proto},
@@ -489,9 +496,8 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'",
-                  Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
+      EnvoyException, fmt::format("Double registration for name: '{}'",
+                                  Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
 }
 
 TEST(AccessLogConfigTest, FileAccessLogTest) {
@@ -527,6 +533,61 @@ TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
   config.set_cluster("cluster");
 
   NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, ExtAuthzCorrectJson) {
+  std::string json = R"EOF(
+    {
+      "grpc_service": {
+          "envoy_grpc": { "cluster_name": "ext_authz_server" }
+      },
+      "failure_mode_allow": true,
+      "stat_prefix": "name"
+    }
+    )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
+  NiceMock<MockFactoryContext> context;
+  ExtAuthzConfigFactory factory;
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
+  std::string json = R"EOF(
+    {
+      "grpc_service": {
+          "google_grpc": {
+             "target_uri": "ext_authz_server",
+             "stat_prefix": "google"
+           }
+      },
+      "failure_mode_allow": false,
+      "stat_prefix": "name"
+    }
+    )EOF";
+
+  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
+  MessageUtil::loadFromJson(json, proto_config);
+
+  NiceMock<MockFactoryContext> context;
+  ExtAuthzConfigFactory factory;
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

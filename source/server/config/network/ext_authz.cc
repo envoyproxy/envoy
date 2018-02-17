@@ -21,7 +21,8 @@ NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
     FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
-  ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty());
+  ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty() ||
+         !proto_config.grpc_service().google_grpc().target_uri().empty());
 
   ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(
       new ExtAuthz::TcpFilter::Config(proto_config, context.scope()));
