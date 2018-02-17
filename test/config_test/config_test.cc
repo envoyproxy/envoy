@@ -5,8 +5,8 @@
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/cluster_manager_impl.h"
 
+#include "server/config_validation/server.h"
 #include "server/configuration_impl.h"
 
 #include "test/integration/server.h"
@@ -41,7 +41,7 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
-    cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+    cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(
         server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo()));
 
