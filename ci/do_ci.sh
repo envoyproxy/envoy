@@ -38,20 +38,6 @@ function bazel_debug_binary_build() {
     "${ENVOY_DELIVERY_DIR}"/envoy-debug
 }
 
-function publish_github_release() {
-  TAG=$(git describe --abbrev=0 --tags)
-
-  wget https://github.com/aktau/github-release/releases/download/v0.7.2/linux-amd64-github-release.tar.bz2 -O /tmp/ghrelease.tar.bz2
-  tar -xvjpf /tmp/ghrelease.tar.bz2 -C /tmp
-  cp /tmp/bin/linux/amd64/github-release /usr/local/bin/ghrelease
-  chmod +x /usr/local/bin/ghrelease
-
-  if [[ -n "${TAG:-}" ]]; then
-      ghrelease release --tag "${TAG:-}" --name "${TAG:-}"
-      ghrelease upload --tag "${TAG:-}" --name "envoy-linux-amd64" --file "${ENVOY_SRCDIR}/build_release_stripped/envoy"
-  fi
-}
-
 if [[ "$1" == "bazel.release" ]]; then
   # The release build step still runs during tag events. Avoid rebuilding for no reason.
   # TODO(mattklein123): Consider moving this into its own "build".
@@ -184,40 +170,7 @@ elif [[ "$1" == "docs" ]]; then
   docs/publish.sh
   exit 0
 elif [[ "$1" == "github_release" ]]; then
-  if [[ ! -f "${ENVOY_SRCDIR}/build_release_stripped/envoy" ]]; then
-      echo "could not locate envoy binary at path: ${ENVOY_SRCDIR}/build_release_stripped/envoy"
-      
-      # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-      exit 0
-  fi
-
-  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-      echo "environment variable GITHUB_TOKEN unset; cannot continue with publishing."
-      
-      # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-      exit 0
-  fi
-
-  if [[ -z "${GITHUB_USER:-}" ]]; then
-      echo "environment variable GITHUB_USERNAME unset; cannot continue with publishing."
-      
-      # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-      exit 0
-  fi
-
-  if [[ -z "${GITHUB_REPO:-}" ]]; then
-      echo "environment variable GITHUB_USERNAME unset; cannot continue with publishing."
-      
-      # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-      exit 0
-  fi
-
-  if [[ -n "${CIRCLE_TAG:-}" ]]; then
-      echo "skipping tag events"
-      exit 0
-  fi
-
-  publish_github_release
+  ./publish_github_release.sh
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1
