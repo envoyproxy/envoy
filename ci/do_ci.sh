@@ -170,7 +170,7 @@ elif [[ "$1" == "docs" ]]; then
   docs/publish.sh
   exit 0
 elif [[ "$1" == "github_release" ]]; then
-  ./publish_github_release.sh
+  ./ci/publish_github_release.sh
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1
