@@ -31,7 +31,7 @@ public:
 private:
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot& google_tls_slot_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   const envoy::api::v2::core::GrpcService config_;
 };
 

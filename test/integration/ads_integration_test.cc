@@ -389,5 +389,50 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
+class AdsFailIntegrationTest : public HttpIntegrationTest,
+                               public Grpc::GrpcClientIntegrationParamTest {
+public:
+  AdsFailIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+
+  void TearDown() override {
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto* grpc_service =
+          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+    });
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+  }
+
+  FakeHttpConnectionPtr ads_connection_;
+  FakeStreamPtr ads_stream_;
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate that we don't crash on failed ADS stream.
+TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
+  initialize();
+  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  ads_stream_->startGrpcStream();
+  ads_stream_->finishGrpcStream(Grpc::Status::Internal);
+}
+
 } // namespace
 } // namespace Envoy

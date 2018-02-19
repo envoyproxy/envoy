@@ -269,7 +269,7 @@ public:
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        *cluster_info_ptr_, stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+        *cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
         std::move(shadow_writer_ptr_));
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
@@ -293,7 +293,7 @@ public:
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
     GoogleGenericStubFactory stub_factory;
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
-                                                   stats_store_, createGoogleGrpcConfig());
+                                                   stats_scope_, createGoogleGrpcConfig());
 #else
     NOT_REACHED;
 #endif
@@ -383,7 +383,8 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  Stats::ScopeSharedPtr stats_scope_{stats_store_};
   std::unique_ptr<FakeUpstream> fake_upstream_;
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
@@ -773,7 +774,7 @@ public:
     Ssl::ClientContextConfigImpl cfg(tls_context);
 
     mock_cluster_info_->transport_socket_factory_ =
-        std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, stats_store_);
+        std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, *stats_store_);
     ON_CALL(*mock_cluster_info_, transportSocketFactory())
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
