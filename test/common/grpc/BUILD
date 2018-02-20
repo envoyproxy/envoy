@@ -81,6 +81,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "grpc_client_integration_test",
     srcs = ["grpc_client_integration_test.cc"],
+    data = ["//test/config/integration/certs"],
     deps = [
         ":grpc_client_integration_lib",
         "//source/common/common:enum_to_int",
@@ -89,6 +90,9 @@ envoy_cc_test(
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/ssl:context_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:stats_lib",
         "//test/integration:integration_lib",
         "//test/mocks/grpc:grpc_mocks",

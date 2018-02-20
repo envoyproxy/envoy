@@ -66,9 +66,9 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-void CreateCheckRequest::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
-                                            const Network::Connection& connection,
-                                            const std::string& service, const bool local) {
+void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+                                           const Network::Connection& connection,
+                                           const std::string& service, const bool local) {
 
   // Set the address
   auto addr = peer.mutable_address();
@@ -103,14 +103,14 @@ void CreateCheckRequest::setAttrContextPeer(envoy::service::auth::v2::AttributeC
   }
 }
 
-std::string CreateCheckRequest::getHeaderStr(const Envoy::Http::HeaderEntry* entry) {
+std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entry) {
   if (entry) {
     return entry->value().getString();
   }
   return "";
 }
 
-void CreateCheckRequest::setHttpRequest(
+void CheckRequestUtils::setHttpRequest(
     ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
@@ -154,16 +154,16 @@ void CreateCheckRequest::setHttpRequest(
       mutable_headers);
 }
 
-void CreateCheckRequest::setAttrContextRequest(
+void CheckRequestUtils::setAttrContextRequest(
     ::envoy::service::auth::v2::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
   setHttpRequest(*req.mutable_http(), callbacks, headers);
 }
 
-void CreateCheckRequest::createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                         const Envoy::Http::HeaderMap& headers,
-                                         envoy::service::auth::v2::CheckRequest& request) {
+void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                                        const Envoy::Http::HeaderMap& headers,
+                                        envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 
@@ -177,8 +177,8 @@ void CreateCheckRequest::createHttpCheck(const Envoy::Http::StreamDecoderFilterC
   setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
 }
 
-void CreateCheckRequest::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                        envoy::service::auth::v2::CheckRequest& request) {
+void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
+                                       envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 

@@ -505,8 +505,9 @@ LcTrie::LcTrieInternal<IpType, address_size>::LcTrieInternal(
 template <class IpType, uint32_t address_size>
 std::vector<std::string>
 LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) const {
+  std::vector<std::string> return_vector;
   if (trie_.empty()) {
-    return std::vector<std::string>();
+    return return_vector;
   }
 
   LcNode node = trie_[0];
