@@ -128,9 +128,7 @@ private:
      * @return true if other is a prefix of this.
      */
     bool isPrefix(const IpPrefix& other) {
-      return (length_ == 0 || (length_ <= other.length_ &&
-                               extractBits<IpType, address_size>(0, length_, ip_) ==
-                                   extractBits<IpType, address_size>(0, length_, other.ip_)));
+      return (length_ == 0 || (length_ <= other.length_ && contains(other.ip_)));
     }
 
     /**
@@ -162,6 +160,8 @@ private:
     // prefix, the lookup will scan the nested prefixes to see if any of them match,
     // too. This situation is rare, so to save memory in the common case the
     // nested_prefixes field is a pointer to a vector rather than an inline vector.
+    // TODO(brian-pane) switch to a trie of nested prefixes, to ensure sublinear-time
+    // searching even in situations where there are a lot of nested prefixes.
     std::shared_ptr<std::vector<IpPrefix>> nested_prefixes_;
   };
 
