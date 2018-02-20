@@ -68,7 +68,7 @@ class ExtAuth : Logger::Loggable<Logger::Id::filter>,
                 public StreamDecoderFilter,
                 public Http::AsyncClient::Callbacks {
 public:
-  ExtAuth(ExtAuthConfigConstSharedPtr config);
+  ExtAuth(const ExtAuthConfigConstSharedPtr& config);
   ~ExtAuth();
 
   static ExtAuthStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -87,7 +87,7 @@ public:
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
-  void dumpHeaders(const char* what, HeaderMap* headers);
+  void dumpHeaders(const char* what, HeaderMap* headers); // dump headers for debugging
 
   ExtAuthConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
