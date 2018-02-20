@@ -367,8 +367,8 @@ public:
                          Runtime::RandomGenerator& random,
                          Redis::ConnPool::ClientFactory& client_factory);
 
-  static const Redis::RespValue& healthCheckRequest() {
-    static HealthCheckRequest* request = new HealthCheckRequest();
+  static const Redis::RespValue& healthCheckRequest(const std::string& key) {
+    static HealthCheckRequest* request = new HealthCheckRequest(key);
     return request->request_;
   }
 
@@ -406,7 +406,7 @@ private:
   };
 
   struct HealthCheckRequest {
-    HealthCheckRequest();
+    HealthCheckRequest(const std::string& key);
 
     Redis::RespValue request_;
   };
@@ -419,6 +419,7 @@ private:
   }
 
   Redis::ConnPool::ClientFactory& client_factory_;
+  const std::string key_;
 };
 
 /**
