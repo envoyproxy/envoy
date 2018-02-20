@@ -10,20 +10,21 @@ namespace Grpc {
 
 class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
-  AsyncClientFactoryImpl(Upstream::ClusterManager& cm, const std::string& cluster_name);
+  AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
+                         const envoy::api::v2::core::GrpcService& config);
 
   AsyncClientPtr create() override;
 
 private:
   Upstream::ClusterManager& cm_;
-  const std::string cluster_name_;
+  const envoy::api::v2::core::GrpcService config_;
 };
 
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot& google_tls_slot,
                                Stats::Scope& scope,
-                               const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
+                               const envoy::api::v2::core::GrpcService& config);
 
   AsyncClientPtr create() override;
 
@@ -31,7 +32,7 @@ private:
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot& google_tls_slot_;
   Stats::ScopePtr scope_;
-  const envoy::api::v2::core::GrpcService::GoogleGrpc config_;
+  const envoy::api::v2::core::GrpcService config_;
 };
 
 class AsyncClientManagerImpl : public AsyncClientManager {
@@ -39,7 +40,7 @@ public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls);
 
   // Grpc::AsyncClientManager
-  AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
+  AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
                                               Stats::Scope& scope) override;
 
 private:

@@ -101,7 +101,7 @@ public:
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
           Http::TestHeaderMapImpl stream_headers(received_headers);
-          for (auto& value : metadata) {
+          for (const auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
@@ -240,6 +240,14 @@ public:
     }
   }
 
+  void fillServiceWideInitialMetadata(envoy::api::v2::core::GrpcService& config) {
+    for (const auto& item : service_wide_initial_metadata_) {
+      auto* header_value = config.add_initial_metadata();
+      header_value->set_key(item.first.get());
+      header_value->set_value(item.second);
+    }
+  }
+
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
   AsyncClientPtr createAsyncClientImpl() {
@@ -265,13 +273,18 @@ public:
         std::move(shadow_writer_ptr_));
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    return std::make_unique<AsyncClientImpl>(cm_, fake_cluster_name_);
+    envoy::api::v2::core::GrpcService config;
+    config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
+    fillServiceWideInitialMetadata(config);
+    return std::make_unique<AsyncClientImpl>(cm_, config);
   }
 
-  virtual envoy::api::v2::core::GrpcService::GoogleGrpc createGoogleGrpcConfig() {
-    envoy::api::v2::core::GrpcService::GoogleGrpc config;
-    config.set_target_uri(fake_upstream_->localAddress()->asString());
-    config.set_stat_prefix("fake_cluster");
+  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
+    envoy::api::v2::core::GrpcService config;
+    auto* google_grpc = config.mutable_google_grpc();
+    google_grpc->set_target_uri(fake_upstream_->localAddress()->asString());
+    google_grpc->set_stat_prefix("fake_cluster");
+    fillServiceWideInitialMetadata(config);
     return config;
   }
 
@@ -286,20 +299,26 @@ public:
 #endif
   }
 
-  void expectInitialHeaders(FakeStream& fake_stream) {
+  void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
     fake_stream.waitForHeadersComplete();
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     EXPECT_EQ("POST", stream_headers.get_(":method"));
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers.get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers.get_("content-type"));
     EXPECT_EQ("trailers", stream_headers.get_("te"));
+    for (const auto& value : initial_metadata) {
+      EXPECT_EQ(value.second, stream_headers.get_(value.first));
+    }
+    for (const auto& value : service_wide_initial_metadata_) {
+      EXPECT_EQ(value.second, stream_headers.get_(value.first));
+    }
   }
 
   std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
-          for (auto& value : initial_metadata) {
+          for (const auto& value : initial_metadata) {
             headers.addReference(value.first, value.second);
           }
         }));
@@ -326,7 +345,7 @@ public:
     auto& fake_stream = *fake_streams_.back();
     request->fake_stream_ = &fake_stream;
 
-    expectInitialHeaders(fake_stream);
+    expectInitialHeaders(fake_stream, initial_metadata);
 
     helloworld::HelloRequest received_msg;
     fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
@@ -339,7 +358,7 @@ public:
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
-          for (auto& value : initial_metadata) {
+          for (const auto& value : initial_metadata) {
             headers.addReference(value.first, value.second);
           }
         }));
@@ -354,7 +373,7 @@ public:
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;
 
-    expectInitialHeaders(fake_stream);
+    expectInitialHeaders(fake_stream, initial_metadata);
 
     return stream;
   }
@@ -366,6 +385,7 @@ public:
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<FakeUpstream> fake_upstream_;
+  TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
 #endif
@@ -578,7 +598,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that send client initial metadata works.
+// Validate that sending client initial metadata works.
 TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
   initialize();
   const TestMetadata initial_metadata = {
@@ -590,7 +610,7 @@ TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that send client initial metadata works.
+// Validate that sending client initial metadata works.
 TEST_P(GrpcClientIntegrationTest, RequestClientInitialMetadata) {
   initialize();
   const TestMetadata initial_metadata = {
@@ -598,6 +618,16 @@ TEST_P(GrpcClientIntegrationTest, RequestClientInitialMetadata) {
       {Http::LowerCaseString("baz"), "blah"},
   };
   auto request = createRequest(initial_metadata);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that setting service-wide client initial metadata works.
+TEST_P(GrpcClientIntegrationTest, RequestServiceWideInitialMetadata) {
+  service_wide_initial_metadata_.emplace_back(Http::LowerCaseString("foo"), "bar");
+  service_wide_initial_metadata_.emplace_back(Http::LowerCaseString("baz"), "blah");
+  initialize();
+  auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
 }
@@ -712,9 +742,10 @@ public:
     mock_cluster_info_->transport_socket_factory_.reset();
   }
 
-  virtual envoy::api::v2::core::GrpcService::GoogleGrpc createGoogleGrpcConfig() override {
+  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
-    auto* ssl_creds = config.mutable_ssl_credentials();
+    auto* google_grpc = config.mutable_google_grpc();
+    auto* ssl_creds = google_grpc->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (use_client_cert_) {

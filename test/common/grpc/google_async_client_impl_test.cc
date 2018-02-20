@@ -43,9 +43,10 @@ class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    envoy::api::v2::core::GrpcService::GoogleGrpc config;
-    config.set_target_uri("fake_address");
-    config.set_stat_prefix("test_cluster");
+    envoy::api::v2::core::GrpcService config;
+    auto* google_grpc = config.mutable_google_grpc();
+    google_grpc->set_target_uri("fake_address");
+    google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
                                                            stats_store_, config);

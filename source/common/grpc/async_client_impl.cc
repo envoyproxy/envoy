@@ -11,8 +11,9 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
-                                 const std::string& remote_cluster_name)
-    : cm_(cm), remote_cluster_name_(remote_cluster_name) {}
+                                 const envoy::api::v2::core::GrpcService& config)
+    : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
+      initial_metadata_(config.initial_metadata()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -74,6 +75,11 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ = Common::prepareHeaders(
       parent_.remote_cluster_name_, service_method_.service()->full_name(), service_method_.name());
+  // Fill service-wide initial metadata.
+  for (const auto& header_value : parent_.initial_metadata_) {
+    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
+                                        header_value.value());
+  }
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
