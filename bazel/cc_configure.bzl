@@ -61,11 +61,11 @@ def _build_envoy_cc_wrapper(repository_ctx):
   #
   # Since the script is Python, we can inject values using `repr(str(value))`
   # and escaping will be handled correctly.
-  repository_ctx.template("envoy_cc_wrapper", repository_ctx.attr._envoy_cc_wrapper, {
+  repository_ctx.template("extra_tools/envoy_cc_wrapper", repository_ctx.attr._envoy_cc_wrapper, {
       "{ENVOY_REAL_CC}": repr(str(real_cc)),
       "{ENVOY_REAL_CXX}": repr(str(real_cxx)),
   })
-  return repository_ctx.path("envoy_cc_wrapper")
+  return repository_ctx.path("extra_tools/envoy_cc_wrapper")
 
 def _needs_envoy_cc_wrapper(repository_ctx):
   # When building for Linux we set additional C++ compiler options that aren't
