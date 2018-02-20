@@ -539,31 +539,6 @@ TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
   cb(connection);
 }
 
-TEST(NetworkFilterConfigTest, ExtAuthzCorrectJson) {
-  std::string json = R"EOF(
-    {
-      "grpc_service": {
-          "envoy_grpc": { "cluster_name": "ext_authz_server" }
-      },
-      "failure_mode_allow": true,
-      "stat_prefix": "name"
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-  NiceMock<MockFactoryContext> context;
-  ExtAuthzConfigFactory factory;
-
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
-  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
 TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
   std::string json = R"EOF(
     {

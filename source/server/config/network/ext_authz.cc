@@ -43,11 +43,9 @@ NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
   };
 }
 
-NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                                                  FactoryContext& context) {
-  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config;
-  MessageUtil::loadFromJson(json_config.asJsonString(), proto_config);
-  return createFilter(proto_config, context);
+NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilterFactory(const Json::Object&,
+                                                                  FactoryContext&) {
+  NOT_IMPLEMENTED;
 }
 
 NetworkFilterFactoryCb
