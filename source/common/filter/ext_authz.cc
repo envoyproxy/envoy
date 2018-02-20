@@ -30,7 +30,7 @@ void Instance::callCheck() {
   calling_check_ = false;
 }
 
-Network::FilterStatus Instance::onData(Buffer::Instance&) {
+Network::FilterStatus Instance::onData(Buffer::Instance&, bool /* end_stream */) {
   if (status_ == Status::NotStarted) {
     // By waiting to invoke the check at onData() the call to authorization service will have
     // sufficient information to fillout the checkRequest_.
