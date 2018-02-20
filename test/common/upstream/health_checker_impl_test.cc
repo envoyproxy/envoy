@@ -1413,7 +1413,7 @@ public:
                                                      dispatcher_, runtime_, random_, *this));
   }
 
-    void setupExistsHealthcheck() {
+  void setupExistsHealthcheck() {
     std::string json = R"EOF(
     {
       "type": "redis",
@@ -1503,6 +1503,13 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   response->type(Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
+
+  // FOOO
+  Redis::RespValue request;
+  request.type(Redis::RespType::Error);
+  request.asString() = "blah blah blah";
+  // EXPECT_CALL(&pool_callbacks_, onResponse_(PointeesEq(&request)));
+  // FOOO
 
   expectRequestCreate();
   interval_timer_->callback_();
