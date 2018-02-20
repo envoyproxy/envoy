@@ -35,7 +35,11 @@ public:
   void expectIPAndTags(
       const std::vector<std::pair<std::string, std::vector<std::string>>>& test_output) {
     for (const auto& kv : test_output) {
-      EXPECT_EQ(kv.second, trie_->getTags(Utility::parseInternetAddress(kv.first)));
+      std::vector<std::string> expected(kv.second);
+      std::sort(expected.begin(), expected.end());
+      std::vector<std::string> actual(trie_->getTags(Utility::parseInternetAddress(kv.first)));
+      std::sort(actual.begin(), actual.end());
+      EXPECT_EQ(expected, actual);
     }
   }
 
@@ -43,7 +47,6 @@ public:
 };
 
 // TODO(ccaraman): Add a performance and memory benchmark test.
-
 // Use the default constructor values.
 TEST_F(LcTrieTest, IPv4Defaults) {
   std::vector<std::vector<std::string>> cidr_range_strings = {
@@ -252,22 +255,50 @@ TEST_F(LcTrieTest, BothIpvVersions) {
 }
 
 TEST_F(LcTrieTest, NestedPrefixes) {
-  EXPECT_THROW_WITH_MESSAGE(setup({{"1.2.3.130/24", "1.2.3.255/32"}}), EnvoyException,
-                            "LcTrie does not support nested prefixes. '1.2.3.255/32' is a nested "
-                            "prefix of '1.2.3.0/24'.");
+  const std::vector<std::vector<std::string>> cidr_range_strings = {
+      {"203.0.113.0/24", "203.0.113.128/25"}, // tag_0
+      {"203.0.113.255/32"},                   // tag_1
+      {"198.51.100.0/24"},                    // tag_2
+      {"2001:db8::/96", "2001:db8::8000/97"}, // tag_3
+      {"2001:db8::ffff/128"},                 // tag_4
+      {"2001:db8:1::/48"},                    // tag_5
+      {"2001:db8:1::/48"}                     // tag_6
+  };
+  setup(cidr_range_strings);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setup({{"0.0.0.0/0", "1.2.3.254/32"}}), EnvoyException,
-      "LcTrie does not support nested prefixes. '1.2.3.254/32' is a nested prefix of '0.0.0.0/0'.");
+  const std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"203.0.113.0", {"tag_0"}},
+      {"203.0.113.192", {"tag_0"}},
+      {"203.0.113.255", {"tag_0", "tag_1"}},
+      {"198.51.100.1", {"tag_2"}},
+      {"2001:db8::ffff", {"tag_3", "tag_4"}},
+      {"2001:db8:1::ffff", {"tag_5", "tag_6"}}};
+  expectIPAndTags(test_case);
+}
 
-  EXPECT_THROW_WITH_MESSAGE(setup({{"2406:da00:2000::/40", "2406:da00:2000::1/100"}}),
-                            EnvoyException,
-                            "LcTrie does not support nested prefixes. '2406:da00:2000::/100' is a "
-                            "nested prefix of '2406:da00:2000::/40'.");
+TEST_F(LcTrieTest, NestedPrefixesWithCatchAll) {
+  std::vector<std::vector<std::string>> cidr_range_strings = {
+      {"0.0.0.0/0"},                          // tag_0
+      {"203.0.113.0/24"},                     // tag_1
+      {"203.0.113.128/25"},                   // tag_2
+      {"198.51.100.0/24"},                    // tag_3
+      {"::0/0"},                              // tag_4
+      {"2001:db8::/96", "2001:db8::8000/97"}, // tag_5
+      {"2001:db8::ffff/128"},                 // tag_6
+      {"2001:db8:1::/48"}                     // tag_7
+  };
+  setup(cidr_range_strings);
 
-  EXPECT_THROW_WITH_MESSAGE(setup({{"::/0", "2406:da00:2000::1/100"}}), EnvoyException,
-                            "LcTrie does not support nested prefixes. '2406:da00:2000::/100' is a "
-                            "nested prefix of '::/0'.");
+  std::vector<std::pair<std::string, std::vector<std::string>>> test_case = {
+      {"203.0.113.0", {"tag_0", "tag_1"}},
+      {"203.0.113.192", {"tag_0", "tag_1", "tag_2"}},
+      {"203.0.113.255", {"tag_0", "tag_1", "tag_2"}},
+      {"198.51.100.1", {"tag_0", "tag_3"}},
+      {"2001:db8::ffff", {"tag_4", "tag_5", "tag_6"}},
+      {"2001:db8:1::ffff", {"tag_4", "tag_7"}}
+
+  };
+  expectIPAndTags(test_case);
 }
 
 } // namespace LcTrie
