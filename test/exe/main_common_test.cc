@@ -4,6 +4,7 @@
 // but can't measure its test coverage.
 //
 // TODO(issues/2580): Fix coverage tests when MainCommonTest is enabled.
+// TODO(issues/2649): This test needs to be parameterized on IP versions.
 #ifndef ENVOY_CONFIG_COVERAGE
 
 #include "exe/main_common.h"
@@ -25,6 +26,9 @@
 namespace Envoy {
 
 TEST(MainCommon, ConstructDestruct) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
   std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                             "/test/config/integration/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
@@ -32,6 +36,9 @@ TEST(MainCommon, ConstructDestruct) {
 }
 
 TEST(MainCommon, LegacyMain) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
   // Testing the legacy path is difficult because if we give it a valid config, it will
   // never exit. So just give it an empty config and let it fail.
   int argc = 1;
