@@ -24,8 +24,8 @@ int main(int argc, char* argv[]) {
   try {
 
     Envoy::Event::Libevent::Global::initialize();
-    static auto* lock = new Envoy::Thread::MutexBasicLockable();
-    Envoy::Logger::Registry::initialize(static_cast<spdlog::level::level_enum>(2), *lock);
+    Envoy::Thread::MutexBasicLockable lock;
+    Envoy::Logger::Registry::initialize(static_cast<spdlog::level::level_enum>(2), lock);
 
     const uint32_t num_tested = Envoy::ConfigTest::run(std::string(argv[1]));
     std::cout << fmt::format("Configs tested: {}. ", num_tested);
