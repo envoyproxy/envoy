@@ -10,7 +10,6 @@
 #include "envoy/network/address.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
@@ -48,14 +47,13 @@ public:
   /**
    * Retrieve the tag associated with the CIDR range that contains `ip_address`. Both IPv4 and IPv6
    * addresses are supported.
-   * TODO(ccaraman): Change to getTags and std::vector<std::string> when nested prefixes are
-   * supported.
    * @param  ip_address supplies the IP address.
-   * @return tag from the CIDR range that contains 'ip_address'. An empty string is returned
-   *             if no prefix contains 'ip_address' or there is no data for the IP version of the
-   *             ip_address.
+   * @return a vector of tags from the CIDR ranges and IP addresses that contains 'ip_address'. An
+   * empty vector is returned if no prefix contains 'ip_address' or there is no data for the IP
+   * version of the ip_address.
    */
-  std::string getTag(const Network::Address::InstanceConstSharedPtr& ip_address) const;
+  std::vector<std::string>
+  getTags(const Network::Address::InstanceConstSharedPtr& ip_address) const;
 
 private:
   /**
@@ -198,10 +196,10 @@ private:
     /**
      * Retrieve the tag associated with the CIDR range that contains `ip_address`.
      * @param  ip_address supplies the IP address in host byte order.
-     * @return the tag from the prefix that encompasses the input. An empty string is returned
-     *         if no prefix in the LC Trie exists.
+     * @return a vector of tags from the CIDR ranges and IP addresses that encompasses the input. An
+     * empty vector is returned if the LC Trie is empty.
      */
-    std::string getTag(const IpType& ip_address) const;
+    std::vector<std::string> getTags(const IpType& ip_address) const;
 
   private:
     /**
@@ -510,9 +508,11 @@ LcTrie::LcTrieInternal<IpType, address_size>::LcTrieInternal(
 }
 
 template <class IpType, uint32_t address_size>
-std::string LcTrie::LcTrieInternal<IpType, address_size>::getTag(const IpType& ip_address) const {
+std::vector<std::string>
+LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) const {
+  std::vector<std::string> return_vector;
   if (trie_.empty()) {
-    return EMPTY_STRING;
+    return return_vector;
   }
 
   LcNode node = trie_[0];
@@ -533,16 +533,19 @@ std::string LcTrie::LcTrieInternal<IpType, address_size>::getTag(const IpType& i
 
   // /0 will match all IP addresses.
   if (ip_prefixes_[address].length_ == 0) {
-    return ip_prefixes_[address].tag_;
+    return_vector.push_back(ip_prefixes_[address].tag_);
+    // TODO(ccaraman): When nested prefixes are supported, should the /0 case be handled better?
+    return return_vector;
   }
 
   // Check the input IP address is within the CIDR range stored in ip_prefixes_[adr] by XOR'ing the
   // two values and checking that up until the length of the CIDR range the value is 0.
   IpType bitmask = ip_prefixes_[address].ip_ ^ ip_address;
   if (extractBits<IpType, address_size>(0, ip_prefixes_[address].length_, bitmask) == 0) {
-    return ip_prefixes_[address].tag_;
+    return_vector.push_back(ip_prefixes_[address].tag_);
   }
-  return EMPTY_STRING;
+  // TODO(ccaraman): Search through the nested prefix structure.
+  return return_vector;
 }
 
 } // namespace LcTrie
