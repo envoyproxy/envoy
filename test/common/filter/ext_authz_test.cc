@@ -112,7 +112,7 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->onComplete(CheckStatus::OK);
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
   EXPECT_CALL(*client_, cancel()).Times(0);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
