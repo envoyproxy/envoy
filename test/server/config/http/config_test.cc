@@ -12,6 +12,7 @@
 
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
+#include "server/config/http/ext_authz.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_json_transcoder.h"
@@ -446,6 +447,37 @@ TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory>()), EnvoyException,
       "Double registration for name: 'envoy.zipkin'");
+}
+
+TEST(HttpExtAuthzConfigTest, ExtAuthzCorrectProto) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+)EOF";
+
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
+  MessageUtil::loadFromYaml(yaml, proto_config);
+
+  NiceMock<MockFactoryContext> context;
+  ExtAuthzFilterConfig factory;
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpExtAuthzConfigTest, DoubleRegistrationTest) {
+  EXPECT_THROW_WITH_MESSAGE(
+      (Registry::RegisterFactory<ExtAuthzFilterConfig, NamedHttpFilterConfigFactory>()),
+      EnvoyException, "Double registration for name: 'envoy.ext_authz'");
 }
 
 } // namespace Configuration

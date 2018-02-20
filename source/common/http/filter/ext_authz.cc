@@ -42,7 +42,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
   cluster_ = cluster->info();
 
   envoy::service::auth::v2::CheckRequest request;
-  Envoy::ExtAuthz::CreateCheckRequest::createHttpCheck(callbacks_, headers, request);
+  Envoy::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers, request);
 
   state_ = State::Calling;
   initiating_call_ = true;
@@ -98,7 +98,7 @@ void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
     cluster_->statsScope().counter("ext_authz.error").inc();
     break;
   case CheckStatus::Denied:
-    cluster_->statsScope().counter("ext_authz.unauthz").inc();
+    cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->scope(),
                                              cluster_->statsScope(),
                                              EMPTY_STRING,

@@ -182,7 +182,7 @@ TEST_F(HttpExtAuthzFilterTest, DeniedResponse) {
 
   EXPECT_EQ(
       1U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.unauthz").value());
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());

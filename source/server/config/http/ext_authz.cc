@@ -18,8 +18,10 @@ HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
     const envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config, const std::string&,
     FactoryContext& context) {
 
-  ASSERT(proto_config.grpc_service().has_envoy_grpc());
-  ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty());
+  ASSERT((proto_config.grpc_service().has_envoy_grpc() &&
+          !proto_config.grpc_service().envoy_grpc().cluster_name().empty()) ||
+         (proto_config.grpc_service().has_google_grpc() &&
+          !proto_config.grpc_service().google_grpc().target_uri().empty()));
 
   Http::ExtAuthz::FilterConfigSharedPtr filter_config(
       new Http::ExtAuthz::FilterConfig(proto_config, context.localInfo(), context.scope(),
@@ -41,12 +43,9 @@ HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
   };
 }
 
-HttpFilterFactoryCb ExtAuthzFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                                              const std::string& stats_prefix,
-                                                              FactoryContext& context) {
-  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config;
-  MessageUtil::loadFromJson(json_config.asJsonString(), proto_config);
-  return createFilter(proto_config, stats_prefix, context);
+HttpFilterFactoryCb ExtAuthzFilterConfig::createFilterFactory(const Json::Object&,
+                                                              const std::string&, FactoryContext&) {
+  NOT_IMPLEMENTED;
 }
 
 HttpFilterFactoryCb
