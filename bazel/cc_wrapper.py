@@ -29,7 +29,10 @@ def main():
     # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
     # This check lets Envoy statically link against libstdc++ to be more
     # portable between intalled glibc versions.
-    if "-static-libstdc++" in sys.argv[1:]:
+    #
+    # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
+    # it in the same test.
+    if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
         compiler = envoy_real_cxx
         argv = []
         for arg in sys.argv[1:]:
