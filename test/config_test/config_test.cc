@@ -60,7 +60,7 @@ public:
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-                Server::Configuration::ListenerFactoryContext& context)
+                Server::Configuration::FactoryContext& context)
                 -> std::vector<Server::Configuration::ListenerFilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
                   filters, context);
