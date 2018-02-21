@@ -4,6 +4,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_googlesource_boringssl = dict(
+        # Use commits from branch "chromium-stable-with-bazel"
         commit = "426db8db7d1cbd17573e295b52d7aab7a97ba1ff",  # chromium-64.0.3282.119
         remote = "https://boringssl.googlesource.com/boringssl",
     ),
