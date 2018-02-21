@@ -18,5 +18,10 @@ envoy_cc_test_library(
 envoy_cc_binary(
     name = "config_load_check_tool",
     testonly = 1,
-    deps = [":config_load_check_lib"],
+    deps = [
+        ":config_load_check_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/event:libevent_lib",
+    ],
 )
