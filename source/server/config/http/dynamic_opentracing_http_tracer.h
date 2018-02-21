@@ -21,7 +21,7 @@ public:
 
   std::string name() override;
 
-  bool requiresClusterName() override { return false; }
+  bool requiresClusterName() const override { return false; }
 };
 
 } // namespace Configuration

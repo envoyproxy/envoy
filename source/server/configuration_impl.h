@@ -58,7 +58,7 @@ public:
   /**
    * Returns true if the tracing driver requires cluster name to be defined.
    */
-  virtual bool requiresClusterName() { return true; }
+  virtual bool requiresClusterName() const { return true; }
 };
 
 /**
