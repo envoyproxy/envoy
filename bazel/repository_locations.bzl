@@ -3,6 +3,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "787891a3882795cee0364e8a0f0dda315578d155",
         remote = "https://github.com/abseil/abseil-cpp",
     ),
+    com_googlesource_boringssl = dict(
+        commit = "426db8db7d1cbd17573e295b52d7aab7a97ba1ff",  # chromium-64.0.3282.119
+        remote = "https://boringssl.googlesource.com/boringssl",
+    ),
     com_github_bombela_backward = dict(
         commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
         remote = "https://github.com/bombela/backward-cpp",

@@ -175,6 +175,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_google_absl()
+    _com_googlesource_boringssl()
     _com_github_bombela_backward()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
@@ -315,6 +316,13 @@ def _com_google_absl():
     native.bind(
         name = "abseil_int128",
         actual = "@com_google_absl//absl/numeric:int128",
+    )
+
+def _com_googlesource_boringssl():
+    _repository_impl("com_googlesource_boringssl")
+    native.bind(
+        name = "ssl",
+        actual = "@com_googlesource_boringssl//:ssl",
     )
 
 def _com_google_protobuf():
