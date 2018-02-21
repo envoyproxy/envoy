@@ -4,15 +4,21 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/ssl/context_config_impl.h"
+#include "common/ssl/context_manager_impl.h"
+#include "common/ssl/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -21,6 +27,7 @@
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
+using testing::IsSubstring;
 
 namespace Envoy {
 namespace {
@@ -33,7 +40,7 @@ dynamic_resources:
     api_type: GRPC
 static_resources:
   clusters:
-    name: ads_cluster
+    name: dummy_cluster
     connect_timeout: { seconds: 5 }
     type: STATIC
     hosts:
@@ -59,16 +66,49 @@ public:
     fake_upstreams_.clear();
   }
 
-  AssertionResult compareDiscoveryRequest(const std::string& expected_type_url,
-                                          const std::string& expected_version,
-                                          const std::vector<std::string>& expected_resource_names) {
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_));
+  }
+
+  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h2");
+    auto* tls_cert = common_tls_context->add_tls_certificates();
+    tls_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+    tls_cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    Ssl::ServerContextConfigImpl cfg(tls_context);
+
+    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
+                                                         std::vector<std::string>{}, true,
+                                                         context_manager_, *upstream_stats_store);
+  }
+
+  AssertionResult
+  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
+                          const std::vector<std::string>& expected_resource_names,
+                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+                          const std::string& expected_error_message = "") {
     envoy::api::v2::DiscoveryRequest discovery_request;
     ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
       return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                                discovery_request.type_url(), expected_type_url);
     }
+    if (!(expected_error_code == discovery_request.error_detail().code())) {
+      return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
+                                               discovery_request.error_detail().code(),
+                                               expected_error_code);
+    }
+    EXPECT_TRUE(
+        IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
     const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
                                                   discovery_request.resource_names().cend());
     if (expected_resource_names != resource_names) {
@@ -172,17 +212,34 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      setGrpcService(
-          *bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services(),
-          "ads_cluster", fake_upstreams_.back()->localAddress());
+      auto* grpc_service =
+          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+      auto* context = ads_cluster->mutable_tls_context();
+      auto* validation_context =
+          context->mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      validation_context->add_verify_subject_alt_name("foo.lyft.com");
+      if (clientType() == Grpc::ClientType::GoogleGrpc) {
+        auto* google_grpc = grpc_service->mutable_google_grpc();
+        auto* ssl_creds = google_grpc->mutable_ssl_credentials();
+        ssl_creds->mutable_root_certs()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      }
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    ads_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
   }
 
+  Runtime::MockLoader runtime_;
+  Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
@@ -276,7 +333,10 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Cluster, "", {}, Grpc::Status::GrpcStatus::Internal,
+      fmt::format("{} does not match {}", Config::TypeUrl::get().ClusterLoadAssignment,
+                  Config::TypeUrl::get().Cluster)));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")}, "1");
 
@@ -287,7 +347,10 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"},
+                              Grpc::Status::GrpcStatus::Internal,
+                              fmt::format("{} does not match {}", Config::TypeUrl::get().Cluster,
+                                          Config::TypeUrl::get().ClusterLoadAssignment)));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
 
@@ -296,7 +359,10 @@ TEST_P(AdsIntegrationTest, Failure) {
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().Listener, {buildRouteConfig("listener_0", "route_config_0")}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Listener, "", {}, Grpc::Status::GrpcStatus::Internal,
+      fmt::format("{} does not match {}", Config::TypeUrl::get().RouteConfiguration,
+                  Config::TypeUrl::get().Listener)));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
 
@@ -308,7 +374,10 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"},
+                              Grpc::Status::GrpcStatus::Internal,
+                              fmt::format("{} does not match {}", Config::TypeUrl::get().Listener,
+                                          Config::TypeUrl::get().RouteConfiguration)));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       "1");

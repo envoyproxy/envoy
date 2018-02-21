@@ -8,6 +8,8 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added support for sending error details as grpc.rpc.Status in DiscoveryRequest.
+* Added support for specifying alternate stats name while emitting stats for clusters.
 * Added support for inline delivery of TLS certificates and private keys.
 * Added gRPC healthcheck based on [grpc.health.v1.Health](https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto) service.
 * Added Metrics Service implementation.
@@ -28,6 +30,7 @@ final version.
 * Added support for listening for both IPv4 and IPv6 when binding to ::.
 * Added support for :ref:`LocalityLbEndpoints<envoy_api_msg_LocalityLbEndpoints>` priorities.
 * Added idle timeout to TCP proxy.
+* Added Maglev consistent hash load balancer.
 * Improved TCP proxy to correctly proxy TCP half-close.
 * Added support for dynamic headers generated from upstream host endpoint metadata
   (`UPSTREAM_METADATA(...)`).
@@ -65,3 +68,5 @@ final version.
   namespace can be used by prepending '@' to a socket path.
 * Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
 * Added support for trusting additional hops in the X-Forwarded-For request header.
+* Added setting host header value for http health check request.
+* Added SIGTERM propagation to children to hot-restarter.py, which enables using it as a parent of containers.

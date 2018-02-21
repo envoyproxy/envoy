@@ -8,6 +8,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
+#include "common/common/thread_annotations.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpc++/generic/generic_stub.h"
@@ -151,7 +152,7 @@ class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger:
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::Scope& scope,
-                        const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
+                        const envoy::api::v2::core::GrpcService& config);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -174,6 +175,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
+  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
   Stats::Scope& scope_;
   GoogleAsyncClientStats stats_;
 
@@ -289,7 +291,8 @@ private:
   uint32_t inflight_tags_{};
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
-  std::deque<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops_;
+  std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
+      completed_ops_ GUARDED_BY(completed_ops_lock_);
   std::mutex completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;

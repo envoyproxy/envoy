@@ -10,6 +10,8 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Event {
 class Dispatcher;
@@ -58,6 +60,20 @@ public:
    */
   virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                           IntervalSet<size_t>& remove_characters) const PURE;
+
+  /**
+   * Finds a prefix string associated with the matching criteria owned by the
+   * extractor. This is used to reduce the number of extractors required for
+   * processing each stat, by pulling the first "."-separated token on the tag.
+   *
+   * If a prefix cannot be extracted, an empty string_view is returned, and the
+   * matcher must be applied on all inputs.
+   *
+   * The storage for the prefix is owned by the TagExtractor.
+   *
+   * @return absl::string_view the prefix, or an empty string_view if none was found.
+   */
+  virtual absl::string_view prefixToken() const PURE;
 };
 
 typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
@@ -280,6 +296,30 @@ public:
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
+
+struct RawStatData;
+
+/**
+ * Abstract interface for allocating a RawStatData.
+ */
+class RawStatDataAllocator {
+public:
+  virtual ~RawStatDataAllocator() {}
+
+  /**
+   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
+   *         more memory available for stats. The allocator should return a reference counted
+   *         data location by name if one already exists with the same name. This is used for
+   *         intra-process scope swapping as well as inter-process hot restart.
+   */
+  virtual RawStatData* alloc(const std::string& name) PURE;
+
+  /**
+   * Free a raw stat data block. The allocator should handle reference counting and only truly
+   * free the block if it is no longer needed.
+   */
+  virtual void free(RawStatData& data) PURE;
+};
 
 } // namespace Stats
 } // namespace Envoy

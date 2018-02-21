@@ -39,6 +39,13 @@ namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
+void IntegrationStreamDecoder::waitForContinueHeaders() {
+  if (!continue_headers_.get()) {
+    waiting_for_continue_headers_ = true;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
+}
+
 void IntegrationStreamDecoder::waitForHeaders() {
   if (!headers_.get()) {
     waiting_for_headers_ = true;
@@ -68,6 +75,9 @@ void IntegrationStreamDecoder::waitForReset() {
 
 void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
+  if (waiting_for_continue_headers_) {
+    dispatcher_.exit();
+  }
 }
 
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -263,7 +273,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1);
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options();
         });

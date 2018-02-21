@@ -92,6 +92,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                              " the cluster name)",
                                              false, ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH, "uint64_t",
                                              cmd);
+  TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
+                                       "Disable hot restart functionality", cmd, false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -169,5 +171,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   max_obj_name_length_ = max_obj_name_len.getValue();
+  hot_restart_disabled_ = disable_hot_restart.getValue();
 }
 } // namespace Envoy

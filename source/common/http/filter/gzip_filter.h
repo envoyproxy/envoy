@@ -43,7 +43,7 @@ private:
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
       envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
   static StringUtil::CaseUnorderedSet
-  contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
+  contentTypeSet(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& types);
 
   static uint64_t contentLengthUint(Protobuf::uint32 length);
   static uint64_t memoryLevelUint(Protobuf::uint32 level);

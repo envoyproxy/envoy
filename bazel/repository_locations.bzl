@@ -71,7 +71,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "6f30fb48a7e7a4b21f6889c58b1a069fee95a498", # FIXFIX branch
+        commit = "42f85a50c509b4e7451123f525c75bf92ace3a52",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(
@@ -79,7 +79,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "4374be38e9a75ff5957c3922adb155d32086fe14",
+        commit = "0.9.0",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar

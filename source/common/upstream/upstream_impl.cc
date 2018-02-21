@@ -120,7 +120,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
+      stats_scope_(stats.createScope(fmt::format(
+          "cluster.{}.",
+          config.alt_stat_name().empty() ? name_ : std::string(config.alt_stat_name())))),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
@@ -171,6 +173,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
           "cluster: LB type 'original_dst_lb' may only be used with cluser type 'original_dst'"));
     }
     lb_type_ = LoadBalancerType::OriginalDst;
+    break;
+  case envoy::api::v2::Cluster::MAGLEV:
+    lb_type_ = LoadBalancerType::Maglev;
     break;
   default:
     NOT_REACHED;

@@ -146,3 +146,17 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "ext_authz_lib",
+    srcs = ["ext_authz.cc"],
+    hdrs = ["ext_authz.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/common/filter:ext_authz_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
+    ],
+)

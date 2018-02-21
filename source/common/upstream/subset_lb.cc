@@ -10,6 +10,7 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
 
 namespace Envoy {
@@ -354,6 +355,16 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     thread_aware_lb_.reset(
         new RingHashLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
                                  subset_lb.lb_ring_hash_config_, subset_lb.common_config_));
+    thread_aware_lb_->initialize();
+    lb_ = thread_aware_lb_->factory()->create();
+    break;
+
+  case LoadBalancerType::Maglev:
+    // TODO(mattklein123): The Maglev LB is thread aware, but currently the subset LB is not.
+    // We should make the subset LB thread aware since the calculations are costly, and then we
+    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
+    thread_aware_lb_.reset(new MaglevLoadBalancer(*this, subset_lb.stats_, subset_lb.runtime_,
+                                                  subset_lb.random_, subset_lb.common_config_));
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;

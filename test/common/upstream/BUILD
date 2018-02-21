@@ -233,6 +233,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "maglev_lb_test",
+    srcs = ["maglev_lb_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:maglev_lb_lib",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
 envoy_cc_binary(
     name = "load_balancer_benchmark",
     testonly = 1,
