@@ -58,7 +58,7 @@ final version.
   DOWNSTREAM_LOCAL_ADDRESS access log formatter.
 * Added support for HTTPS redirects on specific routes.
 * access log: added less than or equal (LE) comparison filter.
-* access log: added configuration to runtime filter to set defualt sampling rate, divisor, and
+* access log: added configuration to runtime filter to set default sampling rate, divisor, and
   whether to use independent randomness or not.
 * Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
 * Added support for abstract unix domain sockets on linux. The abstract
