@@ -474,6 +474,13 @@ TEST(HttpExtAuthzConfigTest, ExtAuthzCorrectProto) {
   cb(filter_callback);
 }
 
+TEST(HttpExtAuthzConfigTest, ExtAuthzEmptyProto) {
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
+  NiceMock<MockFactoryContext> context;
+  ExtAuthzFilterConfig factory;
+  EXPECT_DEATH(factory.createFilterFactoryFromProto(proto_config, "stats", context), ".*");
+}
+
 TEST(HttpExtAuthzConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ExtAuthzFilterConfig, NamedHttpFilterConfigFactory>()),
