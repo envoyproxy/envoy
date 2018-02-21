@@ -13,9 +13,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
+#include "envoy/server/server_context.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -27,7 +29,7 @@ namespace Server {
 /**
  * An instance of the running server.
  */
-class Instance {
+class Instance : public ServerContext {
 public:
   virtual ~Instance() {}
 

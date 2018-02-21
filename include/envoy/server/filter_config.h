@@ -5,17 +5,11 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
-#include "envoy/ratelimit/ratelimit.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/admin.h"
-#include "envoy/singleton/manager.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/server/server_context.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"
@@ -30,25 +24,9 @@ namespace Configuration {
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext {
+class FactoryContext : public ServerContext {
 public:
   virtual ~FactoryContext() {}
-
-  /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
-
-  /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
-   *         for all singleton processing.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -57,81 +35,21 @@ public:
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return whether external healthchecks are currently failed or not.
-   */
-  virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return the server-wide http tracer.
-   */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
-
-  /**
-   * @return the server's init manager. This can be used for extensions that need to initialize
-   *         after cluster manager init but before the server starts listening. All extensions
-   *         should register themselves during configuration load. initialize() will be called on
-   *         each registered target after cluster manager init but before the server starts
-   *         listening. Once all targets have initialized and invoked their callbacks, the server
-   *         will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
-
-  /**
-   * @return information about the local environment the server is running in.
-   */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
-
-  /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Runtime::RandomGenerator& random() PURE;
-
-  /**
-   * @return a new ratelimit client. The implementation depends on the configuration of the server.
-   */
-  virtual RateLimit::ClientPtr
-  rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) PURE;
-
-  /**
-   * @return Runtime::Loader& the singleton runtime loader for the server.
-   */
-  virtual Envoy::Runtime::Loader& runtime() PURE;
-
-  /**
    * @return Stats::Scope& the filter's stats scope.
    */
   virtual Stats::Scope& scope() PURE;
-
-  /**
-   * @return Singleton::Manager& the server-wide singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
-
-  /**
-   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
-   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
-   */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-
-  /**
-   * @return Server::Admin& the server's global admin HTTP endpoint.
-   */
-  virtual Server::Admin& admin() PURE;
-
-  /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
 
   /**
    * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
    * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
-};
 
-class ListenerFactoryContext : public FactoryContext {
-public:
+  /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
+
   /**
    * Store socket options to be set on the listen socket before listening.
    */
@@ -165,9 +83,8 @@ public:
    * @param context supplies the filter's context.
    * @return ListenerFilterFactoryCb the factory creation function.
    */
-  virtual ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config,
-                               ListenerFactoryContext& context) PURE;
+  virtual ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                               FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter

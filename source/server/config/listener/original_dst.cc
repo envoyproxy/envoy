@@ -17,7 +17,7 @@ class OriginalDstConfigFactory : public NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
   ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                       ListenerFactoryContext&) override {
+                                                       FactoryContext&) override {
     return [](Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(std::make_unique<Filter::Listener::OriginalDst>());
     };

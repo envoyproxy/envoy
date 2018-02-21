@@ -111,7 +111,7 @@ public:
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-               Configuration::ListenerFactoryContext& context)
+               Configuration::FactoryContext& context)
                 -> std::vector<Configuration::ListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
@@ -1272,7 +1272,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     // NamedListenerFilterConfigFactory
     Configuration::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::ListenerFactoryContext& context) override {
+                                 Configuration::FactoryContext& context) override {
       EXPECT_CALL(*options_, setOptions(_)).WillOnce(Invoke([](Network::Socket& socket) -> bool {
         fd = socket.fd();
         return true;
@@ -1347,7 +1347,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
     // NamedListenerFilterConfigFactory
     Configuration::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::ListenerFactoryContext& context) override {
+                                 Configuration::FactoryContext& context) override {
       EXPECT_CALL(*options_, setOptions(_)).WillOnce(Return(false));
       context.setListenSocketOptions(options_);
       return [](Network::ListenerFilterManager& filter_manager) -> void {

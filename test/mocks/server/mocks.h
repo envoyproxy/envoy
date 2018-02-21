@@ -164,7 +164,7 @@ public:
   MOCK_METHOD2(createListenerFilterFactoryList,
                std::vector<Configuration::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
-                   Configuration::ListenerFactoryContext& context));
+                   Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                         bool bind_to_port));
@@ -342,6 +342,7 @@ public:
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_METHOD1(setListenSocketOptions, void(const Network::Socket::OptionsSharedPtr&));
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -366,14 +367,6 @@ public:
 
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
-};
-
-class MockListenerFactoryContext : public MockFactoryContext {
-public:
-  MockListenerFactoryContext();
-  ~MockListenerFactoryContext();
-
-  MOCK_METHOD1(setListenSocketOptions, void(const Network::Socket::OptionsSharedPtr&));
 };
 
 } // namespace Configuration
