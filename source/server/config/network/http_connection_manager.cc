@@ -85,6 +85,13 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
       context);
 }
 
+std::shared_ptr<Router::ServerRouteConfigProviderManager>
+HttpConnectionManagerFilterConfigFactory::getServerRouteConfigProviderManager(
+    ServerContext& context) {
+  return context.singletonManager().tryGetTyped<Router::ServerRouteConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager));
+}
+
 /**
  * Static registration for the HTTP connection manager filter.
  */
@@ -102,8 +109,9 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
   // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
   // internal cases this should practically never happen.
-  if (-1 != data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(),
-                        Http::Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
+  if (-1 !=
+      data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(), Http::Http2::CLIENT_MAGIC_PREFIX.size(),
+                  0)) {
     return Http::Http2::ALPN_STRING;
   }
 
