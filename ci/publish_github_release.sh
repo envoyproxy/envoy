@@ -11,23 +11,17 @@ fi
 
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
     echo "environment variable GITHUB_TOKEN unset; cannot continue with publishing."
-    
-    # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-    exit 0
+    exit 1
 fi
 
 if [[ -z "${GITHUB_USER:-}" ]]; then
-    echo "environment variable GITHUB_USERNAME unset; cannot continue with publishing."
-    
-    # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-    exit 0
+    echo "environment variable GITHUB_USER unset; cannot continue with publishing."
+    exit 1
 fi
 
 if [[ -z "${GITHUB_REPO:-}" ]]; then
-    echo "environment variable GITHUB_USERNAME unset; cannot continue with publishing."
-    
-    # TODO(taion809): discuss whether or not failing to publish to github warrents failing the build itself
-    exit 0
+    echo "environment variable GITHUB_REPO unset; cannot continue with publishing."
+    exit 1
 fi
 
 if [[ -n "${CIRCLE_TAG:-}" ]]; then
