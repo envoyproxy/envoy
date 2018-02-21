@@ -74,13 +74,27 @@ public:
   /**
    * Get a singleton and create it if it does not exist.
    * @param name supplies the singleton name. Must be registered via RegistrationImpl.
-   * @param singleton supplies the singleton creation callback. This will only be called if the
+   * @param cb supplies the singleton creation callback. This will only be called if the
    *        singleton does not already exist. NOTE: The manager only stores a weak pointer. This
    *        allows a singleton to be cleaned up if it is not needed any more. All code that uses
    *        singletons must store the shared_ptr for as long as the singleton is needed.
    * @return InstancePtr the singleton.
    */
   virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb) PURE;
+
+  /**
+   * Helper for tryGet() that dynamic_casts and returns a pointer of the requested type
+   */
+  template <class T> std::shared_ptr<T> tryGetTyped(const std::string& name) {
+    return std::dynamic_pointer_cast<T>(tryGet(name));
+  }
+
+  /**
+   * Get a singleton and return nullptr if it does not exist.
+   * @param name supplies the singleton name. Must be registered via RegistrationImpl.
+   * @return InstancePtr the singleton.
+   */
+  virtual InstanceSharedPtr tryGet(const std::string& name) PURE;
 };
 
 typedef std::unique_ptr<Manager> ManagerPtr;
