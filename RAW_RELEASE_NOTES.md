@@ -66,4 +66,5 @@ final version.
 * Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
 * Added support for trusting additional hops in the X-Forwarded-For request header.
 * Added setting host header value for http health check request.
-
+* Added support for prefix_rewrite for redirects.
+* Added support for stripping query string for redirects.
