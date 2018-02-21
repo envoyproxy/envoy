@@ -352,7 +352,7 @@ private:
   static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
 
   Runtime::Loader& runtime_;
-  const Envoy::ProtobufTypes::String name_;
+  const std::string name_;
   const envoy::api::v2::Cluster::DiscoveryType type_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
