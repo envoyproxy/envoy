@@ -89,6 +89,7 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
+  envoy::service::auth::v2::CheckRequest checkRequest_{};
 };
 
 } // namespace ExtAuthz
