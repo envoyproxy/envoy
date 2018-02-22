@@ -74,7 +74,8 @@ void Instance::onComplete(CheckStatus status) {
   }
 
   // Fail open only if configured to do so and if the check status was a error.
-  if (status == CheckStatus::Denied || (status == CheckStatus::Error && !config_->failOpen())) {
+  if (status == CheckStatus::Denied ||
+      (status == CheckStatus::Error && !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   } else {

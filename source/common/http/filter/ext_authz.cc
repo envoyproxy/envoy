@@ -30,13 +30,13 @@ static const Http::HeaderMap* getDeniedHeader() {
 void Filter::initiateCall(const HeaderMap& headers) {
 
   Router::RouteConstSharedPtr route = callbacks_->route();
-  if (!route || !route->routeEntry()) {
+  if (route == nullptr || route->routeEntry() == nullptr) {
     return;
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
-  if (!cluster) {
+  if (cluster == nullptr) {
     return;
   }
   cluster_ = cluster->info();
@@ -51,22 +51,16 @@ void Filter::initiateCall(const HeaderMap& headers) {
 
 FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   initiateCall(headers);
-  return (state_ == State::Calling || state_ == State::Responded)
-             ? FilterHeadersStatus::StopIteration
-             : FilterHeadersStatus::Continue;
+  return (state_ == State::Calling) ? FilterHeadersStatus::StopIteration
+                                    : FilterHeadersStatus::Continue;
 }
 
 FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
-  ASSERT(state_ != State::Responded);
-  if (state_ != State::Calling) {
-    return FilterDataStatus::Continue;
-  }
-  // If the request is too large, stop reading new data until the buffer drains.
-  return FilterDataStatus::StopIterationAndWatermark;
+  return (state_ == State::Calling) ? FilterDataStatus::StopIterationAndWatermark
+                                    : FilterDataStatus::Continue;
 }
 
 FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
-  ASSERT(state_ != State::Responded);
   return state_ == State::Calling ? FilterTrailersStatus::StopIteration
                                   : FilterTrailersStatus::Continue;
 }
@@ -114,8 +108,8 @@ void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
 
   // We fail open/fail close based of filter config
   // if there is an error contacting the service.
-  if (status == CheckStatus::Denied || (status == CheckStatus::Error && !config_->failOpen())) {
-    state_ = State::Responded;
+  if (status == CheckStatus::Denied ||
+      (status == CheckStatus::Error && !config_->failureModeAllow())) {
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getDeniedHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
     callbacks_->requestInfo().setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized);

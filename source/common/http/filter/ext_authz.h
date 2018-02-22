@@ -30,7 +30,6 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  // TBD(saumoh) Take care of grpc service != envoy_grpc()
   FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
@@ -43,7 +42,7 @@ public:
   Stats::Scope& scope() { return scope_; }
   std::string cluster() { return cluster_name_; }
   Upstream::ClusterManager& cm() { return cm_; }
-  bool failOpen() const { return failure_mode_allow_; }
+  bool failureModeAllow() const { return failure_mode_allow_; }
 
 private:
   const LocalInfo::LocalInfo& local_info_;
@@ -65,8 +64,6 @@ public:
   Filter(FilterConfigSharedPtr config, Envoy::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
-  ~Filter() {}
-
   // Http::StreamFilterBase
   void onDestroy() override;
 
@@ -80,7 +77,7 @@ public:
   void onComplete(Envoy::ExtAuthz::CheckStatus status) override;
 
 private:
-  enum class State { NotStarted, Calling, Complete, Responded };
+  enum class State { NotStarted, Calling, Complete };
   void initiateCall(const HeaderMap& headers);
 
   FilterConfigSharedPtr config_;

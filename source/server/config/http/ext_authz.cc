@@ -23,19 +23,17 @@ HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
          (proto_config.grpc_service().has_google_grpc() &&
           !proto_config.grpc_service().google_grpc().target_uri().empty()));
 
-  Http::ExtAuthz::FilterConfigSharedPtr filter_config(
-      new Http::ExtAuthz::FilterConfig(proto_config, context.localInfo(), context.scope(),
-                                       context.runtime(), context.clusterManager()));
+  auto filter_config = std::make_shared<Http::ExtAuthz::FilterConfig>(
+      proto_config, context.localInfo(), context.scope(), context.runtime(),
+      context.clusterManager());
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [ grpc_service = proto_config.grpc_service(), &context, filter_config,
            timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks)
       ->void {
-
     auto async_client_factory =
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
                                                                                 context.scope());
-
     auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
     callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{

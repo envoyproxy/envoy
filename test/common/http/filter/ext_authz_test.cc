@@ -30,6 +30,8 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::TestWithParam;
+using testing::Values;
 using testing::WithArgs;
 using testing::_;
 
@@ -37,7 +39,26 @@ namespace Envoy {
 namespace Http {
 namespace ExtAuthz {
 
-class HttpExtAuthzFilterTest : public testing::Test {
+class HttpExtAuthzFilterTestBase {
+public:
+  HttpExtAuthzFilterTestBase() {}
+
+  FilterConfigSharedPtr config_;
+  Envoy::ExtAuthz::MockClient* client_;
+  std::unique_ptr<Filter> filter_;
+  NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;
+  Envoy::ExtAuthz::RequestCallbacks* request_callbacks_{};
+  TestHeaderMapImpl request_headers_;
+  Buffer::OwnedImpl data_;
+  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Network::Address::InstanceConstSharedPtr addr_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
+};
+
+class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTestBase {
 public:
   HttpExtAuthzFilterTest() {}
 
@@ -60,41 +81,43 @@ public:
       "failure_mode_allow": true
     }
   )EOF";
-
-  FilterConfigSharedPtr config_;
-  Envoy::ExtAuthz::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
-  NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  Envoy::ExtAuthz::RequestCallbacks* request_callbacks_{};
-  TestHeaderMapImpl request_headers_;
-  Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Network::Address::InstanceConstSharedPtr addr_;
-  NiceMock<Envoy::Network::MockConnection> connection_;
 };
 
-TEST_F(HttpExtAuthzFilterTest, BadConfig) {
-  const std::string filter_config = R"EOF(
-  {
-    "failure_mode_allow": true,
-    "grpc_service": {}
+typedef envoy::config::filter::http::ext_authz::v2::ExtAuthz CreateFilterConfigFunc();
+
+class HttpExtAuthzFilterParamTest : public TestWithParam<CreateFilterConfigFunc*>,
+                                    public HttpExtAuthzFilterTestBase {
+public:
+  virtual void SetUp() {
+    envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config = (*GetParam())();
+    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
+
+    client_ = new Envoy::ExtAuthz::MockClient();
+    filter_.reset(new Filter(config_, Envoy::ExtAuthz::ClientPtr{client_}));
+    filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
+};
+
+template <bool failure_mode_allow_value>
+envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
+  const std::string json = R"EOF(
+    {
+      "grpc_service": {
+          "envoy_grpc": { "cluster_name": "ext_authz_server" }
+      },
+    }
   )EOF";
-
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromJson(filter_config, proto_config);
-
-  EXPECT_THROW(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
-          proto_config),
-      ProtoValidationException);
+  MessageUtil::loadFromJson(json, proto_config);
+  proto_config.set_failure_mode_allow(failure_mode_allow_value);
+  return proto_config;
 }
 
-TEST_F(HttpExtAuthzFilterTest, NoRoute) {
-  SetUpTest(filter_config_);
+INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpExtAuthzFilterParamTest,
+                        Values(&GetFilterConfig<true>, &GetFilterConfig<false>));
+
+TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
 
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
 
@@ -103,8 +126,7 @@ TEST_F(HttpExtAuthzFilterTest, NoRoute) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
-TEST_F(HttpExtAuthzFilterTest, NoCluster) {
-  SetUpTest(filter_config_);
+TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
 
   ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
 
@@ -113,8 +135,7 @@ TEST_F(HttpExtAuthzFilterTest, NoCluster) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
-TEST_F(HttpExtAuthzFilterTest, OkResponse) {
-  SetUpTest(filter_config_);
+TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
@@ -139,8 +160,7 @@ TEST_F(HttpExtAuthzFilterTest, OkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
 }
 
-TEST_F(HttpExtAuthzFilterTest, ImmediateOkResponse) {
-  SetUpTest(filter_config_);
+TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
   InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
@@ -160,8 +180,7 @@ TEST_F(HttpExtAuthzFilterTest, ImmediateOkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
 }
 
-TEST_F(HttpExtAuthzFilterTest, DeniedResponse) {
-  SetUpTest(filter_config_);
+TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
   InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
@@ -189,6 +208,40 @@ TEST_F(HttpExtAuthzFilterTest, DeniedResponse) {
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
+}
+
+TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
+  InSequence s;
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      })));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*client_, cancel());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpExtAuthzFilterTest, BadConfig) {
+  const std::string filter_config = R"EOF(
+  {
+    "failure_mode_allow": true,
+    "grpc_service": {}
+  }
+  )EOF";
+
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
+  MessageUtil::loadFromJson(filter_config, proto_config);
+
+  EXPECT_THROW(
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
+          proto_config),
+      ProtoValidationException);
 }
 
 TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
@@ -239,24 +292,6 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
-}
-
-TEST_F(HttpExtAuthzFilterTest, ResetDuringCall) {
-  SetUpTest(filter_config_);
-  InSequence s;
-
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](Envoy::ExtAuthz::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  EXPECT_CALL(*client_, cancel());
-  filter_->onDestroy();
 }
 
 } // namespace ExtAuthz

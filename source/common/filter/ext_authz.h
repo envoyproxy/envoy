@@ -49,7 +49,7 @@ public:
         failure_mode_allow_(config.failure_mode_allow()) {}
 
   const InstanceStats& stats() { return stats_; }
-  bool failOpen() const { return failure_mode_allow_; }
+  bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
 
 private:
