@@ -174,6 +174,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
+    _boringssl()
     _com_google_absl()
     _com_github_bombela_backward()
     _com_github_cyan4973_xxhash()
@@ -196,6 +197,13 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _cc_deps()
     _go_deps(skip_targets)
     _envoy_api_deps()
+
+def _boringssl():
+    _repository_impl("boringssl")
+    native.bind(
+        name = "ssl",
+        actual = "@boringssl//:ssl",
+    )
 
 def _com_github_bombela_backward():
     _repository_impl(
