@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/registry/registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
@@ -345,6 +346,71 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
   return rc;
 }
 
+Http::Code AdminImpl::handlerRoutes(const std::string& url, Http::HeaderMap&,
+                                    Buffer::Instance& response) const {
+  using Factory = Configuration::HttpConnectionManagerFilterConfigFactory;
+  using BaseFactory = Configuration::NamedNetworkFilterConfigFactory;
+  auto config_factory = Registry::FactoryRegistry<BaseFactory>::getFactory<Factory>(
+      Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER);
+  if (config_factory) {
+    const auto route_config_provider_manager =
+        config_factory->getServerRouteConfigProviderManager(server_);
+    if (route_config_provider_manager) {
+      Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+      // If there are no query params, print out all the configured route tables.
+      if (query_params.size() == 0) {
+        return handlerRoutesLoop(response,
+                                 route_config_provider_manager->rdsRouteConfigProviders());
+      }
+
+      // If there are query params, make sure it is only the route_config_name param.
+      const auto it = query_params.find("route_config_name");
+      if (query_params.size() == 1 && it != query_params.end()) {
+        // Create a vector with all the providers that have the queried route_config_name.
+        std::vector<Router::RdsRouteConfigProviderSharedPtr> selected_providers;
+        for (const auto& provider : route_config_provider_manager->rdsRouteConfigProviders()) {
+          if (provider->routeConfigName() == it->second) {
+            selected_providers.push_back(provider);
+          }
+        }
+        return handlerRoutesLoop(response, selected_providers);
+      }
+    }
+  }
+
+  response.add("{\n");
+  response.add("    \"general_usage\": \"/routes (dump all dynamic HTTP route tables).\",\n");
+  response.add("    \"specify_name_usage\": \"/routes?route_config_name=<name> (dump all dynamic "
+               "HTTP route tables with the "
+               "<name> if any).\"\n");
+  response.add("}");
+  return Http::Code::NotFound;
+}
+
+Http::Code AdminImpl::handlerRoutesLoop(
+    Buffer::Instance& response,
+    const std::vector<Router::RdsRouteConfigProviderSharedPtr> providers) const {
+  bool first_item = true;
+  response.add("[\n");
+  for (const auto& provider : providers) {
+    if (!first_item) {
+      response.add(",");
+    } else {
+      first_item = false;
+    }
+    response.add("{\n");
+    response.add(fmt::format("\"version_info\": \"{}\",\n", provider->versionInfo()));
+    response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider->routeConfigName()));
+    response.add(fmt::format("\"config_source\": {},\n", provider->configSource()));
+    response.add("\"route_table_dump\": ");
+    response.add(fmt::format("{}\n", provider->configAsJson()));
+    std::cout << provider->configAsJson();
+    response.add("}\n");
+  }
+  response.add("]\n");
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
                                            Buffer::Instance& response) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -641,6 +707,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
+          {"/routes", "print out currently loaded dynamic HTTP route tables",
+           MAKE_ADMIN_HANDLER(handlerRoutes), false, true},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
       listener_(*this, std::move(listener_scope)) {
 

@@ -15,6 +15,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -273,6 +274,100 @@ TEST_P(AdminInstanceTest, RuntimeBadFormat) {
   EXPECT_EQ(Http::Code::BadRequest,
             admin_.runCallback("/runtime?format=foo", header_map, response));
   EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
+}
+
+class MockHttpConnectionManagerFilterConfigFactory
+    : public Configuration::HttpConnectionManagerFilterConfigFactory {
+public:
+  MOCK_METHOD1(getServerRouteConfigProviderManager,
+               std::shared_ptr<Router::ServerRouteConfigProviderManager>(ServerContext&));
+};
+
+class MockRdsRouteConfigProvider : public Router::RdsRouteConfigProvider {
+public:
+  MOCK_METHOD0(config, Router::ConfigConstSharedPtr());
+  MOCK_CONST_METHOD0(versionInfo, const std::string());
+  // RdsRouteConfigProvider
+  MOCK_CONST_METHOD0(configAsJson, std::string());
+  MOCK_CONST_METHOD0(routeConfigName, const std::string&());
+  MOCK_CONST_METHOD0(configSource, const std::string&());
+};
+
+class MockRouteConfigProviderManager : public Router::ServerRouteConfigProviderManager {
+public:
+  // RouteConfigProviderManager
+  MOCK_METHOD5(getRouteConfigProvider,
+               Router::RouteConfigProviderSharedPtr(
+                   const envoy::config::filter::network::http_connection_manager::v2::Rds&,
+                   Upstream::ClusterManager&, Stats::Scope&, const std::string&, Init::Manager&));
+  // ServerRouteConfigProviderManager
+  MOCK_METHOD0(rdsRouteConfigProviders, std::vector<Router::RdsRouteConfigProviderSharedPtr>());
+};
+
+TEST_P(AdminInstanceTest, Routes) {
+  MockHttpConnectionManagerFilterConfigFactory factory;
+  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> inject_factory{factory};
+
+  auto provider_manager = std::make_shared<NiceMock<MockRouteConfigProviderManager>>();
+  auto provider = std::make_shared<NiceMock<MockRdsRouteConfigProvider>>();
+  EXPECT_CALL(factory, getServerRouteConfigProviderManager(_))
+      .WillRepeatedly(testing::Return(provider_manager));
+
+  const std::string& routes_expected_output_empty = R"EOF([
+]
+)EOF";
+
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes", header_map, data));
+  EXPECT_EQ(routes_expected_output_empty, TestUtility::bufferToString(data));
+  data.drain(data.length());
+
+  const std::string& routes_expected_output_table = R"EOF([
+{
+"version_info": "foo_version",
+"route_config_name": "foo_route_config_name",
+"config_source": "foo_config_source",
+"route_table_dump": {}
+}
+]
+)EOF";
+
+  EXPECT_CALL(*provider_manager, rdsRouteConfigProviders())
+      .WillRepeatedly(
+          testing::Return(std::vector<Router::RdsRouteConfigProviderSharedPtr>{provider}));
+  EXPECT_CALL(*provider, versionInfo()).WillRepeatedly(testing::Return("foo_version"));
+  EXPECT_CALL(*provider, configAsJson()).WillRepeatedly(testing::Return("{}"));
+  const std::string route_config_name = "foo_route_config_name";
+  EXPECT_CALL(*provider, routeConfigName()).WillRepeatedly(testing::ReturnRef(route_config_name));
+  const std::string config_source = "\"foo_config_source\"";
+  EXPECT_CALL(*provider, configSource()).WillRepeatedly(testing::ReturnRef(config_source));
+
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes", header_map, data));
+  EXPECT_EQ(routes_expected_output_table, TestUtility::bufferToString(data));
+  data.drain(data.length());
+
+  // Test that we get the same dump if we specify the route name.
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/routes?route_config_name=foo_route_config_name",
+                                               header_map, data));
+  EXPECT_EQ(routes_expected_output_table, TestUtility::bufferToString(data));
+  data.drain(data.length());
+
+  // Test that we get an emtpy response if the name does not match.
+  EXPECT_EQ(Http::Code::OK,
+            admin_.runCallback("/routes?route_config_name=does_not_exist", header_map, data));
+  EXPECT_EQ("[\n]\n", TestUtility::bufferToString(data));
+  data.drain(data.length());
+
+  const std::string routes_expected_output_usage = R"EOF({
+    "general_usage": "/routes (dump all dynamic HTTP route tables).",
+    "specify_name_usage": "/routes?route_config_name=<name> (dump all dynamic HTTP route tables with the <name> if any)."
+})EOF";
+
+  // Test that we get the help text if we use the command in an invalid ways.
+  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/routes?bad_param", header_map, data));
+  EXPECT_EQ(routes_expected_output_usage, TestUtility::bufferToString(data));
+  data.drain(data.length());
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {
