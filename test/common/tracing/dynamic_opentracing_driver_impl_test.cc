@@ -43,6 +43,13 @@ public:
   NiceMock<Tracing::MockConfig> config_;
 };
 
+TEST_F(DynamicOpenTracingDriverTest, formatErrorMessage) {
+  const std::error_code error_code = std::make_error_code(std::errc::permission_denied);
+  EXPECT_EQ(error_code.message(), DynamicOpenTracingDriver::formatErrorMessage(error_code, ""));
+  EXPECT_EQ(error_code.message() + ": abc",
+            DynamicOpenTracingDriver::formatErrorMessage(error_code, "abc"));
+}
+
 TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   {
     std::string invalid_library = "abc123";

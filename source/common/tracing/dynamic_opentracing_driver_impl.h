@@ -21,6 +21,9 @@ public:
   DynamicOpenTracingDriver(Stats::Store& stats, const std::string& library,
                            const std::string& tracer_config);
 
+  static std::string formatErrorMessage(std::error_code error_code,
+                                        const std::string& error_message);
+
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override { return *tracer_; }
 
