@@ -158,7 +158,7 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
   // What did we get back from the auth server?
 
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
-  std::string response_body(std::move(response->bodyAsString()));
+  std::string response_body = response->bodyAsString();
 
   ENVOY_STREAM_LOG(trace, "ExtAuth Auth responded with code {}", *callbacks_, response_code);
 
