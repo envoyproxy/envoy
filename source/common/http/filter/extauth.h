@@ -64,11 +64,11 @@ typedef std::shared_ptr<const ExtAuthConfig> ExtAuthConfigConstSharedPtr;
 /**
  * ExtAuth filter itself.
  */
-class ExtAuth : Logger::Loggable<Logger::Id::filter>,
+class ExtAuth : public Logger::Loggable<Logger::Id::filter>,
                 public StreamDecoderFilter,
                 public Http::AsyncClient::Callbacks {
 public:
-  ExtAuth(const ExtAuthConfigConstSharedPtr& config);
+  ExtAuth(ExtAuthConfigConstSharedPtr config);
   ~ExtAuth();
 
   static ExtAuthStats generateStats(const std::string& prefix, Stats::Scope& scope);

@@ -12,15 +12,15 @@ namespace Http {
 
 namespace {
 
-const LowerCaseString& header_to_add() {
+const LowerCaseString header_to_add() {
   CONSTRUCT_ON_FIRST_USE(LowerCaseString, "x-ambassador-calltype");
 }
 
-const std::string& value_to_add() { CONSTRUCT_ON_FIRST_USE(std::string, "extauth-request"); }
+const std::string value_to_add() { CONSTRUCT_ON_FIRST_USE(std::string, "extauth-request"); }
 
 } // namespace
 
-ExtAuth::ExtAuth(const ExtAuthConfigConstSharedPtr& config) : config_(config) {}
+ExtAuth::ExtAuth(ExtAuthConfigConstSharedPtr config) : config_(std::move(config)) {}
 
 ExtAuth::~ExtAuth() { ASSERT(!auth_request_); }
 
@@ -77,7 +77,8 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
   if (!config_->path_prefix_.empty()) {
     // Yes, it has. Go ahead and prepend it to the request_message path.
     std::string path;
-    absl::StrAppend(&path, config_->path_prefix_, request_message->headers().insertPath().value().c_str());
+    absl::StrAppend(&path, config_->path_prefix_,
+                    request_message->headers().insertPath().value().getString());
     request_message->headers().insertPath().value(path);
   }
 
@@ -105,9 +106,9 @@ FilterHeadersStatus ExtAuth::decodeHeaders(HeaderMap& headers, bool) {
 
   ENVOY_STREAM_LOG(trace, "ExtAuth contacting auth server", *callbacks_);
 
-  auth_request_ =
-      config_->cm_.httpAsyncClientForCluster(config_->cluster_)
-          .send(std::move(request_message), *this, Optional<std::chrono::milliseconds>(config_->timeout_));
+  auth_request_ = config_->cm_.httpAsyncClientForCluster(config_->cluster_)
+                      .send(std::move(request_message), *this,
+                            Optional<std::chrono::milliseconds>(config_->timeout_));
 
   // It'll take some time for our auth call to complete. Stop
   // filtering while we wait for it.
@@ -157,11 +158,11 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
   // What did we get back from the auth server?
 
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
-  std::string response_body(response->bodyAsString());
+  std::string response_body(std::move(response->bodyAsString()));
 
   ENVOY_STREAM_LOG(trace, "ExtAuth Auth responded with code {}", *callbacks_, response_code);
 
-  if (!response_body.empty()) {
+  if (!response->body()->length()) {
     ENVOY_STREAM_LOG(trace, "ExtAuth Auth said: {}", *callbacks_, response->bodyAsString());
   }
 
@@ -214,7 +215,7 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
   if (!config_->allowed_headers_.empty()) {
     // Yup. Let's see if any of them are present.
 
-    for (std::string allowed_header : config_->allowed_headers_) {
+    for (const std::string& allowed_header : config_->allowed_headers_) {
       LowerCaseString key(allowed_header);
 
       // OK, do we have this header?
@@ -229,7 +230,7 @@ void ExtAuth::onSuccess(Http::MessagePtr&& response) {
         if (!value.empty()) {
           // Not empty! Copy it into our request_headers_.
 
-          std::string valstr(value.c_str());
+          std::string valstr{value.c_str()};
 
           ENVOY_STREAM_LOG(trace, "ExtAuth allowing response header {}: {}", *callbacks_,
                            allowed_header, valstr);
