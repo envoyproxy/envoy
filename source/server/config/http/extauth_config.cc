@@ -46,7 +46,7 @@ HttpFilterFactoryCb ExtAuthConfig::createFilterFactory(const Json::Object& json_
       json_config.getStringArray("allowed_headers", true), prefix});
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new Http::ExtAuth(config)});
+    callbacks.addStreamDecoderFilter(std::make_shared<Http::ExtAuth>(config));
   };
 }
 
