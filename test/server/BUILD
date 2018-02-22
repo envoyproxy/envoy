@@ -20,16 +20,21 @@ envoy_cc_test(
 envoy_cc_test(
     name = "configuration_impl_test",
     srcs = ["configuration_impl_test.cc"],
+    data = [
+        "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
+    ],
     deps = [
         "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/server:configuration_lib",
+        "//source/server/config/http:dynamic_opentracing_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/stats:statsd_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
