@@ -139,8 +139,12 @@ def sigchld_handler(signum, frame):
       kill_all_and_exit = True
 
   if kill_all_and_exit:
-    print "Due to abnormal exit, terminating all child processes and exiting"
-    term_all_children()
+    print "Due to abnormal exit, force killing all child processes and exiting"
+
+    # First uninstall the SIGCHLD handler so that we don't get called again.
+    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+
+    force_kill_all_children()
 
   # Our last child died, so we have no purpose. Exit.
   if not pid_list:
