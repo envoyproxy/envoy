@@ -14,8 +14,6 @@ envoy_cc_library(
     hdrs = ["access_log_formatter.h"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/common:optional",
-        "//include/envoy/common:time_interface",
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -40,8 +38,6 @@ envoy_cc_library(
     hdrs = ["access_log_impl.h"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/common:optional",
-        "//include/envoy/common:time_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/runtime:runtime_interface",
