@@ -69,17 +69,6 @@ public:
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
-   * @return the time that the first byte of the request was received.
-   */
-  virtual const SystemTime& startTime() const PURE;
-
-  /**
-   * @return the monotonic time that the first byte of the request was received. Duration
-  calculations should be made relative to this value.
-  */
-  virtual const MonotonicTime& startTimeMonotonic() const PURE;
-
-  /**
    * @return the # of body bytes received in the request.
    */
   virtual uint64_t bytesReceived() const PURE;
@@ -98,6 +87,17 @@ public:
    * @return the response code.
    */
   virtual const Optional<uint32_t>& responseCode() const PURE;
+
+  /**
+   * @return the time that the first byte of the request was received.
+   */
+  virtual const SystemTime& startTime() const PURE;
+
+  /**
+   * @return the monotonic time that the first byte of the request was received. Duration
+  calculations should be made relative to this value.
+  */
+  virtual const MonotonicTime& startTimeMonotonic() const PURE;
 
   /**
    * @return the monotonic clock time when the last byte of the request was received.
