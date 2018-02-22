@@ -56,7 +56,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_store_ = std::make_shared<Stats::IsolatedStoreImpl>();
   std::unique_ptr<GoogleAsyncClientImpl> grpc_client_;
 };
 
