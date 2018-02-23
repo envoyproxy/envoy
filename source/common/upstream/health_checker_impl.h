@@ -367,8 +367,13 @@ public:
                          Runtime::RandomGenerator& random,
                          Redis::ConnPool::ClientFactory& client_factory);
 
-  static const Redis::RespValue& healthCheckRequest() {
+  static const Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();
+    return request->request_;
+  }
+
+  static const Redis::RespValue& existsHealthCheckRequest(const std::string& key) {
+    static HealthCheckRequest* request = new HealthCheckRequest(key);
     return request->request_;
   }
 
@@ -379,7 +384,6 @@ private:
                                          public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
-
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
@@ -405,7 +409,10 @@ private:
     Redis::ConnPool::PoolRequest* current_request_{};
   };
 
+  enum class Type { Ping, Exists };
+
   struct HealthCheckRequest {
+    HealthCheckRequest(const std::string& key);
     HealthCheckRequest();
 
     Redis::RespValue request_;
@@ -419,6 +426,8 @@ private:
   }
 
   Redis::ConnPool::ClientFactory& client_factory_;
+  Type type_;
+  const std::string key_;
 };
 
 /**

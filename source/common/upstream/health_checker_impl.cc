@@ -527,7 +527,13 @@ RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
                                                Runtime::RandomGenerator& random,
                                                Redis::ConnPool::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      client_factory_(client_factory) {}
+      client_factory_(client_factory), key_(config.redis_health_check().key()) {
+  if (!key_.empty()) {
+    type_ = Type::Exists;
+  } else {
+    type_ = Type::Ping;
+  }
+}
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
     RedisHealthCheckerImpl& parent, const HostSharedPtr& host)
@@ -561,17 +567,42 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
   }
 
   ASSERT(!current_request_);
-  current_request_ = client_->makeRequest(healthCheckRequest(), *this);
+
+  switch (parent_.type_) {
+  case Type::Exists:
+    current_request_ = client_->makeRequest(existsHealthCheckRequest(parent_.key_), *this);
+    break;
+  case Type::Ping:
+    current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
+    break;
+  default:
+    NOT_REACHED;
+  }
 }
 
 void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
-  if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
-    handleSuccess();
-  } else {
-    handleFailure(FailureType::Active);
+
+  switch (parent_.type_) {
+  case Type::Exists:
+    if (value->type() == Redis::RespType::Integer && value->asInteger() == 0) {
+      handleSuccess();
+    } else {
+      handleFailure(FailureType::Active);
+    }
+    break;
+  case Type::Ping:
+    if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
+      handleSuccess();
+    } else {
+      handleFailure(FailureType::Active);
+    }
+    break;
+  default:
+    NOT_REACHED;
   }
+
   if (!parent_.reuse_connection_) {
     client_->close();
   }
@@ -586,6 +617,16 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onTimeout() {
   current_request_->cancel();
   current_request_ = nullptr;
   client_->close();
+}
+
+RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
+  std::vector<Redis::RespValue> values(2);
+  values[0].type(Redis::RespType::BulkString);
+  values[0].asString() = "EXISTS";
+  values[1].type(Redis::RespType::BulkString);
+  values[1].asString() = key;
+  request_.type(Redis::RespType::Array);
+  request_.asArray().swap(values);
 }
 
 RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
