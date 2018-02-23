@@ -3,6 +3,7 @@
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/config/filter/http/router/v2/router.pb.h"
@@ -179,6 +180,16 @@ public:
    */
   static void translateSquashConfig(const Json::Object& json_config,
                                     envoy::config::filter::http::squash::v2::Squash& proto_config);
+
+  /**
+   * Translate a v1 JSON HTTP IP Tagging config to a v2
+   * envoy::config::filter::http::ip_tagging::v2::IPTagging.
+   * @param json_config source v1 JSON HTTP IP Tagging filter object.
+   * @param proto_config destination v2 envoy::config::filter::http::ip_tagging::v2::IPTagging.
+   */
+  static void translateIpTaggingFilterConfig(
+      const Json::Object& json_config,
+      envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config);
 };
 } // namespace Config
 } // namespace Envoy

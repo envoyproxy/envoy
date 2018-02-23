@@ -430,5 +430,31 @@ void FilterJson::translateClientSslAuthFilter(
                                       *proto_config.mutable_ip_white_list());
 }
 
+void FilterJson::translateIpTaggingFilterConfig(
+    const Json::Object& json_config,
+    envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config) {
+  json_config.validateSchema(Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA);
+
+  // Default value is BOTH.
+  std::string request_type = json_config.getString("request_type", "BOTH");
+  if (request_type == "INTERNAL") {
+    proto_config.set_request_type(
+        envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_INTERNAL);
+  } else if (request_type == "EXTERNAL") {
+    proto_config.set_request_type(
+        envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_EXTERNAL);
+  } else {
+    proto_config.set_request_type(
+        envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_BOTH);
+  }
+
+  for (const auto& ip_tags : json_config.getObjectArray("ip_tags", false)) {
+    auto* proto_ip_tags = proto_config.mutable_ip_tags()->Add();
+    proto_ip_tags->set_ip_tag_name(ip_tags->getString("ip_tag_name"));
+    AddressJson::translateCidrRangeList(ip_tags->getStringArray("ip_list", true),
+                                        *proto_ip_tags->mutable_ip_list());
+  }
+}
+
 } // namespace Config
 } // namespace Envoy

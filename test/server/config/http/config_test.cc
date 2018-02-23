@@ -398,13 +398,13 @@ TEST(HttpFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, IpTaggingFilter) {
+TEST(HttpFilterConfigTest, IpTaggingFilterV1Config) {
   std::string json_string = R"EOF(
   {
-    "request_type" : "internal",
+    "request_type" : "INTERNAL",
     "ip_tags" : [
       { "ip_tag_name" : "example_tag",
-        "ip_list" : ["0.0.0.0"]
+        "ip_list" : ["0.0.0.0/32"]
       }
     ]
   }
@@ -419,10 +419,29 @@ TEST(HttpFilterConfigTest, IpTaggingFilter) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
+TEST(HttpFilterConfigTest, IpTaggingFilterV2Config) {
+  std::string external_request_yaml = R"EOF(
+  request_type: external
+  ip_tags:
+    - ip_tag_name: external_request
+      ip_list:
+        - {address_prefix: 1.2.3.4, prefix_len: 32}
+  )EOF";
+
+  envoy::config::filter::http::ip_tagging::v2::IPTagging proto_config;
+  MessageUtil::loadFromYaml(external_request_yaml, proto_config);
+  NiceMock<MockFactoryContext> context;
+  IpTaggingFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, BadIpTaggingFilterv1Config) {
   std::string json_string = R"EOF(
   {
-    "request_type" : "internal",
+    "request_type" : "INTERNAL",
     "ip_tags" : [
       { "ip_tag_name" : "example_tag"
       }

@@ -1082,7 +1082,7 @@ const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
     "properties" : {
       "request_type" : {
         "type" : "string",
-        "enum" : ["internal", "external", "both"]
+        "enum" : ["INTERNAL", "EXTERNAL", "BOTH"]
       },
       "ip_tags" : {
         "type" : "array",
