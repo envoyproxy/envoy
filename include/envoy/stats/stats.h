@@ -210,6 +210,7 @@ typedef std::unique_ptr<Sink> SinkPtr;
 
 class Scope;
 typedef std::unique_ptr<Scope> ScopePtr;
+typedef std::shared_ptr<Scope> ScopeSharedPtr;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
