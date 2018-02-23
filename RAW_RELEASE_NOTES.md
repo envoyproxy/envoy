@@ -67,3 +67,4 @@ final version.
 * Added support for trusting additional hops in the X-Forwarded-For request header.
 * Added setting host header value for http health check request.
 * Added SIGTERM propagation to children to hot-restarter.py, which enables using it as a parent of containers.
+* Added :ref:`HTTP IP Tagging filter<config_http_filters_ip_tagging>`.
