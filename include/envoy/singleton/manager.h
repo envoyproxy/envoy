@@ -63,15 +63,6 @@ public:
   virtual ~Manager() {}
 
   /**
-   * This is a helper on top of get() that casts the object stored to the specified type. Since the
-   * manager only stores pointers to the base interface, dynamic_cast provides some level of
-   * protection via RTTI.
-   */
-  template <class T> std::shared_ptr<T> getTyped(const std::string& name, SingletonFactoryCb cb) {
-    return std::dynamic_pointer_cast<T>(get(name, cb));
-  }
-
-  /**
    * Get a singleton and create it if it does not exist.
    * @param name supplies the singleton name. Must be registered via RegistrationImpl.
    * @param cb supplies the singleton creation callback. This will only be called if the
@@ -83,10 +74,12 @@ public:
   virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb) PURE;
 
   /**
-   * Helper for tryGet() that dynamic_casts and returns a pointer of the requested type
+   * This is a helper on top of get() that casts the object stored to the specified type. Since the
+   * manager only stores pointers to the base interface, dynamic_cast provides some level of
+   * protection via RTTI.
    */
-  template <class T> std::shared_ptr<T> tryGetTyped(const std::string& name) {
-    return std::dynamic_pointer_cast<T>(tryGet(name));
+  template <class T> std::shared_ptr<T> getTyped(const std::string& name, SingletonFactoryCb cb) {
+    return std::dynamic_pointer_cast<T>(get(name, cb));
   }
 
   /**
@@ -95,6 +88,13 @@ public:
    * @return InstancePtr the singleton.
    */
   virtual InstanceSharedPtr tryGet(const std::string& name) PURE;
+
+  /**
+   * Helper for tryGet() that dynamic_casts and returns a pointer of the requested type
+   */
+  template <class T> std::shared_ptr<T> tryGetTyped(const std::string& name) {
+    return std::dynamic_pointer_cast<T>(tryGet(name));
+  }
 };
 
 typedef std::unique_ptr<Manager> ManagerPtr;
