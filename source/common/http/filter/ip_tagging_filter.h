@@ -31,6 +31,10 @@ public:
                         Runtime::Loader& runtime)
       : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
         stats_prefix_(stat_prefix + "ip_tagging.") {
+
+    // Once loading IP tags from a file system is supported, the restriction on the size
+    // of the set should be removed and observability into what tags are loaded needs
+    // to be implemented.
     if (config.ip_tags_size() == 0) {
       throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
     }
@@ -43,7 +47,6 @@ public:
       std::vector<Network::Address::CidrRange> cidr_set;
       for (const envoy::api::v2::core::CidrRange& entry : ip_tag.ip_list()) {
 
-        // TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
         // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
         Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
         if (cidr_entry.isValid()) {

@@ -436,7 +436,7 @@ void FilterJson::translateIpTaggingFilterConfig(
   json_config.validateSchema(Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA);
 
   // Default value is BOTH.
-  std::string request_type = json_config.getString("request_type", "BOTH");
+  const std::string request_type = json_config.getString("request_type", "BOTH");
   if (request_type == "INTERNAL") {
     proto_config.set_request_type(
         envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_INTERNAL);

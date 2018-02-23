@@ -29,13 +29,19 @@ FilterHeadersStatus IpTaggingFilter::decodeHeaders(HeaderMap& headers, bool) {
     if (!header.empty()) {
       header.append(", ", 2);
     }
+
+    // When there are multiple tags, they are joined into one string prior to setting
+    // the header.
     if (tags.size() > 1) {
-      std::string tags_join = absl::StrJoin(tags, ", ");
+      const std::string tags_join = absl::StrJoin(tags, ", ");
       header.append(tags_join.c_str(), tags_join.size());
     } else {
       header.append(tags[0].c_str(), tags[0].size());
     }
 
+    // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
+    // If there are use cases with a large set of tags, a way to opt into these stats
+    // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
       config_->scope().counter(fmt::format("{}{}.hit", config_->statsPrefix(), tag)).inc();
     }
