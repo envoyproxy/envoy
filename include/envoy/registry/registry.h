@@ -42,8 +42,7 @@ public:
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    * Optionally, downcast from the registry type, with the usual caveats about downcasting.
    */
-  template <class T = Base>
-  static T* getFactory(const std::string& name) {
+  template <class T = Base> static T* getFactory(const std::string& name) {
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;

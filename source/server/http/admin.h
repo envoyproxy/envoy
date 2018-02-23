@@ -9,8 +9,8 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/router/rds.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"

@@ -1,19 +1,23 @@
 #pragma once
 
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/singleton/manager.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/init/init.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/access_log/access_log.h"
-#include "envoy/tracing/http_tracer.h"
-#include "envoy/init/init.h"
 #include "envoy/server/admin.h"
+#include "envoy/singleton/manager.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
-
 
 namespace Envoy {
 namespace Server {
 
+/*
+ * ServerContext provides controlled, limited access to server resources
+ * For example usage, see subclass FactoryContext and how it is used by the
+ * filter system
+ */
 class ServerContext {
 public:
   virtual ~ServerContext() {}
@@ -90,7 +94,6 @@ public:
    * @return Server::Admin& the server's global admin HTTP endpoint.
    */
   virtual Server::Admin& admin() PURE;
-
 };
 
 } // namespace Server

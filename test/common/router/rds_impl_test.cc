@@ -47,9 +47,7 @@ public:
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RdsImplTest() {
-    tls_.shutdownThread();
-  }
+  ~RdsImplTest() { tls_.shutdownThread(); }
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -370,9 +368,7 @@ public:
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RouteConfigProviderManagerImplTest() {
-    tls_.shutdownThread();
-  }
+  ~RouteConfigProviderManagerImplTest() { tls_.shutdownThread(); }
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;

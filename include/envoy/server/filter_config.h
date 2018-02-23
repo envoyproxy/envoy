@@ -83,9 +83,8 @@ public:
    * @param context supplies the filter's context.
    * @return ListenerFilterFactoryCb the factory creation function.
    */
-  virtual ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config,
-                               FactoryContext& context) PURE;
+  virtual ListenerFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                               FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
