@@ -527,7 +527,13 @@ RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
                                                Runtime::RandomGenerator& random,
                                                Redis::ConnPool::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      client_factory_(client_factory), key_(config.redis_health_check().key()) {}
+      client_factory_(client_factory), key_(config.redis_health_check().key()) {
+  if (!key_.empty()) {
+    type_ = Type::Exists;
+  } else {
+    type_ = Type::Ping;
+  }
+}
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
     RedisHealthCheckerImpl& parent, const HostSharedPtr& host)
@@ -561,26 +567,40 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
   }
 
   ASSERT(!current_request_);
-  current_request_ = client_->makeRequest(healthCheckRequest(parent_.key_), *this);
+
+  switch (parent_.type_) {
+  case Type::Exists:
+    current_request_ = client_->makeRequest(existsHealthCheckRequest(parent_.key_), *this);
+    break;
+  case Type::Ping:
+    current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
+    break;
+  default:
+    NOT_REACHED;
+  }
 }
 
 void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
-  if (!parent_.key_.empty()) {
-    // EXISTS
+
+  switch (parent_.type_) {
+  case Type::Exists:
     if (value->type() == Redis::RespType::Integer && value->asInteger() == 0) {
       handleSuccess();
     } else {
       handleFailure(FailureType::Active);
     }
-  } else {
-    // PING
+    break;
+  case Type::Ping:
     if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
       handleSuccess();
     } else {
       handleFailure(FailureType::Active);
     }
+    break;
+  default:
+    NOT_REACHED;
   }
 
   if (!parent_.reuse_connection_) {
@@ -600,21 +620,21 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onTimeout() {
 }
 
 RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
-  if (!key.empty()) {
-    std::vector<Redis::RespValue> values(2);
-    values[0].type(Redis::RespType::BulkString);
-    values[0].asString() = "EXISTS";
-    values[1].type(Redis::RespType::BulkString);
-    values[1].asString() = key;
-    request_.type(Redis::RespType::Array);
-    request_.asArray().swap(values);
-  } else {
-    std::vector<Redis::RespValue> values(1);
-    values[0].type(Redis::RespType::BulkString);
-    values[0].asString() = "PING";
-    request_.type(Redis::RespType::Array);
-    request_.asArray().swap(values);
-  }
+  std::vector<Redis::RespValue> values(2);
+  values[0].type(Redis::RespType::BulkString);
+  values[0].asString() = "EXISTS";
+  values[1].type(Redis::RespType::BulkString);
+  values[1].asString() = key;
+  request_.type(Redis::RespType::Array);
+  request_.asArray().swap(values);
+}
+
+RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
+  std::vector<Redis::RespValue> values(1);
+  values[0].type(Redis::RespType::BulkString);
+  values[0].asString() = "PING";
+  request_.type(Redis::RespType::Array);
+  request_.asArray().swap(values);
 }
 
 GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,

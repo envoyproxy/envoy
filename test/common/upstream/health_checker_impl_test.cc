@@ -1463,8 +1463,14 @@ public:
     EXPECT_CALL(*client_, addConnectionCallbacks(_));
   }
 
-  void expectRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::healthCheckRequest("")), _))
+  void expectExistsRequestCreate() {
+    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::existsHealthCheckRequest("")), _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+    EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  }
+
+  void expectPingRequestCreate() {
+    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::pingHealthCheckRequest()), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     EXPECT_CALL(*timeout_timer_, enableTimer(_));
   }
@@ -1481,7 +1487,7 @@ public:
   std::shared_ptr<RedisHealthCheckerImpl> health_checker_;
 };
 
-TEST_F(RedisHealthCheckerImplTest, All) {
+TEST_F(RedisHealthCheckerImplTest, PingAndVariousFailures) {
   InSequence s;
   setup();
 
@@ -1490,7 +1496,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
 
   expectSessionCreate();
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   health_checker_->start();
 
   client_->runHighWatermarkCallbacks();
@@ -1504,14 +1510,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
-  // FOOO
-  Redis::RespValue request;
-  request.type(Redis::RespType::Error);
-  request.asString() = "blah blah blah";
-  // EXPECT_CALL(&pool_callbacks_, onResponse_(PointeesEq(&request)));
-  // FOOO
-
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Failure
@@ -1520,7 +1519,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   response.reset(new Redis::RespValue());
   pool_callbacks_->onResponse(std::move(response));
 
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Redis failure via disconnect
@@ -1530,7 +1529,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Timeout
@@ -1541,7 +1540,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   timeout_timer_->callback_();
 
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Shutdown with active request.
@@ -1554,8 +1553,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
-// TODO: test alternate hc
-TEST_F(RedisHealthCheckerImplTest, AllExistsHealthcheck) {
+TEST_F(RedisHealthCheckerImplTest, Exists) {
   InSequence s;
   setupExistsHealthcheck();
 
@@ -1564,7 +1562,7 @@ TEST_F(RedisHealthCheckerImplTest, AllExistsHealthcheck) {
 
   expectSessionCreate();
   expectClientCreate();
-  expectRequestCreate();
+  expectExistsRequestCreate();
   health_checker_->start();
 
   client_->runHighWatermarkCallbacks();
@@ -1578,7 +1576,7 @@ TEST_F(RedisHealthCheckerImplTest, AllExistsHealthcheck) {
   response->asInteger() = 0;
   pool_callbacks_->onResponse(std::move(response));
 
-  expectRequestCreate();
+  expectExistsRequestCreate();
   interval_timer_->callback_();
 
   // Failure, exists
@@ -1589,7 +1587,7 @@ TEST_F(RedisHealthCheckerImplTest, AllExistsHealthcheck) {
   response->asInteger() = 1;
   pool_callbacks_->onResponse(std::move(response));
 
-  expectRequestCreate();
+  expectExistsRequestCreate();
   interval_timer_->callback_();
 
   // Failure, no value
@@ -1606,7 +1604,7 @@ TEST_F(RedisHealthCheckerImplTest, AllExistsHealthcheck) {
 }
 
 // Tests that redis client will behave appropriately when reuse_connection is false.
-TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
+TEST_F(RedisHealthCheckerImplTest, NoConnectionReuse) {
   InSequence s;
   setupDontReuseConnection();
 
@@ -1615,7 +1613,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
 
   expectSessionCreate();
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   health_checker_->start();
 
   // The connection will close on success.
@@ -1628,7 +1626,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // The connection will close on failure.
@@ -1639,7 +1637,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Redis failure via disconnect, the connection was closed by the other end.
@@ -1649,7 +1647,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Timeout, the connection will be closed.
@@ -1660,7 +1658,7 @@ TEST_F(RedisHealthCheckerImplTest, AllDontReuseConnection) {
   timeout_timer_->callback_();
 
   expectClientCreate();
-  expectRequestCreate();
+  expectPingRequestCreate();
   interval_timer_->callback_();
 
   // Shutdown with active request.

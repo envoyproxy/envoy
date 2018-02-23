@@ -54,8 +54,9 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
   } else {
     ASSERT(hc_type == "redis");
     auto* redis_health_check = health_check.mutable_redis_health_check();
-    const std::string redis_key = json_health_check.getString("redis_key", "");
-    redis_health_check->set_key(redis_key);
+    if (json_health_check.hasObject("redis_key")) {
+      redis_health_check->set_key(json_health_check.getString("redis_key"));
+    }
   }
 }
 
