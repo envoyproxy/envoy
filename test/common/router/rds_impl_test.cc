@@ -44,17 +44,10 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
 class RdsImplTest : public testing::Test {
 public:
   RdsImplTest() : request_(&cm_.async_client_) {
-    EXPECT_CALL(admin_,
-                addHandler("/routes", "print out currently loaded dynamic HTTP route tables", _,
-                           true, false))
-        .WillOnce(DoAll(SaveArg<2>(&handler_callback_), Return(true)));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RdsImplTest() {
-    EXPECT_CALL(admin_, removeHandler("/routes"));
-    tls_.shutdownThread();
-  }
+  ~RdsImplTest() { tls_.shutdownThread(); }
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -121,7 +114,6 @@ public:
   RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
-  Server::Admin::HandlerCb handler_callback_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -211,31 +203,7 @@ TEST_F(RdsImplTest, Basic) {
 
   // Make sure the initial empty route table works.
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
-
-  // Test Admin /routes handler. There should be no route table to dump.
-  const std::string& routes_expected_output_no_routes = R"EOF([
-{
-"version_info": "",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "foo_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {}
-
-}
-]
-)EOF";
   EXPECT_EQ("", rds_->versionInfo());
-  Http::HeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
-  EXPECT_EQ(routes_expected_output_no_routes, TestUtility::bufferToString(data));
-  data.drain(data.length());
   EXPECT_EQ(0UL, store_.gauge("foo.rds.foo_route_config.version").value());
 
   // Initial request.
@@ -254,32 +222,6 @@ TEST_F(RdsImplTest, Basic) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
-  // Test Admin /routes handler. Now we should have an empty route table, with exception of name.
-  const std::string routes_expected_output_only_name = R"EOF([
-{
-"version_info": "hash_15ed54077da94d8b",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "foo_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {
- "name": "foo_route_config"
-}
-
-}
-]
-)EOF";
-
-  EXPECT_EQ("hash_15ed54077da94d8b", rds_->versionInfo());
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
-  EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
-  data.drain(data.length());
   EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
@@ -293,12 +235,6 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
-
-  // Test Admin /routes handler. The route table should not change.
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
-  EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
-  data.drain(data.length());
-  EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -342,82 +278,6 @@ TEST_F(RdsImplTest, Basic) {
                        ->route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}}, 0)
                        ->routeEntry()
                        ->clusterName());
-
-  // Test Admin /routes handler. The route table should now have the information given in
-  // response2_json.
-  const std::string routes_expected_output_full_table = R"EOF([
-{
-"version_info": "hash_7a3f97b327d08382",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "foo_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {
- "name": "foo_route_config",
- "virtual_hosts": [
-  {
-   "name": "local_service",
-   "domains": [
-    "*"
-   ],
-   "routes": [
-    {
-     "match": {
-      "prefix": "/foo"
-     },
-     "route": {
-      "cluster_header": ":authority"
-     }
-    },
-    {
-     "match": {
-      "prefix": "/bar"
-     },
-     "route": {
-      "cluster": "bar"
-     }
-    }
-   ]
-  }
- ]
-}
-
-}
-]
-)EOF";
-
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
-  EXPECT_EQ(routes_expected_output_full_table, TestUtility::bufferToString(data));
-  data.drain(data.length());
-  EXPECT_EQ(8808926191882896258U, store_.gauge("foo.rds.foo_route_config.version").value());
-
-  // Test that we get the same dump if we specify the route name.
-  EXPECT_EQ(Http::Code::OK,
-            handler_callback_("/routes?route_config_name=foo_route_config", header_map, data));
-  EXPECT_EQ(routes_expected_output_full_table, TestUtility::bufferToString(data));
-  data.drain(data.length());
-
-  // Test that we get an emtpy response if the name does not match.
-  EXPECT_EQ(Http::Code::OK,
-            handler_callback_("/routes?route_config_name=does_not_exist", header_map, data));
-  EXPECT_EQ("[\n]\n", TestUtility::bufferToString(data));
-  data.drain(data.length());
-
-  const std::string routes_expected_output_usage = R"EOF({
-    "general_usage": "/routes (dump all dynamic HTTP route tables).",
-    "specify_name_usage": "/routes?route_config_name=<name> (dump all dynamic HTTP route tables with the <name> if any)."
-})EOF";
-
-  // Test that we get the help text if we use the command in an invalid ways.
-  EXPECT_EQ(Http::Code::NotFound, handler_callback_("/routes?bad_param", header_map, data));
-  EXPECT_EQ(routes_expected_output_usage, TestUtility::bufferToString(data));
-  data.drain(data.length());
 
   // Old config use count should be 1 now.
   EXPECT_EQ(1, config.use_count());
@@ -505,17 +365,10 @@ public:
   }
 
   RouteConfigProviderManagerImplTest() {
-    EXPECT_CALL(admin_,
-                addHandler("/routes", "print out currently loaded dynamic HTTP route tables", _,
-                           true, false))
-        .WillOnce(DoAll(SaveArg<2>(&handler_callback_), Return(true)));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RouteConfigProviderManagerImplTest() {
-    EXPECT_CALL(admin_, removeHandler("/routes"));
-    tls_.shutdownThread();
-  }
+  ~RouteConfigProviderManagerImplTest() { tls_.shutdownThread(); }
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -527,7 +380,6 @@ public:
   NiceMock<Init::MockManager> init_manager_;
   NiceMock<Server::MockAdmin> admin_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
-  Server::Admin::HandlerCb handler_callback_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
@@ -578,46 +430,6 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(2UL, configured_providers.size());
   EXPECT_EQ(3UL, provider_.use_count());
   EXPECT_EQ(2UL, provider3.use_count());
-
-  const std::string routes_expected_output = R"EOF([
-{
-"version_info": "",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "bar_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {}
-
-}
-,{
-"version_info": "",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "foo_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {}
-
-}
-]
-)EOF";
-
-  // Test Admin /routes handler.
-  Http::HeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data));
-  EXPECT_EQ(routes_expected_output, TestUtility::bufferToString(data));
-  data.drain(data.length());
 
   provider_.reset();
   provider2.reset();

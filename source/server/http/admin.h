@@ -9,6 +9,7 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
@@ -159,6 +160,8 @@ private:
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
   Http::Code handlerQuitQuitQuit(const std::string& path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code handlerRoutes(const std::string& path_and_query, Http::HeaderMap& response_headers,
+                           Buffer::Instance& response) const;
   Http::Code handlerResetCounters(const std::string& path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response);
   Http::Code handlerServerInfo(const std::string& path_and_query, Http::HeaderMap& response_headers,
@@ -167,6 +170,11 @@ private:
                           Buffer::Instance& response);
   Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
+
+  // Helper for handlerRoutes
+  Http::Code
+  handlerRoutesLoop(Buffer::Instance& response,
+                    const std::vector<Router::RdsRouteConfigProviderSharedPtr> providers) const;
 
   class AdminListener : public Network::ListenerConfig {
   public:

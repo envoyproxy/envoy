@@ -9,6 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/server_context.h"
 
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
@@ -37,6 +38,9 @@ public:
         new envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager());
   }
   std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
+
+  virtual std::shared_ptr<Router::ServerRouteConfigProviderManager>
+  getServerRouteConfigProviderManager(ServerContext& context);
 
 private:
   NetworkFilterFactoryCb createFilter(

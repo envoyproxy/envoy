@@ -41,5 +41,18 @@ TEST(SingletonManagerImplTest, Basic) {
   singleton.reset();
 }
 
+TEST(SingletonManagerImplTest, TryGet) {
+  ManagerImpl manager;
+
+  auto singleton = std::make_shared<TestSingleton>();
+  EXPECT_EQ(nullptr, manager.tryGet("test_singleton"));
+  EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }));
+  EXPECT_EQ(singleton, manager.tryGet("test_singleton"));
+  EXPECT_EQ(singleton, manager.tryGetTyped<TestSingleton>("test_singleton"));
+
+  EXPECT_CALL(*singleton, onDestroy());
+  singleton.reset();
+}
+
 } // namespace Singleton
 } // namespace Envoy
