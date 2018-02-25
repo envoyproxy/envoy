@@ -27,10 +27,14 @@ TEST_F(PerfAnnotationTest, testMacros) {
   PERF_RECORD(perf, "alpha", "2");
   PERF_RECORD(perf, "beta", "3");
   std::string report = PERF_TO_STRING();
-  EXPECT_TRUE(report.find("alpha / 0\n") != std::string::npos) << report;
-  EXPECT_TRUE(report.find("beta / 1\n") != std::string::npos) << report;
-  EXPECT_TRUE(report.find("alpha / 2\n") != std::string::npos) << report;
-  EXPECT_TRUE(report.find("beta / 3\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 0\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 1\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 2\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 3\n") != std::string::npos) << report;
   PERF_DUMP();
 }
 
@@ -45,10 +49,10 @@ TEST_F(PerfAnnotationTest, testFormat) {
   }
   context->record(std::chrono::microseconds{200}, "gamma", "2");
   std::string report = context->toString();
-  EXPECT_EQ("Duration(us)  # Calls  per_call(ns)  Category / Description\n"
-            "        4000        4       1000000  alpha / 1\n"
-            "         200        1        200000  gamma / 2\n"
-            "          90        3         30000  beta / 3\n",
+  EXPECT_EQ("Duration(us)  # Calls  per_call(ns)  Category  Description\n"
+            "        4000        4       1000000     alpha            1\n"
+            "         200        1        200000     gamma            2\n"
+            "          90        3         30000      beta            3\n",
             context->toString());
 }
 

@@ -69,8 +69,8 @@ namespace Envoy {
 class PerfAnnotationContext {
 public:
   /**
-   * Records time consumed by a category and description, which are just
-   * joined together in the library with " / ".
+   * Records time consumed by a category and description, which are shown as separate
+   * columns in the generated output table.
    */
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
@@ -103,10 +103,14 @@ private:
    */
   PerfAnnotationContext();
 
-  typedef std::pair<std::chrono::nanoseconds, uint64_t> DurationCount;
-  typedef std::map<std::string, DurationCount> DurationCountMap;
+  using CategoryDescription = std::pair<std::string, std::string>;
+  using DurationCount = std::pair<std::chrono::nanoseconds, uint64_t>;
 
-  DurationCountMap duration_count_map_; // Maps "$category / $description" to the duration.
+  // TODO(jmarantz): consider switching to a std::unordered_map, but note it isn't
+  // a drop-in replacement, possibly due to the use of a std::pair as a key.
+  using DurationCountMap = std::map<CategoryDescription, DurationCount>;
+
+  DurationCountMap duration_count_map_; // Maps {category, description} to {duration, count}.
 #if PERF_THREAD_SAFE
   std::mutex mutex_;
 #endif

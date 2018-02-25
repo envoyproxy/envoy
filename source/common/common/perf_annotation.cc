@@ -21,8 +21,8 @@ PerfOperation::PerfOperation()
       context_(PerfAnnotationContext::getOrCreate()) {}
 
 void PerfOperation::record(absl::string_view category, absl::string_view description) {
-  SystemTime end_time = ProdSystemTimeSource::instance_.currentTime();
-  std::chrono::nanoseconds duration =
+  const SystemTime end_time = ProdSystemTimeSource::instance_.currentTime();
+  const std::chrono::nanoseconds duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_);
   context_->record(duration, category, description);
 }
@@ -31,7 +31,7 @@ PerfAnnotationContext::PerfAnnotationContext() {}
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
-  std::string key = absl::StrCat(category, " / ", description);
+  CategoryDescription key(category, description);
   {
 #if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
@@ -62,27 +62,34 @@ std::string PerfAnnotationContext::toString() {
   std::sort(
       sorted_values.begin(), sorted_values.end(),
       [](const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
-        return a->second.first > b->second.first;
+        const DurationCount& a_duration_count = a->second;
+        const std::chrono::nanoseconds& a_duration = a_duration_count.first;
+        const DurationCount& b_duration_count = b->second;
+        const std::chrono::nanoseconds& b_duration = b_duration_count.first;
+        return a_duration > b_duration;
       });
 
   // Organize the report so it lines up in columns. Note that the widest duration comes first,
   // though that may not be descending order of calls or per_call time, so we need two passes
   // to compute column widths. First collect the column headers and their widths.
-  static const char* headers[] = {"Duration(us)", "# Calls", "per_call(ns)",
-                                  "Category / Description"};
+  //
+  // TODO(jmarantz): add more stats, e.g. std deviation, median, min, max.
+  static const char* headers[] = {"Duration(us)", "# Calls", "per_call(ns)", "Category",
+                                  "Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
   size_t widths[num_columns];
   std::vector<std::string> columns[num_columns];
   for (size_t i = 0; i < num_columns; ++i) {
-    columns[i].push_back(headers[i]);
-    widths[i] = strlen(headers[i]);
+    std::string column(headers[i]);
+    widths[i] = column.size();
+    columns[i].emplace_back(column);
   }
 
   // Compute all the column strings and their max widths.
   for (const auto& p : sorted_values) {
     const DurationCount& duration_count = p->second;
-    std::chrono::nanoseconds duration = duration_count.first;
-    uint64_t count = duration_count.second;
+    const std::chrono::nanoseconds duration = duration_count.first;
+    const uint64_t count = duration_count.second;
     columns[0].push_back(
         std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()));
     columns[1].push_back(std::to_string(count));
@@ -91,24 +98,25 @@ std::string PerfAnnotationContext::toString() {
             ? "NaN"
             : std::to_string(
                   std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
-    columns[3].push_back(p->first);
+    const CategoryDescription& category_description = p->first;
+    columns[3].push_back(category_description.first);
+    columns[4].push_back(category_description.second);
     for (size_t i = 0; i < num_columns; ++i) {
       widths[i] = std::max(widths[i], columns[i].back().size());
     }
+  }
+
+  // Create format-strings to right justify each column, e.g. {:>14} for a column of width 14.
+  std::vector<std::string> formats;
+  for (size_t i = 0; i < num_columns; ++i) {
+    formats.push_back(absl::StrCat("{:>", widths[i], "}"));
   }
 
   // Write out the table.
   for (size_t row = 0; row < columns[0].size(); ++row) {
     for (size_t i = 0; i < num_columns; ++i) {
       const std::string& str = columns[i][row];
-      // Right-justify all but last column by appending the number of spaces needed to bring
-      // it inline with the largest.
-      if (i != (num_columns - 1)) {
-        out.append(widths[i] - str.size(), ' ');
-        absl::StrAppend(&out, str, "  ");
-      } else {
-        absl::StrAppend(&out, str, "\n");
-      }
+      absl::StrAppend(&out, fmt::format(formats[i], str), (i != (num_columns - 1) ? "  " : "\n"));
     }
   }
   return out;
