@@ -4,7 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
-#include <map>
+#include <unordered_map>
 #include <mutex>
 
 #include "common/common/utility.h"
@@ -106,9 +106,13 @@ private:
   using CategoryDescription = std::pair<std::string, std::string>;
   using DurationCount = std::pair<std::chrono::nanoseconds, uint64_t>;
 
-  // TODO(jmarantz): consider switching to a std::unordered_map, but note it isn't
-  // a drop-in replacement, possibly due to the use of a std::pair as a key.
-  using DurationCountMap = std::map<CategoryDescription, DurationCount>;
+  struct Hash {
+    size_t operator()(const CategoryDescription& a) const {
+      return std::hash<std::string>()(a.first) + 13 * std::hash<std::string>()(a.second);
+    }
+  };
+
+  using DurationCountMap = std::unordered_map<CategoryDescription, DurationCount, Hash>;
 
   DurationCountMap duration_count_map_; // Maps {category, description} to {duration, count}.
 #if PERF_THREAD_SAFE
