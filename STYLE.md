@@ -69,7 +69,7 @@
   locks/mutexes.
 * Functions intended to be local to a cc file should be declared in an anonymonus namespace,
   rather than using the 'static' keyword. Note that the
-  [Google styleguide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
+  [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
    allows either, but in Envoy we prefer annonymous namespaces.
 
 # Error handling
