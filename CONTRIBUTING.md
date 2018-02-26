@@ -114,8 +114,9 @@ maximize the chances of your PR being merged.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
 * Please **clean up the commit message** before merging. By default, GitHub fills the squash merge
-  commit message with every individual commit from the PR. Generally, we want a commit message
-  that is roughly equal to the original PR title and description.
+  commit message with every individual commit from the PR. Generally, the maintainer doing the merge
+  should overwrite these with the original PR title and description (cleaning it up if necessary)
+  while preserving the PR author's final DCO sign-off.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
