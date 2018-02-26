@@ -15,6 +15,7 @@ namespace Tracing {
 /**
  * This driver provides support for dynamically loading tracing libraries into Envoy that provide an
  * implementation of the OpenTracing API (see https://github.com/opentracing/opentracing-cpp).
+ * TODO(rnburn): Add an example showing how to use a tracer library with this driver.
  */
 class DynamicOpenTracingDriver : public OpenTracingDriver {
 public:
