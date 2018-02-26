@@ -18,6 +18,9 @@
 // In the absense of such directives, the support classes are built and tested.
 // However, the macros for instrumenting code for performance analysis will expand
 // to nothing.
+//
+// See also: https://github.com/LLNL/Caliper -- it may be worth integrating with
+// that for added functionality, partiicularly around loops.
 
 /**
  * Initiates a performance operation, storing its state in perf_var. A perf_var
@@ -71,6 +74,11 @@ public:
   /**
    * Records time consumed by a category and description, which are shown as separate
    * columns in the generated output table.
+   *
+   * @param duration std::chrono::nanoseconds the duration.
+   * @param category absl::string_view the name of a category for the recording.
+   * @param category absl::string_view the name of description for the recording.
+   *
    */
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
@@ -148,7 +156,7 @@ public:
   void record(absl::string_view category, absl::string_view description);
 
 private:
-  SystemTime start_time_;
+  MonotonicTime start_time_;
   PerfAnnotationContext* context_;
 };
 

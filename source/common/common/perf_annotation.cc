@@ -17,11 +17,11 @@
 namespace Envoy {
 
 PerfOperation::PerfOperation()
-    : start_time_(ProdSystemTimeSource::instance_.currentTime()),
+    : start_time_(ProdMonotonicTimeSource::instance_.currentTime()),
       context_(PerfAnnotationContext::getOrCreate()) {}
 
 void PerfOperation::record(absl::string_view category, absl::string_view description) {
-  const SystemTime end_time = ProdSystemTimeSource::instance_.currentTime();
+  const MonotonicTime end_time = ProdMonotonicTimeSource::instance_.currentTime();
   const std::chrono::nanoseconds duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_);
   context_->record(duration, category, description);
