@@ -77,8 +77,8 @@ std::string PerfAnnotationContext::toString() {
   // to compute column widths. First collect the column headers and their widths.
   //
   // TODO(jmarantz): add more stats, e.g. std deviation, median, min, max.
-  static const char* headers[] = {"Duration(us)", "# Calls", "Mean(ms)", "StdDev",
-                                  "Min(ms)",      "Max(ms)", "Category", "Description"};
+  static const char* headers[] = {"Duration(us)", "# Calls", "Mean(ns)", "StdDev(ns)",
+                                  "Min(ns)",      "Max(ns)", "Category", "Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
   size_t widths[num_columns];
   std::vector<std::string> columns[num_columns];
@@ -94,6 +94,9 @@ std::string PerfAnnotationContext::toString() {
     auto microseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
       return std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(ns).count());
     };
+    auto nanoseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
+      return std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count());
+    };
     columns[0].push_back(microseconds_string(stats.total_));
     uint64_t count = stats.stddev_.count();
     columns[1].push_back(std::to_string(count));
@@ -104,8 +107,8 @@ std::string PerfAnnotationContext::toString() {
                   std::chrono::duration_cast<std::chrono::nanoseconds>(stats.total_).count() /
                   count));
     columns[3].push_back(fmt::format("{}", stats.stddev_.computeStandardDeviation()));
-    columns[4].push_back(microseconds_string(stats.min_));
-    columns[5].push_back(microseconds_string(stats.max_));
+    columns[4].push_back(nanoseconds_string(stats.min_));
+    columns[5].push_back(nanoseconds_string(stats.max_));
     const CategoryDescription& category_description = p->first;
     columns[6].push_back(category_description.first);
     columns[7].push_back(category_description.second);
