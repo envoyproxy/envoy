@@ -110,6 +110,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "thread_annotations",
+    hdrs = ["thread_annotations.h"],
+    external_deps = ["abseil_base"],
+)
+
+envoy_cc_library(
     name = "thread_lib",
     srcs = ["thread.cc"],
     hdrs = ["thread.h"],
@@ -124,7 +130,12 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = ["//include/envoy/common:time_interface"],
+    deps = [
+        ":assert_lib",
+        ":hash_lib",
+        "//include/envoy/common:interval_set_interface",
+        "//include/envoy/common:time_interface",
+    ],
 )
 
 genrule(

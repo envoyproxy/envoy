@@ -86,6 +86,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "datasource_lib",
+    srcs = ["datasource.cc"],
+    hdrs = ["datasource.h"],
+    deps = [
+        "//source/common/filesystem:filesystem_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_json_lib",
     srcs = ["filter_json.cc"],
     hdrs = ["filter_json.h"],
@@ -104,6 +114,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
         "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
         "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
         "@envoy_api//envoy/config/filter/http/lua/v2:lua_cc",
         "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",

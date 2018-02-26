@@ -111,6 +111,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "gzip_lib",
+    srcs = ["gzip.cc"],
+    hdrs = ["gzip.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/common/http/filter:gzip_filter_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_web_lib",
     srcs = ["grpc_web.cc"],
     hdrs = ["grpc_web.h"],

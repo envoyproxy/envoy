@@ -81,8 +81,14 @@ public:
     backward::ResolvedTrace first_frame_trace = resolver.resolve(stack_trace_[0]);
     auto obj_name = first_frame_trace.object_filename;
 
+#ifdef __APPLE__
+    // The stack_decode.py script uses addr2line which isn't readily available and doesn't seem to
+    // work when installed.
+    ENVOY_LOG(critical, "Backtrace obj<{}> thr<{}>:", obj_name, thread_id);
+#else
     ENVOY_LOG(critical, "Backtrace obj<{}> thr<{}> (use tools/stack_decode.py):", obj_name,
               thread_id);
+#endif
 
     // Backtrace gets tagged by ASAN when we try the object name resolution for the last
     // frame on stack, so skip the last one. It has no useful info anyway.
@@ -92,7 +98,14 @@ public:
         obj_name = trace.object_filename;
         ENVOY_LOG(critical, "thr<{}> obj<{}>", thread_id, obj_name);
       }
+
+#ifdef __APPLE__
+      // In the absence of stack_decode.py, print the function name.
+      ENVOY_LOG(critical, "thr<{}> #{} {}: {}", thread_id, stack_trace_[i].idx,
+                stack_trace_[i].addr, trace.object_function);
+#else
       ENVOY_LOG(critical, "thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
+#endif
     }
     ENVOY_LOG(critical, "end backtrace thread {}", stack_trace_.thread_id());
   }

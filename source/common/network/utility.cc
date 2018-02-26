@@ -89,6 +89,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
     return std::make_shared<Address::Ipv4Instance>(&sa4);
   }
   sockaddr_in6 sa6;
+  memset(&sa6, 0, sizeof(sa6));
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
@@ -116,6 +117,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
       throwWithMalformedIp(ip_address);
     }
     sockaddr_in6 sa6;
+    memset(&sa6, 0, sizeof(sa6));
     if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
       throwWithMalformedIp(ip_address);
     }

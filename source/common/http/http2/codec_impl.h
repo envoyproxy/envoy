@@ -41,7 +41,8 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
   COUNTER(tx_reset)                                                                                \
   COUNTER(header_overflow)                                                                         \
   COUNTER(trailers)                                                                                \
-  COUNTER(headers_cb_no_stream)
+  COUNTER(headers_cb_no_stream)                                                                    \
+  COUNTER(too_many_header_frames)
 // clang-format on
 
 /**

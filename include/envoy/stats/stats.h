@@ -7,7 +7,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Event {
@@ -41,19 +44,36 @@ public:
   virtual std::string name() const PURE;
 
   /**
-   * Returns a modified name with the tag removed and added to the tags vector. If the tag is not
-   * represented in the name, the tags vector will remain unmodified and the return value will be a
-   * copy of name. The portion removed from the name may be different than the value put into
-   * the tag vector for readability purposes. Note: The extraction process is expected to be run
-   * iteratively. For a list of TagExtractors, the original name is expected to be passed into
-   * extractTag for the first, and then each iteration after the modified name returned from the
-   * previous iteration should be passed in. The same vector should be passed into each successive
-   * call for updating.
-   * @param name name from which the tag will be extracted if found to exist.
+   * Finds tags for stat_name and adds them to the tags vector. If the tag is not
+   * represented in the name, the tags vector will remain unmodified. Also finds the
+   * character indexes for the tags in stat_name and adds them to remove_characters (an
+   * in/out arg). Returns true if a tag-match was found. The characters removed from the
+   * name may be different from the values put into the tag vector for readability
+   * purposes. Note: The extraction process is expected to be run iteratively, aggregating
+   * the character intervals to be removed from the name after all the tag extractions are
+   * complete. This approach simplifies the tag searching process because without mutations,
+   * the tag extraction will be order independent, apart from the order of the tag array.
+   * @param stat_name name from which the tag will be extracted if found to exist.
    * @param tags list of tags updated with the tag name and value if found in the name.
-   * @return std::string modified name with the tag removed.
+   * @param remove_characters set of intervals of character-indices to be removed from name.
+   * @return bool indicates whether a tag was found in the name.
    */
-  virtual std::string extractTag(const std::string& name, std::vector<Tag>& tags) const PURE;
+  virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
+                          IntervalSet<size_t>& remove_characters) const PURE;
+
+  /**
+   * Finds a prefix string associated with the matching criteria owned by the
+   * extractor. This is used to reduce the number of extractors required for
+   * processing each stat, by pulling the first "."-separated token on the tag.
+   *
+   * If a prefix cannot be extracted, an empty string_view is returned, and the
+   * matcher must be applied on all inputs.
+   *
+   * The storage for the prefix is owned by the TagExtractor.
+   *
+   * @return absl::string_view the prefix, or an empty string_view if none was found.
+   */
+  virtual absl::string_view prefixToken() const PURE;
 };
 
 typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
@@ -190,6 +210,7 @@ typedef std::unique_ptr<Sink> SinkPtr;
 
 class Scope;
 typedef std::unique_ptr<Scope> ScopePtr;
+typedef std::shared_ptr<Scope> ScopeSharedPtr;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
@@ -276,6 +297,30 @@ public:
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
+
+struct RawStatData;
+
+/**
+ * Abstract interface for allocating a RawStatData.
+ */
+class RawStatDataAllocator {
+public:
+  virtual ~RawStatDataAllocator() {}
+
+  /**
+   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
+   *         more memory available for stats. The allocator should return a reference counted
+   *         data location by name if one already exists with the same name. This is used for
+   *         intra-process scope swapping as well as inter-process hot restart.
+   */
+  virtual RawStatData* alloc(const std::string& name) PURE;
+
+  /**
+   * Free a raw stat data block. The allocator should handle reference counting and only truly
+   * free the block if it is no longer needed.
+   */
+  virtual void free(RawStatData& data) PURE;
+};
 
 } // namespace Stats
 } // namespace Envoy

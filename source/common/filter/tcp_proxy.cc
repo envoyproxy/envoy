@@ -161,6 +161,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+  read_callbacks_->connection().enableHalfClose(true);
   request_info_.downstream_local_address_ = read_callbacks_->connection().localAddress();
   request_info_.downstream_remote_address_ = read_callbacks_->connection().remoteAddress();
 
@@ -258,8 +259,12 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   }
 }
 
-Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data) {
-  parent_->onUpstreamData(data);
+Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
+  if (parent_) {
+    parent_->onUpstreamData(data, end_stream);
+  } else {
+    drainer_->onData(data, end_stream);
+  }
   return Network::FilterStatus::StopIteration;
 }
 
@@ -333,6 +338,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
+  upstream_connection_->enableHalfClose(true);
   upstream_connection_->setConnectionStats(
       {read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_total_,
        read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
@@ -371,10 +377,11 @@ void TcpProxy::onConnectTimeout() {
   initializeUpstreamConnection();
 }
 
-Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "received {} bytes", read_callbacks_->connection(), data.length());
+Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
+                 read_callbacks_->connection(), data.length(), end_stream);
   request_info_.bytes_received_ += data.length();
-  upstream_connection_->write(data);
+  upstream_connection_->write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
@@ -403,9 +410,11 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpProxy::onUpstreamData(Buffer::Instance& data) {
+void TcpProxy::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
+                 read_callbacks_->connection(), data.length(), end_stream);
   request_info_.bytes_sent_ += data.length();
-  read_callbacks_->connection().write(data);
+  read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
@@ -551,6 +560,16 @@ void TcpProxyDrainer::onEvent(Network::ConnectionEvent event) {
     config_->stats().upstream_flush_active_.dec();
     finalizeConnectionStats(*upstream_host_, *connected_timespan_);
     parent_.remove(*this, upstream_connection_->dispatcher());
+  }
+}
+
+void TcpProxyDrainer::onData(Buffer::Instance& data, bool) {
+  if (data.length() > 0) {
+    // There is no downstream connection to send any data to, but the upstream
+    // sent some data. Try to behave similar to what the kernel would do
+    // when it receives data on a connection where the application has closed
+    // the socket or ::shutdown(fd, SHUT_RD), and close/reset the connection.
+    cancelDrain();
   }
 }
 

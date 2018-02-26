@@ -743,6 +743,14 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
     return parseYamlNode(YAML::Load(yaml));
   } catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
+  } catch (YAML::BadConversion& e) {
+    throw EnvoyException(e.what());
+  } catch (std::exception& e) {
+    // There is a potentially wide space of exceptions thrown by the YAML parser,
+    // and enumerating them all may be difficult. Envoy doesn't work well with
+    // unhandled exceptions, so we capture them and record the exception name in
+    // the Envoy Exception text.
+    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
 }
 

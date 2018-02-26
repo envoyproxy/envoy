@@ -28,6 +28,7 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
@@ -442,7 +443,12 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   if (primary_cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     cluster_entry_it->second.thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
         primary_cluster_reference.prioritySet(), primary_cluster_reference.info()->stats(),
-        runtime_, random_, primary_cluster_reference.info()->lbRingHashConfig());
+        runtime_, random_, primary_cluster_reference.info()->lbRingHashConfig(),
+        primary_cluster_reference.info()->lbConfig());
+  } else if (primary_cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
+    cluster_entry_it->second.thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
+        primary_cluster_reference.prioritySet(), primary_cluster_reference.info()->stats(),
+        runtime_, random_, primary_cluster_reference.info()->lbConfig());
   }
 
   cm_stats_.total_clusters_.set(primary_clusters_.size());
@@ -681,30 +687,32 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     lb_.reset(new SubsetLoadBalancer(cluster->lbType(), priority_set_, parent_.local_priority_set_,
                                      cluster->stats(), parent.parent_.runtime_,
                                      parent.parent_.random_, cluster->lbSubsetInfo(),
-                                     cluster->lbRingHashConfig()));
+                                     cluster->lbRingHashConfig(), cluster->lbConfig()));
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_.reset(new LeastRequestLoadBalancer(priority_set_, parent_.local_priority_set_,
                                              cluster->stats(), parent.parent_.runtime_,
-                                             parent.parent_.random_));
+                                             parent.parent_.random_, cluster->lbConfig()));
       break;
     }
     case LoadBalancerType::Random: {
       ASSERT(lb_factory_ == nullptr);
       lb_.reset(new RandomLoadBalancer(priority_set_, parent_.local_priority_set_, cluster->stats(),
-                                       parent.parent_.runtime_, parent.parent_.random_));
+                                       parent.parent_.runtime_, parent.parent_.random_,
+                                       cluster->lbConfig()));
       break;
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
       lb_.reset(new RoundRobinLoadBalancer(priority_set_, parent_.local_priority_set_,
                                            cluster->stats(), parent.parent_.runtime_,
-                                           parent.parent_.random_));
+                                           parent.parent_.random_, cluster->lbConfig()));
       break;
     }
-    case LoadBalancerType::RingHash: {
+    case LoadBalancerType::RingHash:
+    case LoadBalancerType::Maglev: {
       ASSERT(lb_factory_ != nullptr);
       lb_ = lb_factory_->create();
       break;

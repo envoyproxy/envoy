@@ -74,14 +74,20 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "google_async_client_lib",
-    srcs = ["google_async_client_impl.cc"],
+    srcs = [
+        "google_async_client_impl.cc",
+        "google_async_client_site.cc",
+    ],
     hdrs = ["google_async_client_impl.h"],
     external_deps = ["grpc"],
     deps = [
         "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
+        "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )

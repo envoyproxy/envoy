@@ -24,6 +24,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/redis/conn_pool_impl.h"
+#include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
 namespace Envoy {
@@ -281,7 +282,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.http_health_check().path()) {
+      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_.value(config.http_health_check().service_name());
   }
@@ -332,7 +333,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host, parent_.cluster_.info()->name()},
+      {Http::Headers::get().Host,
+       parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
@@ -510,7 +512,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
       data.add(&segment[0], segment.size());
     }
 
-    client_->write(data);
+    client_->write(data, false);
   }
 }
 
@@ -525,7 +527,13 @@ RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
                                                Runtime::RandomGenerator& random,
                                                Redis::ConnPool::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      client_factory_(client_factory) {}
+      client_factory_(client_factory), key_(config.redis_health_check().key()) {
+  if (!key_.empty()) {
+    type_ = Type::Exists;
+  } else {
+    type_ = Type::Ping;
+  }
+}
 
 RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
     RedisHealthCheckerImpl& parent, const HostSharedPtr& host)
@@ -559,17 +567,42 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
   }
 
   ASSERT(!current_request_);
-  current_request_ = client_->makeRequest(healthCheckRequest(), *this);
+
+  switch (parent_.type_) {
+  case Type::Exists:
+    current_request_ = client_->makeRequest(existsHealthCheckRequest(parent_.key_), *this);
+    break;
+  case Type::Ping:
+    current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
+    break;
+  default:
+    NOT_REACHED;
+  }
 }
 
 void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
-  if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
-    handleSuccess();
-  } else {
-    handleFailure(FailureType::Active);
+
+  switch (parent_.type_) {
+  case Type::Exists:
+    if (value->type() == Redis::RespType::Integer && value->asInteger() == 0) {
+      handleSuccess();
+    } else {
+      handleFailure(FailureType::Active);
+    }
+    break;
+  case Type::Ping:
+    if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
+      handleSuccess();
+    } else {
+      handleFailure(FailureType::Active);
+    }
+    break;
+  default:
+    NOT_REACHED;
   }
+
   if (!parent_.reuse_connection_) {
     client_->close();
   }
@@ -584,6 +617,16 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onTimeout() {
   current_request_->cancel();
   current_request_ = nullptr;
   client_->close();
+}
+
+RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
+  std::vector<Redis::RespValue> values(2);
+  values[0].type(Redis::RespType::BulkString);
+  values[0].asString() = "EXISTS";
+  values[1].type(Redis::RespType::BulkString);
+  values[1].asString() = key;
+  request_.type(Redis::RespType::Array);
+  request_.asArray().swap(values);
 }
 
 RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
@@ -723,6 +766,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       parent_.service_method_.name());
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
+  Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 

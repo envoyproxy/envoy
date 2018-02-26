@@ -121,6 +121,8 @@ public:
   const std::string GRPC_JSON_TRANSCODER = "envoy.grpc_json_transcoder";
   // GRPC web filter
   const std::string GRPC_WEB = "envoy.grpc_web";
+  // Gzip filter
+  const std::string ENVOY_GZIP = "envoy.gzip";
   // IP tagging filter
   const std::string IP_TAGGING = "envoy.ip_tagging";
   // Rate limit filter
@@ -219,6 +221,20 @@ typedef ConstSingleton<MetadataEnvoyLbKeyValues> MetadataEnvoyLbKeys;
  */
 class TagNameValues {
 public:
+  TagNameValues();
+
+  /**
+   * Represents a tag extraction. This structure may be extended to
+   * allow for an faster pattern-matching engine to be used as an
+   * alternative to regexes, on an individual tag basis. Some of the
+   * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
+   */
+  struct Descriptor {
+    Descriptor(const std::string& name, const std::string& regex) : name_(name), regex_(regex) {}
+    const std::string name_;
+    const std::string regex_;
+  };
+
   // Cluster name tag
   const std::string CLUSTER_NAME = "envoy.cluster_name";
   // Listener port tag
@@ -269,12 +285,14 @@ public:
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
 
-  // Constructor to fill map.
-  TagNameValues() : name_regex_pairs_(getRegexMapping()) {}
+  // Returns the list of descriptors.
+  const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
 private:
-  // Creates a regex mapping for all tag names.
-  std::vector<std::pair<std::string, std::string>> getRegexMapping();
+  void addRegex(const std::string& name, const std::string& regex);
+
+  // Collection of tag descriptors.
+  std::vector<Descriptor> descriptor_vec_;
 };
 
 typedef ConstSingleton<TagNameValues> TagNames;

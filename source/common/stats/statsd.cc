@@ -222,7 +222,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
     connection_->connect();
   }
 
-  connection_->write(buffer);
+  connection_->write(buffer, false);
 }
 
 uint64_t TcpStatsdSink::TlsSink::usedBuffer() {

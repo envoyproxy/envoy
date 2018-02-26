@@ -120,6 +120,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),

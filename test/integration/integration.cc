@@ -39,6 +39,13 @@ namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
+void IntegrationStreamDecoder::waitForContinueHeaders() {
+  if (!continue_headers_.get()) {
+    waiting_for_continue_headers_ = true;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
+}
+
 void IntegrationStreamDecoder::waitForHeaders() {
   if (!headers_.get()) {
     waiting_for_headers_ = true;
@@ -68,6 +75,9 @@ void IntegrationStreamDecoder::waitForReset() {
 
 void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
+  if (waiting_for_continue_headers_) {
+    dispatcher_.exit();
+  }
 }
 
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -115,7 +125,8 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
                                            MockBufferFactory& factory, uint32_t port,
-                                           Network::Address::IpVersion version)
+                                           Network::Address::IpVersion version,
+                                           bool enable_half_close)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _))
@@ -134,6 +145,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
+  connection_->enableHalfClose(enable_half_close);
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
@@ -155,17 +167,26 @@ void IntegrationTcpClient::waitForDisconnect() {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationTcpClient::write(const std::string& data) {
+void IntegrationTcpClient::waitForHalfClose() {
+  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader_->readLastByte());
+}
+
+void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
+
+void IntegrationTcpClient::write(const std::string& data, bool end_stream) {
   Buffer::OwnedImpl buffer(data);
   EXPECT_CALL(*client_write_buffer_, move(_));
-  EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
+  if (!data.empty()) {
+    EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
+  }
 
   int bytes_expected = client_write_buffer_->bytes_written() + data.size();
 
-  connection_->write(buffer);
-  while (client_write_buffer_->bytes_written() != bytes_expected) {
+  connection_->write(buffer, end_stream);
+  do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  }
+  } while (client_write_buffer_->bytes_written() != bytes_expected);
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -197,10 +218,13 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
 }
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
-  return dispatcher_->createClientConnection(
+  Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+
+  connection->enableHalfClose(enable_half_close_);
+  return connection;
 }
 
 void BaseIntegrationTest::initialize() {
@@ -216,7 +240,8 @@ void BaseIntegrationTest::createUpstreams() {
   if (autonomous_upstream_) {
     fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
   } else {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
   }
 }
 
@@ -234,7 +259,13 @@ void BaseIntegrationTest::createEnvoy() {
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
-  createGeneratedApiTestServer(bootstrap_path, named_ports_);
+
+  std::vector<std::string> named_ports;
+  const auto& static_resources = config_helper_.bootstrap().static_resources();
+  for (int i = 0; i < static_resources.listeners_size(); ++i) {
+    named_ports.push_back(static_resources.listeners(i).name());
+  }
+  createGeneratedApiTestServer(bootstrap_path, named_ports);
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
@@ -242,7 +273,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1);
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options();
         });
@@ -252,8 +283,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return IntegrationTcpClientPtr{
-      new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port, version_)};
+  return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, *mock_buffer_factory_, port,
+                                                          version_, enable_half_close_)};
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

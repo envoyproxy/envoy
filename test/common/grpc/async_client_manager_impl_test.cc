@@ -17,7 +17,7 @@ namespace {
 class AsyncClientManagerImplTest : public testing::Test {
 public:
   Upstream::MockClusterManager cm_;
-  ThreadLocal::MockInstance tls_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore scope_;
 };
 
