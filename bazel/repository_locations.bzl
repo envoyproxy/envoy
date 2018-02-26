@@ -34,8 +34,8 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "1368b7de0343388a0e217643481ec4d475ed22e5",
-        remote = "https://github.com/rnburn/opentracing-cpp",
+        commit = "6d813faa3a214869de2ea6164a34616398414378",
+        remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
         commit = "6a198acd328f976984699f7272bbec7c8b220f65",
