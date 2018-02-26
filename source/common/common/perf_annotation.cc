@@ -36,9 +36,13 @@ void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::stri
 #if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
 #endif
-    DurationCount& duration_count = duration_count_map_[key];
-    duration_count.first += duration;
-    ++duration_count.second;
+    DurationStats& stats = duration_stats_map_[key];
+    if ((++stats.count_ == 1) || (duration < stats.min_)) {
+      stats.min_ = duration;
+    }
+    stats.max_ = std::max(stats.max_, duration);
+    stats.total_ += duration;
+    // TODO(jmarantz): accumulate standard deviation.
   }
 }
 
@@ -54,19 +58,17 @@ std::string PerfAnnotationContext::toString() {
 #endif
 
   // The map is from category/description -> [duration, time]. Reverse-sort by duration.
-  std::vector<const DurationCountMap::value_type*> sorted_values;
-  sorted_values.reserve(context->duration_count_map_.size());
-  for (const auto& iter : context->duration_count_map_) {
+  std::vector<const DurationStatsMap::value_type*> sorted_values;
+  sorted_values.reserve(context->duration_stats_map_.size());
+  for (const auto& iter : context->duration_stats_map_) {
     sorted_values.push_back(&iter);
   }
   std::sort(
       sorted_values.begin(), sorted_values.end(),
-      [](const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
-        const DurationCount& a_duration_count = a->second;
-        const std::chrono::nanoseconds& a_duration = a_duration_count.first;
-        const DurationCount& b_duration_count = b->second;
-        const std::chrono::nanoseconds& b_duration = b_duration_count.first;
-        return a_duration > b_duration;
+      [](const DurationStatsMap::value_type* a, const DurationStatsMap::value_type* b) -> bool {
+        const DurationStats& a_stats = a->second;
+        const DurationStats& b_stats = b->second;
+        return a_stats.total_ > b_stats.total_;
       });
 
   // Organize the report so it lines up in columns. Note that the widest duration comes first,
@@ -74,8 +76,8 @@ std::string PerfAnnotationContext::toString() {
   // to compute column widths. First collect the column headers and their widths.
   //
   // TODO(jmarantz): add more stats, e.g. std deviation, median, min, max.
-  static const char* headers[] = {"Duration(us)", "# Calls", "per_call(ns)", "Category",
-                                  "Description"};
+  static const char* headers[] = {"Duration(us)", "# Calls",  "Mean(ms)",   "Min(ms)",
+                                  "Max(ms)",      "Category", "Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
   size_t widths[num_columns];
   std::vector<std::string> columns[num_columns];
@@ -87,20 +89,23 @@ std::string PerfAnnotationContext::toString() {
 
   // Compute all the column strings and their max widths.
   for (const auto& p : sorted_values) {
-    const DurationCount& duration_count = p->second;
-    const std::chrono::nanoseconds duration = duration_count.first;
-    const uint64_t count = duration_count.second;
-    columns[0].push_back(
-        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()));
-    columns[1].push_back(std::to_string(count));
+    const DurationStats& stats = p->second;
+    auto microseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
+      return std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(ns).count());
+    };
+    columns[0].push_back(microseconds_string(stats.total_));
+    columns[1].push_back(std::to_string(stats.count_));
     columns[2].push_back(
-        (count == 0)
+        (stats.count_ == 0)
             ? "NaN"
             : std::to_string(
-                  std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
+                  std::chrono::duration_cast<std::chrono::nanoseconds>(stats.total_).count() /
+                  stats.count_));
+    columns[3].push_back(microseconds_string(stats.min_));
+    columns[4].push_back(microseconds_string(stats.max_));
     const CategoryDescription& category_description = p->first;
-    columns[3].push_back(category_description.first);
-    columns[4].push_back(category_description.second);
+    columns[5].push_back(category_description.first);
+    columns[6].push_back(category_description.second);
     for (size_t i = 0; i < num_columns; ++i) {
       widths[i] = std::max(widths[i], columns[i].back().size());
     }
@@ -127,7 +132,7 @@ void PerfAnnotationContext::clear() {
 #if PERF_THREAD_SAFE
   std::unique_lock<std::mutex> lock(context->mutex_);
 #endif
-  context->duration_count_map_.clear();
+  context->duration_stats_map_.clear();
 }
 
 PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {

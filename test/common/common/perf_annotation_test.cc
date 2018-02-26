@@ -42,17 +42,17 @@ TEST_F(PerfAnnotationTest, testMacros) {
 TEST_F(PerfAnnotationTest, testFormat) {
   PerfAnnotationContext* context = PerfAnnotationContext::getOrCreate();
   for (int i = 0; i < 4; ++i) {
-    context->record(std::chrono::microseconds{1000}, "alpha", "1");
+    context->record(std::chrono::microseconds{1000 + 100 * i}, "alpha", "1");
   }
   for (int i = 0; i < 3; ++i) {
-    context->record(std::chrono::microseconds{30}, "beta", "3");
+    context->record(std::chrono::microseconds{30 - i}, "beta", "3");
   }
   context->record(std::chrono::microseconds{200}, "gamma", "2");
   std::string report = context->toString();
-  EXPECT_EQ("Duration(us)  # Calls  per_call(ns)  Category  Description\n"
-            "        4000        4       1000000     alpha            1\n"
-            "         200        1        200000     gamma            2\n"
-            "          90        3         30000      beta            3\n",
+  EXPECT_EQ("Duration(us)  # Calls  Mean(ms)  Min(ms)  Max(ms)  Category  Description\n"
+            "        4600        4   1150000     1000     1300     alpha            1\n"
+            "         200        1    200000      200      200     gamma            2\n"
+            "          87        3     29000       28       30      beta            3\n",
             context->toString());
 }
 

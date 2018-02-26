@@ -104,7 +104,16 @@ private:
   PerfAnnotationContext();
 
   using CategoryDescription = std::pair<std::string, std::string>;
-  using DurationCount = std::pair<std::chrono::nanoseconds, uint64_t>;
+
+  struct DurationStats {
+    std::chrono::nanoseconds total_{0};
+    std::chrono::nanoseconds min_{0};
+    std::chrono::nanoseconds max_{0};
+    uint64_t count_{0};
+
+    // TODO(jmarantz): add running standard deviation as described in
+    // https://en.wikipedia.org/wiki/Standard_deviation
+  };
 
   struct Hash {
     size_t operator()(const CategoryDescription& a) const {
@@ -112,9 +121,9 @@ private:
     }
   };
 
-  using DurationCountMap = std::unordered_map<CategoryDescription, DurationCount, Hash>;
+  using DurationStatsMap = std::unordered_map<CategoryDescription, DurationStats, Hash>;
 
-  DurationCountMap duration_count_map_; // Maps {category, description} to {duration, count}.
+  DurationStatsMap duration_stats_map_; // Maps {category, description} to DurationStats.
 #if PERF_THREAD_SAFE
   std::mutex mutex_;
 #endif
