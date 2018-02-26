@@ -4,6 +4,9 @@
 #include <string>
 
 #include "common/common/fmt.h"
+#include "common/common/logger.h"
+#include "common/common/thread.h"
+#include "common/event/libevent.h"
 
 #include "test/config_test/config_test.h"
 
@@ -19,6 +22,11 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
   try {
+
+    Envoy::Event::Libevent::Global::initialize();
+    Envoy::Thread::MutexBasicLockable lock;
+    Envoy::Logger::Registry::initialize(static_cast<spdlog::level::level_enum>(2), lock);
+
     const uint32_t num_tested = Envoy::ConfigTest::run(std::string(argv[1]));
     std::cout << fmt::format("Configs tested: {}. ", num_tested);
     if (testing::Test::HasFailure()) {

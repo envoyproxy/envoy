@@ -47,6 +47,11 @@ public:
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
+    expectSendMessage(cluster_names, version, Grpc::Status::GrpcStatus::Ok, "");
+  }
+
+  void expectSendMessage(const std::vector<std::string>& cluster_names, const std::string& version,
+                         const Protobuf::int32 error_code, const std::string& error_message) {
     envoy::api::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     for (const auto& cluster : cluster_names) {
@@ -57,6 +62,11 @@ public:
     }
     expected_request.set_response_nonce(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+      ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
+      error_detail->set_code(error_code);
+      error_detail->set_message(error_message);
+    }
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
@@ -97,7 +107,8 @@ public:
       version_ = version;
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-      expectSendMessage(last_cluster_names_, version_);
+      expectSendMessage(last_cluster_names_, version_, Grpc::Status::GrpcStatus::Internal,
+                        "bad config");
     }
     subscription_->grpcMux().onReceiveMessage(std::move(response));
     EXPECT_EQ(version_, subscription_->versionInfo());

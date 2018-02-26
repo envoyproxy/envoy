@@ -1,4 +1,9 @@
 REPOSITORY_LOCATIONS = dict(
+    boringssl = dict(
+        # Use commits from branch "chromium-stable-with-bazel"
+        commit = "426db8db7d1cbd17573e295b52d7aab7a97ba1ff",  # chromium-64.0.3282.119
+        remote = "https://boringssl.googlesource.com/boringssl",
+    ),
     com_google_absl = dict(
         commit = "787891a3882795cee0364e8a0f0dda315578d155",
         remote = "https://github.com/abseil/abseil-cpp",
@@ -71,7 +76,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "258bfddfddaad4d6a1da7b4476c98b060d57bcc1",
+        commit = "42f85a50c509b4e7451123f525c75bf92ace3a52",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(
@@ -79,7 +84,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "4374be38e9a75ff5957c3922adb155d32086fe14",
+        commit = "0.9.0",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar

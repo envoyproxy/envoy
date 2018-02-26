@@ -103,7 +103,6 @@ envoy_cc_library(
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:empty_string",
     ],
 )
 

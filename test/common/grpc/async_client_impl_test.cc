@@ -20,8 +20,10 @@ namespace {
 class EnvoyAsyncClientImplTest : public testing::Test {
 public:
   EnvoyAsyncClientImplTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        grpc_client_(new AsyncClientImpl(cm_, "test_cluster")) {
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
+    envoy::api::v2::core::GrpcService config;
+    config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config);
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 

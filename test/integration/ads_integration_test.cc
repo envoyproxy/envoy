@@ -4,10 +4,12 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
@@ -25,6 +27,7 @@
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
+using testing::IsSubstring;
 
 namespace Envoy {
 namespace {
@@ -86,16 +89,26 @@ public:
                                                          context_manager_, *upstream_stats_store);
   }
 
-  AssertionResult compareDiscoveryRequest(const std::string& expected_type_url,
-                                          const std::string& expected_version,
-                                          const std::vector<std::string>& expected_resource_names) {
+  AssertionResult
+  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
+                          const std::vector<std::string>& expected_resource_names,
+                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+                          const std::string& expected_error_message = "") {
     envoy::api::v2::DiscoveryRequest discovery_request;
     ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
       return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                                discovery_request.type_url(), expected_type_url);
     }
+    if (!(expected_error_code == discovery_request.error_detail().code())) {
+      return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
+                                               discovery_request.error_detail().code(),
+                                               expected_error_code);
+    }
+    EXPECT_TRUE(
+        IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
     const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
                                                   discovery_request.resource_names().cend());
     if (expected_resource_names != resource_names) {
@@ -320,7 +333,10 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Cluster, "", {}, Grpc::Status::GrpcStatus::Internal,
+      fmt::format("{} does not match {}", Config::TypeUrl::get().ClusterLoadAssignment,
+                  Config::TypeUrl::get().Cluster)));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")}, "1");
 
@@ -331,7 +347,10 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"},
+                              Grpc::Status::GrpcStatus::Internal,
+                              fmt::format("{} does not match {}", Config::TypeUrl::get().Cluster,
+                                          Config::TypeUrl::get().ClusterLoadAssignment)));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
 
@@ -340,7 +359,10 @@ TEST_P(AdsIntegrationTest, Failure) {
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().Listener, {buildRouteConfig("listener_0", "route_config_0")}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Listener, "", {}, Grpc::Status::GrpcStatus::Internal,
+      fmt::format("{} does not match {}", Config::TypeUrl::get().RouteConfiguration,
+                  Config::TypeUrl::get().Listener)));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
 
@@ -352,7 +374,10 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"},
+                              Grpc::Status::GrpcStatus::Internal,
+                              fmt::format("{} does not match {}", Config::TypeUrl::get().Listener,
+                                          Config::TypeUrl::get().RouteConfiguration)));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       "1");
@@ -362,6 +387,51 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
+}
+
+class AdsFailIntegrationTest : public HttpIntegrationTest,
+                               public Grpc::GrpcClientIntegrationParamTest {
+public:
+  AdsFailIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+
+  void TearDown() override {
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto* grpc_service =
+          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+    });
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+  }
+
+  FakeHttpConnectionPtr ads_connection_;
+  FakeStreamPtr ads_stream_;
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate that we don't crash on failed ADS stream.
+TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
+  initialize();
+  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  ads_stream_->startGrpcStream();
+  ads_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
 } // namespace
