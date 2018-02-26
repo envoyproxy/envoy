@@ -32,7 +32,7 @@ TEST(MainCommon, ConstructDestruct) {
   std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                             "/test/config/integration/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), nullptr};
-  MainCommon main_common(3, const_cast<char**>(argv), false);
+  MainCommon main_common(3, const_cast<char**>(argv));
 }
 
 TEST(MainCommon, LegacyMain) {
@@ -49,23 +49,11 @@ TEST(MainCommon, LegacyMain) {
   Envoy::SignalAction handle_sigs;
 #endif
 
-#ifdef ENVOY_HOT_RESTART
-  // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
-  const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb =
-      [](uint64_t max_num_stats, uint64_t max_stat_name_len) {
-        return Envoy::Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
-      };
-#else
-  const Envoy::OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
-    return "disabled";
-  };
-#endif
-
   std::unique_ptr<Envoy::OptionsImpl> options;
   int return_code = -1;
   try {
-    options = std::make_unique<Envoy::OptionsImpl>(argc, const_cast<char**>(argv),
-                                                   hot_restart_version_cb, spdlog::level::info);
+    options = std::make_unique<Envoy::OptionsImpl>(
+        argc, const_cast<char**>(argv), &MainCommon::hotRestartVersion, spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
     return_code = EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {

@@ -27,7 +27,7 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     argv.push_back(s.c_str());
   }
   return std::unique_ptr<OptionsImpl>(new OptionsImpl(argv.size(), const_cast<char**>(&argv[0]),
-                                                      [](uint64_t, uint64_t) { return "1"; },
+                                                      [](uint64_t, uint64_t, bool) { return "1"; },
                                                       spdlog::level::warn));
 }
 
