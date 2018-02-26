@@ -31,7 +31,7 @@ PerfAnnotationContext::PerfAnnotationContext() {}
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
-  CategoryDescription key(std::string(category), std::string(description));
+  CategoryDescription key((std::string(category)), (std::string(description)));
   {
 #if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
