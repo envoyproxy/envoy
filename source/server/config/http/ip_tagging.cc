@@ -38,8 +38,7 @@ HttpFilterFactoryCb IpTaggingFilterConfig::createFilter(
       proto_config, stat_prefix, context.scope(), context.runtime()));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(
-        Http::StreamDecoderFilterSharedPtr{new Http::IpTaggingFilter(config)});
+    callbacks.addStreamDecoderFilter(std::make_shared<Http::IpTaggingFilter>(config));
   };
 }
 

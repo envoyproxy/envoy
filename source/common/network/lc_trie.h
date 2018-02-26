@@ -42,7 +42,7 @@ public:
    *                              factor. It reduces the depth of the trie.
    */
   LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
-         double fill_factor = 0.5, uint32_t root_branching_factor = 16);
+         double fill_factor = 0.5, uint32_t root_branching_factor = 0);
 
   /**
    * Retrieve the tag associated with the CIDR range that contains `ip_address`. Both IPv4 and IPv6

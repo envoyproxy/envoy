@@ -66,7 +66,7 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
-  Network::LcTrie::LcTrie& trie() const { return *trie_; }
+  const Network::LcTrie::LcTrie& trie() const { return *trie_; }
   const std::string& statsPrefix() const { return stats_prefix_; }
 
 private:

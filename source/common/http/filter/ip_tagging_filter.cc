@@ -1,5 +1,7 @@
 #include "common/http/filter/ip_tagging_filter.h"
 
+#include "common/http/headers.h"
+
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -13,7 +15,8 @@ void IpTaggingFilter::onDestroy() {}
 
 FilterHeadersStatus IpTaggingFilter::decodeHeaders(HeaderMap& headers, bool) {
   bool is_internal_request =
-      headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
+      headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() ==
+                                         Headers::get().EnvoyInternalRequestValues.True.c_str());
 
   if ((is_internal_request && config_->requestType() == FilterRequestType::EXTERNAL) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::INTERNAL) ||
