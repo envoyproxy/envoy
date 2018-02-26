@@ -21,56 +21,65 @@ struct RequestInfoImpl : public RequestInfo {
 
   const MonotonicTime& startTimeMonotonic() const override { return start_time_monotonic_; }
 
-  const Optional<MonotonicTime>& lastDownstreamRxByteReceived() const override {
-    return last_rx_byte_received_;
+  Optional<std::chrono::nanoseconds> duration(const Optional<MonotonicTime>& time) const {
+    if (!time.valid()) {
+      return {};
+    }
+
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() -
+                                                                start_time_monotonic_);
+  }
+
+  Optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
+    return duration(last_rx_byte_received_);
   }
 
   void lastDownstreamRxByteReceived(MonotonicTime time) override {
     last_rx_byte_received_.value(time);
   }
 
-  const Optional<MonotonicTime>& firstUpstreamTxByteSent() const override {
-    return first_upstream_tx_byte_sent_;
+  Optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
+    return duration(first_upstream_tx_byte_sent_);
   }
 
   void firstUpstreamTxByteSent(MonotonicTime time) override {
     first_upstream_tx_byte_sent_.value(time);
   }
 
-  const Optional<MonotonicTime>& lastUpstreamTxByteSent() const override {
-    return last_upstream_tx_byte_sent_;
+  Optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
+    return duration(last_upstream_tx_byte_sent_);
   }
 
   void lastUpstreamTxByteSent(MonotonicTime time) override {
     last_upstream_tx_byte_sent_.value(time);
   }
 
-  const Optional<MonotonicTime>& firstUpstreamRxByteReceived() const override {
-    return first_upstream_rx_byte_received_;
+  Optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
+    return duration(first_upstream_rx_byte_received_);
   }
 
   void firstUpstreamRxByteReceived(MonotonicTime time) override {
     first_upstream_rx_byte_received_.value(time);
   }
 
-  const Optional<MonotonicTime>& lastUpstreamRxByteReceived() const override {
-    return last_upstream_rx_byte_received_;
+  Optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
+    return duration(last_upstream_rx_byte_received_);
   }
 
   void lastUpstreamRxByteReceived(MonotonicTime time) override {
     last_upstream_rx_byte_received_.value(time);
   }
 
-  const Optional<MonotonicTime>& firstDownstreamTxByteSent() const override {
-    return first_downstream_tx_byte_sent_;
+  Optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
+    return duration(first_downstream_tx_byte_sent_);
   }
 
   void firstDownstreamTxByteSent(MonotonicTime time) override {
     first_downstream_tx_byte_sent_.value(time);
   }
 
-  const Optional<MonotonicTime>& lastDownstreamTxByteSent() const override {
-    return last_downstream_tx_byte_sent_;
+  Optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
+    return duration(last_downstream_tx_byte_sent_);
   }
 
   void lastDownstreamTxByteSent(MonotonicTime time) override {
@@ -79,7 +88,9 @@ struct RequestInfoImpl : public RequestInfo {
 
   void finalize(MonotonicTime time) override { end_time_.value(time); }
 
-  const Optional<MonotonicTime>& finalTimeMonotonic() const override { return end_time_; }
+  Optional<std::chrono::nanoseconds> finalTimeMonotonic() const override {
+    return duration(end_time_);
+  }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 

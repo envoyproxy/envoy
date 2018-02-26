@@ -55,30 +55,29 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    Optional<MonotonicTime> time = request_info.startTimeMonotonic() + std::chrono::milliseconds(5);
-    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(ReturnRef(time));
+    Optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
+    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
     EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    Optional<MonotonicTime> time;
-    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(ReturnRef(time));
+    Optional<std::chrono::nanoseconds> dur;
+    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
     EXPECT_EQ("-", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    Optional<MonotonicTime> time =
-        request_info.startTimeMonotonic() + std::chrono::milliseconds(10);
-    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(ReturnRef(time));
+    Optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(10000000);
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    Optional<MonotonicTime> time;
-    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(ReturnRef(time));
+    Optional<std::chrono::nanoseconds> dur;
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("-", response_duration_format.format(header, header, request_info));
   }
 
@@ -117,10 +116,9 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter duration_format("DURATION");
-    Optional<MonotonicTime> time =
-        request_info.startTimeMonotonic() + std::chrono::milliseconds(10);
-    EXPECT_CALL(request_info, finalTimeMonotonic()).WillRepeatedly(ReturnRef(time));
-    EXPECT_EQ("10", duration_format.format(header, header, request_info));
+    Optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+    EXPECT_CALL(request_info, finalTimeMonotonic()).WillRepeatedly(Return(dur));
+    EXPECT_EQ("15", duration_format.format(header, header, request_info));
   }
 
   {

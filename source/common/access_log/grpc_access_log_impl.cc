@@ -164,67 +164,46 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
               request_info.startTime().time_since_epoch())
               .count()));
 
-  if (request_info.lastDownstreamRxByteReceived().valid()) {
+  Optional<std::chrono::nanoseconds> dur = request_info.lastDownstreamRxByteReceived();
+  if (dur.valid()) {
     common_properties->mutable_time_to_last_rx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.lastDownstreamRxByteReceived())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.firstUpstreamTxByteSent().valid()) {
+  dur = request_info.firstUpstreamTxByteSent();
+  if (dur.valid()) {
     common_properties->mutable_time_to_first_upstream_tx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.firstUpstreamTxByteSent())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.lastUpstreamTxByteSent().valid()) {
+  dur = request_info.lastUpstreamTxByteSent();
+  if (dur.valid()) {
     common_properties->mutable_time_to_last_upstream_tx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.lastUpstreamTxByteSent())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.firstUpstreamRxByteReceived().valid()) {
+  dur = request_info.firstUpstreamRxByteReceived();
+  if (dur.valid()) {
     common_properties->mutable_time_to_first_upstream_rx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.firstUpstreamRxByteReceived())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.lastUpstreamRxByteReceived().valid()) {
+  dur = request_info.lastUpstreamRxByteReceived();
+  if (dur.valid()) {
     common_properties->mutable_time_to_last_upstream_rx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.lastUpstreamRxByteReceived())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.firstDownstreamTxByteSent().valid()) {
+  dur = request_info.firstDownstreamTxByteSent();
+  if (dur.valid()) {
     common_properties->mutable_time_to_first_downstream_tx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.firstDownstreamTxByteSent())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (request_info.lastDownstreamTxByteSent().valid()) {
+  dur = request_info.lastDownstreamTxByteSent();
+  if (dur.valid()) {
     common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::NanosecondsToDuration(
-            RequestInfo::TimingUtils::duration<std::chrono::nanoseconds>(
-                request_info, request_info.lastDownstreamTxByteSent())
-                .value()
-                .count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   if (request_info.upstreamHost() != nullptr) {

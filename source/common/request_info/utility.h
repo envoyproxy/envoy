@@ -48,18 +48,5 @@ public:
   formatDownstreamAddressNoPort(const Network::Address::Instance& address);
 };
 
-class TimingUtils {
-public:
-  template <typename T>
-  static Optional<T> duration(const RequestInfo& request_info,
-                              const Optional<MonotonicTime>& time) {
-    if (!time.valid()) {
-      return {};
-    }
-
-    return {std::chrono::duration_cast<T>(time.value() - request_info.startTimeMonotonic())};
-  }
-};
-
 } // namespace RequestInfo
 } // namespace Envoy

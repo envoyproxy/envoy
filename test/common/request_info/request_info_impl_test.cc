@@ -22,64 +22,66 @@ TEST(RequestInfoImplTest, TimingTest) {
   RequestInfoImpl info(Http::Protocol::Http2);
   MonotonicTime post_start = std::chrono::steady_clock::now();
 
-  EXPECT_LE(pre_start, info.startTimeMonotonic()) << "Start time was lower than expected";
-  EXPECT_GE(post_start, info.startTimeMonotonic()) << "Start time was higher than expected";
+  const MonotonicTime& start = info.startTimeMonotonic();
 
-  MonotonicTime now = std::chrono::steady_clock::now();
+  EXPECT_LE(pre_start, start) << "Start time was lower than expected";
+  EXPECT_GE(post_start, start) << "Start time was higher than expected";
+
+  std::chrono::nanoseconds dur = std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastDownstreamRxByteReceived().valid());
-  info.lastDownstreamRxByteReceived(now);
-  Optional<MonotonicTime> timing = info.lastDownstreamRxByteReceived();
+  info.lastDownstreamRxByteReceived(start + dur);
+  Optional<std::chrono::nanoseconds> timing = info.lastDownstreamRxByteReceived();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.firstUpstreamTxByteSent().valid());
-  info.firstUpstreamTxByteSent(now);
+  info.firstUpstreamTxByteSent(start + dur);
   timing = info.firstUpstreamTxByteSent();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastUpstreamTxByteSent().valid());
-  info.lastUpstreamTxByteSent(now);
+  info.lastUpstreamTxByteSent(start + dur);
   timing = info.lastUpstreamTxByteSent();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.firstUpstreamRxByteReceived().valid());
-  info.firstUpstreamRxByteReceived(now);
+  info.firstUpstreamRxByteReceived(start + dur);
   timing = info.firstUpstreamRxByteReceived();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastUpstreamRxByteReceived().valid());
-  info.lastUpstreamRxByteReceived(now);
+  info.lastUpstreamRxByteReceived(start + dur);
   timing = info.lastUpstreamRxByteReceived();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.firstDownstreamTxByteSent().valid());
-  info.firstDownstreamTxByteSent(now);
+  info.firstDownstreamTxByteSent(start + dur);
   timing = info.firstDownstreamTxByteSent();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastDownstreamTxByteSent().valid());
-  info.lastDownstreamTxByteSent(now);
+  info.lastDownstreamTxByteSent(start + dur);
   timing = info.lastDownstreamTxByteSent();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 
-  now = std::chrono::steady_clock::now();
+  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.finalTimeMonotonic().valid());
-  info.finalize(now);
+  info.finalize(start + dur);
   timing = info.finalTimeMonotonic();
   EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(now, timing.value());
+  EXPECT_EQ(dur, timing.value());
 }
 
 TEST(RequestInfoImplTest, BytesTest) {

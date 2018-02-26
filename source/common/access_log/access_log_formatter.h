@@ -31,8 +31,7 @@ class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
   static const std::string& protocolToString(const Optional<Http::Protocol>& protocol);
-  static std::string durationToString(const RequestInfo::RequestInfo& info,
-                                      const Optional<MonotonicTime>& time);
+  static std::string durationToString(const Optional<std::chrono::nanoseconds>& time);
 
 private:
   AccessLogFormatUtils();

@@ -26,12 +26,10 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
 }
 
-std::string AccessLogFormatUtils::durationToString(const RequestInfo::RequestInfo& info,
-                                                   const Optional<MonotonicTime>& time) {
-  Optional<std::chrono::milliseconds> duration =
-      RequestInfo::TimingUtils::duration<std::chrono::milliseconds>(info, time);
-  if (duration.valid()) {
-    return std::to_string(duration.value().count());
+std::string AccessLogFormatUtils::durationToString(const Optional<std::chrono::nanoseconds>& time) {
+  if (time.valid()) {
+    return std::to_string(
+        std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count());
   } else {
     return UnspecifiedValueString;
   }
@@ -161,13 +159,11 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info,
-                                                    request_info.lastDownstreamRxByteReceived());
+      return AccessLogFormatUtils::durationToString(request_info.lastDownstreamRxByteReceived());
     };
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info,
-                                                    request_info.firstUpstreamRxByteReceived());
+      return AccessLogFormatUtils::durationToString(request_info.firstUpstreamRxByteReceived());
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
@@ -189,8 +185,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info,
-                                                    request_info.finalTimeMonotonic());
+      return AccessLogFormatUtils::durationToString(request_info.finalTimeMonotonic());
     };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
