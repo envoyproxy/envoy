@@ -28,6 +28,10 @@ size_t roundUpMultipleNaturalAlignment(size_t val) {
   return (val + multiple - 1) & ~(multiple - 1);
 }
 
+bool regexStartsWithDot(absl::string_view regex) {
+  return absl::StartsWith(regex, "\\.") || absl::StartsWith(regex, "(?=\\.)");
+}
+
 } // namespace
 
 size_t RawStatData::size() {
@@ -67,10 +71,6 @@ std::string Utility::sanitizeStatsName(const std::string& name) {
 TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex)
     : name_(name), prefix_(std::string(extractRegexPrefix(regex))),
       regex_(RegexUtil::parseRegex(regex)) {}
-
-static bool regexStartsWithDot(absl::string_view regex) {
-  return absl::StartsWith(regex, "\\.") || absl::StartsWith(regex, "(?=\\.)");
-}
 
 std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
   std::string prefix;
