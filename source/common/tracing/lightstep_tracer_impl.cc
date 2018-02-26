@@ -15,26 +15,6 @@
 namespace Envoy {
 namespace Tracing {
 
-namespace {
-class LightStepLogger : Logger::Loggable<Logger::Id::tracing> {
-public:
-  void operator()(lightstep::LogLevel level, opentracing::string_view message) const {
-    const fmt::StringRef fmt_message{message.data(), message.size()};
-    switch (level) {
-    case lightstep::LogLevel::debug:
-      ENVOY_LOG(debug, "{}", fmt_message);
-      break;
-    case lightstep::LogLevel::info:
-      ENVOY_LOG(info, "{}", fmt_message);
-      break;
-    default:
-      ENVOY_LOG(warn, "{}", fmt_message);
-      break;
-    }
-  }
-};
-} // namespace
-
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
     : driver_(driver) {}
 
