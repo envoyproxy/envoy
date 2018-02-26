@@ -173,19 +173,18 @@ public:
 
   /**
    * Sets the end time for the request. This method is called once the request has been fully
-   * completed, and should not be called again.
+   * completed (i.e., when the request's ActiveStream is destroyed).
    */
-  virtual void finalize(MonotonicTime) PURE;
+  virtual void finalTimeMonotonic(MonotonicTime) PURE;
 
   /**
-   * After finalize has been called, returns the monotonic clock time when the request has been
-   * fully completed. The return value of this method is erroneous until after finalize has been
-   * called.
+   * Returns the monotonic clock time when the request has been fully completed (i.e., when the
+   * request's ActiveStream is destroyed) and may be longer than lastDownstreamTxByteSent.
    */
   virtual Optional<std::chrono::nanoseconds> finalTimeMonotonic() const PURE;
 
   /**
-   * @return the # of body bytes sent in the response.
+   * @return the number of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;
 

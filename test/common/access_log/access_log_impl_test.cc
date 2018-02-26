@@ -153,7 +153,7 @@ public:
     last_downstream_tx_byte_sent_.value(time);
   }
 
-  void finalize(MonotonicTime time) override { end_time_.value(time); }
+  void finalTimeMonotonic(MonotonicTime time) override { end_time_.value(time); }
 
   Optional<std::chrono::nanoseconds> finalTimeMonotonic() const override {
     return duration(end_time_);

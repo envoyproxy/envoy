@@ -198,7 +198,7 @@ http_logs:
     NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.start_time_ = SystemTime(1h);
 
-    request_info.last_rx_byte_received_.value(2ms);
+    request_info.last_downstream_rx_byte_received_.value(2ms);
     request_info.first_upstream_tx_byte_sent_.value(4ms);
     request_info.last_upstream_tx_byte_sent_.value(6ms);
     request_info.first_upstream_rx_byte_received_.value(8ms);

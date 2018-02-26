@@ -364,7 +364,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  request_info_.finalize(std::chrono::steady_clock::now());
+  request_info_.finalTimeMonotonic(std::chrono::steady_clock::now());
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {

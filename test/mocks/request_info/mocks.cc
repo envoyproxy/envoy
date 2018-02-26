@@ -19,7 +19,7 @@ MockRequestInfo::MockRequestInfo()
   ON_CALL(*this, startTime()).WillByDefault(ReturnRef(start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnRef(start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
-      .WillByDefault(ReturnPointee(&last_rx_byte_received_));
+      .WillByDefault(ReturnPointee(&last_downstream_rx_byte_received_));
   ON_CALL(*this, firstUpstreamTxByteSent())
       .WillByDefault(ReturnPointee(&first_upstream_tx_byte_sent_));
   ON_CALL(*this, lastUpstreamTxByteSent())

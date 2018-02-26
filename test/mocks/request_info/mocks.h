@@ -33,7 +33,7 @@ public:
   MOCK_METHOD1(firstDownstreamTxByteSent, void(MonotonicTime time));
   MOCK_CONST_METHOD0(lastDownstreamTxByteSent, Optional<std::chrono::nanoseconds>());
   MOCK_METHOD1(lastDownstreamTxByteSent, void(MonotonicTime time));
-  MOCK_METHOD1(finalize, void(MonotonicTime time));
+  MOCK_METHOD1(finalTimeMonotonic, void(MonotonicTime time));
   MOCK_CONST_METHOD0(finalTimeMonotonic, Optional<std::chrono::nanoseconds>());
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, const Optional<Http::Protocol>&());
@@ -53,7 +53,7 @@ public:
       new testing::NiceMock<Upstream::MockHostDescription>()};
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
-  Optional<std::chrono::nanoseconds> last_rx_byte_received_;
+  Optional<std::chrono::nanoseconds> last_downstream_rx_byte_received_;
   Optional<std::chrono::nanoseconds> first_upstream_tx_byte_sent_;
   Optional<std::chrono::nanoseconds> last_upstream_tx_byte_sent_;
   Optional<std::chrono::nanoseconds> first_upstream_rx_byte_received_;
