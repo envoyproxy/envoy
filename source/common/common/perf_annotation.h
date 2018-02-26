@@ -109,10 +109,7 @@ private:
     std::chrono::nanoseconds total_{0};
     std::chrono::nanoseconds min_{0};
     std::chrono::nanoseconds max_{0};
-    uint64_t count_{0};
-
-    // TODO(jmarantz): add running standard deviation as described in
-    // https://en.wikipedia.org/wiki/Standard_deviation
+    WelfordStandardDeviation stddev_;
   };
 
   struct Hash {

@@ -49,10 +49,10 @@ TEST_F(PerfAnnotationTest, testFormat) {
   }
   context->record(std::chrono::microseconds{200}, "gamma", "2");
   std::string report = context->toString();
-  EXPECT_EQ("Duration(us)  # Calls  Mean(ms)  Min(ms)  Max(ms)  Category  Description\n"
-            "        4600        4   1150000     1000     1300     alpha            1\n"
-            "         200        1    200000      200      200     gamma            2\n"
-            "          87        3     29000       28       30      beta            3\n",
+  EXPECT_EQ("Duration(us)  # Calls  Mean(ms)  StdDev  Min(ms)  Max(ms)  Category  Description\n"
+            "        4600        4   1150000  129099     1000     1300     alpha            1\n"
+            "         200        1    200000     nan      200      200     gamma            2\n"
+            "          87        3     29000    1000       28       30      beta            3\n",
             context->toString());
 }
 

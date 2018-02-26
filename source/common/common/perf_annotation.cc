@@ -31,13 +31,14 @@ PerfAnnotationContext::PerfAnnotationContext() {}
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
-  CategoryDescription key(category, description);
+  CategoryDescription key(std::string(category), std::string(description));
   {
 #if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
 #endif
     DurationStats& stats = duration_stats_map_[key];
-    if ((++stats.count_ == 1) || (duration < stats.min_)) {
+    stats.stddev_.update(static_cast<double>(duration.count()));
+    if ((stats.stddev_.count() == 1) || (duration < stats.min_)) {
       stats.min_ = duration;
     }
     stats.max_ = std::max(stats.max_, duration);
@@ -76,8 +77,8 @@ std::string PerfAnnotationContext::toString() {
   // to compute column widths. First collect the column headers and their widths.
   //
   // TODO(jmarantz): add more stats, e.g. std deviation, median, min, max.
-  static const char* headers[] = {"Duration(us)", "# Calls",  "Mean(ms)",   "Min(ms)",
-                                  "Max(ms)",      "Category", "Description"};
+  static const char* headers[] = {"Duration(us)", "# Calls", "Mean(ms)", "StdDev",
+                                  "Min(ms)",      "Max(ms)", "Category", "Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
   size_t widths[num_columns];
   std::vector<std::string> columns[num_columns];
@@ -94,18 +95,20 @@ std::string PerfAnnotationContext::toString() {
       return std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(ns).count());
     };
     columns[0].push_back(microseconds_string(stats.total_));
-    columns[1].push_back(std::to_string(stats.count_));
+    uint64_t count = stats.stddev_.count();
+    columns[1].push_back(std::to_string(count));
     columns[2].push_back(
-        (stats.count_ == 0)
+        (count == 0)
             ? "NaN"
             : std::to_string(
                   std::chrono::duration_cast<std::chrono::nanoseconds>(stats.total_).count() /
-                  stats.count_));
-    columns[3].push_back(microseconds_string(stats.min_));
-    columns[4].push_back(microseconds_string(stats.max_));
+                  count));
+    columns[3].push_back(fmt::format("{}", stats.stddev_.computeStandardDeviation()));
+    columns[4].push_back(microseconds_string(stats.min_));
+    columns[5].push_back(microseconds_string(stats.max_));
     const CategoryDescription& category_description = p->first;
-    columns[5].push_back(category_description.first);
-    columns[6].push_back(category_description.second);
+    columns[6].push_back(category_description.first);
+    columns[7].push_back(category_description.second);
     for (size_t i = 0; i < num_columns; ++i) {
       widths[i] = std::max(widths[i], columns[i].back().size());
     }
