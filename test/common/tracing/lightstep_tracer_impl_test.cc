@@ -95,7 +95,7 @@ public:
 TEST_F(LightStepDriverTest, LightStepLogger) {
   LightStepLogger logger;
 
-  // Verify calls to logger don't crash
+  // Verify calls to logger don't crash.
   logger(lightstep::LogLevel::debug, "abc");
   logger(lightstep::LogLevel::info, "abc");
   logger(lightstep::LogLevel::error, "abc");
