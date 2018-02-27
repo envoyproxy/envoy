@@ -37,15 +37,22 @@ def main():
     os.execv(envoy_real_cxx,
              [envoy_real_cxx, "-E", "-", "-v", "-no-canonical-prefixes"])
 
+  avoid_linking_libstdcxx = False
+
   # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
   # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
   # This check lets Envoy statically link against libstdc++ to be more
   # portable between installed glibc versions.
-  #
+  if "-static-libstdc++" in sys.argv[1:]:
+    compiler = envoy_real_cxx
+    avoid_linking_libstdcxx = True
+
   # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
   # it in the same test.
-  if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:]:
-    compiler = envoy_real_cxx
+  if "-stdlib=libc++" in sys.argv[1:]:
+    avoid_linking_libstdcxx = True
+
+  if avoid_linking_libstdcxx:
     argv = []
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
