@@ -404,10 +404,10 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_path = path_redirect_.c_str();
   } else {
     ASSERT(headers.Path());
-    final_path = absl::string_view(headers.Path()->value().c_str());
+    final_path = absl::string_view(headers.Path()->value().c_str(), headers.Path()->value().size());
     if (strip_query_) {
       size_t path_end = final_path.find("?");
-      if (path_end != std::string::npos) {
+      if (path_end != absl::string_view::npos) {
         final_path = final_path.substr(0, path_end);
       }
     }
