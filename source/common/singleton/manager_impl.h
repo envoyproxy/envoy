@@ -21,6 +21,8 @@ public:
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
 
+  InstanceSharedPtr tryGet(const std::string& name) override;
+
 private:
   std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;
   Thread::ThreadId run_tid_{};

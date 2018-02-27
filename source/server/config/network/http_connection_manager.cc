@@ -85,6 +85,13 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
       context);
 }
 
+std::shared_ptr<Router::ServerRouteConfigProviderManager>
+HttpConnectionManagerFilterConfigFactory::getServerRouteConfigProviderManager(
+    ServerContext& context) {
+  return context.singletonManager().tryGetTyped<Router::ServerRouteConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager));
+}
+
 /**
  * Static registration for the HTTP connection manager filter.
  */

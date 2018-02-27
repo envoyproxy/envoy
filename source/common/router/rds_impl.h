@@ -152,8 +152,6 @@ public:
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
                                  ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
-  ~RouteConfigProviderManagerImpl();
-
   // ServerRouteConfigProviderManager
   std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager

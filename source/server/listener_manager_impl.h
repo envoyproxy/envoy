@@ -35,7 +35,7 @@ public:
    */
   static std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-      Configuration::ListenerFactoryContext& context);
+      Configuration::FactoryContext& context);
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
@@ -45,7 +45,7 @@ public:
   }
   std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-      Configuration::ListenerFactoryContext& context) override {
+      Configuration::FactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
 
@@ -166,7 +166,7 @@ private:
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Network::ListenerConfig,
-                     public Configuration::ListenerFactoryContext,
+                     public Configuration::FactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainFactory,
                      public Configuration::TransportSocketFactoryContext,
@@ -224,7 +224,7 @@ public:
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
 
-  // Server::Configuration::ListenerFactoryContext
+  // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
     return parent_.server_.accessLogManager();
   }

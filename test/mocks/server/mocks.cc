@@ -142,9 +142,6 @@ MockFactoryContext::~MockFactoryContext() {}
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {}
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 
-MockListenerFactoryContext::MockListenerFactoryContext() {}
-MockListenerFactoryContext::~MockListenerFactoryContext() {}
-
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
