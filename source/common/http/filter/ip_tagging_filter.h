@@ -35,6 +35,7 @@ public:
     // Once loading IP tags from a file system is supported, the restriction on the size
     // of the set should be removed and observability into what tags are loaded needs
     // to be implemented.
+    // TODO(ccaraman): Remove size check once file system support is implemented.
     if (config.ip_tags_size() == 0) {
       throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
     }

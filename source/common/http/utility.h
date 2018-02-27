@@ -154,6 +154,14 @@ public:
    * @return string representation of the protocol.
    */
   static const std::string& getProtocolString(const Protocol p);
+
+  /**
+   * Appends data to headers. If header already has a value,the string ',' will be added between the
+   * existing content and the data.
+   * @param header the header to append to.
+   * @param data to append to the header.
+   */
+  static void appendToHeader(HeaderString& header, const std::string& data);
 };
 
 } // namespace Http

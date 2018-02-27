@@ -94,6 +94,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:lc_trie_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
     ],
