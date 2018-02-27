@@ -137,7 +137,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     for (int j = 0; j < cluster->hosts_size(); ++j) {
       if (cluster->mutable_hosts(j)->has_socket_address()) {
         auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-        RELEASE_ASSERT(ports.size() >= port_idx);
+        RELEASE_ASSERT(ports.size() > port_idx);
         host_socket_addr->set_port_value(ports[port_idx++]);
       }
     }
