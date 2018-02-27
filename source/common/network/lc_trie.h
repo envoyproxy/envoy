@@ -37,9 +37,13 @@ public:
    * @param tag_data supplies a vector of tag and CIDR ranges.
    * @param fill_factor supplies the fraction of completeness to use when calculating the branch
    *                    value for a sub-trie.
-   * @param root_branching_factor supplies the branching factor at the root. The paper suggests for
-   *                              large LC-Tries to use the value '16' for the root branching
-   *                              factor. It reduces the depth of the trie.
+   * @param root_branching_factor supplies the branching factor at the root.
+   *
+   * TODO(ccaraman): Investigate if a non-zero root branching factor should be the default. The
+   * paper suggests for large LC-Tries to use the value '16'. It reduces the depth of the trie.
+   * However, there is no suggested values for smaller LC-Tries. With perf tests, it is possible to
+   * get this data for smaller LC-Tries. Another option is to expose this in the configuration and
+   * let consumers decide.
    */
   LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
          double fill_factor = 0.5, uint32_t root_branching_factor = 0);

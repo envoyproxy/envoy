@@ -279,7 +279,8 @@ TEST(HttpUtility, TestAppendHeader) {
   // Test empty data case.
   {
     HeaderString value3;
-    value3.setCopy("empty") Utility::appendToHeader(value3, "");
+    value3.setCopy("empty", 5);
+    Utility::appendToHeader(value3, "");
     EXPECT_EQ(value3, "empty");
   }
 }
