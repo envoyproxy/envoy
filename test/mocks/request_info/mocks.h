@@ -17,8 +17,8 @@ public:
   // RequestInfo::RequestInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
-  MOCK_CONST_METHOD0(startTime, const SystemTime&());
-  MOCK_CONST_METHOD0(startTimeMonotonic, MonotonicTime&());
+  MOCK_CONST_METHOD0(startTime, SystemTime());
+  MOCK_CONST_METHOD0(startTimeMonotonic, MonotonicTime());
   MOCK_CONST_METHOD0(lastDownstreamRxByteReceived, Optional<std::chrono::nanoseconds>());
   MOCK_METHOD1(lastDownstreamRxByteReceived, void(MonotonicTime time));
   MOCK_CONST_METHOD0(firstUpstreamTxByteSent, Optional<std::chrono::nanoseconds>());

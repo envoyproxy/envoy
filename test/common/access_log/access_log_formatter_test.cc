@@ -48,7 +48,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   {
     RequestInfoFormatter start_time_format("START_TIME");
     SystemTime time;
-    EXPECT_CALL(request_info, startTime()).WillOnce(ReturnRef(time));
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
               start_time_format.format(header, header, request_info));
   }

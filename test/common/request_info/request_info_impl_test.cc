@@ -78,7 +78,7 @@ TEST(RequestInfoImplTest, TimingTest) {
 
   dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.finalTimeMonotonic().valid());
-  info.finalize(start + dur);
+  info.finalTimeMonotonic(start + dur);
   timing = info.finalTimeMonotonic();
   EXPECT_TRUE(timing.valid());
   EXPECT_EQ(dur, timing.value());

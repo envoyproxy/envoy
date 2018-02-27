@@ -16,8 +16,8 @@ MockRequestInfo::MockRequestInfo()
     : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
-  ON_CALL(*this, startTime()).WillByDefault(ReturnRef(start_time_));
-  ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnRef(start_time_monotonic_));
+  ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
+  ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
       .WillByDefault(ReturnPointee(&last_downstream_rx_byte_received_));
   ON_CALL(*this, firstUpstreamTxByteSent())

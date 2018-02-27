@@ -91,13 +91,13 @@ public:
   /**
    * @return the time that the first byte of the request was received.
    */
-  virtual const SystemTime& startTime() const PURE;
+  virtual SystemTime startTime() const PURE;
 
   /**
    * @return the monotonic time that the first byte of the request was received. Duration
   calculations should be made relative to this value.
   */
-  virtual const MonotonicTime& startTimeMonotonic() const PURE;
+  virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
    * @return the monotonic clock time when the last byte of the request was received.

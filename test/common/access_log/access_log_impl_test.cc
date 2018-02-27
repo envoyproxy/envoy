@@ -55,8 +55,8 @@ public:
     end_time_.value(now + std::chrono::milliseconds(3));
   }
 
-  const SystemTime& startTime() const override { return start_time_; }
-  const MonotonicTime& startTimeMonotonic() const override { return start_time_monotonic_; }
+  SystemTime startTime() const override { return start_time_; }
+  MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
   uint64_t bytesReceived() const override { return 1; }
   const Optional<Http::Protocol>& protocol() const override { return protocol_; }

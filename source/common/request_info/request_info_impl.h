@@ -17,9 +17,9 @@ struct RequestInfoImpl : public RequestInfo {
 
   RequestInfoImpl(Http::Protocol protocol) : RequestInfoImpl() { protocol_ = protocol; }
 
-  const SystemTime& startTime() const override { return start_time_; }
+  SystemTime startTime() const override { return start_time_; }
 
-  const MonotonicTime& startTimeMonotonic() const override { return start_time_monotonic_; }
+  MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
   Optional<std::chrono::nanoseconds> duration(const Optional<MonotonicTime>& time) const {
     if (!time.valid()) {
