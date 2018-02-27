@@ -156,8 +156,8 @@ public:
   static const std::string& getProtocolString(const Protocol p);
 
   /**
-   * Appends data to headers. If header already has a value,the string ',' will be added between the
-   * existing content and the data.
+   * Appends data to header. If header already has a value, the string ',' is added between the
+   * existing value and data.
    * @param header the header to append to.
    * @param data to append to the header.
    */
