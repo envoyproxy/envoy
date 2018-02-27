@@ -213,7 +213,6 @@ private:
       // LcNode uses the last 20 bits to store either the index into ip_prefixes_ or trie_.
       // In theory, the trie_ should only need twice the amount of entries of CIDR ranges.
       // To prevent index out of bounds issues, only support a maximum of (2^19) CIDR ranges.
-      // TODO(ccaraman): Add a test case for this.
       if (tag_data.size() > MAXIMUM_CIDR_RANGE_ENTRIES) {
         throw EnvoyException(fmt::format("The input vector has '{0}' CIDR ranges entires. LC-Trie "
                                          "can only support '{1}' CIDR ranges.",
@@ -370,7 +369,6 @@ private:
         // LC-Trie. If while building the trie the position that is being set exceeds the maximum
         // number of supported trie_ entries, throw an Envoy Exception instead of letting an
         // out_of_range exception be thrown.
-        // TODO(ccaraman): Add a test case.
         if (position > maximum_trie_node_size) {
           throw EnvoyException(fmt::format("The number of internal nodes required for the LC-Trie "
                                            "exceeded the maximum number of "
