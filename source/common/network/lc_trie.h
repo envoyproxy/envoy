@@ -376,6 +376,7 @@ private:
                                            "'{0}'. Maximum number of supported nodes: '{1}'.",
                                            position, maximum_trie_node_size));
         }
+
         trie_[position].address_ = first;
         return;
       }
