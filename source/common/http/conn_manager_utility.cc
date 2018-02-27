@@ -235,7 +235,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward) {
-    Utility::appendToHeader(request_headers.ForwardedClientCert()->value(),
+    Utility::appendToHeader(request_headers.insertForwardedClientCert().value(),
                             client_cert_details_str);
   } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
