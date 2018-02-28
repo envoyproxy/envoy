@@ -4,13 +4,8 @@
 
 #include <chrono>
 #include <cstdint>
-<<<<<<< HEAD
-#include <map>
-#include <mutex>
-=======
 #include <mutex>
 #include <unordered_map>
->>>>>>> master
 
 #include "common/common/utility.h"
 
@@ -23,8 +18,6 @@
 // In the absense of such directives, the support classes are built and tested.
 // However, the macros for instrumenting code for performance analysis will expand
 // to nothing.
-<<<<<<< HEAD
-=======
 //
 // See also: https://github.com/LLNL/Caliper -- it may be worth integrating with
 // that for added functionality, partiicularly around loops.
@@ -32,7 +25,6 @@
 // See also, for a much more comprehensive study in performance annotation:
 // https://labs.vmware.com/vmtj/methodology-for-performance-analysis-of-vmware-vsphere-under-tier-1-applications
 // https://dl.acm.org/citation.cfm?id=1899945&dl=ACM&coll=DL
->>>>>>> master
 
 /**
  * Initiates a performance operation, storing its state in perf_var. A perf_var
@@ -127,12 +119,6 @@ private:
    */
   PerfAnnotationContext();
 
-<<<<<<< HEAD
-  typedef std::pair<std::chrono::nanoseconds, uint64_t> DurationCount;
-  typedef std::map<std::string, DurationCount> DurationCountMap;
-
-  DurationCountMap duration_count_map_; // Maps "$category / $description" to the duration.
-=======
   using CategoryDescription = std::pair<std::string, std::string>;
 
   struct DurationStats {
@@ -151,7 +137,6 @@ private:
   using DurationStatsMap = std::unordered_map<CategoryDescription, DurationStats, Hash>;
 
   DurationStatsMap duration_stats_map_; // Maps {category, description} to DurationStats.
->>>>>>> master
 #if PERF_THREAD_SAFE
   std::mutex mutex_;
 #endif
