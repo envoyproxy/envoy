@@ -63,13 +63,13 @@ private:
 
 /**
  * For creating ext_authz.proto (authorization) request.
- * CreateCheckRequest is used to extract attributes from the TCP/HTTP request
+ * CheckRequestUtils is used to extract attributes from the TCP/HTTP request
  * and fill out the details in the authorization protobuf that is sent to authorization
  * service.
  * The specific information in the request is as per the specification in the
  * data-plane-api.
  */
-class CreateCheckRequest {
+class CheckRequestUtils {
 public:
   /**
    * createHttpCheck is used to extract the attributes from the stream and the http headers

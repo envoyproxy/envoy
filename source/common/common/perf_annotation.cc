@@ -17,28 +17,35 @@
 namespace Envoy {
 
 PerfOperation::PerfOperation()
-    : start_time_(ProdSystemTimeSource::instance_.currentTime()),
+    : start_time_(ProdMonotonicTimeSource::instance_.currentTime()),
       context_(PerfAnnotationContext::getOrCreate()) {}
 
 void PerfOperation::record(absl::string_view category, absl::string_view description) {
-  SystemTime end_time = ProdSystemTimeSource::instance_.currentTime();
-  std::chrono::nanoseconds duration =
+  const MonotonicTime end_time = ProdMonotonicTimeSource::instance_.currentTime();
+  const std::chrono::nanoseconds duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_);
   context_->record(duration, category, description);
 }
 
+// The ctor is explicitly declared private to encourage clients to use getOrCreate(), at
+// least for now. Given that it's declared it must be instantiated. It's not inlined
+// because the contructor is non-trivial due to the contained unordered_map.
 PerfAnnotationContext::PerfAnnotationContext() {}
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
-  std::string key = absl::StrCat(category, " / ", description);
+  CategoryDescription key((std::string(category)), (std::string(description)));
   {
 #if PERF_THREAD_SAFE
     std::unique_lock<std::mutex> lock(mutex_);
 #endif
-    DurationCount& duration_count = duration_count_map_[key];
-    duration_count.first += duration;
-    ++duration_count.second;
+    DurationStats& stats = duration_stats_map_[key];
+    stats.stddev_.update(static_cast<double>(duration.count()));
+    if ((stats.stddev_.count() == 1) || (duration < stats.min_)) {
+      stats.min_ = duration;
+    }
+    stats.max_ = std::max(stats.max_, duration);
+    stats.total_ += duration;
   }
 }
 
@@ -54,61 +61,75 @@ std::string PerfAnnotationContext::toString() {
 #endif
 
   // The map is from category/description -> [duration, time]. Reverse-sort by duration.
-  std::vector<const DurationCountMap::value_type*> sorted_values;
-  sorted_values.reserve(context->duration_count_map_.size());
-  for (const auto& iter : context->duration_count_map_) {
+  std::vector<const DurationStatsMap::value_type*> sorted_values;
+  sorted_values.reserve(context->duration_stats_map_.size());
+  for (const auto& iter : context->duration_stats_map_) {
     sorted_values.push_back(&iter);
   }
   std::sort(
       sorted_values.begin(), sorted_values.end(),
-      [](const DurationCountMap::value_type* a, const DurationCountMap::value_type* b) -> bool {
-        return a->second.first > b->second.first;
+      [](const DurationStatsMap::value_type* a, const DurationStatsMap::value_type* b) -> bool {
+        const DurationStats& a_stats = a->second;
+        const DurationStats& b_stats = b->second;
+        return a_stats.total_ > b_stats.total_;
       });
 
   // Organize the report so it lines up in columns. Note that the widest duration comes first,
   // though that may not be descending order of calls or per_call time, so we need two passes
   // to compute column widths. First collect the column headers and their widths.
-  static const char* headers[] = {"Duration(us)", "# Calls", "per_call(ns)",
-                                  "Category / Description"};
+  //
+  // TODO(jmarantz): Add a mechanism for dumping to HTML for viewing results in web browser.
+  static const char* headers[] = {"Duration(us)", "# Calls", "Mean(ns)", "StdDev(ns)",
+                                  "Min(ns)",      "Max(ns)", "Category", "Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
   size_t widths[num_columns];
   std::vector<std::string> columns[num_columns];
   for (size_t i = 0; i < num_columns; ++i) {
-    columns[i].push_back(headers[i]);
-    widths[i] = strlen(headers[i]);
+    std::string column(headers[i]);
+    widths[i] = column.size();
+    columns[i].emplace_back(column);
   }
 
   // Compute all the column strings and their max widths.
   for (const auto& p : sorted_values) {
-    const DurationCount& duration_count = p->second;
-    std::chrono::nanoseconds duration = duration_count.first;
-    uint64_t count = duration_count.second;
-    columns[0].push_back(
-        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(duration).count()));
+    const DurationStats& stats = p->second;
+    const auto microseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
+      return std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(ns).count());
+    };
+    const auto nanoseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
+      return std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count());
+    };
+    columns[0].push_back(microseconds_string(stats.total_));
+    const uint64_t count = stats.stddev_.count();
     columns[1].push_back(std::to_string(count));
     columns[2].push_back(
         (count == 0)
             ? "NaN"
             : std::to_string(
-                  std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() / count));
-    columns[3].push_back(p->first);
+                  std::chrono::duration_cast<std::chrono::nanoseconds>(stats.total_).count() /
+                  count));
+    columns[3].push_back(fmt::format("{}", stats.stddev_.computeStandardDeviation()));
+    columns[4].push_back(nanoseconds_string(stats.min_));
+    columns[5].push_back(nanoseconds_string(stats.max_));
+    const CategoryDescription& category_description = p->first;
+    columns[6].push_back(category_description.first);
+    columns[7].push_back(category_description.second);
     for (size_t i = 0; i < num_columns; ++i) {
       widths[i] = std::max(widths[i], columns[i].back().size());
     }
+  }
+
+  // Create format-strings to right justify each column, e.g. {:>14} for a column of width 14.
+  std::vector<std::string> formats;
+  for (size_t i = 0; i < num_columns; ++i) {
+    formats.push_back(absl::StrCat("{:>", widths[i], "}"));
   }
 
   // Write out the table.
   for (size_t row = 0; row < columns[0].size(); ++row) {
     for (size_t i = 0; i < num_columns; ++i) {
       const std::string& str = columns[i][row];
-      // Right-justify all but last column by appending the number of spaces needed to bring
-      // it inline with the largest.
-      if (i != (num_columns - 1)) {
-        out.append(widths[i] - str.size(), ' ');
-        absl::StrAppend(&out, str, "  ");
-      } else {
-        absl::StrAppend(&out, str, "\n");
-      }
+      absl::StrAppend(&out, fmt::format(formats[i], str), (i != (num_columns - 1) ? "  " : "\n"));
     }
   }
   return out;
@@ -119,7 +140,7 @@ void PerfAnnotationContext::clear() {
 #if PERF_THREAD_SAFE
   std::unique_lock<std::mutex> lock(context->mutex_);
 #endif
-  context->duration_count_map_.clear();
+  context->duration_stats_map_.clear();
 }
 
 PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {

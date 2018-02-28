@@ -114,16 +114,16 @@ TEST_F(ExtAuthzGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-class CreateCheckRequestTest : public testing::Test {
+class CheckRequestUtilsTest : public testing::Test {
 public:
-  CreateCheckRequestTest() {
+  CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     protocol_ = Envoy::Http::Protocol::Http10;
   };
 
   Network::Address::InstanceConstSharedPtr addr_;
   Optional<Http::Protocol> protocol_;
-  CreateCheckRequest check_request_generator_;
+  CheckRequestUtils check_request_generator_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
   NiceMock<Envoy::Network::MockConnection> connection_;
@@ -131,7 +131,7 @@ public:
   NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
 };
 
-TEST_F(CreateCheckRequestTest, BasicTcp) {
+TEST_F(CheckRequestUtilsTest, BasicTcp) {
 
   envoy::service::auth::v2::CheckRequest request;
 
@@ -140,10 +140,10 @@ TEST_F(CreateCheckRequestTest, BasicTcp) {
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
 
-  CreateCheckRequest::createTcpCheck(&net_callbacks_, request);
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request);
 }
 
-TEST_F(CreateCheckRequestTest, BasicHttp) {
+TEST_F(CheckRequestUtilsTest, BasicHttp) {
 
   Http::HeaderMapImpl headers;
   envoy::service::auth::v2::CheckRequest request;
@@ -155,10 +155,10 @@ TEST_F(CreateCheckRequestTest, BasicHttp) {
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol_));
-  CreateCheckRequest::createHttpCheck(&callbacks_, headers, request);
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers, request);
 }
 
-TEST_F(CreateCheckRequestTest, CheckAttrContextPeer) {
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
@@ -174,7 +174,7 @@ TEST_F(CreateCheckRequestTest, CheckAttrContextPeer) {
 
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
   EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));
-  CreateCheckRequest::createHttpCheck(&callbacks_, request_headers, request);
+  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, request);
 
   EXPECT_EQ("source", request.attributes().source().principal());
   EXPECT_EQ("destination", request.attributes().destination().principal());

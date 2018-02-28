@@ -4,8 +4,13 @@
 
 #include <chrono>
 #include <cstdint>
+<<<<<<< HEAD
 #include <map>
 #include <mutex>
+=======
+#include <mutex>
+#include <unordered_map>
+>>>>>>> master
 
 #include "common/common/utility.h"
 
@@ -18,6 +23,16 @@
 // In the absense of such directives, the support classes are built and tested.
 // However, the macros for instrumenting code for performance analysis will expand
 // to nothing.
+<<<<<<< HEAD
+=======
+//
+// See also: https://github.com/LLNL/Caliper -- it may be worth integrating with
+// that for added functionality, partiicularly around loops.
+//
+// See also, for a much more comprehensive study in performance annotation:
+// https://labs.vmware.com/vmtj/methodology-for-performance-analysis-of-vmware-vsphere-under-tier-1-applications
+// https://dl.acm.org/citation.cfm?id=1899945&dl=ACM&coll=DL
+>>>>>>> master
 
 /**
  * Initiates a performance operation, storing its state in perf_var. A perf_var
@@ -69,8 +84,17 @@ namespace Envoy {
 class PerfAnnotationContext {
 public:
   /**
+<<<<<<< HEAD
    * Records time consumed by a category and description, which are just
    * joined together in the library with " / ".
+=======
+   * Records time consumed by a category and description, which are shown as separate
+   * columns in the generated output table.
+   *
+   * @param duration the duration.
+   * @param category the name of a category for the recording.
+   * @param description the name of description for the recording.
+>>>>>>> master
    */
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
@@ -103,10 +127,31 @@ private:
    */
   PerfAnnotationContext();
 
+<<<<<<< HEAD
   typedef std::pair<std::chrono::nanoseconds, uint64_t> DurationCount;
   typedef std::map<std::string, DurationCount> DurationCountMap;
 
   DurationCountMap duration_count_map_; // Maps "$category / $description" to the duration.
+=======
+  using CategoryDescription = std::pair<std::string, std::string>;
+
+  struct DurationStats {
+    std::chrono::nanoseconds total_{0};
+    std::chrono::nanoseconds min_{0};
+    std::chrono::nanoseconds max_{0};
+    WelfordStandardDeviation stddev_;
+  };
+
+  struct Hash {
+    size_t operator()(const CategoryDescription& a) const {
+      return std::hash<std::string>()(a.first) + 13 * std::hash<std::string>()(a.second);
+    }
+  };
+
+  using DurationStatsMap = std::unordered_map<CategoryDescription, DurationStats, Hash>;
+
+  DurationStatsMap duration_stats_map_; // Maps {category, description} to DurationStats.
+>>>>>>> master
 #if PERF_THREAD_SAFE
   std::mutex mutex_;
 #endif
@@ -128,13 +173,13 @@ public:
   /**
    * Report an event relative to the operation in progress. Note report can be called
    * multiple times on a single PerfOperation, with distinct category/description combinations.
-   * @param category absl::string_view the name of a category for the recording.
-   * @param category absl::string_view the name of description for the recording.
+   * @param category the name of a category for the recording.
+   * @param description the name of description for the recording.
    */
   void record(absl::string_view category, absl::string_view description);
 
 private:
-  SystemTime start_time_;
+  MonotonicTime start_time_;
   PerfAnnotationContext* context_;
 };
 

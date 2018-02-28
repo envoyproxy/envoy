@@ -27,10 +27,14 @@ TEST_F(PerfAnnotationTest, testMacros) {
   PERF_RECORD(perf, "alpha", "2");
   PERF_RECORD(perf, "beta", "3");
   std::string report = PERF_TO_STRING();
-  EXPECT_TRUE(report.find("alpha / 0\n") != std::string::npos) << report;
-  EXPECT_TRUE(report.find("beta / 1\n") != std::string::npos) << report;
-  EXPECT_TRUE(report.find("alpha / 2\n") != std::string::npos) << report;
-  EXPECT_TRUE(report.find("beta / 3\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 0\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 1\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 2\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 3\n") != std::string::npos) << report;
   PERF_DUMP();
 }
 
@@ -38,18 +42,19 @@ TEST_F(PerfAnnotationTest, testMacros) {
 TEST_F(PerfAnnotationTest, testFormat) {
   PerfAnnotationContext* context = PerfAnnotationContext::getOrCreate();
   for (int i = 0; i < 4; ++i) {
-    context->record(std::chrono::microseconds{1000}, "alpha", "1");
+    context->record(std::chrono::microseconds{1000 + 100 * i}, "alpha", "1");
   }
   for (int i = 0; i < 3; ++i) {
-    context->record(std::chrono::microseconds{30}, "beta", "3");
+    context->record(std::chrono::microseconds{30 - i}, "beta", "3");
   }
   context->record(std::chrono::microseconds{200}, "gamma", "2");
   std::string report = context->toString();
-  EXPECT_EQ("Duration(us)  # Calls  per_call(ns)  Category / Description\n"
-            "        4000        4       1000000  alpha / 1\n"
-            "         200        1        200000  gamma / 2\n"
-            "          90        3         30000  beta / 3\n",
-            context->toString());
+  EXPECT_EQ(
+      "Duration(us)  # Calls  Mean(ns)  StdDev(ns)  Min(ns)  Max(ns)  Category  Description\n"
+      "        4600        4   1150000      129099  1000000  1300000     alpha            1\n"
+      "         200        1    200000         nan   200000   200000     gamma            2\n"
+      "          87        3     29000        1000    28000    30000      beta            3\n",
+      context->toString());
 }
 
 } // namespace Envoy

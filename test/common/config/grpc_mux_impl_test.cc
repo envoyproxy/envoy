@@ -43,8 +43,9 @@ public:
   }
 
   void expectSendMessage(const std::string& type_url,
-                         const std::vector<std::string>& resource_names,
-                         const std::string& version) {
+                         const std::vector<std::string>& resource_names, const std::string& version,
+                         const Protobuf::int32 error_code = Grpc::Status::GrpcStatus::Ok,
+                         const std::string& error_message = "") {
     envoy::api::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     for (const auto& resource : resource_names) {
@@ -55,6 +56,11 @@ public:
     }
     expected_request.set_response_nonce("");
     expected_request.set_type_url(type_url);
+    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+      ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
+      error_detail->set_code(error_code);
+      error_detail->set_message(error_message);
+    }
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
@@ -134,8 +140,12 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 
 // Validate behavior when type URL mismatches occur.
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
+
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response(
+      new envoy::api::v2::DiscoveryResponse());
   InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
+
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   grpc_mux_->start();
@@ -148,18 +158,18 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   }
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
-    response->set_type_url("foo");
-    response->mutable_resources()->Add()->set_type_url("bar");
+    invalid_response->set_type_url("foo");
+    invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
       EXPECT_TRUE(
           IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
     }));
-    expectSendMessage("foo", {"x", "y"}, "");
-    grpc_mux_->onReceiveMessage(std::move(response));
-  }
 
+    expectSendMessage("foo", {"x", "y"}, "", Grpc::Status::GrpcStatus::Internal,
+                      fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
+                                  invalid_response->DebugString()));
+    grpc_mux_->onReceiveMessage(std::move(invalid_response));
+  }
   expectSendMessage("foo", {}, "");
 }
 
