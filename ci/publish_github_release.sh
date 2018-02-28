@@ -4,6 +4,11 @@
 # as it will leak credentials in the logs.
 set -e
 
+if [[ -z "${CIRCLE_TAG:-}" ]]; then
+    echo "skipping non tag events"
+    exit 0
+fi
+
 if [[ ! -f "${ENVOY_SRCDIR}/build_release_stripped/envoy" ]]; then
     echo "could not locate envoy binary at path: ${ENVOY_SRCDIR}/build_release_stripped/envoy"
     exit 1
@@ -22,11 +27,6 @@ fi
 if [[ -z "${GITHUB_REPO:-}" ]]; then
     echo "environment variable GITHUB_REPO unset; cannot continue with publishing."
     exit 1
-fi
-
-if [[ -z "${CIRCLE_TAG:-}" ]]; then
-    echo "skipping non tag events"
-    exit 0
 fi
 
 wget https://github.com/aktau/github-release/releases/download/v0.7.2/linux-amd64-github-release.tar.bz2 -O /tmp/ghrelease.tar.bz2
