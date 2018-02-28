@@ -76,17 +76,12 @@ namespace Envoy {
 class PerfAnnotationContext {
 public:
   /**
-<<<<<<< HEAD
-   * Records time consumed by a category and description, which are just
-   * joined together in the library with " / ".
-=======
    * Records time consumed by a category and description, which are shown as separate
    * columns in the generated output table.
    *
    * @param duration the duration.
    * @param category the name of a category for the recording.
    * @param description the name of description for the recording.
->>>>>>> master
    */
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
