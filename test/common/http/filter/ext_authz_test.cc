@@ -117,6 +117,7 @@ envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
 INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpExtAuthzFilterParamTest,
                         Values(&GetFilterConfig<true>, &GetFilterConfig<false>));
 
+// Test that the request continues when the filter_callbacks has no route.
 TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
 
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
@@ -126,6 +127,7 @@ TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
+// Test that the request continues when the authorization service cluster is not present.
 TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
 
   ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
@@ -135,6 +137,7 @@ TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
+// Test that the request is stopped till there is an OK response back after which it continues on.
 TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   InSequence s;
 
@@ -160,6 +163,8 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
 }
 
+// Test that an synchronous OK response from the authorization service, on the call stack, results
+// in request continuing on.
 TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
   InSequence s;
 
@@ -180,6 +185,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
 }
 
+// Test that a denied response results in the connection closing with a 403 response to the client.
 TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
   InSequence s;
 
@@ -210,6 +216,8 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
 }
 
+// Test that when a connection awaiting a authorization response is canceled then the authorization
+// call is closed.
 TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
   InSequence s;
 
@@ -227,6 +235,7 @@ TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
   filter_->onDestroy();
 }
 
+// Check a bad configuration results in validation exception.
 TEST_F(HttpExtAuthzFilterTest, BadConfig) {
   const std::string filter_config = R"EOF(
   {
@@ -244,6 +253,8 @@ TEST_F(HttpExtAuthzFilterTest, BadConfig) {
       ProtoValidationException);
 }
 
+// Test when failure_mode_allow is NOT set and the response from the authorization service is Error
+// that the request is not allowed to continue.
 TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
   const std::string fail_close_config = R"EOF(
     {
@@ -273,6 +284,8 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
 }
 
+// Test when failure_mode_allow is set and the response from the authorization service is Error that
+// the request is allowed to continue.
 TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   SetUpTest(filter_config_);
   InSequence s;
