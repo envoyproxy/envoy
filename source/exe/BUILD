@@ -80,6 +80,7 @@ envoy_cc_library(
     deps = [
         ":envoy_main_common_lib",
         ":extra_protocol_proxies_lib",
+        "//source/server/config/http:dynamic_opentracing_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:zipkin_lib",
     ],

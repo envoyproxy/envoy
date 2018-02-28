@@ -92,6 +92,15 @@ public:
   NiceMock<Tracing::MockConfig> config_;
 };
 
+TEST_F(LightStepDriverTest, LightStepLogger) {
+  LightStepLogger logger;
+
+  // Verify calls to logger don't crash.
+  logger(lightstep::LogLevel::debug, "abc");
+  logger(lightstep::LogLevel::info, "abc");
+  logger(lightstep::LogLevel::error, "abc");
+}
+
 TEST_F(LightStepDriverTest, InitializeDriver) {
   {
     std::string invalid_config = R"EOF(
@@ -236,12 +245,54 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 
   first_span->finishSpan();
 
+  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.failure")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.total")
+                    .value());
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+}
+
+TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
+  setupValidDriver();
+
+  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
+                         message->headers().Path()->value().c_str());
+            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
+
+            return &request;
+          }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+
+  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+
+  first_span->finishSpan();
+
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
 
   msg->trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+  msg->body() = std::make_unique<Buffer::OwnedImpl>("invalidresponse");
 
-  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+  callback->onSuccess(std::move(msg));
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.failure")

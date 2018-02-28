@@ -32,6 +32,14 @@ struct LightstepTracerStats {
 };
 
 /**
+ * LightStepLogger is used to translate logs generated from LightStep's tracer to Envoy logs.
+ */
+class LightStepLogger : Logger::Loggable<Logger::Id::tracing> {
+public:
+  void operator()(lightstep::LogLevel level, opentracing::string_view message) const;
+};
+
+/**
  * LightStep (http://lightstep.com/) provides tracing capabilities, aggregation, visualization of
  * application trace data.
  *
@@ -50,7 +58,7 @@ public:
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
   // Tracer::OpenTracingDriver
-  const opentracing::Tracer& tracer() const override;
+  opentracing::Tracer& tracer() override;
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
 private:
@@ -90,7 +98,7 @@ private:
     TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
                        LightStepDriver& driver, Event::Dispatcher& dispatcher);
 
-    const opentracing::Tracer& tracer() const;
+    opentracing::Tracer& tracer();
 
   private:
     void enableTimer();

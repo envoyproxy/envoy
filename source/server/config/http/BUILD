@@ -162,6 +162,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dynamic_opentracing_lib",
+    srcs = ["dynamic_opentracing_http_tracer.cc"],
+    hdrs = ["dynamic_opentracing_http_tracer.h"],
+    deps = [
+        "//source/common/config:well_known_names",
+        "//source/common/tracing:dynamic_opentracing_driver_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/server:configuration_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
