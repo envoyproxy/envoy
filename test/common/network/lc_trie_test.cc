@@ -333,10 +333,11 @@ TEST_F(LcTrieTest, ExceedingAllocatedTrieNodesException) {
   std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
       std::make_pair("bad_tag", large_vector_cidr);
   std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
-  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input, 0.01, 16), EnvoyException,
-                            "The number of internal nodes required for the LC-Trie exceeded the "
-                            "maximum number of supported nodes. Number of internal nodes required: "
-                            "'3048577'. Maximum number of supported nodes: '3048576'.");
+  EXPECT_THROW_WITH_MESSAGE(
+      new LcTrie(ip_tags_input, 0.01, 16), EnvoyException,
+      "The number of internal nodes required for the LC-Trie exceeded the "
+      "maximum number of supported nodes. Minimum number of internal nodes required: "
+      "'3048577'. Maximum number of supported nodes: '3048576'.");
 }
 
 } // namespace LcTrie
