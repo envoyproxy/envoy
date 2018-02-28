@@ -62,6 +62,7 @@ public:
   ~TestDnsServerQuery() { connection_->close(ConnectionCloseType::NoFlush); }
 
   // Utility to encode a dns string in the rfc format. Example: \004some\004good\006domain
+  // RFC link: https://www.ietf.org/rfc/rfc1035.txt
   static std::string encodeDnsName(const std::string& input) {
     auto name_split = StringUtil::splitToken(input, ".");
     std::string res;
@@ -125,7 +126,8 @@ private:
         // We only expect resources of type A or AAAA.
         const int q_type = DNS_QUESTION_TYPE(question + name_len);
         std::string cname;
-        // check if we have a cname
+        // check if we have a cname. If so, we will need to send a response element with the cname
+        // and lookup the ips of the cname and send back those ips (if any) too
         auto cit = parent_.cnames_.find(name);
         if (cit != parent_.cnames_.end()) {
           cname = cit->second;
@@ -138,7 +140,8 @@ private:
           hostLookup = cname.c_str();
           encodedCname = TestDnsServerQuery::encodeDnsName(cname);
           ip_question = reinterpret_cast<const unsigned char*>(encodedCname.c_str());
-          ip_name_len = encodedCname.size() + 1;
+          ip_name_len =
+              encodedCname.size() + 1; //+1 as we need to include the final null terminator
         }
         ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
         if (q_type == T_A) {
@@ -168,6 +171,7 @@ private:
         DNS_HEADER_SET_ANCOUNT(response_base, answer_size);
         DNS_HEADER_SET_NSCOUNT(response_base, 0);
         DNS_HEADER_SET_ARCOUNT(response_base, 0);
+        // Total response size will be computed according to cname response size + ip response sizes
         size_t response_ip_rest_len;
         if (q_type == T_A) {
           response_ip_rest_len =
@@ -178,14 +182,14 @@ private:
         }
         size_t response_cname_len =
             encodedCname.size() > 0 ? name_len + RRFIXEDSZ + encodedCname.size() + 1 : 0;
-        // Send response to client.
         const uint16_t response_size_n =
             htons(response_base_len + response_ip_rest_len + response_cname_len);
         Buffer::OwnedImpl write_buffer_;
+        // Write response header
         write_buffer_.add(&response_size_n, sizeof(response_size_n));
         write_buffer_.add(response_base, response_base_len);
 
-        // create a resource record for cname if we have
+        // if we have a cname, create a resource record
         if (encodedCname.size() > 0) {
           unsigned char cname_rr_fixed[RRFIXEDSZ];
           DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
