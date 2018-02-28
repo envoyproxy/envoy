@@ -21,6 +21,10 @@
 //
 // See also: https://github.com/LLNL/Caliper -- it may be worth integrating with
 // that for added functionality, partiicularly around loops.
+//
+// See also, for a much more comprehensive study in performance annotation:
+// https://labs.vmware.com/vmtj/methodology-for-performance-analysis-of-vmware-vsphere-under-tier-1-applications
+// https://dl.acm.org/citation.cfm?id=1899945&dl=ACM&coll=DL
 
 /**
  * Initiates a performance operation, storing its state in perf_var. A perf_var
@@ -75,10 +79,9 @@ public:
    * Records time consumed by a category and description, which are shown as separate
    * columns in the generated output table.
    *
-   * @param duration std::chrono::nanoseconds the duration.
-   * @param category absl::string_view the name of a category for the recording.
-   * @param category absl::string_view the name of description for the recording.
-   *
+   * @param duration the duration.
+   * @param category the name of a category for the recording.
+   * @param description the name of description for the recording.
    */
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
@@ -150,8 +153,8 @@ public:
   /**
    * Report an event relative to the operation in progress. Note report can be called
    * multiple times on a single PerfOperation, with distinct category/description combinations.
-   * @param category absl::string_view the name of a category for the recording.
-   * @param category absl::string_view the name of description for the recording.
+   * @param category the name of a category for the recording.
+   * @param description the name of description for the recording.
    */
   void record(absl::string_view category, absl::string_view description);
 

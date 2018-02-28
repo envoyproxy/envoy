@@ -27,6 +27,9 @@ void PerfOperation::record(absl::string_view category, absl::string_view descrip
   context_->record(duration, category, description);
 }
 
+// The ctor is explicitly declared private to encourage clients to use getOrCreate(), at
+// least for now. Given that it's declared it must be instantiated. It's not inlined
+// because the contructor is non-trivial due to the contained unordered_map.
 PerfAnnotationContext::PerfAnnotationContext() {}
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
@@ -43,7 +46,6 @@ void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::stri
     }
     stats.max_ = std::max(stats.max_, duration);
     stats.total_ += duration;
-    // TODO(jmarantz): accumulate standard deviation.
   }
 }
 
@@ -76,7 +78,7 @@ std::string PerfAnnotationContext::toString() {
   // though that may not be descending order of calls or per_call time, so we need two passes
   // to compute column widths. First collect the column headers and their widths.
   //
-  // TODO(jmarantz): add more stats, e.g. std deviation, median, min, max.
+  // TODO(jmarantz): Add a mechanism for dumping to HTML for viewing results in web browser.
   static const char* headers[] = {"Duration(us)", "# Calls", "Mean(ns)", "StdDev(ns)",
                                   "Min(ns)",      "Max(ns)", "Category", "Description"};
   constexpr int num_columns = ARRAY_SIZE(headers);
@@ -91,14 +93,14 @@ std::string PerfAnnotationContext::toString() {
   // Compute all the column strings and their max widths.
   for (const auto& p : sorted_values) {
     const DurationStats& stats = p->second;
-    auto microseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
+    const auto microseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
       return std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(ns).count());
     };
-    auto nanoseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
+    const auto nanoseconds_string = [](std::chrono::nanoseconds ns) -> std::string {
       return std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count());
     };
     columns[0].push_back(microseconds_string(stats.total_));
-    uint64_t count = stats.stddev_.count();
+    const uint64_t count = stats.stddev_.count();
     columns[1].push_back(std::to_string(count));
     columns[2].push_back(
         (count == 0)
