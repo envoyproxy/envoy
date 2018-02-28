@@ -151,7 +151,7 @@ public:
 class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-                        GoogleStubFactory& stub_factory, Stats::Scope& scope,
+                        GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
                         const envoy::api::v2::core::GrpcService& config);
   ~GoogleAsyncClientImpl() override;
 
@@ -176,7 +176,7 @@ private:
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
-  Stats::Scope& scope_;
+  Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
 
   friend class GoogleAsyncClientThreadLocal;

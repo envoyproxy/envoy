@@ -28,6 +28,10 @@ size_t roundUpMultipleNaturalAlignment(size_t val) {
   return (val + multiple - 1) & ~(multiple - 1);
 }
 
+bool regexStartsWithDot(absl::string_view regex) {
+  return absl::StartsWith(regex, "\\.") || absl::StartsWith(regex, "(?=\\.)");
+}
+
 } // namespace
 
 size_t RawStatData::size() {
@@ -75,7 +79,7 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
       if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
         if (i > 1) {
           const bool last_char = i == regex.size() - 1;
-          if ((!last_char && (regex[i] == '\\') && (regex[i + 1] == '.')) ||
+          if ((!last_char && regexStartsWithDot(regex.substr(i))) ||
               (last_char && (regex[i] == '$'))) {
             prefix.append(regex.data() + 1, i - 1);
           }

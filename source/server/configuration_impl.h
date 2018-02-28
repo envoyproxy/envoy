@@ -54,6 +54,11 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * Returns true if the tracing driver requires cluster name to be defined.
+   */
+  virtual bool requiresClusterName() const { return true; }
 };
 
 /**

@@ -58,7 +58,8 @@ void GoogleAsyncClientThreadLocal::completionThread() {
 
 GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
-                                             GoogleStubFactory& stub_factory, Stats::Scope& scope,
+                                             GoogleStubFactory& stub_factory,
+                                             Stats::ScopeSharedPtr scope,
                                              const envoy::api::v2::core::GrpcService& config)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
@@ -69,9 +70,9 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   std::shared_ptr<grpc::Channel> channel = createChannel(config.google_grpc());
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
-  stats_.streams_total_ = &scope_.counter("streams_total");
+  stats_.streams_total_ = &scope_->counter("streams_total");
   for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
-    stats_.streams_closed_[i] = &scope_.counter(fmt::format("streams_closed_{}", i));
+    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
   }
 }
 
