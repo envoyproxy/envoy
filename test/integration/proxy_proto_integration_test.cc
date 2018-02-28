@@ -58,9 +58,9 @@ TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownLongRequestAndResponseWithBo
 }
 
 TEST_P(ProxyProtoIntegrationTest, OriginalDst) {
-  // Change the cluster to an original destination cluster. An original destiantion cluster
-  // ignores the configured hosts, and instead uses the restored destiantion address from the
-  // incoming (server) connection as the destiantion address for the outgoing (client) connection.
+  // Change the cluster to an original destination cluster. An original destination cluster
+  // ignores the configured hosts, and instead uses the restored destination address from the
+  // incoming (server) connection as the destination address for the outgoing (client) connection.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster->set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
