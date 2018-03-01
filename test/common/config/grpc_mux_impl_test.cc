@@ -71,7 +71,7 @@ public:
   Event::TimerCb timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
-  MockGrpcMuxCallbacks callbacks_;
+  NiceMock<MockGrpcMuxCallbacks> callbacks_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -208,9 +208,9 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
 TEST_F(GrpcMuxImplTest, WatchDemux) {
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  MockGrpcMuxCallbacks foo_callbacks;
+  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
-  MockGrpcMuxCallbacks bar_callbacks;
+  NiceMock<MockGrpcMuxCallbacks> bar_callbacks;
   auto bar_sub = grpc_mux_->subscribe(type_url, {"y", "z"}, bar_callbacks);
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   // Should dedupe the "x" resource.

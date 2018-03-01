@@ -63,6 +63,7 @@ final version.
 * Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
 * Added support for abstract unix domain sockets on linux. The abstract
   namespace can be used by prepending '@' to a socket path.
+* Added support for dynamically loading a tracer.
 * Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
 * Added support for trusting additional hops in the X-Forwarded-For request header.
 * Added setting host header value for http health check request.

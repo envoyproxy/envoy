@@ -96,11 +96,6 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
     return;
   }
 
-  if (server.localInfo().clusterName().empty()) {
-    throw EnvoyException("cluster name must be defined if tracing is enabled. See "
-                         "--service-cluster option.");
-  }
-
   // Initialize tracing driver.
   std::string type = configuration.http().name();
   ENVOY_LOG(info, "  loading tracing driver: {}", type);
@@ -111,6 +106,11 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
 
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<HttpTracerFactory>(type);
+  if (factory.requiresClusterName() && server.localInfo().clusterName().empty()) {
+    throw EnvoyException(fmt::format("cluster name must be defined for the tracing driver {}. See "
+                                     "--service-cluster option.",
+                                     type));
+  }
   http_tracer_ = factory.createHttpTracer(*driver_config, server, *cluster_manager_);
 }
 
