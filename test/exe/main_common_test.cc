@@ -7,6 +7,8 @@
 // TODO(issues/2649): This test needs to be parameterized on IP versions.
 #ifndef ENVOY_CONFIG_COVERAGE
 
+#include "common/runtime/runtime_impl.h"
+
 #include "exe/main_common.h"
 
 #include "server/options_impl.h"
@@ -20,41 +22,57 @@
 #include "exe/signal_action.h"
 #endif
 
-#ifdef ENVOY_HOT_RESTART
-#include "server/hot_restart_impl.h"
-#endif
-
 namespace Envoy {
 
-TEST(MainCommon, ConstructDestructHotRestartEnabled) {
+class MainCommonTest : public testing::Test {
+public:
+  MainCommonTest()
+      : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
+                     "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
+        random_string_(fmt::format("{}", random_generator_.random() % 1024)),
+        argv_({"envoy-static", "--base-id", random_string_.c_str(), nullptr}) {}
+
+  char** argv() { return const_cast<char**>(&argv_[0]); }
+  int argc() { return argv_.size() - 1; }
+
+  void addConfig() {
+    addArg("-c");
+    addArg(config_file_.c_str());
+  }
+
+  // Adds an argument, assuring that argv remains null-terminated.
+  void addArg(const char* arg) {
+    argv_[argv_.size() - 1] = arg;
+    argv_.push_back(nullptr);
+  }
+
+  std::string config_file_;
+  Runtime::RandomGeneratorImpl random_generator_;
+  std::string random_string_;
+  std::vector<const char*> argv_;
+};
+
+TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
-                            "/test/config/integration/google_com_proxy_port_0.v2.yaml";
-  const char* argv[] = {"envoy-static", "-c", config_file.c_str(), "--base-id", "1", nullptr};
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(ARRAY_SIZE(argv) - 1, const_cast<char**>(argv)));
+  addConfig();
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
-TEST(MainCommon, ConstructDestructHotRestartDisabled) {
+TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
-                            "/test/config/integration/google_com_proxy_port_0.v2.yaml";
-  const char* argv[] = {"envoy-static",          "-c",   config_file.c_str(), "--base-id", "2",
-                        "--disable-hot-restart", nullptr};
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(ARRAY_SIZE(argv) - 1, const_cast<char**>(argv)));
+  addConfig();
+  addArg("--disable-hot-restart");
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
-TEST(MainCommon, LegacyMain) {
+TEST_F(MainCommonTest, LegacyMain) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  // Testing the legacy path is difficult because if we give it a valid config, it will
-  // never exit. So just give it an empty config and let it fail.
-  int argc = 1;
-  const char* argv[] = {"envoy_static", nullptr};
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
@@ -64,8 +82,8 @@ TEST(MainCommon, LegacyMain) {
   std::unique_ptr<Envoy::OptionsImpl> options;
   int return_code = -1;
   try {
-    options = std::make_unique<Envoy::OptionsImpl>(
-        argc, const_cast<char**>(argv), &MainCommon::hotRestartVersion, spdlog::level::info);
+    options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
+                                                   spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
     return_code = EXIT_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
