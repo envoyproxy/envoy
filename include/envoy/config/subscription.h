@@ -36,7 +36,7 @@ public:
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
-   * a Routeconfiguration, based on the underlying resource type.
+   * a RouteConfiguration, based on the underlying resource type.
    */
   virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
 };
