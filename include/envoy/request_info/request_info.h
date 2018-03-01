@@ -51,20 +51,19 @@ enum ResponseFlag {
 
 /**
  * Additional information about a completed request for logging.
- * TODO(mattklein123): This interface needs a thorough cleanup in terms of how we handle time
- *                     durations. I will be following up with a dedicated change for this.
  */
 class RequestInfo {
 public:
   virtual ~RequestInfo() {}
 
   /**
-   * Each filter can set independent response flags. The flags are accumulated.
+   * @param response_flag the response flag. Each filter can set independent response flags. The
+   * flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
-   * Filters can trigger this callback when an upstream host has been selected.
+   * @param host the selected upstream host for the request.
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
@@ -79,7 +78,7 @@ public:
   virtual const Optional<Http::Protocol>& protocol() const PURE;
 
   /**
-   * Set the request's protocol.
+   * @param protocol the request's protocol.
    */
   virtual void protocol(Http::Protocol protocol) PURE;
 
@@ -181,13 +180,13 @@ public:
   virtual void lastDownstreamTxByteSent(MonotonicTime time) PURE;
 
   /**
-   * Sets the end time for the request. This method is called once the request has been fully
+   * @param time the end time for the request. This method is called once the request has been fully
    * completed (i.e., when the request's ActiveStream is destroyed).
    */
   virtual void finalTimeMonotonic(MonotonicTime time) PURE;
 
   /**
-   * Returns the total duration of the request (i.e., when the request's ActiveStream is destroyed)
+   * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
   virtual Optional<std::chrono::nanoseconds> finalTimeMonotonic() const PURE;
@@ -208,7 +207,7 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
-   * Get the upstream local address.
+   * @return the upstream local address.
    */
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
 
@@ -218,17 +217,17 @@ public:
   virtual bool healthCheck() const PURE;
 
   /**
-   * Set whether the request is a health check request or not.
+   * @param is_hc whether the request is a health check request or not.
    */
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
-   * Get the downstream local address. Note that this will never be nullptr.
+   * @return the downstream local address. Note that this will never be nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
 
   /**
-   * Get the downstream remote address. Note that this will never be nullptr. Additionally note
+   * @return the downstream remote address. Note that this will never be nullptr. Additionally note
    * that this may not be the address of the physical connection if for example the address was
    * inferred from proxy proto, x-forwarded-for, etc.
    */
