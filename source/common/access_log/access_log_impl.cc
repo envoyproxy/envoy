@@ -84,11 +84,7 @@ bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http
 
 bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
   Optional<std::chrono::nanoseconds> final = info.finalTimeMonotonic();
-
-  if (!final.valid()) {
-    final = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() -
-                                                                 info.startTimeMonotonic());
-  }
+  ASSERT(final.valid());
 
   return compareAgainstValue(
       std::chrono::duration_cast<std::chrono::milliseconds>(final.value()).count());
