@@ -19,14 +19,14 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Instance::callCheck() {
-  CheckRequestUtils::createTcpCheck(filter_callbacks_, checkRequest_);
+  CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_);
 
   status_ = Status::Calling;
   config_->stats().active_.inc();
   config_->stats().total_.inc();
 
   calling_check_ = true;
-  client_->check(*this, checkRequest_, Tracing::NullSpan::instance());
+  client_->check(*this, check_request_, Tracing::NullSpan::instance());
   calling_check_ = false;
 }
 

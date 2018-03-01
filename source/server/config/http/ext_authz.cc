@@ -17,20 +17,13 @@ namespace Configuration {
 HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
     const envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config, const std::string&,
     FactoryContext& context) {
-
-  ASSERT((proto_config.grpc_service().has_envoy_grpc() &&
-          !proto_config.grpc_service().envoy_grpc().cluster_name().empty()) ||
-         (proto_config.grpc_service().has_google_grpc() &&
-          !proto_config.grpc_service().google_grpc().target_uri().empty()));
-
   auto filter_config = std::make_shared<Http::ExtAuthz::FilterConfig>(
       proto_config, context.localInfo(), context.scope(), context.runtime(),
       context.clusterManager());
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [ grpc_service = proto_config.grpc_service(), &context, filter_config,
-           timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks)
-      ->void {
+           timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks) {
     auto async_client_factory =
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
                                                                                 context.scope());

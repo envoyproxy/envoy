@@ -62,9 +62,9 @@ class HttpExtAuthzFilterTest : public testing::Test, public HttpExtAuthzFilterTe
 public:
   HttpExtAuthzFilterTest() {}
 
-  void SetUpTest(const std::string json) {
+  void initialize(const std::string yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-    MessageUtil::loadFromJson(json, proto_config);
+    MessageUtil::loadFromYaml(yaml, proto_config);
     config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
 
     client_ = new Envoy::ExtAuthz::MockClient();
@@ -74,12 +74,10 @@ public:
   }
 
   const std::string filter_config_ = R"EOF(
-    {
-      "grpc_service": {
-          "envoy_grpc": { "cluster_name": "ext_authz_server" }
-      },
-      "failure_mode_allow": true
-    }
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: true
   )EOF";
 };
 
@@ -88,7 +86,7 @@ typedef envoy::config::filter::http::ext_authz::v2::ExtAuthz CreateFilterConfigF
 class HttpExtAuthzFilterParamTest : public TestWithParam<CreateFilterConfigFunc*>,
                                     public HttpExtAuthzFilterTestBase {
 public:
-  virtual void SetUp() {
+  virtual void SetUp() override {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config = (*GetParam())();
     config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
 
@@ -101,15 +99,13 @@ public:
 
 template <bool failure_mode_allow_value>
 envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
-  const std::string json = R"EOF(
-    {
-      "grpc_service": {
-          "envoy_grpc": { "cluster_name": "ext_authz_server" }
-      },
-    }
+  const std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
   )EOF";
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromJson(json, proto_config);
+  MessageUtil::loadFromYaml(yaml, proto_config);
   proto_config.set_failure_mode_allow(failure_mode_allow_value);
   return proto_config;
 }
@@ -238,14 +234,12 @@ TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
 // Check a bad configuration results in validation exception.
 TEST_F(HttpExtAuthzFilterTest, BadConfig) {
   const std::string filter_config = R"EOF(
-  {
-    "failure_mode_allow": true,
-    "grpc_service": {}
-  }
+  failure_mode_allow: true
+  grpc_service: {}
   )EOF";
 
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromJson(filter_config, proto_config);
+  MessageUtil::loadFromYaml(filter_config, proto_config);
 
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
@@ -257,14 +251,12 @@ TEST_F(HttpExtAuthzFilterTest, BadConfig) {
 // that the request is not allowed to continue.
 TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
   const std::string fail_close_config = R"EOF(
-    {
-      "grpc_service": {
-          "envoy_grpc": { "cluster_name": "ext_authz_server" }
-      },
-      "failure_mode_allow": false
-    }
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
   )EOF";
-  SetUpTest(fail_close_config);
+  initialize(fail_close_config);
   InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
@@ -287,7 +279,7 @@ TEST_F(HttpExtAuthzFilterTest, ErrorFailClose) {
 // Test when failure_mode_allow is set and the response from the authorization service is Error that
 // the request is allowed to continue.
 TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
-  SetUpTest(filter_config_);
+  initialize(filter_config_);
   InSequence s;
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));

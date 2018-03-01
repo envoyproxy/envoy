@@ -19,7 +19,7 @@ namespace ExtAuthz {
 
 namespace {
 
-static const Http::HeaderMap* getDeniedHeader() {
+const Http::HeaderMap* getDeniedHeader() {
   static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
       {Http::Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
   return header_map;
@@ -28,7 +28,6 @@ static const Http::HeaderMap* getDeniedHeader() {
 } // namespace
 
 void Filter::initiateCall(const HeaderMap& headers) {
-
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
     return;
@@ -41,23 +40,23 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
   cluster_ = cluster->info();
 
-  Envoy::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers, checkRequest_);
+  Envoy::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers, check_request_);
 
   state_ = State::Calling;
   initiating_call_ = true;
-  client_->check(*this, checkRequest_, callbacks_->activeSpan());
+  client_->check(*this, check_request_, callbacks_->activeSpan());
   initiating_call_ = false;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   initiateCall(headers);
-  return (state_ == State::Calling) ? FilterHeadersStatus::StopIteration
-                                    : FilterHeadersStatus::Continue;
+  return state_ == State::Calling ? FilterHeadersStatus::StopIteration
+                                  : FilterHeadersStatus::Continue;
 }
 
 FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
-  return (state_ == State::Calling) ? FilterDataStatus::StopIterationAndWatermark
-                                    : FilterDataStatus::Continue;
+  return state_ == State::Calling ? FilterDataStatus::StopIterationAndWatermark
+                                  : FilterDataStatus::Continue;
 }
 
 FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
