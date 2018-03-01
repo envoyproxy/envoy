@@ -75,7 +75,7 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual const Optional<Http::Protocol>& protocol() const PURE;
+  virtual Optional<Http::Protocol> protocol() const PURE;
 
   /**
    * @param protocol the request's protocol.
@@ -85,7 +85,7 @@ public:
   /**
    * @return the response code.
    */
-  virtual const Optional<uint32_t>& responseCode() const PURE;
+  virtual Optional<uint32_t> responseCode() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.

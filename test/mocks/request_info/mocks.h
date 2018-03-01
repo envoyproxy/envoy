@@ -36,9 +36,9 @@ public:
   MOCK_METHOD1(finalTimeMonotonic, void(MonotonicTime time));
   MOCK_CONST_METHOD0(finalTimeMonotonic, Optional<std::chrono::nanoseconds>());
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
-  MOCK_CONST_METHOD0(protocol, const Optional<Http::Protocol>&());
+  MOCK_CONST_METHOD0(protocol, Optional<Http::Protocol>());
   MOCK_METHOD1(protocol, void(Http::Protocol protocol));
-  MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>&());
+  MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>());
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD1(getResponseFlag, bool(ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());

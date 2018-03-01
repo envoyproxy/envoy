@@ -21,7 +21,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
-  Optional<std::chrono::nanoseconds> duration(const Optional<MonotonicTime>& time) const {
+  Optional<std::chrono::nanoseconds> duration(Optional<MonotonicTime> time) const {
     if (!time.valid()) {
       return {};
     }
@@ -94,11 +94,11 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
+  Optional<Http::Protocol> protocol() const override { return protocol_; }
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
-  const Optional<uint32_t>& responseCode() const override { return response_code_; }
+  Optional<uint32_t> responseCode() const override { return response_code_; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 

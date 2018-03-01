@@ -36,8 +36,8 @@ MockRequestInfo::MockRequestInfo()
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
   ON_CALL(*this, downstreamRemoteAddress()).WillByDefault(ReturnRef(downstream_remote_address_));
-  ON_CALL(*this, protocol()).WillByDefault(ReturnRef(protocol_));
-  ON_CALL(*this, responseCode()).WillByDefault(ReturnRef(response_code_));
+  ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
+  ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, bytesReceived()).WillByDefault(ReturnPointee(&bytes_received_));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
 }

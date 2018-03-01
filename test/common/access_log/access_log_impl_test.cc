@@ -59,9 +59,9 @@ public:
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
   uint64_t bytesReceived() const override { return 1; }
-  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
+  Optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
-  const Optional<uint32_t>& responseCode() const override { return response_code_; }
+  Optional<uint32_t> responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
 
   bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {

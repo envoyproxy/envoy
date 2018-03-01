@@ -90,21 +90,21 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   {
     RequestInfoFormatter protocol_format("PROTOCOL");
     Optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+    EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_format("RESPONSE_CODE");
     Optional<uint32_t> response_code{200};
-    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(Return(response_code));
     EXPECT_EQ("200", response_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_code_format("RESPONSE_CODE");
     Optional<uint32_t> response_code;
-    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(Return(response_code));
     EXPECT_EQ("0", response_code_format.format(header, header, request_info));
   }
 
@@ -241,7 +241,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     FormatterImpl formatter(format);
 
     Optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
+    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
     EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT[]",
               formatter.format(request_header, response_header, request_info));
