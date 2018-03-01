@@ -74,7 +74,6 @@ void ConnPoolImpl::checkForDrained() {
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   ASSERT(drained_callbacks_.empty());
-
   // First see if we need to handle max streams rollover.
   uint64_t max_streams = host_->cluster().maxRequestsPerConnection();
   if (max_streams == 0) {
@@ -103,6 +102,9 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
+
+    //reset idle timer
+    primary_client_->resetIdleTimer();
   }
 
   return nullptr;
@@ -176,6 +178,12 @@ void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
   client.client_->close();
 }
 
+void ConnPoolImpl::onIdleTimeout(ActiveClient& client) {
+  ENVOY_CONN_LOG(debug, "idle timeout", *client.client_);
+  host_->cluster().stats().upstream_cx_connect_timeout_.inc(); //TODO add idle metric
+  client.client_->close();
+}
+
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
@@ -201,6 +209,9 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   if (!client.closed_with_active_rq_) {
     checkForDrained();
   }
+
+  // Start the idle timer
+  client.startIdleTimer();
 }
 
 void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason reason) {
@@ -213,11 +224,15 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
   } else if (reason == StreamResetReason::RemoteReset) {
     host_->cluster().stats().upstream_rq_rx_reset_.inc();
   }
+
+  //Start the idle timer
+  client.startIdleTimer();
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
+      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
+      idle_timer_(parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); })) {
 
   parent_.conn_connect_ms_.reset(
       new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
