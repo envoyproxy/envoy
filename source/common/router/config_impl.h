@@ -304,8 +304,9 @@ public:
   bool isDirectResponse() const { return direct_response_code_.valid(); }
 
   bool isRedirect() const {
-    if (!isDirectResponse())
+    if (!isDirectResponse()) {
       return false;
+    }
     return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty();
   }
 
