@@ -1074,6 +1074,29 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, WebSocketMetadataMatch) {
+  setup(false, "");
+
+  Router::MockMetadataMatchCriteria matches;
+
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, metadataMatchCriteria())
+      .WillByDefault(Return(
+          &route_config_provider_.route_config_->route_->route_entry_.metadata_matches_criteria_));
+
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_, _))
+      .WillOnce(Invoke([&](const std::string&, Upstream::LoadBalancerContext* context)
+                           -> Upstream::MockHost::MockCreateConnectionData {
+        EXPECT_EQ(
+            context->metadataMatchCriteria(),
+            &route_config_provider_.route_config_->route_->route_entry_.metadata_matches_criteria_);
+        return {};
+      }));
+  expectOnUpstreamInitFailure();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   setup(false, "");
 
