@@ -15,13 +15,13 @@ IpTaggingFilter::~IpTaggingFilter() {}
 void IpTaggingFilter::onDestroy() {}
 
 FilterHeadersStatus IpTaggingFilter::decodeHeaders(HeaderMap& headers, bool) {
-  bool is_internal_request =
+  const bool is_internal_request =
       headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() ==
                                          Headers::get().EnvoyInternalRequestValues.True.c_str());
 
   if ((is_internal_request && config_->requestType() == FilterRequestType::EXTERNAL) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::INTERNAL) ||
-      (!config_->runtime().snapshot().featureEnabled("ip_tagging.http_filter_enabled", 100))) {
+      !config_->runtime().snapshot().featureEnabled("ip_tagging.http_filter_enabled", 100)) {
     return FilterHeadersStatus::Continue;
   }
 

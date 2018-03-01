@@ -11,31 +11,21 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb IpTaggingFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                                               const std::string& stat_prefix,
-                                                               FactoryContext& context) {
-
-  envoy::config::filter::http::ip_tagging::v2::IPTagging proto_config;
-  Config::FilterJson::translateIpTaggingFilterConfig(json_config, proto_config);
-  return createFilter(proto_config, stat_prefix, context);
+HttpFilterFactoryCb IpTaggingFilterConfig::createFilterFactory(const Json::Object&,
+                                                               const std::string&,
+                                                               FactoryContext&) {
+  NOT_IMPLEMENTED;
 }
 
 HttpFilterFactoryCb
 IpTaggingFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                     const std::string& stat_prefix,
                                                     FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::filter::http::ip_tagging::v2::IPTagging&>(proto_config),
-      stat_prefix, context);
-}
-
-HttpFilterFactoryCb IpTaggingFilterConfig::createFilter(
-    const envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config,
-    const std::string& stat_prefix, FactoryContext& context) {
 
   Http::IpTaggingFilterConfigSharedPtr config(new Http::IpTaggingFilterConfig(
-      proto_config, stat_prefix, context.scope(), context.runtime()));
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::http::ip_tagging::v2::IPTagging&>(proto_config),
+      stat_prefix, context.scope(), context.runtime()));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Http::IpTaggingFilter>(config));

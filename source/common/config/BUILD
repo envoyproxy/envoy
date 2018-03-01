@@ -116,7 +116,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
         "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
         "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
         "@envoy_api//envoy/config/filter/http/lua/v2:lua_cc",
         "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",
         "@envoy_api//envoy/config/filter/http/router/v2:router_cc",

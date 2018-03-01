@@ -29,11 +29,6 @@ public:
   }
 
   std::string name() override { return Config::HttpFilterNames::get().IP_TAGGING; }
-
-private:
-  HttpFilterFactoryCb
-  createFilter(const envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config,
-               const std::string& stat_prefix, FactoryContext& context);
 };
 
 } // namespace Configuration

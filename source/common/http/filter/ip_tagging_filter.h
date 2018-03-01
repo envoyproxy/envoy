@@ -36,10 +36,13 @@ public:
     // of the set should be removed and observability into what tags are loaded needs
     // to be implemented.
     // TODO(ccaraman): Remove size check once file system support is implemented.
-    if (config.ip_tags_size() == 0) {
+    // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
+    if (config.ip_tags().empty()) {
       throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
     }
 
+    // TODO(ccaraman): Reduce the amount of copies operations performed to build the
+    // IP tag data set and passing it to the LcTrie constructor.
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
     for (const auto& ip_tag : config.ip_tags()) {
       std::pair<std::string, std::vector<Network::Address::CidrRange>> ip_tag_pair;
@@ -51,7 +54,7 @@ public:
         // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
         Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
         if (cidr_entry.isValid()) {
-          cidr_set.push_back(cidr_entry);
+          cidr_set.emplace_back(cidr_entry);
         } else {
           throw EnvoyException(
               fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
@@ -59,7 +62,7 @@ public:
         }
       }
       ip_tag_pair.second = cidr_set;
-      tag_data.push_back(ip_tag_pair);
+      tag_data.emplace_back(ip_tag_pair);
     }
     trie_.reset(new Network::LcTrie::LcTrie(tag_data));
   }
