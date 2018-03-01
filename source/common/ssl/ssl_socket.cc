@@ -16,7 +16,6 @@ namespace Ssl {
 
 SslSocket::SslSocket(Context& ctx, InitialState state)
     : ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
-  SSL_set_mode(ssl_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
