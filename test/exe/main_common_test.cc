@@ -12,6 +12,7 @@
 #include "server/options_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -32,7 +33,7 @@ TEST(MainCommon, ConstructDestructHotRestartEnabled) {
   std::string config_file = Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                             "/test/config/integration/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static", "-c", config_file.c_str(), "--base-id", "1", nullptr};
-  EXPECT_NO_THROW(MainCommon main_common(ARRAY_SIZE(argv) - 1, const_cast<char**>(argv)));
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(ARRAY_SIZE(argv) - 1, const_cast<char**>(argv)));
 }
 
 TEST(MainCommon, ConstructDestructHotRestartDisabled) {
@@ -43,7 +44,7 @@ TEST(MainCommon, ConstructDestructHotRestartDisabled) {
                             "/test/config/integration/google_com_proxy_port_0.v2.yaml";
   const char* argv[] = {"envoy-static",          "-c",   config_file.c_str(), "--base-id", "2",
                         "--disable-hot-restart", nullptr};
-  EXPECT_NO_THROW(MainCommon main_common(ARRAY_SIZE(argv) - 1, const_cast<char**>(argv)));
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(ARRAY_SIZE(argv) - 1, const_cast<char**>(argv)));
 }
 
 TEST(MainCommon, LegacyMain) {
