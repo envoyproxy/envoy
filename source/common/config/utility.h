@@ -1,10 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/grpc_mux.h"
@@ -222,16 +218,6 @@ public:
 
     return config;
   }
-
-  /**
-   * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
-   * a Routeconfiguration, based on the underlying resource type.
-   * TODO(htuch): This is kind of a hack. If we had a better support for resource names as first
-   * class in the API, this would not be necessary.
-   * @param resource google.protobuf.Any v2 API resource.
-   * @return std::string resource name.
-   */
-  static std::string resourceName(const ProtobufWkt::Any& resource);
 
   /**
    * Create TagProducer instance. Check all tag names for conflicts to avoid

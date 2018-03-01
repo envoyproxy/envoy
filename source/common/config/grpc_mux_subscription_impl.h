@@ -72,6 +72,10 @@ public:
     callbacks_->onConfigUpdateFailed(e);
   }
 
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return callbacks_->resourceName(resource);
+  }
+
 private:
   GrpcMux& grpc_mux_;
   SubscriptionStats stats_;
