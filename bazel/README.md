@@ -54,7 +54,7 @@ Envoy compiles and passes tests with the version of clang installed by XCode 8.3
 Apple LLVM version 8.1.0 (clang-802.0.42).
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
-and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files. 
+and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 4. `go get github.com/bazelbuild/buildtools/buildifier` to install buildifier
 5. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
 6. `bazel build //source/exe:envoy-static` from the Envoy source directory.
@@ -259,6 +259,7 @@ The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
   This is useful in cases where you have a lua script that loads shared object libraries, such as those installed via luarocks.
+* Perf annotation with `define perf_annotation=enabled` (see source/common/common/perf_annotation.h for details).
 
 ## Stats Tunables
 

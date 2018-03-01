@@ -186,3 +186,13 @@ envoy_cc_library(
         ":logger_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "perf_annotation_lib",
+    srcs = ["perf_annotation.cc"],
+    hdrs = ["perf_annotation.h"],
+    deps = [
+        ":assert_lib",
+        ":utility_lib",
+    ],
+)
