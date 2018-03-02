@@ -213,7 +213,6 @@ private:
       // LcNode uses the last 20 bits to store either the index into ip_prefixes_ or trie_.
       // In theory, the trie_ should only need twice the amount of entries of CIDR ranges.
       // To prevent index out of bounds issues, only support a maximum of (2^19) CIDR ranges.
-      // TODO(ccaraman): Add a test case for this.
       if (tag_data.size() > MAXIMUM_CIDR_RANGE_ENTRIES) {
         throw EnvoyException(fmt::format("The input vector has '{0}' CIDR ranges entires. LC-Trie "
                                          "can only support '{1}' CIDR ranges.",
@@ -368,16 +367,17 @@ private:
       if (n == 1) {
         // There is no way to predictably determine the number of trie nodes required to build a
         // LC-Trie. If while building the trie the position that is being set exceeds the maximum
-        // number of supported trie_ entries, throw an Envoy Exception instead of letting an
-        // out_of_range exception be thrown.
-        // TODO(ccaraman): Add a test case.
-        if (position > maximum_trie_node_size) {
-          throw EnvoyException(fmt::format("The number of internal nodes required for the LC-Trie "
-                                           "exceeded the maximum number of "
-                                           "supported nodes. Number of internal nodes required: "
-                                           "'{0}'. Maximum number of supported nodes: '{1}'.",
-                                           position, maximum_trie_node_size));
+        // number of supported trie_ entries, throw an Envoy Exception.
+        if (position >= maximum_trie_node_size) {
+          // Adding 1 to the position to count how many nodes are trying to be set.
+          throw EnvoyException(
+              fmt::format("The number of internal nodes required for the LC-Trie "
+                          "exceeded the maximum number of "
+                          "supported nodes. Minimum number of internal nodes required: "
+                          "'{0}'. Maximum number of supported nodes: '{1}'.",
+                          (position + 1), maximum_trie_node_size));
         }
+
         trie_[position].address_ = first;
         return;
       }

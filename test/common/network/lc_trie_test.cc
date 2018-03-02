@@ -262,7 +262,7 @@ TEST_F(LcTrieTest, NestedPrefixes) {
       {"2001:db8::/96", "2001:db8::8000/97"}, // tag_3
       {"2001:db8::ffff/128"},                 // tag_4
       {"2001:db8:1::/48"},                    // tag_5
-      {"2001:db8:1::/48"}                     // tag_6
+      {"2001:db8:1::/128", "2001:db8:1::/48"} // tag_6
   };
   setup(cidr_range_strings);
 
@@ -299,6 +299,45 @@ TEST_F(LcTrieTest, NestedPrefixesWithCatchAll) {
 
   };
   expectIPAndTags(test_case);
+}
+
+// Test the trie can only support 2^19 Cidr Entries.
+TEST_F(LcTrieTest, MaximumEntriesException) {
+  Address::CidrRange cidr_entry = Address::CidrRange::create("1.2.3.4/32");
+  std::vector<Address::CidrRange> large_vector_cidr(((1 << 19) + 1), cidr_entry);
+
+  std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
+      std::make_pair("bad_tag", large_vector_cidr);
+  std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
+  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input), EnvoyException,
+                            "The input vector has '524289' CIDR ranges entires. LC-Trie can only "
+                            "support '524288' CIDR ranges.");
+}
+
+// Test the exception will be thrown when the maximum allocated trie nodes are being set.
+TEST_F(LcTrieTest, ExceedingAllocatedTrieNodesException) {
+  std::vector<Address::CidrRange> large_vector_cidr((1 << 19));
+
+  // The CIDR ranges have to be unique as to force getting towards the higher range of nodes
+  // inserted in the trie.
+  uint32_t ip_address = 1u;
+  for (int i = 0; i < (1 << 19); i++) {
+    ip_address++;
+    sockaddr_in addr4;
+    addr4.sin_family = AF_INET;
+    addr4.sin_addr.s_addr = ip_address;
+    Address::InstanceConstSharedPtr address = std::make_shared<Address::Ipv4Instance>(&addr4);
+    large_vector_cidr[i] = Address::CidrRange::create(address, 32);
+  }
+
+  std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
+      std::make_pair("bad_tag", large_vector_cidr);
+  std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
+  EXPECT_THROW_WITH_MESSAGE(
+      new LcTrie(ip_tags_input, 0.01, 16), EnvoyException,
+      "The number of internal nodes required for the LC-Trie exceeded the "
+      "maximum number of supported nodes. Minimum number of internal nodes required: "
+      "'3048577'. Maximum number of supported nodes: '3048576'.");
 }
 
 } // namespace LcTrie
