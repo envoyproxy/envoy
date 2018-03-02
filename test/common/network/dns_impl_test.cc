@@ -137,6 +137,7 @@ private:
         long ip_name_len = name_len;
         std::string encodedCname;
         if (cname.size() > 0) {
+          ASSERT_TRUE(cname.size() <= 253);
           hostLookup = cname.c_str();
           encodedCname = TestDnsServerQuery::encodeDnsName(cname);
           ip_question = reinterpret_cast<const unsigned char*>(encodedCname.c_str());
@@ -184,10 +185,10 @@ private:
             encodedCname.size() > 0 ? name_len + RRFIXEDSZ + encodedCname.size() + 1 : 0;
         const uint16_t response_size_n =
             htons(response_base_len + response_ip_rest_len + response_cname_len);
-        Buffer::OwnedImpl write_buffer_;
+        Buffer::OwnedImpl write_buffer;
         // Write response header
-        write_buffer_.add(&response_size_n, sizeof(response_size_n));
-        write_buffer_.add(response_base, response_base_len);
+        write_buffer.add(&response_size_n, sizeof(response_size_n));
+        write_buffer.add(response_base, response_base_len);
 
         // if we have a cname, create a resource record
         if (encodedCname.size() > 0) {
@@ -196,9 +197,9 @@ private:
           DNS_RR_SET_LEN(cname_rr_fixed, encodedCname.size() + 1);
           DNS_RR_SET_CLASS(cname_rr_fixed, C_IN);
           DNS_RR_SET_TTL(cname_rr_fixed, 0);
-          write_buffer_.add(question, name_len);
-          write_buffer_.add(cname_rr_fixed, RRFIXEDSZ);
-          write_buffer_.add(encodedCname.c_str(), encodedCname.size() + 1);
+          write_buffer.add(question, name_len);
+          write_buffer.add(cname_rr_fixed, RRFIXEDSZ);
+          write_buffer.add(encodedCname.c_str(), encodedCname.size() + 1);
         }
 
         // Create a resource record for each IP found in the host map.
@@ -214,20 +215,20 @@ private:
         DNS_RR_SET_TTL(response_rr_fixed, 0);
         if (ips != nullptr) {
           for (const auto& it : *ips) {
-            write_buffer_.add(ip_question, ip_name_len);
-            write_buffer_.add(response_rr_fixed, RRFIXEDSZ);
+            write_buffer.add(ip_question, ip_name_len);
+            write_buffer.add(response_rr_fixed, RRFIXEDSZ);
             if (q_type == T_A) {
               in_addr addr;
               ASSERT_EQ(1, inet_pton(AF_INET, it.c_str(), &addr));
-              write_buffer_.add(&addr, sizeof(addr));
+              write_buffer.add(&addr, sizeof(addr));
             } else {
               in6_addr addr;
               ASSERT_EQ(1, inet_pton(AF_INET6, it.c_str(), &addr));
-              write_buffer_.add(&addr, sizeof(addr));
+              write_buffer.add(&addr, sizeof(addr));
             }
           }
         }
-        parent_.connection_->write(write_buffer_, false);
+        parent_.connection_->write(write_buffer, false);
 
         // Reset query state, time for the next one.
         buffer_.drain(size_);
