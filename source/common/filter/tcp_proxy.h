@@ -22,6 +22,7 @@
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
+#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Filter {
@@ -104,6 +105,13 @@ public:
   const Optional<std::chrono::milliseconds>& idleTimeout() { return shared_config_->idleTimeout(); }
   TcpProxyUpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() {
+    if (cluster_metadata_match_criteria_) {
+      return cluster_metadata_match_criteria_.get();
+    }
+
+    return nullptr;
+  }
 
 private:
   struct Route {
@@ -122,6 +130,7 @@ private:
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
+  std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
 };
 
 typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
@@ -145,7 +154,10 @@ public:
 
   // Upstream::LoadBalancerContext
   Optional<uint64_t> computeHashKey() override { return {}; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+    return config_->metadataMatchCriteria();
+  }
+
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }
