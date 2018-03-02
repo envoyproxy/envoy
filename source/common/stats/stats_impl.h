@@ -286,7 +286,7 @@ public:
               std::vector<Tag>&& tags)
       : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
         alloc_(alloc) {}
-  ~CounterImpl() { alloc_.free(data_); }
+  ~CounterImpl() {}
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -300,7 +300,6 @@ public:
   void reset() override { data_.value_ = 0; }
   bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
   uint64_t value() const override { return data_.value_; }
-
 private:
   RawStatData& data_;
   RawStatDataAllocator& alloc_;
@@ -315,7 +314,7 @@ public:
             std::vector<Tag>&& tags)
       : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
         alloc_(alloc) {}
-  ~GaugeImpl() { alloc_.free(data_); }
+  ~GaugeImpl() {}
 
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
@@ -365,7 +364,11 @@ public:
   // RawStatDataAllocator
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+  ~HeapRawStatDataAllocator();
+private:
+ RawStatData *data_=nullptr;
 };
+
 
 /**
  * A stats cache template that is used by the isolated store.
