@@ -9,8 +9,6 @@
 
 #include <unistd.h>
 
-#include "common/runtime/runtime_impl.h"
-
 #include "exe/main_common.h"
 
 #include "server/options_impl.h"
@@ -40,23 +38,8 @@ public:
   MainCommonTest()
       : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
-        random_string_(fmt::format("{}", computeBaseId())),
+        random_string_(fmt::format("{}", static_cast<uint32_t>(getpid()))),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), nullptr}) {}
-
-  /**
-   * Computes a numeric ID to incorporate into the names of shared-memory segments and
-   * domain sockets, to help keep them distinct from other tests that might be running
-   * concurrently.
-   *
-   * @return uint32_t a unique numreic ID based on PID and a random number.
-   */
-  static uint32_t computeBaseId() {
-    Runtime::RandomGeneratorImpl random_generator_;
-    // Pick a prime number to give more of the 32-bits of entropy to the PID, and the
-    // remainder to the random number.
-    const uint32_t four_digit_prime = 7919;
-    return getpid() * four_digit_prime + random_generator_.random() % four_digit_prime;
-  }
 
   char** argv() { return const_cast<char**>(&argv_[0]); }
   int argc() { return argv_.size() - 1; }
@@ -69,7 +52,7 @@ public:
   // Adds an argument, assuring that argv remains null-terminated.
   void addArg(const char* arg) {
     ASSERT(!argv_.empty());
-    size_t last = argv_.size() - 1;
+    const size_t last = argv_.size() - 1;
     ASSERT(argv_[last] == nullptr); // invariant established in ctor, maintained below.
     argv_[last] = arg;              // guaranteed non-empty
     argv_.push_back(nullptr);
@@ -80,6 +63,7 @@ public:
   std::vector<const char*> argv_;
 };
 
+// Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
 TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
@@ -88,6 +72,7 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
+// Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
 TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
@@ -97,6 +82,7 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
+// Ensurees that existing users of main_common() can link.
 TEST_F(MainCommonTest, LegacyMain) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
