@@ -120,10 +120,12 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
     throw MalformedArgvException(message);
   }
 
+  hot_restart_disabled_ = disable_hot_restart.getValue();
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(max_stats.getValue(),
                                         max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength());
+                                            Stats::RawStatData::maxStatSuffixLength(),
+                                        !hot_restart_disabled_);
     throw NoServingException();
   }
 
@@ -171,6 +173,5 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   max_obj_name_length_ = max_obj_name_len.getValue();
-  hot_restart_disabled_ = disable_hot_restart.getValue();
 }
 } // namespace Envoy
