@@ -280,6 +280,7 @@ int PipeInstance::bind(int fd) const {
     return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
                   offsetof(struct sockaddr_un, sun_path) + address_length_);
   }
+  unlink(address_.sun_path);
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 

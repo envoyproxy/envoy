@@ -75,16 +75,21 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                                  bool bind_to_port) {
-  // UdsListenerSockets are not managed and do not participate in hot restart as they are only
-  // used for testing.
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
+
+  // For each listener config we share a single socket among all threaded listeners.
+  // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
-    return std::make_shared<Network::UdsListenSocket>(address->asString());
+    const std::string addr = fmt::format("unix://{}", address->asString());
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
+    if (fd != -1) {
+      ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+      return std::make_shared<Network::UdsListenSocket>(fd, address);
+    }
+    return std::make_shared<Network::UdsListenSocket>(address);
   }
 
-  // For each listener config we share a single TcpListenSocket among all threaded listeners.
-  // First we try to get the socket from our parent if applicable.
   const std::string addr = fmt::format("tcp://{}", address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
