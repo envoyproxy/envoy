@@ -209,7 +209,7 @@ protected:
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
   do {                                                                                             \
-    if (static_cast<spdlog::level::level_enum>(Logger::Logger::LEVEL) >= LOGGER.level()) {         \
+    if (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level()) {  \
       ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__);                                        \
     }                                                                                              \
   } while (0)
