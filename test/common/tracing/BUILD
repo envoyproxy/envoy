@@ -33,6 +33,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "opentracing_driver_impl_test",
+    srcs = [
+        "opentracing_driver_impl_test.cc",
+    ],
+    deps = [
+        "//source/common/tracing:dynamic_opentracing_driver_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "@io_opentracing_cpp//mocktracer",
+    ],
+)
+
+envoy_cc_test(
     name = "lightstep_tracer_impl_test",
     srcs = [
         "lightstep_tracer_impl_test.cc",
@@ -53,5 +67,23 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "dynamic_opentracing_driver_impl_test",
+    srcs = [
+        "dynamic_opentracing_driver_impl_test.cc",
+    ],
+    data = [
+        "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/tracing:dynamic_opentracing_driver_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:environment_lib",
     ],
 )

@@ -332,4 +332,27 @@ std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type
   }
 }
 
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
+void WelfordStandardDeviation::update(double newValue) {
+  ++count_;
+  const double delta = newValue - mean_;
+  mean_ += delta / count_;
+  const double delta2 = newValue - mean_;
+  m2_ += delta * delta2;
+}
+
+double WelfordStandardDeviation::computeVariance() const {
+  if (count_ < 2) {
+    return std::nan("");
+  }
+  return m2_ / (count_ - 1);
+}
+
+double WelfordStandardDeviation::computeStandardDeviation() const {
+  const double variance = computeVariance();
+  // It seems very difficult for variance to go negative, but from the calculation in update()
+  // above, I can't quite convince myself it's impossible, so put in a guard to be sure.
+  return (std::isnan(variance) || variance < 0) ? std::nan("") : sqrt(variance);
+}
+
 } // namespace Envoy

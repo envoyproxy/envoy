@@ -150,18 +150,23 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
     return;
   }
+  if (api_state_[type_url].watches_.size() == 0) {
+    ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+    return;
+  }
   try {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
     // We have to walk all watches (and need an efficient map as a result) to
     // ensure we deliver empty config updates when a resource is dropped.
     std::unordered_map<std::string, ProtobufWkt::Any> resources;
+    GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
         throw EnvoyException(fmt::format("{} does not match {} type URL is DiscoveryResponse {}",
                                          resource.type_url(), type_url, message->DebugString()));
       }
-      const std::string resource_name = Utility::resourceName(resource);
+      const std::string resource_name = callbacks.resourceName(resource);
       resources.emplace(resource_name, resource);
     }
     for (auto watch : api_state_[type_url].watches_) {

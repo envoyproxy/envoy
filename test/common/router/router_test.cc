@@ -1555,6 +1555,7 @@ TEST_F(RouterTest, AltStatName) {
 TEST_F(RouterTest, Redirect) {
   MockDirectResponseEntry direct_response;
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, rewritePathHeader(_));
   EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
@@ -1571,6 +1572,7 @@ TEST_F(RouterTest, Redirect) {
 TEST_F(RouterTest, RedirectFound) {
   MockDirectResponseEntry direct_response;
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, rewritePathHeader(_));
   EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));

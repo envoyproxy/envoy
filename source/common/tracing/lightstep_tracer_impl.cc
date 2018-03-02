@@ -15,25 +15,21 @@
 namespace Envoy {
 namespace Tracing {
 
-namespace {
-class LightStepLogger : Logger::Loggable<Logger::Id::tracing> {
-public:
-  void operator()(lightstep::LogLevel level, opentracing::string_view message) const {
-    const fmt::StringRef fmt_message{message.data(), message.size()};
-    switch (level) {
-    case lightstep::LogLevel::debug:
-      ENVOY_LOG(debug, "{}", fmt_message);
-      break;
-    case lightstep::LogLevel::info:
-      ENVOY_LOG(info, "{}", fmt_message);
-      break;
-    default:
-      ENVOY_LOG(warn, "{}", fmt_message);
-      break;
-    }
+void LightStepLogger::operator()(lightstep::LogLevel level,
+                                 opentracing::string_view message) const {
+  const fmt::StringRef fmt_message{message.data(), message.size()};
+  switch (level) {
+  case lightstep::LogLevel::debug:
+    ENVOY_LOG(debug, "{}", fmt_message);
+    break;
+  case lightstep::LogLevel::info:
+    ENVOY_LOG(info, "{}", fmt_message);
+    break;
+  default:
+    ENVOY_LOG(warn, "{}", fmt_message);
+    break;
   }
-};
-} // namespace
+}
 
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
     : driver_(driver) {}
@@ -68,8 +64,6 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
     active_request_ = nullptr;
     Grpc::Common::validateResponse(*response);
 
-    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
-                             lightstep::CollectorMethodName(), true);
     // http://www.grpc.io/docs/guides/wire.html
     // First 5 bytes contain the message header.
     response->body()->drain(5);
@@ -77,11 +71,17 @@ void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& respons
     if (!active_response_->ParseFromZeroCopyStream(&stream)) {
       throw EnvoyException("Failed to parse LightStep collector response");
     }
+    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), true);
     active_callback_->OnSuccess();
   } catch (const Grpc::Exception& ex) {
     Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                              lightstep::CollectorMethodName(), false);
     active_callback_->OnFailure(std::make_error_code(std::errc::network_down));
+  } catch (const EnvoyException& ex) {
+    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), false);
+    active_callback_->OnFailure(std::make_error_code(std::errc::bad_message));
   }
 }
 
@@ -112,7 +112,7 @@ LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
   enableTimer();
 }
 
-const opentracing::Tracer& LightStepDriver::TlsLightStepTracer::tracer() const { return *tracer_; }
+opentracing::Tracer& LightStepDriver::TlsLightStepTracer::tracer() { return *tracer_; }
 
 void LightStepDriver::TlsLightStepTracer::enableTimer() {
   const uint64_t flush_interval =
@@ -160,7 +160,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
   });
 }
 
-const opentracing::Tracer& LightStepDriver::tracer() const {
+opentracing::Tracer& LightStepDriver::tracer() {
   return tls_->getTyped<TlsLightStepTracer>().tracer();
 }
 
