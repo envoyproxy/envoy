@@ -52,6 +52,8 @@ public:
    */
   static uint32_t computeBaseId() {
     Runtime::RandomGeneratorImpl random_generator_;
+    // Pick a prime number to give more of the 32-bits of entropy to the PID, and the
+    // remainder to the random number.
     const uint32_t four_digit_prime = 7919;
     return getpid() * four_digit_prime + random_generator_.random() % four_digit_prime;
   }
@@ -113,6 +115,9 @@ TEST_F(MainCommonTest, LegacyMain) {
     return_code = EXIT_FAILURE;
   }
   if (return_code == -1) {
+    // Note that Envoy::main_common() will run an event loop if properly configured, which
+    // would hang the test. This is why we don't supply a config file in this testcase;
+    // we just want to make sure we wake up this code in a test.
     return_code = Envoy::main_common(*options);
   }
   EXPECT_EQ(EXIT_FAILURE, return_code);
