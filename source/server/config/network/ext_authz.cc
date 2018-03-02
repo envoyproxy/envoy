@@ -34,7 +34,7 @@ NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
     auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
-        new ExtAuthz::TcpFilter::Instance(ext_authz_config, std::move(client))});
+        std::make_shared<ExtAuthz::TcpFilter::Instance>(ext_authz_config, std::move(client))});
   };
 }
 
