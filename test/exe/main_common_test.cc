@@ -7,6 +7,8 @@
 // TODO(issues/2649): This test needs to be parameterized on IP versions.
 #ifndef ENVOY_CONFIG_COVERAGE
 
+#include <unistd.h>
+
 #include "common/runtime/runtime_impl.h"
 
 #include "exe/main_common.h"
@@ -24,13 +26,35 @@
 
 namespace Envoy {
 
+/**
+ * Captures common functions needed for invoking MainCommon. Generates a
+ * unique --base-id setting based on the pid and a random number. Maintains
+ * an argv array that is terminated with nullptr. Identifies the config
+ * file relative to $TEST_RUNDIR.
+ *
+ * TODO(jmarantz): Make these tests work with ipv6. See
+ * https://github.com/envoyproxy/envoy/issues/2649
+ */
 class MainCommonTest : public testing::Test {
 public:
   MainCommonTest()
       : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
-        random_string_(fmt::format("{}", random_generator_.random() % 1024)),
+        random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), nullptr}) {}
+
+  /**
+   * Computes a numeric ID to incorporate into the names of shared-memory segments and
+   * domain sockets, to help keep them distinct from other tests that might be running
+   * concurrently.
+   *
+   * @return uint32_t a unique numreic ID based on PID and a random number.
+   */
+  static uint32_t computeBaseId() {
+    Runtime::RandomGeneratorImpl random_generator_;
+    const uint32_t four_digit_prime = 7919;
+    return getpid() * four_digit_prime + random_generator_.random() % four_digit_prime;
+  }
 
   char** argv() { return const_cast<char**>(&argv_[0]); }
   int argc() { return argv_.size() - 1; }
@@ -47,7 +71,6 @@ public:
   }
 
   std::string config_file_;
-  Runtime::RandomGeneratorImpl random_generator_;
   std::string random_string_;
   std::vector<const char*> argv_;
 };
