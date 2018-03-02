@@ -354,7 +354,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "uniqueItems": true,
           "items" : {
               "type" : "string",
-              "enum" : ["Subject", "SAN"]
+              "enum" : ["Subject", "SAN", "By", "Hash"]
           }
       },
       "generate_request_id" : {"type" : "boolean"}
