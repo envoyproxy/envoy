@@ -68,7 +68,10 @@ public:
 
   // Adds an argument, assuring that argv remains null-terminated.
   void addArg(const char* arg) {
-    argv_[argv_.size() - 1] = arg;
+    ASSERT(!argv_.empty());
+    size_t last = argv_.size() - 1;
+    ASSERT(argv_[last] == nullptr); // invariant established in ctor, maintained below.
+    argv_[last] = arg;              // guaranteed non-empty
     argv_.push_back(nullptr);
   }
 
