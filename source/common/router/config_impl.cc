@@ -230,7 +230,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       runtime_(loadRuntimeData(route.match())), loader_(loader),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
-      https_redirect_(route.redirect().https_redirect()), retry_policy_(route.route()),
+      https_redirect_(route.redirect().https_redirect()),
+      prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
+      strip_query_(route.redirect().strip_query()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -374,21 +376,22 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             const std::string& matched_path) const {
-  if (prefix_rewrite_.empty()) {
+  const auto& rewrite = (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  if (rewrite.empty()) {
     return;
   }
 
   std::string path = headers.Path()->value().c_str();
   headers.insertEnvoyOriginalPath().value(*headers.Path());
   ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
-  headers.Path()->value(path.replace(0, matched_path.size(), prefix_rewrite_));
+  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
   const char* final_host;
-  const char* final_path;
+  absl::string_view final_path;
   const char* final_scheme;
   if (!host_redirect_.empty()) {
     final_host = host_redirect_.c_str();
@@ -401,7 +404,13 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_path = path_redirect_.c_str();
   } else {
     ASSERT(headers.Path());
-    final_path = headers.Path()->value().c_str();
+    final_path = absl::string_view(headers.Path()->value().c_str(), headers.Path()->value().size());
+    if (strip_query_) {
+      size_t path_end = final_path.find("?");
+      if (path_end != absl::string_view::npos) {
+        final_path = final_path.substr(0, path_end);
+      }
+    }
   }
 
   if (https_redirect_) {
@@ -539,6 +548,10 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(
   finalizePathHeader(headers, prefix_);
 }
 
+void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
+  finalizePathHeader(headers, prefix_);
+}
+
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value) &&
@@ -557,6 +570,10 @@ void PathRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
+  finalizePathHeader(headers, path_);
+}
+
+void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
   finalizePathHeader(headers, path_);
 }
 
@@ -595,15 +612,19 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
       regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
       regex_str_(route.match().regex()) {}
 
-void RegexRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
-
+void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
   const Http::HeaderString& path = headers.Path()->value();
   const char* query_string_start = Http::Utility::findQueryStringStart(path);
   ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
   std::string matched_path(path.c_str(), query_string_start);
+
   finalizePathHeader(headers, matched_path);
+}
+
+void RegexRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
+  rewritePathHeader(headers);
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
