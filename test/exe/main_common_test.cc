@@ -98,6 +98,18 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
+// Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
+TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  addArg("--disable-hot-restart");
+  addArg("--mode");
+  addArg("init_only");
+  MainCommon main_common(argc(), argv());
+  EXPECT_TRUE(main_common.run());
+}
+
 // Ensurees that existing users of main_common() can link.
 TEST_F(MainCommonTest, LegacyMain) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
