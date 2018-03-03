@@ -98,7 +98,7 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
-// Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
+// Exercise init_only explicitly.
 TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
