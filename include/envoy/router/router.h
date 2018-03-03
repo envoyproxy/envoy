@@ -68,6 +68,14 @@ public:
    *         or an empty string if no response body is specified.
    */
   virtual const std::string& responseBody() const PURE;
+
+  /**
+   * Do potentially destructive header transforms on Path header prior to redirection. For
+   * example prefix rewriting for redirects etc. This should only be called ONCE
+   * immediately prior to redirecting.
+   * @param headers supplies the request headers, which may be modified during this call.
+   */
+  virtual void rewritePathHeader(Http::HeaderMap& headers) const PURE;
 };
 
 /**

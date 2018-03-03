@@ -37,4 +37,40 @@ TEST(Logger, All) {
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");
 }
+
+TEST(Logger, evaluateParams) {
+  uint32_t i = 1;
+
+  // set logger's level to low level.
+  // log message with higher severity and make sure that params were evaluated.
+  GET_MISC_LOGGER().set_level(spdlog::level::info);
+  ENVOY_LOG_MISC(warn, "test message '{}'", i++);
+  ASSERT_THAT(i, testing::Eq(2));
+}
+
+TEST(Logger, doNotEvaluateParams) {
+  uint32_t i = 1;
+
+  // set logger's logging level high and log a message with lower severity
+  // params should not be evaluated.
+  GET_MISC_LOGGER().set_level(spdlog::level::critical);
+  ENVOY_LOG_MISC(error, "test message '{}'", i++);
+  ASSERT_THAT(i, testing::Eq(1));
+}
+
+TEST(Logger, logAsStatement) {
+  // Just log as part of if ... statement
+
+  if (true)
+    ENVOY_LOG_MISC(critical, "test message 1");
+  else
+    ENVOY_LOG_MISC(critical, "test message 2");
+
+  // do the same with curly brackets
+  if (true) {
+    ENVOY_LOG_MISC(critical, "test message 3");
+  } else {
+    ENVOY_LOG_MISC(critical, "test message 4");
+  }
+}
 } // namespace Envoy

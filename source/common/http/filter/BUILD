@@ -91,10 +91,12 @@ envoy_cc_library(
     hdrs = ["ip_tagging_filter.h"],
     deps = [
         "//include/envoy/http:filter_interface",
-        "//include/envoy/json:json_object_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/network:lc_trie_lib",
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
     ],
 )
 

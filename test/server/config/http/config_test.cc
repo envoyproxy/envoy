@@ -398,44 +398,6 @@ TEST(HttpFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, IpTaggingFilter) {
-  std::string json_string = R"EOF(
-  {
-    "request_type" : "internal",
-    "ip_tags" : [
-      { "ip_tag_name" : "example_tag",
-        "ip_list" : ["0.0.0.0"]
-      }
-    ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  IpTaggingFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, BadIpTaggingFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "request_type" : "internal",
-    "ip_tags" : [
-      { "ip_tag_name" : "example_tag"
-      }
-    ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  IpTaggingFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
-}
-
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
