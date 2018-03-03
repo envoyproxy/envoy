@@ -57,7 +57,7 @@ rm -f "${SENTINEL}"
 # Environment setup.
 export USER=bazel
 export TEST_TMPDIR=/build/tmp
-export BAZEL="bazel"
+export BAZEL="bazel ${BAZEL_STARTUP_OPTIONS}"
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
@@ -73,7 +73,7 @@ ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 
 # Replace the existing Bazel output cache with a copy of the image's prebuilt deps.
 if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
-  BAZEL_OUTPUT_BASE="$(bazel info output_base)"
+  BAZEL_OUTPUT_BASE="$(bazel ${BAZEL_STARTUP_OPTIONS} info output_base)"
   mkdir -p "${TEST_TMPDIR}/_bazel_${USER}/install"
   rsync -a /bazel-prebuilt-root/install/* "${TEST_TMPDIR}/_bazel_${USER}/install/"
   rsync -a /bazel-prebuilt-output "${BAZEL_OUTPUT_BASE}"
