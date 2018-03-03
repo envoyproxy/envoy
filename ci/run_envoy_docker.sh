@@ -15,11 +15,12 @@ USER_GROUP=root
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+[[ -z "${ENVOY_DOCKER_BAZEL_CACHE}" ]] && ENVOY_DOCKER_BAZEL_CACHE=bazel-cache
 
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm -t -i -e http_proxy=${http_proxy} -e https_proxy=${https_proxy} \
-  -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
+  -u "${USER}":"${USER_GROUP}" -v ${ENVOY_DOCKER_BAZEL_CACHE}:/root/.cache/bazel/ -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
   -v "$PWD":/source -e NUM_CPUS --cap-add SYS_PTRACE "${IMAGE_NAME}":"${IMAGE_ID}" \
   /bin/bash -lc "groupadd --gid $(id -g) -f envoygroup && useradd -o --uid $(id -u) --gid $(id -g) \
   --no-create-home --home-dir /source envoybuild && su envoybuild -c \"cd source && $*\""
