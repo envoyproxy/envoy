@@ -50,9 +50,9 @@ public:
    * distinct from other tests that might be running concurrently.
    *
    * The PID is needed to isolate namespaces between concurrent
-   * processes in CI. The random number generator is needed as each
-   * test methods, run sequentially, don't work properly if they
-   * access the same segment names.
+   * processes in CI. The random number generator is needed
+   * sequentially executed test methods fail with an error in
+   * bindDomainSocket if the the same base-id is re-used.
    *
    * @return uint32_t a unique numeric ID based on the PID and a random number.
    */
@@ -115,10 +115,6 @@ TEST_F(MainCommonTest, LegacyMain) {
     // Set the mode to init-only so main_common doesn't initiate a server-loop.
     addArg("--mode");
     addArg("init_only");
-
-    // disable hotRestart, otherwise bindDomainSocket fails.
-    // addArg("--disable-hot-restart");
-    // HotRestartImpl
     options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
                                                    spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
