@@ -66,9 +66,8 @@ public:
 
   // Runtime::Snapshot
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
-                      uint16_t num_buckets) const override {
-    return random_value % static_cast<uint64_t>(num_buckets) <
-           std::min(getInteger(key, default_value), static_cast<uint64_t>(num_buckets));
+                      uint64_t num_buckets) const override {
+    return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
   }
 
   bool featureEnabled(const std::string& key, uint64_t default_value) const override {
@@ -159,9 +158,8 @@ private:
 
     // Runtime::Snapshot
     bool featureEnabled(const std::string&, uint64_t default_value, uint64_t random_value,
-                        uint16_t num_buckets) const override {
-      return random_value % static_cast<uint64_t>(num_buckets) <
-             std::min(default_value, static_cast<uint64_t>(num_buckets));
+                        uint64_t num_buckets) const override {
+      return random_value % num_buckets < std::min(default_value, num_buckets);
     }
 
     bool featureEnabled(const std::string& key, uint64_t default_value) const override {

@@ -146,8 +146,7 @@ private:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   const std::string runtime_key_;
-  const uint64_t default_;
-  const uint64_t divisor_;
+  const envoy::type::FractionalPercent percent_;
   const bool use_independent_randomness_;
 };
 

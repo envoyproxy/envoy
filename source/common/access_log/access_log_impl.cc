@@ -90,7 +90,7 @@ bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::
 RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::RuntimeFilter& config,
                              Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : runtime_(runtime), random_(random), runtime_key_(config.runtime_key()),
-      default_(config.default_()), divisor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, divisor, 100)),
+      percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
 bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
@@ -98,11 +98,14 @@ bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint64_t random_value;
   if (use_independent_randomness_ || uuid == nullptr ||
-      !UuidUtils::uuidModBy(uuid->value().c_str(), random_value, divisor_)) {
+      !UuidUtils::uuidModBy(uuid->value().c_str(), random_value,
+                            ProtobufPercentHelper::fractionPercentDenominatorToInt(percent_))) {
     random_value = random_.random();
   }
 
-  return runtime_.snapshot().featureEnabled(runtime_key_, default_, random_value, divisor_);
+  return runtime_.snapshot().featureEnabled(
+      runtime_key_, percent_.numerator(), random_value,
+      ProtobufPercentHelper::fractionPercentDenominatorToInt(percent_));
 }
 
 OperatorFilter::OperatorFilter(const Protobuf::RepeatedPtrField<
