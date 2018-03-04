@@ -917,7 +917,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // For Egress (outbound) response, if a decorator operation name has been provided, it
       // should be used to override the active span's operation.
       if (resp_operation_override) {
-        if (!resp_operation_override->value().empty()) {
+        if (!resp_operation_override->value().empty() && active_span_) {
           active_span_->setOperation(resp_operation_override->value().c_str());
         }
         // Remove header so not propagated to service.
