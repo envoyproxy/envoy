@@ -134,7 +134,7 @@ bool StringUtil::caseCompare(absl::string_view lhs, absl::string_view rhs) {
   if (rhs.size() != lhs.size()) {
     return false;
   }
-  return absl::StartsWithIgnoreCase(rhs.data(), lhs.data());
+  return absl::StartsWithIgnoreCase(rhs, lhs);
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
