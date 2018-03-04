@@ -55,7 +55,7 @@ uint64_t convertPercent(double percent, uint64_t max_value);
  * @param percent supplies percent to convert.
  * @return the converted denominator.
  */
-uint64_t fractionPercentDenominatorToInt(const envoy::type::FractionalPercent& percent);
+uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
