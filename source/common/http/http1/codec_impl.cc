@@ -44,6 +44,7 @@ void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
+  bool no_chunks = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         const char* key_to_use = header.key().c_str();
@@ -69,12 +70,16 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     saw_content_length = true;
   }
 
+  if (headers.NoChunks()) {
+    no_chunks = true;
+  }
+
   ASSERT(!headers.TransferEncoding());
 
   // Assume we are chunk encoding unless we are passed a content length or this is a header only
   // response. Upper layers generally should strip transfer-encoding since it only applies to
   // HTTP/1.1. The codec will infer it based on the type of response.
-  if (saw_content_length) {
+  if (saw_content_length || no_chunks) {
     chunk_encoding_ = false;
   } else {
     if (processing_100_continue_) {
@@ -105,8 +110,8 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
 }
 
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
-  // end_stream may be indicated with a zero length data buffer. If that is the case, so not
-  // atually write the zero length buffer out.
+  // end_stream may be indicated with a zero length data buffer. If that is the case, do not
+  // actually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(fmt::format("{:x}\r\n", data.length()));

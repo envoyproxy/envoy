@@ -69,3 +69,9 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "hystrix_lib",
+    srcs = ["hystrix.cc"],
+    hdrs = ["hystrix.h"],
+)

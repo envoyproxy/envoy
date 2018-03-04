@@ -80,3 +80,11 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "hystrix_test",
+    srcs = ["hystrix_test.cc"],
+    deps = [
+        "//source/common/stats:hystrix_lib",
+    ],
+)

@@ -219,7 +219,7 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 }
 
 Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
-                                      Buffer::Instance& response) {
+                                      Buffer::Instance& response, HandlerInfo&) {
   response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
 
   for (auto& cluster : server_.clusterManager().clusters()) {
@@ -276,7 +276,7 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap&,
-                                         Buffer::Instance& response) {
+                                         Buffer::Instance& response, HandlerInfo&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -300,27 +300,27 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap
 }
 
 Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Http::HeaderMap&,
-                                             Buffer::Instance& response) {
+                                             Buffer::Instance& response, HandlerInfo&) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Http::HeaderMap&,
-                                           Buffer::Instance& response) {
+                                           Buffer::Instance& response, HandlerInfo&) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Http::HeaderMap&,
-                                               Buffer::Instance& response) {
+                                               Buffer::Instance& response, HandlerInfo&) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
-                                     Buffer::Instance& response) {
+                                     Buffer::Instance& response, HandlerInfo&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
@@ -346,7 +346,7 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
-                                           Buffer::Instance& response) {
+                                           Buffer::Instance& response, HandlerInfo&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -356,7 +356,7 @@ Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
-                                        Buffer::Instance& response) {
+                                        Buffer::Instance& response, HandlerInfo&) {
   time_t current_time = time(nullptr);
   response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
                            server_.healthCheckFailed() ? "draining" : "live",
@@ -367,7 +367,7 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& response_headers,
-                                   Buffer::Instance& response) {
+                                   Buffer::Instance& response, HandlerInfo&) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
@@ -469,14 +469,14 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
 }
 
 Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Http::HeaderMap&,
-                                          Buffer::Instance& response) {
+                                          Buffer::Instance& response, HandlerInfo&) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap& response_headers,
-                                          Buffer::Instance& response) {
+                                          Buffer::Instance& response, HandlerInfo&) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
   std::list<std::string> listeners;
@@ -487,8 +487,8 @@ Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap& r
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
-                                   Buffer::Instance& response) {
+Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&, Buffer::Instance& response,
+                                   HandlerInfo&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
@@ -507,7 +507,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerRuntime(const std::string& url, Http::HeaderMap& response_headers,
-                                     Buffer::Instance& response) {
+                                     Buffer::Instance& response, HandlerInfo&) {
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   const auto& entries = server_.runtime().snapshot().getAll();
@@ -528,7 +528,6 @@ Http::Code AdminImpl::handlerRuntime(const std::string& url, Http::HeaderMap& re
       rc = Http::Code::BadRequest;
     }
   }
-
   return rc;
 }
 
@@ -575,13 +574,66 @@ std::string AdminImpl::runtimeAsJson(
   return strbuf.GetString();
 }
 
+Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
+                                                Http::HeaderMap& response_headers,
+                                                Buffer::Instance&, HandlerInfo& handler_info) {
+
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.TextEventStream);
+  response_headers.insertCacheControl().value().setReference(
+      Http::Headers::get().CacheControlValues.NoCache);
+  response_headers.insertConnection().value().setReference(
+      Http::Headers::get().ConnectionValues.Close);
+  response_headers.insertAccessControlAllowHeaders().value().setReference(
+      Http::Headers::get().AccessControlAllowHeadersValue.AccessControlAllowHeadersHystrix);
+  response_headers.insertAccessControlAllowOrigin().value().setReference(
+      Http::Headers::get().AccessControlAllowOriginValue.All);
+  response_headers.insertNoChunks().value().setReference("0");
+
+  HystrixHandlerInfo& hystrix_handler_info = dynamic_cast<HystrixHandlerInfo&>(handler_info);
+
+  // start streaming
+  hystrix_handler_info.data_timer_ = hystrix_handler_info.callbacks_->dispatcher().createTimer(
+      [this, &hystrix_handler_info]() -> void {
+        HystrixHandler::prepareAndSendHystrixStream(&hystrix_handler_info, server_);
+      });
+  hystrix_handler_info.data_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
+
+  // start keep alive ping
+  hystrix_handler_info.ping_timer_ = hystrix_handler_info.callbacks_->dispatcher().createTimer(
+      [this, &hystrix_handler_info]() -> void {
+        HystrixHandler::sendKeepAlivePing(&hystrix_handler_info);
+      });
+
+  hystrix_handler_info.ping_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
+
+  ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
+            hystrix_handler_info.callbacks_->connection()->localAddress()->asString());
+  return Http::Code::OK;
+}
+
 void AdminFilter::onComplete() {
   std::string path = request_headers_->Path()->value().c_str();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
-  Http::Code code = parent_.runCallback(path, *header_map, response);
+  Http::Code code;
+  bool end_stream = true;
+
+  if (path.find("/hystrix_event_stream") == std::string::npos) {
+    HandlerInfoPtr temp_handler(new HandlerInfo);
+    handler_info_ = std::move(temp_handler);
+    code = parent_.runCallback(path, *header_map, response, *handler_info_);
+  } else {
+    HandlerInfoPtr temp_handler(new HystrixHandlerInfo(callbacks_));
+    handler_info_ = std::move(temp_handler);
+    code = parent_.runCallback(path, *header_map, response, *handler_info_);
+    end_stream = false;
+  }
+
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
@@ -596,7 +648,7 @@ void AdminFilter::onComplete() {
 
   // Under no circumstance should browsers sniff content-type.
   header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
-  callbacks_->encodeHeaders(std::move(header_map), response.length() == 0);
+  callbacks_->encodeHeaders(std::move(header_map), end_stream && response.length() == 0);
 
   if (response.length() > 0) {
     callbacks_->encodeData(response, true);
@@ -641,7 +693,9 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
+          {"/hystrix_event_stream", "send hystrix event stream",
+           MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false}},
       listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {
@@ -678,7 +732,8 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 }
 
 Http::Code AdminImpl::runCallback(const std::string& path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response) {
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                  HandlerInfo& handler_info) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -689,7 +744,7 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
-      code = handler.handler_(path_and_query, response_headers, response);
+      code = handler.handler_(path_and_query, response_headers, response, handler_info);
       found_handler = true;
       break;
     }
@@ -699,7 +754,7 @@ Http::Code AdminImpl::runCallback(const std::string& path_and_query,
     // Extra space is emitted below to have "invalid path." be a separate sentence in the
     // 404 output from "admin commands are:" in handlerHelp.
     response.add("invalid path. ");
-    handlerHelp(path_and_query, response_headers, response);
+    handlerHelp(path_and_query, response_headers, response, handler_info);
     code = Http::Code::NotFound;
   }
 
@@ -717,8 +772,8 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   return sorted_handlers;
 }
 
-Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
-                                  Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&, Buffer::Instance& response,
+                                  HandlerInfo&) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
@@ -729,7 +784,7 @@ Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& response_headers,
-                                       Buffer::Instance& response) {
+                                       Buffer::Instance& response, HandlerInfo&) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Html);
 
@@ -791,6 +846,72 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
     return true;
   }
   return false;
+}
+
+void HystrixHandlerInfo::Destroy() {
+  if (data_timer_) {
+    data_timer_->disableTimer();
+    data_timer_.reset();
+  }
+  if (ping_timer_) {
+    ping_timer_->disableTimer();
+    ping_timer_.reset();
+  }
+}
+
+void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfo* hystrix_handler_info,
+                                                Server::Instance& server) {
+  hystrix_handler_info->stats_->incCounter();
+
+  for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
+    // we save all upstream_rq stats.
+    if (counter->name().find("upstream_rq_") != std::string::npos) {
+      hystrix_handler_info->stats_->pushNewValue(counter->name(), counter->value());
+    }
+  }
+}
+
+void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfo* hystrix_handler_info,
+                                                 Server::Instance& server) {
+  updateHystrixRollingWindow(hystrix_handler_info, server);
+  std::stringstream ss;
+  for (auto& cluster : server.clusterManager().clusters()) {
+    hystrix_handler_info->stats_->getClusterStats(
+        ss, cluster.second.get().info()->name(),
+        cluster.second.get()
+            .info()
+            ->resourceManager(Upstream::ResourcePriority::Default)
+            .pendingRequests()
+            .max(),
+        server.stats()
+            .gauge("cluster." + cluster.second.get().info()->name() + ".membership_total")
+            .value());
+  }
+  Buffer::OwnedImpl data;
+  data.add(ss.str());
+
+  // using write() since we are sending network level
+  // TODO(trabetti): is there an alternative to the const_cast?
+  (const_cast<Network::Connection*>((hystrix_handler_info->callbacks_)->connection()))
+      ->write(data, false);
+
+  // restart timer
+  hystrix_handler_info->data_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
+}
+
+void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfo* hystrix_handler_info) {
+  Buffer::OwnedImpl data;
+  data.add(":\n\n");
+
+  // using write() since we are sending network level
+  // TODO(trabetti): is there an alternative to the const_cast?
+  (const_cast<Network::Connection*>((hystrix_handler_info->callbacks_)->connection()))
+      ->write(data, false);
+
+  // restart timer
+  hystrix_handler_info->ping_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
 }
 
 } // namespace Server

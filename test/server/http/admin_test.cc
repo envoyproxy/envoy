@@ -99,9 +99,12 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/cpuprofiler?enable=y", header_map, data));
+  HandlerInfo handler_info;
+  EXPECT_EQ(Http::Code::OK,
+            admin_.runCallback("/cpuprofiler?enable=y", header_map, data, handler_info));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/cpuprofiler?enable=n", header_map, data));
+  EXPECT_EQ(Http::Code::OK,
+            admin_.runCallback("/cpuprofiler?enable=n", header_map, data, handler_info));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -114,7 +117,8 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                                    "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                    server_, listener_scope_.createScope("listener.admin."));
   Http::HeaderMapImpl header_map;
-  admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data);
+  HandlerInfo handler_info;
+  admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data, handler_info);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -134,52 +138,56 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false));
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+  HandlerInfo handler_info;
+
+  EXPECT_EQ(Http::Code::Accepted,
+            admin_.runCallback("/foo/bar", header_map, response, handler_info));
 
   // Test that removable handler gets removed.
   EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::NotFound,
+            admin_.runCallback("/foo/bar", header_map, response, handler_info));
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::Accepted,
+            admin_.runCallback("/foo/bar", header_map, response, handler_info));
 
   // Add again and make sure it is not there twice.
   EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::Accepted,
+            admin_.runCallback("/foo/bar", header_map, response, handler_info));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_FALSE(
       admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
+
+  HandlerInfo handler_info;
 
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.
@@ -188,7 +196,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response));
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response, handler_info));
   Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_TRUE(content_type.find("text/html")) << content_type.c_str();
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
@@ -199,7 +207,8 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response));
+  HandlerInfo handler_info;
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response, handler_info));
   const std::string logging_action = "<form action='/logging' method='post'";
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
@@ -214,12 +223,13 @@ TEST_P(AdminInstanceTest, Runtime) {
       {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
+  HandlerInfo handler_info;
 
   EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response, handler_info));
   EXPECT_EQ("int_key: 1\nother_key: bar\nstring_key: foo\n", TestUtility::bufferToString(response));
 }
 
@@ -231,12 +241,14 @@ TEST_P(AdminInstanceTest, RuntimeJSON) {
       {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
+  HandlerInfo handler_info;
 
   EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime?format=json", header_map, response));
+  EXPECT_EQ(Http::Code::OK,
+            admin_.runCallback("/runtime?format=json", header_map, response, handler_info));
 
   std::string output = TestUtility::bufferToString(response);
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(output);
@@ -265,13 +277,14 @@ TEST_P(AdminInstanceTest, RuntimeBadFormat) {
   std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
+  HandlerInfo handler_info;
 
   EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
   EXPECT_EQ(Http::Code::BadRequest,
-            admin_.runCallback("/runtime?format=foo", header_map, response));
+            admin_.runCallback("/runtime?format=foo", header_map, response, handler_info));
   EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
 }
 
