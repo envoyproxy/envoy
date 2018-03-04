@@ -500,6 +500,33 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
 }
 
+// The server (local) dentity is foo.com/be. The client does not set XFCC.
+TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
+  NiceMock<Ssl::MockConnection> ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
+  std::string expected_pem("%3D%3Dabc%0Ade%3D");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
+  std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  details.push_back(Http::ClientCertDetailsType::Cert);
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/"
+            "be;Hash=abcdefg;SAN=test://foo.com/fe;Cert=\"%3D%3Dabc%0Ade%3D\"",
+            headers.get_("x-forwarded-client-cert"));
+}
+
 // This test assumes the following scenario:
 // The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be

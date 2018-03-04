@@ -247,4 +247,8 @@ fi
 enableHeapCheck
 set -e
 
+start_test disabling hot_restart by command line.
+CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
+check [ "disabled" = "${CLI_HOT_RESTART_VERSION}" ]
+
 echo "PASS"

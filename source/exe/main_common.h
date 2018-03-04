@@ -22,7 +22,7 @@ public:
 
 class MainCommonBase {
 public:
-  MainCommonBase(OptionsImpl& options, bool hot_restart);
+  MainCommonBase(OptionsImpl& options);
   ~MainCommonBase();
 
   bool run();
@@ -39,18 +39,18 @@ protected:
 
 class MainCommon {
 public:
-  MainCommon(int argc, char** argv, bool hot_restart);
+  MainCommon(int argc, char** argv);
   bool run() { return base_.run(); }
 
-private:
-  static std::unique_ptr<Envoy::OptionsImpl> computeOptions(int argc, char** argv,
-                                                            bool hot_restart);
+  static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
+                                       bool hot_restart_enabled);
 
+private:
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs;
 #endif
 
-  std::unique_ptr<Envoy::OptionsImpl> options_;
+  Envoy::OptionsImpl options_;
   MainCommonBase base_;
 };
 

@@ -214,6 +214,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   const auto* direct_response = route_->directResponseEntry();
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
+    direct_response->rewritePathHeader(headers);
     sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
