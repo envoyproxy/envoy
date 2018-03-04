@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=cares-1_13_0
+VERSION=cares-1_14_0
 
 # cares is fussy over whether -D appears inside CFLAGS vs. CPPFLAGS, oss-fuzz
 # sets CFLAGS with -D, so we need to impedance match here.
