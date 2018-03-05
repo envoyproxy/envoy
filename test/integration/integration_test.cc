@@ -172,7 +172,7 @@ TEST_P(IntegrationTest, MissingDelimiter) { testMissingDelimiter(); }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) { testInvalidCharacterInFirstline(); }
 
-TEST_P(IntegrationTest, LowVersion) { testLowVersion(); }
+TEST_P(IntegrationTest, InvalidVersion) { testInvalidVersion(); }
 
 TEST_P(IntegrationTest, Http10Request) { testHttp10Request(); }
 

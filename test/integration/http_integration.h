@@ -129,7 +129,7 @@ protected:
   void testBadFirstline();
   void testMissingDelimiter();
   void testInvalidCharacterInFirstline();
-  void testLowVersion();
+  void testInvalidVersion();
   void testHttp10Request();
   void testNoHost();
   void testUpstreamProtocolError();
