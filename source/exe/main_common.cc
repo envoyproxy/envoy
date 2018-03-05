@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "common/common/compiler_requirements.h"
+#include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
@@ -43,6 +44,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
   switch (options_.mode()) {
+  case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (!options.hotRestartDisabled()) {
@@ -84,6 +86,9 @@ bool MainCommonBase::run() {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     return Server::validateConfig(options_, local_address, component_factory_);
   }
+  case Server::Mode::InitOnly:
+    PERF_DUMP();
+    return true;
   }
   NOT_REACHED;
 }
