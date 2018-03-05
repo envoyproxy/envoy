@@ -78,7 +78,7 @@ public:
 
 private:
   enum class State { NotStarted, Calling, Complete };
-  bool initiateCall(const HeaderMap& headers);
+  void initiateCall(const HeaderMap& headers);
 
   FilterConfigSharedPtr config_;
   Envoy::ExtAuthz::ClientPtr client_;

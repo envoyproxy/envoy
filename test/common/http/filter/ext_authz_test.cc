@@ -113,6 +113,26 @@ envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
 INSTANTIATE_TEST_CASE_P(ParameterizedFilterConfig, HttpExtAuthzFilterParamTest,
                         Values(&GetFilterConfig<true>, &GetFilterConfig<false>));
 
+// Test that the request continues when the filter_callbacks has no route.
+TEST_P(HttpExtAuthzFilterParamTest, NoRoute) {
+
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+}
+
+// Test that the request continues when the authorization service cluster is not present.
+TEST_P(HttpExtAuthzFilterParamTest, NoCluster) {
+
+  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+}
+
 // Test that the request is stopped till there is an OK response back after which it continues on.
 TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
   InSequence s;
@@ -277,62 +297,6 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
-}
-
-// Test that the request does not continues when the filter_callbacks has no route and
-// failure_mode_allow is false.
-TEST_F(HttpExtAuthzFilterTest, NoRouteErrorFailClose) {
-  const std::string fail_close_config = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_authz_server"
-  failure_mode_allow: false
-  )EOF";
-  initialize(fail_close_config);
-  InSequence s;
-
-  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_CALL(filter_callbacks_, requestInfo()).Times(1);
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-}
-
-// Test that the request continues when the filter_callbacks has no route and
-// failure_mode_allow is set.
-TEST_F(HttpExtAuthzFilterTest, NoRouteErrorOpen) {
-  initialize(filter_config_);
-  InSequence s;
-
-  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_CALL(filter_callbacks_, requestInfo()).Times(0);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-}
-
-// Test that the request does not continues when the requests upstream cluster is not present and
-// failure_mode_allow is false.
-TEST_F(HttpExtAuthzFilterTest, NoClusterFailClose) {
-  const std::string fail_close_config = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_authz_server"
-  failure_mode_allow: false
-  )EOF";
-  initialize(fail_close_config);
-  InSequence s;
-
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
-  EXPECT_CALL(filter_callbacks_, requestInfo()).Times(1);
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-}
-
-// Test that the request continues when the requests upstream cluster is not present and
-// failure_mode_allow is set.
-TEST_F(HttpExtAuthzFilterTest, NoClusterErrorOpen) {
-  initialize(filter_config_);
-  InSequence s;
-
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
-  EXPECT_CALL(filter_callbacks_, requestInfo()).Times(0);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 } // namespace ExtAuthz
