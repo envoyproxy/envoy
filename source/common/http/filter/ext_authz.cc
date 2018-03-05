@@ -27,16 +27,16 @@ const Http::HeaderMap* getDeniedHeader() {
 
 } // namespace
 
-void Filter::initiateCall(const HeaderMap& headers) {
+bool Filter::initiateCall(const HeaderMap& headers) {
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
-    return;
+    return false;
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
   if (cluster == nullptr) {
-    return;
+    return false;
   }
   cluster_ = cluster->info();
 
@@ -46,10 +46,17 @@ void Filter::initiateCall(const HeaderMap& headers) {
   initiating_call_ = true;
   client_->check(*this, check_request_, callbacks_->activeSpan());
   initiating_call_ = false;
+  return true;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
-  initiateCall(headers);
+  if (initiateCall(headers) == false) {
+    if (config_->failureModeAllow()) {
+      return FilterHeadersStatus::Continue;
+    }
+    onComplete(Envoy::ExtAuthz::CheckStatus::Error);
+    return FilterHeadersStatus::StopIteration;
+  }
   return state_ == State::Calling ? FilterHeadersStatus::StopIteration
                                   : FilterHeadersStatus::Continue;
 }
@@ -76,33 +83,34 @@ void Filter::onDestroy() {
 }
 
 void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
-  ASSERT(cluster_);
 
   state_ = State::Complete;
 
   using Envoy::ExtAuthz::CheckStatus;
 
-  switch (status) {
-  case CheckStatus::OK:
-    cluster_->statsScope().counter("ext_authz.ok").inc();
-    break;
-  case CheckStatus::Error:
-    cluster_->statsScope().counter("ext_authz.error").inc();
-    break;
-  case CheckStatus::Denied:
-    cluster_->statsScope().counter("ext_authz.denied").inc();
-    Http::CodeUtility::ResponseStatInfo info{config_->scope(),
-                                             cluster_->statsScope(),
-                                             EMPTY_STRING,
-                                             enumToInt(Code::Forbidden),
-                                             true,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             EMPTY_STRING,
-                                             false};
-    Http::CodeUtility::chargeResponseStat(info);
-    break;
+  if (cluster_ != nullptr) {
+    switch (status) {
+    case CheckStatus::OK:
+      cluster_->statsScope().counter("ext_authz.ok").inc();
+      break;
+    case CheckStatus::Error:
+      cluster_->statsScope().counter("ext_authz.error").inc();
+      break;
+    case CheckStatus::Denied:
+      cluster_->statsScope().counter("ext_authz.denied").inc();
+      Http::CodeUtility::ResponseStatInfo info{config_->scope(),
+                                               cluster_->statsScope(),
+                                               EMPTY_STRING,
+                                               enumToInt(Code::Forbidden),
+                                               true,
+                                               EMPTY_STRING,
+                                               EMPTY_STRING,
+                                               EMPTY_STRING,
+                                               EMPTY_STRING,
+                                               false};
+      Http::CodeUtility::chargeResponseStat(info);
+      break;
+    }
   }
 
   // We fail open/fail close based of filter config
