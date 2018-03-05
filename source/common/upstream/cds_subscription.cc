@@ -14,7 +14,7 @@ namespace Upstream {
 
 CdsSubscription::CdsSubscription(Config::SubscriptionStats stats,
                                  const envoy::api::v2::core::ConfigSource& cds_config,
-                                 const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                                 const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                  ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info)

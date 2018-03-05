@@ -22,9 +22,9 @@ public:
    * Compute and return an optional hash key to use during load balancing. This
    * method may modify internal state so it should only be called once per
    * routing attempt.
-   * @return Optional<uint64_t> the optional hash key to use.
+   * @return absl::optional<uint64_t> the optional hash key to use.
    */
-  virtual Optional<uint64_t> computeHashKey() PURE;
+  virtual absl::optional<uint64_t> computeHashKey() PURE;
 
   /**
    * @return Router::MetadataMatchCriteria* metadata for use in selecting a subset of hosts

@@ -47,12 +47,12 @@ public:
   ReadyWatcher callback_ready_;
   RetryState::DoRetryCallback callback_;
 
-  const Optional<Http::StreamResetReason> no_reset_;
-  const Optional<Http::StreamResetReason> remote_reset_{Http::StreamResetReason::RemoteReset};
-  const Optional<Http::StreamResetReason> remote_refused_stream_reset_{
+  const absl::optional<Http::StreamResetReason> no_reset_;
+  const absl::optional<Http::StreamResetReason> remote_reset_{Http::StreamResetReason::RemoteReset};
+  const absl::optional<Http::StreamResetReason> remote_refused_stream_reset_{
       Http::StreamResetReason::RemoteRefusedStreamReset};
-  const Optional<Http::StreamResetReason> overflow_reset_{Http::StreamResetReason::Overflow};
-  const Optional<Http::StreamResetReason> connect_failure_{
+  const absl::optional<Http::StreamResetReason> overflow_reset_{Http::StreamResetReason::Overflow};
+  const absl::optional<Http::StreamResetReason> connect_failure_{
       Http::StreamResetReason::ConnectionFailure};
 };
 

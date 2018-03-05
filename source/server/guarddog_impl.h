@@ -5,7 +5,7 @@
 #include <mutex>
 #include <vector>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/watchdog.h"
@@ -69,7 +69,7 @@ private:
 
   struct WatchedDog {
     WatchDogSharedPtr dog_;
-    Optional<MonotonicTime> last_alert_time_;
+    absl::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};
   };

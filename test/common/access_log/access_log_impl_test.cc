@@ -52,18 +52,18 @@ public:
   }
 
   SystemTime startTime() const override { return start_time_; }
-  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
+  const absl::optional<std::chrono::microseconds>& requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
-  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
+  const absl::optional<std::chrono::microseconds>& responseReceivedDuration() const override {
     return request_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
   uint64_t bytesReceived() const override { return 1; }
-  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
+  const absl::optional<Http::Protocol>& protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
-  const Optional<uint32_t>& responseCode() const override { return response_code_; }
+  const absl::optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
   std::chrono::microseconds duration() const override {
     return std::chrono::microseconds(duration_);
@@ -93,10 +93,10 @@ public:
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
   SystemTime start_time_;
-  Optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
-  Optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};
-  Optional<Http::Protocol> protocol_{Http::Protocol::Http11};
-  Optional<uint32_t> response_code_;
+  absl::optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
+  absl::optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};
+  absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
@@ -219,7 +219,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(200);
+  request_info_.response_code_ = (200);
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -241,10 +241,10 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = (500);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(200);
+  request_info_.response_code_ = (200);
   request_info_.duration_ = 1000000000;
   log->log(&request_headers_, &response_headers_, request_info_);
 }
@@ -410,7 +410,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = (500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -440,7 +440,7 @@ TEST_F(AccessLogImplTest, orFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = (500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -473,7 +473,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = (500);
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -567,7 +567,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
 
-  info.response_code_.value(400);
+  info.response_code_ = (400);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
   EXPECT_TRUE(filter.evaluate(info, request_headers));
 

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
@@ -77,7 +77,7 @@ public:
    * @return duration from request start to when the entire request was received from the
    * downstream client in microseconds.
    */
-  virtual const Optional<std::chrono::microseconds>& requestReceivedDuration() const PURE;
+  virtual const absl::optional<std::chrono::microseconds>& requestReceivedDuration() const PURE;
 
   /**
    * Set the duration from request start to when the entire request was received from the
@@ -90,7 +90,7 @@ public:
    * @return the duration from request start to when the first byte of the response was received
    * from the upstream host in microseconds.
    */
-  virtual const Optional<std::chrono::microseconds>& responseReceivedDuration() const PURE;
+  virtual const absl::optional<std::chrono::microseconds>& responseReceivedDuration() const PURE;
 
   /**
    * Set the duration from request start to when the first byte of the response was received
@@ -107,7 +107,7 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual const Optional<Http::Protocol>& protocol() const PURE;
+  virtual const absl::optional<Http::Protocol>& protocol() const PURE;
 
   /**
    * Set the request's protocol.
@@ -117,7 +117,7 @@ public:
   /**
    * @return the response code.
    */
-  virtual const Optional<uint32_t>& responseCode() const PURE;
+  virtual const absl::optional<uint32_t>& responseCode() const PURE;
 
   /**
    * @return the # of body bytes sent in the response.

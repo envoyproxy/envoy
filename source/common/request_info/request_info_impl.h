@@ -18,7 +18,7 @@ struct RequestInfoImpl : public RequestInfo {
   // RequestInfo::RequestInfo
   SystemTime startTime() const override { return start_time_; }
 
-  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
+  const absl::optional<std::chrono::microseconds>& requestReceivedDuration() const override {
     return request_received_duration_;
   }
   void requestReceivedDuration(MonotonicTime time) override {
@@ -26,7 +26,7 @@ struct RequestInfoImpl : public RequestInfo {
         std::chrono::duration_cast<std::chrono::microseconds>(time - start_time_monotonic_);
   }
 
-  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
+  const absl::optional<std::chrono::microseconds>& responseReceivedDuration() const override {
     return response_received_duration_;
   }
   void responseReceivedDuration(MonotonicTime time) override {
@@ -36,10 +36,10 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
+  const absl::optional<Http::Protocol>& protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
-  const Optional<uint32_t>& responseCode() const override { return response_code_; }
+  const absl::optional<uint32_t>& responseCode() const override { return response_code_; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
@@ -76,13 +76,13 @@ struct RequestInfoImpl : public RequestInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  Optional<Http::Protocol> protocol_;
+  absl::optional<Http::Protocol> protocol_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
-  Optional<std::chrono::microseconds> request_received_duration_;
-  Optional<std::chrono::microseconds> response_received_duration_;
+  absl::optional<std::chrono::microseconds> request_received_duration_;
+  absl::optional<std::chrono::microseconds> response_received_duration_;
   uint64_t bytes_received_{};
-  Optional<uint32_t> response_code_;
+  absl::optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};

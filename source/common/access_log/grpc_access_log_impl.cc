@@ -166,12 +166,12 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
           std::chrono::duration_cast<std::chrono::microseconds>(
               request_info.startTime().time_since_epoch())
               .count()));
-  if (request_info.requestReceivedDuration().valid()) {
+  if (request_info.requestReceivedDuration()) {
     common_properties->mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             request_info.requestReceivedDuration().value().count()));
   }
-  if (request_info.responseReceivedDuration().valid()) {
+  if (request_info.responseReceivedDuration()) {
     common_properties->mutable_time_to_first_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             request_info.responseReceivedDuration().value().count()));
@@ -190,7 +190,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, request_info);
 
-  if (request_info.protocol().valid()) {
+  if (request_info.protocol()) {
     switch (request_info.protocol().value()) {
     case Http::Protocol::Http10:
       log_entry->set_protocol_version(
@@ -241,7 +241,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // HTTP response properties.
   // TODO(mattklein123): Populate custom response headers.
   auto* response_properties = log_entry->mutable_response();
-  if (request_info.responseCode().valid()) {
+  if (request_info.responseCode()) {
     response_properties->mutable_response_code()->set_value(request_info.responseCode().value());
   }
   response_properties->set_response_headers_bytes(response_headers->byteSize());

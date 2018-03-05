@@ -12,7 +12,7 @@
 
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -82,7 +82,7 @@ public:
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
-  const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
 
 private:
@@ -91,7 +91,7 @@ private:
   std::string allow_headers_;
   std::string expose_headers_;
   std::string max_age_{};
-  Optional<bool> allow_credentials_{};
+  absl::optional<bool> allow_credentials_{};
   bool enabled_;
 };
 
@@ -128,7 +128,7 @@ private:
     const std::string& name() const override { return name_; }
 
     std::regex pattern_;
-    Optional<std::string> method_;
+    absl::optional<std::string> method_;
     std::string name_;
   };
 
@@ -200,14 +200,14 @@ public:
                      hash_policy);
 
   // Router::HashPolicy
-  Optional<uint64_t> generateHash(const std::string& downstream_addr,
+  absl::optional<uint64_t> generateHash(const std::string& downstream_addr,
                                   const Http::HeaderMap& headers,
                                   const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() {}
-    virtual Optional<uint64_t> evaluate(const std::string& downstream_addr,
+    virtual absl::optional<uint64_t> evaluate(const std::string& downstream_addr,
                                         const Http::HeaderMap& headers,
                                         const AddCookieCallback add_cookie) const PURE;
   };
@@ -300,7 +300,7 @@ public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Runtime::Loader& loader);
 
-  bool isDirectResponse() const { return direct_response_code_.valid(); }
+  bool isDirectResponse() const { if(direct_response_code_){ return true;} return false; }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
@@ -460,7 +460,7 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static Optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  static absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
@@ -479,7 +479,7 @@ private:
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
-  const Optional<RuntimeData> runtime_;
+  const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
   const std::string host_redirect_;
   const std::string path_redirect_;
@@ -502,7 +502,7 @@ private:
   const std::multimap<std::string, std::string> opaque_config_;
 
   const DecoratorConstPtr decorator_;
-  const Optional<Http::Code> direct_response_code_;
+  const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
 };
 

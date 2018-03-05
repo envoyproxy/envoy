@@ -63,7 +63,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(*child_span, injectContext(_)).Times(0);
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          active_span, Optional<std::chrono::milliseconds>());
+                                          active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 
@@ -76,7 +76,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   EXPECT_CALL(http_client_, start(_, _, false))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Optional<std::chrono::milliseconds>&, bool) {
+                                                 const absl::optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -102,7 +102,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   EXPECT_CALL(http_client_, start(_, _, true))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Optional<std::chrono::milliseconds>&, bool) {
+                                                 const absl::optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -128,7 +128,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   EXPECT_CALL(*child_span, finishSpan());
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          active_span, Optional<std::chrono::milliseconds>());
+                                          active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 

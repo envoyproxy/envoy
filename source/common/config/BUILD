@@ -60,7 +60,6 @@ envoy_cc_library(
         ":protocol_json_lib",
         ":tls_context_json_lib",
         ":utility_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
@@ -69,6 +68,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

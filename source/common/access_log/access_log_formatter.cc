@@ -27,8 +27,8 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
 }
 
 const std::string&
-AccessLogFormatUtils::protocolToString(const Optional<Http::Protocol>& protocol) {
-  if (protocol.valid()) {
+AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
+  if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
   }
   return UnspecifiedValueString;
@@ -53,7 +53,7 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
 
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
                                          std::string& main_header, std::string& alternative_header,
-                                         Optional<size_t>& max_length) {
+                                         absl::optional<size_t>& max_length) {
   size_t end_request = token.find(')', start);
 
   if (end_request != token.length() - 1) {
@@ -74,7 +74,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
       throw EnvoyException(fmt::format("Length must be an integer, given: {}", length_str));
     }
 
-    max_length.value(length_value);
+    max_length = length_value;
   }
 
   std::string header_name = token.substr(start, end_request - start);
@@ -110,7 +110,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
       if (token.find("REQ(") == 0) {
         std::string main_header, alternative_header;
-        Optional<size_t> max_length;
+        absl::optional<size_t> max_length;
         const size_t start = 4;
 
         parseCommand(token, start, main_header, alternative_header, max_length);
@@ -119,7 +119,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
             FormatterPtr(new RequestHeaderFormatter(main_header, alternative_header, max_length)));
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
-        Optional<size_t> max_length;
+        absl::optional<size_t> max_length;
         const size_t start = 5;
 
         parseCommand(token, start, main_header, alternative_header, max_length);
@@ -150,8 +150,8 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      Optional<std::chrono::microseconds> duration = request_info.requestReceivedDuration();
-      if (duration.valid()) {
+      absl::optional<std::chrono::microseconds> duration = request_info.requestReceivedDuration();
+      if (duration) {
         return std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
       } else {
@@ -160,8 +160,8 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      Optional<std::chrono::microseconds> duration = request_info.responseReceivedDuration();
-      if (duration.valid()) {
+      absl::optional<std::chrono::microseconds> duration = request_info.responseReceivedDuration();
+      if (duration) {
         return std::to_string(
             std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
       } else {
@@ -178,7 +178,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.responseCode().valid()
+      return request_info.responseCode()
                  ? std::to_string(request_info.responseCode().value())
                  : "0";
     };
@@ -257,7 +257,7 @@ std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::Hea
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  const std::string& alternative_header,
-                                 const Optional<size_t>& max_length)
+                                 const absl::optional<size_t>& max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
@@ -274,7 +274,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
     header_value_string = header->value().c_str();
   }
 
-  if (max_length_.valid() && header_value_string.length() > max_length_.value()) {
+  if (max_length_ && header_value_string.length() > max_length_.value()) {
     return header_value_string.substr(0, max_length_.value());
   }
 
@@ -283,7 +283,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
-                                                 const Optional<size_t>& max_length)
+                                                 const absl::optional<size_t>& max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
@@ -294,7 +294,7 @@ std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
 
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
-                                               const Optional<size_t>& max_length)
+                                               const absl::optional<size_t>& max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,

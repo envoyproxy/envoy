@@ -54,12 +54,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "optional_test",
-    srcs = ["optional_test.cc"],
-    deps = ["//include/envoy/common:optional"],
-)
-
-envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [

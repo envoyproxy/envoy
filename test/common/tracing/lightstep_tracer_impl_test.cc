@@ -153,12 +153,12 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(
           Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -211,12 +211,12 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(
           Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -255,7 +255,7 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
@@ -282,12 +282,12 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(
           Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
@@ -325,12 +325,12 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(
           Invoke([&](Http::MessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             return &request;

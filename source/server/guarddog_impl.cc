@@ -41,21 +41,21 @@ void GuardDogImpl::threadRoutine() {
     for (auto& watched_dog : watched_dogs_) {
       const auto ltt = watched_dog.dog_->lastTouchTime();
       const auto delta = now - ltt;
-      if (watched_dog.last_alert_time_.valid() && watched_dog.last_alert_time_.value() < ltt) {
+      if (watched_dog.last_alert_time_ && watched_dog.last_alert_time_.value() < ltt) {
         watched_dog.miss_alerted_ = false;
         watched_dog.megamiss_alerted_ = false;
       }
       if (delta > miss_timeout_) {
         if (!watched_dog.miss_alerted_) {
           watchdog_miss_counter_.inc();
-          watched_dog.last_alert_time_.value(ltt);
+          watched_dog.last_alert_time_ = ltt;
           watched_dog.miss_alerted_ = true;
         }
       }
       if (delta > megamiss_timeout_) {
         if (!watched_dog.megamiss_alerted_) {
           watchdog_megamiss_counter_.inc();
-          watched_dog.last_alert_time_.value(ltt);
+          watched_dog.last_alert_time_ = ltt;
           watched_dog.megamiss_alerted_ = true;
         }
       }

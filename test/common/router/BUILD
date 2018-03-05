@@ -101,7 +101,6 @@ envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
     deps = [
-        "//include/envoy/common:optional",
         "//source/common/buffer:buffer_lib",
         "//source/common/config:filter_json_lib",
         "//source/common/network:utility_lib",
@@ -123,6 +122,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_test(

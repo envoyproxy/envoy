@@ -126,7 +126,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                              const Optional<std::chrono::milliseconds>& timeout) {
+                              const absl::optional<std::chrono::milliseconds>& timeout) {
         UNREFERENCED_PARAMETER(callbacks);
         UNREFERENCED_PARAMETER(timeout);
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));

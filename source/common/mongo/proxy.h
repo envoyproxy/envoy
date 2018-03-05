@@ -176,7 +176,7 @@ private:
   void doDecode(Buffer::Instance& buffer);
   void logMessage(Message& message, bool full);
   void onDrainClose();
-  Optional<uint64_t> delayDuration();
+  absl::optional<uint64_t> delayDuration();
   void delayInjectionTimerCallback();
   void tryInjectDelay();
 

@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -72,7 +72,7 @@ public:
   ListenerManager& listenerManager() override { return listener_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
-  rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
+  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
     return config_->rateLimitClientFactory().create(timeout);
   }
   Runtime::Loader& runtime() override { return *runtime_loader_; }

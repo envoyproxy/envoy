@@ -21,9 +21,9 @@ class ValidationAsyncClient : public AsyncClient {
 public:
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
-                             const Optional<std::chrono::milliseconds>& timeout) override;
+                             const absl::optional<std::chrono::milliseconds>& timeout) override;
   AsyncClient::Stream* start(StreamCallbacks& callbacks,
-                             const Optional<std::chrono::milliseconds>& timeout,
+                             const absl::optional<std::chrono::milliseconds>& timeout,
                              bool buffer_body_for_retry) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 

@@ -98,7 +98,7 @@ public:
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
             Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                          Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
+                          absl::optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -251,7 +251,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;

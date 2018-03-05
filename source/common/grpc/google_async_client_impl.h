@@ -159,7 +159,7 @@ public:
   AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                      const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                      Tracing::Span& parent_span,
-                     const Optional<std::chrono::milliseconds>& timeout) override;
+                     const absl::optional<std::chrono::milliseconds>& timeout) override;
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
@@ -192,7 +192,7 @@ public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                         const Protobuf::MethodDescriptor& service_method,
                         AsyncStreamCallbacks& callbacks,
-                        const Optional<std::chrono::milliseconds>& timeout);
+                        const absl::optional<std::chrono::milliseconds>& timeout);
   ~GoogleAsyncStreamImpl();
 
   virtual void initialize(bool buffer_body_for_retry);
@@ -246,7 +246,7 @@ private:
     PendingMessage() : end_stream_(true) {}
 
     const grpc::Slice slice_;
-    const Optional<grpc::ByteBuffer> buf_;
+    const absl::optional<grpc::ByteBuffer> buf_;
     const bool end_stream_;
   };
 
@@ -269,7 +269,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
-  const Optional<std::chrono::milliseconds>& timeout_;
+  const absl::optional<std::chrono::milliseconds>& timeout_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -307,7 +307,7 @@ public:
                          const Protobuf::MethodDescriptor& service_method,
                          const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                          Tracing::Span& parent_span,
-                         const Optional<std::chrono::milliseconds>& timeout);
+                         const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
 

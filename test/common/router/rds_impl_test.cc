@@ -95,7 +95,7 @@ public:
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
             Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                       const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                       const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
               EXPECT_EQ((Http::TestHeaderMapImpl{
                             {":method", "GET"},
                             {":path", "/v1/routes/foo_route_config/cluster_name/node_name"},

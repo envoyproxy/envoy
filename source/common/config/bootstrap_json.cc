@@ -17,16 +17,16 @@ void BootstrapJson::translateClusterManagerBootstrap(
     const Json::Object& json_cluster_manager, envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   json_cluster_manager.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
 
-  Optional<envoy::api::v2::core::ConfigSource> eds_config;
+  absl::optional<envoy::api::v2::core::ConfigSource> eds_config;
   if (json_cluster_manager.hasObject("sds")) {
     const auto json_sds = json_cluster_manager.getObject("sds");
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
     Config::CdsJson::translateCluster(*json_sds->getObject("cluster"),
-                                      Optional<envoy::api::v2::core::ConfigSource>(), *cluster);
+                                      absl::optional<envoy::api::v2::core::ConfigSource>(), *cluster);
     Config::Utility::translateEdsConfig(
         *json_sds,
         *bootstrap.mutable_dynamic_resources()->mutable_deprecated_v1()->mutable_sds_config());
-    eds_config.value(bootstrap.dynamic_resources().deprecated_v1().sds_config());
+    eds_config = (bootstrap.dynamic_resources().deprecated_v1().sds_config());
   }
 
   if (json_cluster_manager.hasObject("cds")) {
@@ -42,7 +42,6 @@ void BootstrapJson::translateClusterManagerBootstrap(
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
     Config::CdsJson::translateCluster(*json_cluster, eds_config, *cluster);
   }
-
   auto* cluster_manager = bootstrap.mutable_cluster_manager();
   JSON_UTIL_SET_STRING(json_cluster_manager, *cluster_manager, local_cluster_name);
   if (json_cluster_manager.hasObject("outlier_detection")) {

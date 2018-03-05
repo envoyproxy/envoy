@@ -43,7 +43,6 @@ envoy_cc_library(
         ":filter_manager_lib",
         ":raw_buffer_socket_lib",
         ":utility_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
@@ -58,6 +57,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

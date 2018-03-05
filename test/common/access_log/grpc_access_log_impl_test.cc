@@ -200,7 +200,7 @@ http_logs:
     request_info.protocol_ = Http::Protocol::Http10;
     request_info.bytes_received_ = 10;
     request_info.bytes_sent_ = 20;
-    request_info.response_code_.value(200);
+    request_info.response_code_ = 200;
     ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 

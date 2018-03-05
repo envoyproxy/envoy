@@ -4,7 +4,7 @@
 #include <list>
 #include <memory>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"

@@ -36,11 +36,11 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection) : connection_(connection) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override { return 0; }
+  absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
 
-  Optional<uint64_t> hash_key_;
+  absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
 };
 

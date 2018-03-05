@@ -36,7 +36,6 @@ envoy_cc_library(
     hdrs = ["router.h"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/common:optional",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:header_map_interface",
@@ -45,6 +44,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
     ],
+    external_deps=["abseil_optional"],    
 )
 
 envoy_cc_library(

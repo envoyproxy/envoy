@@ -47,7 +47,7 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
-  MOCK_METHOD0(idleTimeout, const Optional<std::chrono::milliseconds>&());
+  MOCK_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>&());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
@@ -58,7 +58,7 @@ public:
   MOCK_CONST_METHOD0(setCurrentClientCertDetails,
                      const std::vector<Http::ClientCertDetailsType>&());
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
-  MOCK_METHOD0(userAgent, const Optional<std::string>&());
+  MOCK_METHOD0(userAgent, const absl::optional<std::string>&());
   MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
@@ -354,15 +354,15 @@ public:
 
   // Http::AsyncClient
   Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const Optional<std::chrono::milliseconds>& timeout) override {
+                const absl::optional<std::chrono::milliseconds>& timeout) override {
     return send_(request, callbacks, timeout);
   }
 
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
-                               const Optional<std::chrono::milliseconds>& timeout));
+                               const absl::optional<std::chrono::milliseconds>& timeout));
 
   MOCK_METHOD3(start, Stream*(StreamCallbacks& callbacks,
-                              const Optional<std::chrono::milliseconds>& timeout,
+                              const absl::optional<std::chrono::milliseconds>& timeout,
                               bool buffer_body_for_retry));
 
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());

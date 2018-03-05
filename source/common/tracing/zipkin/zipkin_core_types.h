@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -133,12 +133,12 @@ public:
   /**
    * Sets the annotation's endpoint attribute (copy semantics).
    */
-  void setEndpoint(const Endpoint& endpoint) { endpoint_.value(endpoint); }
+  void setEndpoint(const Endpoint& endpoint) { endpoint_ = endpoint; }
 
   /**
    * Sets the annotation's endpoint attribute (move semantics).
    */
-  void setEndpoint(const Endpoint&& endpoint) { endpoint_.value(endpoint); }
+  void setEndpoint(const Endpoint&& endpoint) { endpoint_ = endpoint; }
 
   /**
    * Replaces the endpoint's service-name attribute value with the given value.
@@ -171,7 +171,7 @@ public:
   /**
    * @return true if the endpoint attribute is set, or false otherwise.
    */
-  bool isSetEndpoint() const { return endpoint_.valid(); }
+  bool isSetEndpoint() const {  if(endpoint_){return true;} return false; }
 
   /**
    * Serializes the annotation as a Zipkin-compliant JSON representation as a string.
@@ -183,7 +183,7 @@ public:
 private:
   uint64_t timestamp_;
   std::string value_;
-  Optional<Endpoint> endpoint_;
+  absl::optional<Endpoint> endpoint_;
 };
 
 /**
@@ -240,17 +240,17 @@ public:
   /**
    * Sets the annotation's endpoint attribute (copy semantics).
    */
-  void setEndpoint(const Endpoint& endpoint) { endpoint_.value(endpoint); }
+  void setEndpoint(const Endpoint& endpoint) { endpoint_ = endpoint; }
 
   /**
    * Sets the annotation's endpoint attribute (move semantics).
    */
-  void setEndpoint(const Endpoint&& endpoint) { endpoint_.value(endpoint); }
+  void setEndpoint(const Endpoint&& endpoint) { endpoint_ = endpoint; }
 
   /**
    * @return true of the endpoint attribute has been set, or false otherwise.
    */
-  bool isSetEndpoint() const { return endpoint_.valid(); }
+  bool isSetEndpoint() const { if(endpoint_){return true;} return false;}
 
   /**
    * @return the key attribute.
@@ -282,7 +282,7 @@ public:
 private:
   std::string key_;
   std::string value_;
-  Optional<Endpoint> endpoint_;
+  absl::optional<Endpoint> endpoint_;
   AnnotationType annotation_type_;
 };
 
@@ -322,12 +322,12 @@ public:
   /**
    * Sets the span's parent id.
    */
-  void setParentId(const uint64_t val) { parent_id_.value(val); }
+  void setParentId(const uint64_t val) { parent_id_ = val; }
 
   /**
    * @return Whether or not the parent_id attribute is set.
    */
-  bool isSetParentId() const { return parent_id_.valid(); }
+  bool isSetParentId() const { if(parent_id_){return true;} return false;}
 
   /**
    * @return a vector with all annotations added to the span.
@@ -372,33 +372,33 @@ public:
   /**
    * Sets the span's timestamp attribute.
    */
-  void setTimestamp(const int64_t val) { timestamp_.value(val); }
+  void setTimestamp(const int64_t val) { timestamp_ = val; }
 
   /**
    * @return Whether or not the timestamp attribute is set.
    */
-  bool isSetTimestamp() const { return timestamp_.valid(); }
+  bool isSetTimestamp() const { if(timestamp_){return true;} return false;}
 
   /**
    * Sets the span's duration attribute.
    */
-  void setDuration(const int64_t val) { duration_.value(val); }
+  void setDuration(const int64_t val) { duration_ = val; }
 
   /**
    * @return Whether or not the duration attribute is set.
    */
-  bool isSetDuration() const { return duration_.valid(); }
+  bool isSetDuration() const { if(duration_){return true;} return false;}
 
   /**
    * Sets the higher 64 bits of the span's 128-bit trace id.
    * Note that this is optional, since 64-bit trace ids are valid.
    */
-  void setTraceIdHigh(const uint64_t val) { trace_id_high_.value(val); }
+  void setTraceIdHigh(const uint64_t val) { trace_id_high_ = val; }
 
   /**
    * @return whether or not the trace_id_high attribute is set.
    */
-  bool isSetTraceIdHigh() const { return trace_id_high_.valid(); }
+  bool isSetTraceIdHigh() const { if(trace_id_high_){return true;} return false; }
 
   /**
    * Sets the span start-time attribute (monotonic, used to calculate duration).
@@ -444,7 +444,7 @@ public:
    * @return the span's parent id as a hexadecimal string.
    */
   const std::string parentIdAsHexString() const {
-    return parent_id_.valid() ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
+    return parent_id_ ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
   }
 
   /**
@@ -533,13 +533,13 @@ private:
   uint64_t trace_id_;
   std::string name_;
   uint64_t id_;
-  Optional<uint64_t> parent_id_;
+  absl::optional<uint64_t> parent_id_;
   bool debug_;
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
-  Optional<int64_t> timestamp_;
-  Optional<int64_t> duration_;
-  Optional<uint64_t> trace_id_high_;
+  absl::optional<int64_t> timestamp_;
+  absl::optional<int64_t> duration_;
+  absl::optional<uint64_t> trace_id_high_;
   int64_t monotonic_start_time_;
   TracerInterface* tracer_;
 };

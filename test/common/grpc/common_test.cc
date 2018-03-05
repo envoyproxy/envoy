@@ -16,7 +16,7 @@ TEST(GrpcCommonTest, GetGrpcStatus) {
   EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_trailers).value());
 
   Http::TestHeaderMapImpl no_status_trailers{{"foo", "bar"}};
-  EXPECT_FALSE(Common::getGrpcStatus(no_status_trailers).valid());
+  EXPECT_FALSE(Common::getGrpcStatus(no_status_trailers));
 
   Http::TestHeaderMapImpl aborted_trailers{{"grpc-status", "10"}};
   EXPECT_EQ(Status::Aborted, Common::getGrpcStatus(aborted_trailers).value());

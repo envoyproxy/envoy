@@ -19,7 +19,6 @@ envoy_cc_test(
         "zipkin_tracer_impl_test.cc",
     ],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
@@ -39,4 +38,5 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
+    external_deps=["abseil_optional"],
 )

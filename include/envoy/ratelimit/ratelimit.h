@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -92,7 +92,7 @@ public:
   /**
    * Return a new rate limit client.
    */
-  virtual ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) PURE;
+  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;

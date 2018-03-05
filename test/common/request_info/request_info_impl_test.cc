@@ -113,9 +113,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     request_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, request_info.protocol().value());
 
-    EXPECT_FALSE(request_info.responseCode().valid());
+    EXPECT_FALSE(request_info.responseCode());
     request_info.response_code_ = 200;
-    ASSERT_TRUE(request_info.responseCode().valid());
+    ASSERT_TRUE(request_info.responseCode());
     EXPECT_EQ(200, request_info.responseCode().value());
 
     EXPECT_EQ(nullptr, request_info.upstreamHost());
@@ -137,16 +137,16 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     RequestInfoImpl request_info;
 
     // If no value is set, these should be not valid
-    EXPECT_FALSE(request_info.protocol().valid());
-    EXPECT_FALSE(request_info.requestReceivedDuration().valid());
-    EXPECT_FALSE(request_info.responseReceivedDuration().valid());
+    EXPECT_FALSE(request_info.protocol());
+    EXPECT_FALSE(request_info.requestReceivedDuration());
+    EXPECT_FALSE(request_info.responseReceivedDuration());
 
     request_info.protocol(Http::Protocol::Http10);
     request_info.requestReceivedDuration(std::chrono::steady_clock::now());
     request_info.responseReceivedDuration(std::chrono::steady_clock::now());
-    EXPECT_TRUE(request_info.protocol().valid());
-    EXPECT_TRUE(request_info.requestReceivedDuration().valid());
-    EXPECT_TRUE(request_info.responseReceivedDuration().valid());
+    EXPECT_TRUE(request_info.protocol());
+    EXPECT_TRUE(request_info.requestReceivedDuration());
+    EXPECT_TRUE(request_info.responseReceivedDuration());
   }
 }
 

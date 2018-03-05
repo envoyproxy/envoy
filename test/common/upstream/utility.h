@@ -47,7 +47,7 @@ inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_stri
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateCluster(*json_object_ptr,
-                                    Optional<envoy::api::v2::core::ConfigSource>(), cluster);
+                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster);
   return cluster;
 }
 

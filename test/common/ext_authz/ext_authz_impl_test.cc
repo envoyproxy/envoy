@@ -39,7 +39,7 @@ class ExtAuthzGrpcClientTest : public testing::Test {
 public:
   ExtAuthzGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::AsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
+        client_(Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>()) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
@@ -74,7 +74,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
       .WillOnce(
           Invoke([this](const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
                         Grpc::AsyncRequestCallbacks&, Tracing::Span&,
-                        const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+                        const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
             EXPECT_EQ("envoy.service.auth.v2.Authorization", service_method.service()->full_name());
             EXPECT_EQ("Check", service_method.name());
             return &async_request_;
@@ -122,7 +122,7 @@ public:
   };
 
   Network::Address::InstanceConstSharedPtr addr_;
-  Optional<Http::Protocol> protocol_;
+  absl::optional<Http::Protocol> protocol_;
   CheckRequestUtils check_request_generator_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;

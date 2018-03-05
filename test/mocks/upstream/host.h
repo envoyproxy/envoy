@@ -26,8 +26,8 @@ public:
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
   MOCK_METHOD1(putResult, void(Result result));
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
-  MOCK_METHOD0(lastEjectionTime, const Optional<MonotonicTime>&());
-  MOCK_METHOD0(lastUnejectionTime, const Optional<MonotonicTime>&());
+  MOCK_METHOD0(lastEjectionTime, const absl::optional<MonotonicTime>&());
+  MOCK_METHOD0(lastUnejectionTime, const absl::optional<MonotonicTime>&());
   MOCK_CONST_METHOD0(successRate, double());
   MOCK_METHOD1(successRate, void(double new_success_rate));
 };

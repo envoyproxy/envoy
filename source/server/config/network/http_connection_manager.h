@@ -84,7 +84,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return generate_request_id_; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return *route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
@@ -99,7 +99,7 @@ public:
     return tracing_config_.get();
   }
   const Network::Address::Instance& localAddress() override;
-  const Optional<std::string>& userAgent() override { return user_agent_; }
+  const absl::optional<std::string>& userAgent() override { return user_agent_; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
 
@@ -124,8 +124,8 @@ private:
   const Http::Http1Settings http1_settings_;
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
-  Optional<std::string> user_agent_;
-  Optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::string> user_agent_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;

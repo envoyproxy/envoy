@@ -67,7 +67,7 @@ public:
   }
 
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&,
-                      const Optional<envoy::api::v2::core::ConfigSource>&,
+                      const absl::optional<envoy::api::v2::core::ConfigSource>&,
                       ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
@@ -118,7 +118,7 @@ public:
   AccessLog::MockAccessLogManager log_manager_;
 };
 
-envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {  
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap);

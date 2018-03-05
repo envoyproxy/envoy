@@ -73,7 +73,7 @@ bool TraceableRequestFilter::evaluate(const RequestInfo::RequestInfo& info,
 }
 
 bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
-  if (!info.responseCode().valid()) {
+  if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
 

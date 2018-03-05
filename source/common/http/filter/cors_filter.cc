@@ -159,7 +159,7 @@ const std::string& CorsFilter::maxAge() {
 
 bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
-    if (policy && policy->allowCredentials().valid()) {
+    if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
     }
   }

@@ -13,11 +13,11 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     deps = [
         ":status",
-        "//include/envoy/common:optional",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/protobuf",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

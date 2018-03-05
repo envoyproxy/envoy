@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/fmt.h"

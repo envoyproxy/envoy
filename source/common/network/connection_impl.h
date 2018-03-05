@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/optional.h"
+#include "absl/types/optional.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"

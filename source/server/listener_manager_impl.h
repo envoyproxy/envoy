@@ -237,7 +237,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return parent_.server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
   RateLimit::ClientPtr
-  rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
+  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
     return parent_.server_.rateLimitClient(timeout);
   }
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }

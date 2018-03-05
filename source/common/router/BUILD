@@ -18,7 +18,6 @@ envoy_cc_library(
         ":header_parser_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -35,6 +34,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(
@@ -102,7 +102,6 @@ envoy_cc_library(
     srcs = ["retry_state_impl.cc"],
     hdrs = ["retry_state_impl.h"],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
@@ -116,6 +115,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(
@@ -208,11 +208,11 @@ envoy_cc_library(
     srcs = ["header_formatter.cc"],
     hdrs = ["header_formatter.h"],
     deps = [
-        "//include/envoy/common:optional",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/json:json_loader_lib",
     ],
+    external_deps=["abseil_optional"],
 )

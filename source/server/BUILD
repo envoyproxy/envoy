@@ -91,7 +91,6 @@ envoy_cc_library(
     hdrs = ["guarddog_impl.h"],
     deps = [
         ":watchdog_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
@@ -102,6 +101,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(
@@ -245,7 +245,6 @@ envoy_cc_library(
         ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
         "//include/envoy/event:timer_interface",
@@ -274,6 +273,7 @@ envoy_cc_library(
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
+    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(
