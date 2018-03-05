@@ -94,7 +94,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
         address_list.emplace_back(new Address::Ipv6Instance(address));
       }
     }
-    if (address_list.size() > 0) {
+    if (!address_list.empty()) {
       completed_ = true;
     }
   }
