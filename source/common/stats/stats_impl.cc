@@ -110,11 +110,13 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
 
 bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                                   IntervalSet<size_t>& remove_characters) const {
+  PERF_OPERATION(perf);
+
   if (!substr_.empty() && stat_name.find(substr_) == std::string::npos) {
+    PERF_RECORD(perf, "re-skip-substr", name_);
     return false;
   }
 
-  PERF_OPERATION(perf);
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
