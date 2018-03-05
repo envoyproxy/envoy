@@ -136,7 +136,7 @@ private:
         const unsigned char* ip_question = question;
         long ip_name_len = name_len;
         std::string encodedCname;
-        if (cname.size() > 0) {
+        if (!cname.empty()) {
           ASSERT_TRUE(cname.size() <= 253);
           hostLookup = cname.c_str();
           encodedCname = TestDnsServerQuery::encodeDnsName(cname);
@@ -159,7 +159,7 @@ private:
         ares_free_string(name);
 
         int answer_size = ips != nullptr ? ips->size() : 0;
-        answer_size += encodedCname.size() > 0 ? 1 : 0;
+        answer_size += !encodedCname.empty() ? 1 : 0;
 
         // The response begins with the intial part of the request
         // (including the question section).
@@ -182,7 +182,7 @@ private:
               ips != nullptr ? ips->size() * (ip_name_len + RRFIXEDSZ + sizeof(in6_addr)) : 0;
         }
         size_t response_cname_len =
-            encodedCname.size() > 0 ? name_len + RRFIXEDSZ + encodedCname.size() + 1 : 0;
+            !encodedCname.empty() ? name_len + RRFIXEDSZ + encodedCname.size() + 1 : 0;
         const uint16_t response_size_n =
             htons(response_base_len + response_ip_rest_len + response_cname_len);
         Buffer::OwnedImpl write_buffer;
@@ -191,7 +191,7 @@ private:
         write_buffer.add(response_base, response_base_len);
 
         // if we have a cname, create a resource record
-        if (encodedCname.size() > 0) {
+        if (!encodedCname.empty()) {
           unsigned char cname_rr_fixed[RRFIXEDSZ];
           DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
           DNS_RR_SET_LEN(cname_rr_fixed, encodedCname.size() + 1);

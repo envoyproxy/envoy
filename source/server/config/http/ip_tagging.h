@@ -21,7 +21,7 @@ public:
                                           FactoryContext& context) override;
 
   HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                   const std::string& stats_prefix,
+                                                   const std::string& stat_prefix,
                                                    FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
