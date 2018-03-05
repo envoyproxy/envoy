@@ -14,7 +14,7 @@
 #include "common/common/hash.h"
 
 #include "absl/strings/ascii.h"
-#include "absl/strings/internal/memutil.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
@@ -134,7 +134,7 @@ bool StringUtil::caseCompare(absl::string_view lhs, absl::string_view rhs) {
   if (rhs.size() != lhs.size()) {
     return false;
   }
-  return absl::strings_internal::memcasecmp(rhs.data(), lhs.data(), rhs.size()) == 0;
+  return absl::StartsWithIgnoreCase(rhs, lhs);
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
