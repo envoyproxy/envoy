@@ -67,7 +67,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     delete this;
     return;
   }
-  if (status == ARES_SUCCESS || !fallback_if_failed_) {
+  if (!fallback_if_failed_) {
     completed_ = true;
   }
 
@@ -94,6 +94,9 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
         address_list.emplace_back(new Address::Ipv6Instance(address));
       }
     }
+    if (address_list.size() > 0) {
+      completed_ = true;
+    }
   }
 
   if (timeouts > 0) {
@@ -110,7 +113,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     }
   }
 
-  if (status != ARES_SUCCESS && fallback_if_failed_) {
+  if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
     getHostByName(AF_INET);
     // Note: Nothing can follow this call to getHostByName due to deletion of this
