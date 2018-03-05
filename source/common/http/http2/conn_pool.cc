@@ -180,7 +180,7 @@ void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
 
 void ConnPoolImpl::onIdleTimeout(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "idle timeout", *client.client_);
-  host_->cluster().stats().upstream_cx_connect_timeout_.inc(); //TODO add idle metric
+  host_->cluster().stats().upstream_cx_idle_timeout_.inc();
   client.client_->close();
 }
 

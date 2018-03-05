@@ -81,6 +81,8 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
     attachRequestToClient(*busy_clients_.front(), response_decoder, callbacks);
+    //reset idle timer
+    busy_clients_.front()->resetIdleTimer();
     return nullptr;
   }
 
@@ -94,6 +96,8 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     // If we have no connections at all, make one no matter what so we don't starve.
     if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || can_create_connection) {
       createNewConnection();
+      //reset idle timer
+      busy_clients_.front()->resetIdleTimer();
     }
 
     ENVOY_LOG(debug, "queueing request due to no available connections");
@@ -211,6 +215,9 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   } else {
     processIdleClient(client);
   }
+
+  // Start the idle timer
+  client.startIdleTimer();
 }
 
 void ConnPoolImpl::processIdleClient(ActiveClient& client) {
@@ -281,8 +288,8 @@ ConnPoolImpl::PendingRequest::~PendingRequest() {
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
+      idle_timer_(parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
-
   parent_.conn_connect_ms_.reset(
       new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
   Upstream::Host::CreateConnectionData data =
@@ -321,6 +328,12 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", *codec_client_);
   parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
   codec_client_->close();
+}
+
+void ConnPoolImpl::onIdleTimeout(ActiveClient& client) {
+  ENVOY_CONN_LOG(debug, "idle timeout", *client.codec_client_);
+  host_->cluster().stats().upstream_cx_idle_timeout_.inc();
+  client.codec_client_->close();
 }
 
 CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnectionData& data) {

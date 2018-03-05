@@ -80,6 +80,21 @@ protected:
 
     void onConnectTimeout();
 
+    void onIdleTimeout() { parent_.onIdleTimeout(*this); }
+
+    void resetIdleTimer() {
+      if (idle_timer_) {
+        idle_timer_->disableTimer();
+        idle_timer_.reset();
+      }
+    }
+
+    void startIdleTimer() {
+      if (idle_timer_) {
+        idle_timer_->enableTimer(idle_timeout_);
+      }
+    }
+
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
       parent_.onConnectionEvent(*this, event);
@@ -92,8 +107,10 @@ protected:
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     StreamWrapperPtr stream_wrapper_;
     Event::TimerPtr connect_timer_;
+    Event::TimerPtr idle_timer_;
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
+    std::chrono::milliseconds idle_timeout_ = std::chrono::milliseconds(10000); //TODO: get it from config
   };
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
@@ -119,6 +136,7 @@ protected:
   void checkForDrained();
   void createNewConnection();
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
+  void onIdleTimeout(ActiveClient& client);
   void onDownstreamReset(ActiveClient& client);
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);
