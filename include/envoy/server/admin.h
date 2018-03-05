@@ -8,6 +8,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/server/config_tracker.h"
 
 #include "absl/strings/string_view.h"
 
@@ -69,6 +70,9 @@ public:
    * @return Network::Socket& socket reference.
    */
   virtual const Network::Socket& socket() PURE;
+
+  // TODO doxme
+  virtual ConfigTracker& getConfigTracker() PURE;
 };
 
 } // namespace Server

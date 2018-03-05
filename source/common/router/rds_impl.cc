@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/admin/admin.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/api/v2/route/route.pb.validate.h"
 
@@ -29,11 +30,11 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
   switch (config.route_specifier_case()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
-    return RouteConfigProviderSharedPtr{
-        new StaticRouteConfigProviderImpl(config.route_config(), runtime, cm)};
+    return route_config_provider_manager.getStaticRouteConfigProvider(config.route_config(),
+                                                                      runtime, cm);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
-    return route_config_provider_manager.getRouteConfigProvider(config.rds(), cm, scope,
-                                                                stat_prefix, init_manager);
+    return route_config_provider_manager.getRdsRouteConfigProvider(config.rds(), cm, scope,
+                                                                   stat_prefix, init_manager);
   default:
     NOT_REACHED;
   }
@@ -42,7 +43,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
     Upstream::ClusterManager& cm)
-    : config_(new ConfigImpl(config, runtime, cm, true)) {}
+    : config_(new ConfigImpl(config, runtime, cm, true)), route_config_proto_{config} {}
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 // initialization needs to be fixed.
@@ -146,6 +147,13 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
     : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
       tls_(tls), admin_(admin) {
+  config_tracker_entry_ =
+      admin_.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
+  if (!config_tracker_entry_) {
+    ENVOY_LOG_MISC(
+        warn, "Unable to add routes to config tracker, route config dumps will not be available");
+  }
+
   admin_.addHandler("/routes", "print out currently loaded dynamic HTTP route tables",
                     MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true, false);
 }
@@ -155,7 +163,7 @@ RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
 }
 
 std::vector<RdsRouteConfigProviderSharedPtr>
-RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
+RouteConfigProviderManagerImpl::getRdsRouteConfigProviders() {
   std::vector<RdsRouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
   for (const auto& element : route_config_providers_) {
@@ -169,7 +177,27 @@ RouteConfigProviderManagerImpl::rdsRouteConfigProviders() {
   return ret;
 };
 
-Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteConfigProvider(
+// TODO(jsedgwick) sortof-copypasta, see note in rds_impl.h, willfix in subsequent PR
+// This lazy clearing of dead weak ptrs is jank, but will do until said willfix.
+// Doesn't matter much anyways since the number of static routes is bounded.
+std::vector<RouteConfigProviderSharedPtr>
+RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
+  std::vector<RouteConfigProviderSharedPtr> providers_strong;
+  providers_strong.reserve(static_route_config_providers_.size());
+  for (const auto& provider_weak : static_route_config_providers_) {
+    if (auto provider_strong = provider_weak.lock()) {
+      providers_strong.push_back(std::move(provider_strong));
+    }
+  }
+  static_route_config_providers_.clear();
+  for (const auto& provider_strong : providers_strong) {
+    static_route_config_providers_.emplace_back(
+        std::dynamic_pointer_cast<StaticRouteConfigProviderImpl>(provider_strong));
+  }
+  return providers_strong;
+};
+
+Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
     Init::Manager& init_manager) {
@@ -203,12 +231,34 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRouteCon
   return new_provider;
 };
 
+RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfigProvider(
+    envoy::api::v2::RouteConfiguration route_config, Runtime::Loader& runtime,
+    Upstream::ClusterManager& cm) {
+  auto provider =
+      std::make_shared<StaticRouteConfigProviderImpl>(std::move(route_config), runtime, cm);
+  static_route_config_providers_.push_back(provider);
+  return provider;
+}
+
+ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
+  auto config_dump = std::make_unique<envoy::admin::RouteConfigDump>();
+  auto* const dynamic_configs = config_dump->mutable_dynamic_route_configs();
+  for (const auto& provider : getRdsRouteConfigProviders()) {
+    *(dynamic_configs->Add()) = provider->configAsProto();
+  }
+  auto* const static_configs = config_dump->mutable_static_route_configs();
+  for (const auto& provider : getStaticRouteConfigProviders()) {
+    *(static_configs->Add()) = provider->configAsProto();
+  }
+  return config_dump;
+}
+
 Http::Code RouteConfigProviderManagerImpl::handlerRoutes(absl::string_view url, Http::HeaderMap&,
                                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   // If there are no query params, print out all the configured route tables.
   if (query_params.size() == 0) {
-    return handlerRoutesLoop(response, rdsRouteConfigProviders());
+    return handlerRoutesLoop(response, getRdsRouteConfigProviders());
   }
 
   // If there are query params, make sure it is only the route_config_name param.
@@ -216,7 +266,7 @@ Http::Code RouteConfigProviderManagerImpl::handlerRoutes(absl::string_view url, 
   if (query_params.size() == 1 && it != query_params.end()) {
     // Create a vector with all the providers that have the queried route_config_name.
     std::vector<RdsRouteConfigProviderSharedPtr> selected_providers;
-    for (const auto& provider : rdsRouteConfigProviders()) {
+    for (const auto& provider : getRdsRouteConfigProviders()) {
       if (provider->routeConfigName() == it->second) {
         selected_providers.push_back(provider);
       }

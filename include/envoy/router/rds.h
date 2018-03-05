@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -22,6 +23,9 @@ public:
    */
   virtual Router::ConfigConstSharedPtr config() PURE;
 
+  // TODO dox
+  virtual envoy::api::v2::RouteConfiguration configAsProto() const PURE;
+
   /**
    * @return const std::string version info from last accepted config.
    *
@@ -35,6 +39,7 @@ public:
 
 /**
  * A provider for dynamic route configurations.
+ * TODO(jsedgwick) This is only needed for legacy /routes admin endpoint. Remove.
  */
 class RdsRouteConfigProvider : public RouteConfigProvider {
 public:

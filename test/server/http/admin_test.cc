@@ -207,6 +207,28 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
 }
 
+TEST_P(AdminInstanceTest, ConfigDump) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto entry = admin_.getConfigTracker().add("foo", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": {
+  "foo": {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bar"
+  }
+ }
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/config_dump", header_map, response));
+  std::string output = TestUtility::bufferToString(response);
+  EXPECT_EQ(expected_json, output);
+}
+
 TEST_P(AdminInstanceTest, Runtime) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;

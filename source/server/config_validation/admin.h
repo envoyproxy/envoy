@@ -17,6 +17,7 @@ public:
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
+  ConfigTracker& getConfigTracker() override;
 };
 
 } // namespace Server

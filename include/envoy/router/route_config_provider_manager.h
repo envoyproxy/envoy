@@ -37,26 +37,23 @@ public:
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param init_manager supplies the init manager.
    */
-  virtual RouteConfigProviderSharedPtr getRouteConfigProvider(
+  virtual RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
       Init::Manager& init_manager) PURE;
-};
 
-/**
- * The ServerRouteConfigProviderManager additionally allows listing all of the currently managed
- * RouteConfigProviders.
- */
-class ServerRouteConfigProviderManager : public RouteConfigProviderManager {
-public:
-  virtual ~ServerRouteConfigProviderManager() {}
+  virtual RouteConfigProviderSharedPtr
+  getStaticRouteConfigProvider(envoy::api::v2::RouteConfiguration route_config,
+                               Runtime::Loader& runtime, Upstream::ClusterManager& cm) PURE;
 
   /**
    * @return std::vector<Router::RdsRouteConfigProviderSharedPtr> a list of all the
-   * RdsRouteConfigProviders currently loaded. This means that the manager does not provide
-   * pointers to StaticRouteConfigProviders.
+   * RdsRouteConfigProviders currently loaded.
    */
-  virtual std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() PURE;
+  virtual std::vector<RdsRouteConfigProviderSharedPtr> getRdsRouteConfigProviders() PURE;
+
+  // TODO  doxme
+  virtual std::vector<RouteConfigProviderSharedPtr> getStaticRouteConfigProviders() PURE;
 };
 
 } // namespace Router

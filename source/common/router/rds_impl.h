@@ -52,9 +52,11 @@ public:
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
   const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, "static"); }
+  envoy::api::v2::RouteConfiguration configAsProto() const override { return route_config_proto_; }
 
 private:
   ConfigConstSharedPtr config_;
+  envoy::api::v2::RouteConfiguration route_config_proto_;
 };
 
 /**
@@ -96,6 +98,7 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
+  envoy::api::v2::RouteConfiguration configAsProto() const override { return route_config_proto_; }
 
   // Router::RdsRouteConfigProvider
   std::string configAsJson() const override {
@@ -148,7 +151,7 @@ private:
   friend class RouteConfigProviderManagerImpl;
 };
 
-class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager,
+class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
@@ -157,13 +160,18 @@ public:
                                  ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
   ~RouteConfigProviderManagerImpl();
 
-  // ServerRouteConfigProviderManager
-  std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr getRouteConfigProvider(
+  std::vector<RdsRouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
+  std::vector<RouteConfigProviderSharedPtr> getStaticRouteConfigProviders() override;
+
+  RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
+
+  RouteConfigProviderSharedPtr
+  getStaticRouteConfigProvider(envoy::api::v2::RouteConfiguration route_config,
+                               Runtime::Loader& runtime, Upstream::ClusterManager& cm) override;
 
 private:
   /**
@@ -189,14 +197,22 @@ private:
   Http::Code handlerRoutesLoop(Buffer::Instance& response,
                                const std::vector<RdsRouteConfigProviderSharedPtr> providers);
 
+  ProtobufTypes::MessagePtr dumpRouteConfigs();
+
+  // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
+  // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
+  // Then the lifetime management stuff is centralized and opaque. Plus the copypasta
+  // in getRdsRouteConfigProviders()/getStaticRouteConfigProviders() goes away.
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
+  std::vector<std::weak_ptr<StaticRouteConfigProviderImpl>> static_route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::SlotAllocator& tls_;
   Server::Admin& admin_;
+  Server::ConfigTracker::EntryOwner::Ptr config_tracker_entry_;
 
   friend class RdsRouteConfigProviderImpl;
 };

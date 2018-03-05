@@ -11,5 +11,7 @@ bool ValidationAdmin::removeHandler(const std::string&) { return false; };
 
 const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED; };
 
+ConfigTracker& ValidationAdmin::getConfigTracker() { NOT_IMPLEMENTED; };
+
 } // namespace Server
 } // namespace Envoy

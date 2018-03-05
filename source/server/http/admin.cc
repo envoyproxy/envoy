@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/admin.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -562,6 +563,8 @@ const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::s
   return pairs;
 }
 
+ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
+
 std::string AdminImpl::runtimeAsJson(
     const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
   rapidjson::Document document;
@@ -636,6 +639,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
           {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false,
            false},
+          {"/config_dump", "TODO doxme", MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
