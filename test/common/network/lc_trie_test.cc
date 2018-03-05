@@ -326,6 +326,7 @@ TEST_F(LcTrieTest, ExceedingAllocatedTrieNodesException) {
     sockaddr_in addr4;
     addr4.sin_family = AF_INET;
     addr4.sin_addr.s_addr = ip_address;
+    addr4.sin_port = 0;
     Address::InstanceConstSharedPtr address = std::make_shared<Address::Ipv4Instance>(&addr4);
     large_vector_cidr[i] = Address::CidrRange::create(address, 32);
   }
