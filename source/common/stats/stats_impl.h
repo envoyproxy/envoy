@@ -34,9 +34,11 @@ public:
    * @param regex regex expression.
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
-  static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex);
+  static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex,
+                                            const std::string& substr = "");
 
-  TagExtractorImpl(const std::string& name, const std::string& regex);
+  TagExtractorImpl(const std::string& name, const std::string& regex,
+                   const std::string& substr = "");
   std::string name() const override { return name_; }
   bool extractTag(const std::string& tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
@@ -53,6 +55,7 @@ private:
 
   const std::string name_;
   const std::string prefix_;
+  const std::string substr_;
   const std::regex regex_;
 };
 

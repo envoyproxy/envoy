@@ -230,9 +230,11 @@ public:
    * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
    */
   struct Descriptor {
-    Descriptor(const std::string& name, const std::string& regex) : name_(name), regex_(regex) {}
+    Descriptor(const std::string& name, const std::string& regex, const std::string& substr = "")
+        : name_(name), regex_(regex), substr_(substr) {}
     const std::string name_;
     const std::string regex_;
+    const std::string substr_;
   };
 
   // Cluster name tag
@@ -289,7 +291,7 @@ public:
   const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
 private:
-  void addRegex(const std::string& name, const std::string& regex);
+  void addRegex(const std::string& name, const std::string& regex, const std::string& substr = "");
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;
