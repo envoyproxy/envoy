@@ -90,7 +90,7 @@ class IntegrationUtil {
 public:
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
-   * @param port supplies the port to connect to on localhost.
+   * @param addr supplies the address to connect to.
    * @param method supplies the request method.
    * @param url supplies the request url.
    * @param body supplies the optional request body to send.
@@ -101,9 +101,17 @@ public:
    *         remote easly disconnection.
    */
   static BufferingStreamDecoderPtr
+  makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
+                    const std::string& url, const std::string& body, Http::CodecClient::Type type,
+                    const std::string& host = "host");
+
+  /**
+   * Same as a above, but connects to an IP port instead of any address.
+   */
+  static BufferingStreamDecoderPtr
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
-                    Network::Address::IpVersion version, const std::string& host = "host");
+                    Network::Address::IpVersion ip_version, const std::string& host = "host");
 };
 
 // A set of connection callbacks which tracks connection state.
