@@ -154,6 +154,8 @@ public:
     if (config_) {
       return config_->metadataMatchCriteria();
     }
+
+    return nullptr;
   }
 
   const Network::Connection* downstreamConnection() const override {
