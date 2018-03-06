@@ -113,6 +113,14 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
 fi
 
+# Also test for listening on UNIX domain sockets. We use IPv4 for the
+# upstreams to avoid too much wild sedding.
+HOT_RESTART_YAML_UDS="${TEST_TMPDIR}"/hot_restart_uds.yaml
+cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.yaml |
+  sed -e "s#{{ test_tmpdir }}#${TEST_TMPDIR}#" | \
+  cat > "${HOT_RESTART_JSON_UDS}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
+
 # Enable this test to work with --runs_per_test
 if [[ -z "${TEST_RANDOM_SEED}" ]]; then
   BASE_ID=1
