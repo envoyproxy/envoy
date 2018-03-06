@@ -300,7 +300,7 @@ public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Runtime::Loader& loader);
 
-  bool isDirectResponse() const { if(direct_response_code_){ return true;} return false; }
+  bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;

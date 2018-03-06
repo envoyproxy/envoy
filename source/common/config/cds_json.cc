@@ -140,7 +140,7 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
     cluster.set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
   } else {
     ASSERT(string_type == "sds");
-    if(!eds_config.has_value()){
+    if(!eds_config.has_value()) {
       throw EnvoyException("fetching invalid Optional value");
     }
     cluster.set_type(envoy::api::v2::Cluster::EDS);

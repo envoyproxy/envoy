@@ -377,7 +377,7 @@ public:
   /**
    * @return Whether or not the timestamp attribute is set.
    */
-  bool isSetTimestamp() const { if(timestamp_){return true;} return false;}
+  bool isSetTimestamp() const { return timestamp_.has_value();}
 
   /**
    * Sets the span's duration attribute.
@@ -387,7 +387,7 @@ public:
   /**
    * @return Whether or not the duration attribute is set.
    */
-  bool isSetDuration() const { if(duration_){return true;} return false;}
+  bool isSetDuration() const { return duration_.has_value();}
 
   /**
    * Sets the higher 64 bits of the span's 128-bit trace id.
@@ -398,7 +398,7 @@ public:
   /**
    * @return whether or not the trace_id_high attribute is set.
    */
-  bool isSetTraceIdHigh() const { if(trace_id_high_){return true;} return false; }
+  bool isSetTraceIdHigh() const { trace_id_high_.has_value(); }
 
   /**
    * Sets the span start-time attribute (monotonic, used to calculate duration).
