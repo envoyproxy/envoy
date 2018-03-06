@@ -193,11 +193,6 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
       ++num_found;
     }
   }
-  // TODO(jmarantz): Changing the default tag regexes so that more than one regex can
-  // yield the same tag, on the theory that this will reduce regex backtracking. At the
-  // moment, this doesn't happen, so this flow isn't well tested. When we start exploiting
-  // this, and it's tested, we can simply remove this assert.
-  ASSERT(num_found <= 1);
   return num_found;
 }
 
