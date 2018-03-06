@@ -17,10 +17,20 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
+#include "envoy/upstream/lazy_loader.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {
+
+class ClusterUpdateCallbacks {
+public:
+  virtual ~ClusterUpdateCallbacks() {}
+
+  virtual void onClusterAddOrUpdate(const ThreadLocalCluster& cluster) PURE;
+
+  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+};
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -147,6 +157,11 @@ public:
    * @return std::string the local cluster name, or "" if no local cluster was configured.
    */
   virtual const std::string& localClusterName() const PURE;
+
+  virtual void addClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+  virtual void removeClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+
+  virtual LazyLoader* lazyLoader() const PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
@@ -213,7 +228,8 @@ public:
   virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                            bool added_via_api) PURE;
+                                            bool added_via_api,
+                                            bool added_lazily) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.

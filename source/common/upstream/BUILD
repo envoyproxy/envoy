@@ -51,8 +51,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "cluster_manager_lib",
-    srcs = ["cluster_manager_impl.cc"],
-    hdrs = ["cluster_manager_impl.h"],
+    srcs = [
+        "cluster_manager_impl.cc",
+        "lazy_loader_impl.cc",
+    ],
+    hdrs = [
+        "cluster_manager_impl.h",
+        "lazy_loader_impl.h"
+    ],
     deps = [
         ":cds_api_lib",
         ":load_balancer_lib",
@@ -67,6 +73,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:lazy_loader_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:cds_json_lib",

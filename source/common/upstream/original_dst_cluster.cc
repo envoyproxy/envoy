@@ -94,9 +94,9 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
                                        Runtime::Loader& runtime, Stats::Store& stats,
                                        Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
-                                       Event::Dispatcher& dispatcher, bool added_via_api)
+                                       Event::Dispatcher& dispatcher, bool added_via_api, bool added_lazily)
     : ClusterImplBase(config, cm.sourceAddress(), runtime, stats, ssl_context_manager,
-                      added_via_api),
+                      added_via_api, added_lazily),
       dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
                                    PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {

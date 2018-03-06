@@ -52,7 +52,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    bool added_via_api) override;
+                                    bool added_via_api, bool added_lazily) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
@@ -153,6 +153,7 @@ public:
 
   // Upstream::ClusterManager
   bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) override;
+  bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster, bool lazy_loaded);
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -188,6 +189,11 @@ public:
 
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
+
+  void addClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+  void removeClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+
+  LazyLoader* lazyLoader() const override { return lazy_loader_.get(); }
 
 private:
   /**
@@ -258,12 +264,13 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::unordered_set<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };
 
   struct PrimaryClusterData {
-    PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterSharedPtr&& cluster)
-        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
+    PrimaryClusterData(uint64_t config_hash, bool added_via_api, bool added_lazily, ClusterSharedPtr&& cluster)
+        : config_hash_(config_hash), added_via_api_(added_via_api), added_lazily_(added_lazily), cluster_(std::move(cluster)) {}
 
     LoadBalancerFactorySharedPtr loadBalancerFactory() {
       if (thread_aware_lb_ != nullptr) {
@@ -275,13 +282,14 @@ private:
 
     const uint64_t config_hash_;
     const bool added_via_api_;
+    const bool added_lazily_;
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
   };
 
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
+  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api, bool added_lazily);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const HostVector& hosts_added, const HostVector& hosts_removed);
@@ -305,6 +313,7 @@ private:
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
+  std::unique_ptr<LazyLoader> lazy_loader_;
 };
 
 } // namespace Upstream
