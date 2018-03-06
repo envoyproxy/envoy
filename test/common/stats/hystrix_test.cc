@@ -25,7 +25,7 @@ TEST(Hystrix, CreateDataMessage) {
   EXPECT_EQ(hystrix.GetRollingWindowIntervalInMs(), 1000);
   EXPECT_EQ(hystrix.GetPingIntervalInMs(), 3000);
 
-   // insert data to rolling window
+  // insert data to rolling window
   for (uint64_t i = 0; i < 10; i++) {
     hystrix.incCounter();
     hystrix.pushNewValue("cluster.clusterName.upstream_rq_timeout", i + 1);
