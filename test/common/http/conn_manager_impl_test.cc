@@ -828,7 +828,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecoratorOverrideOpNoActiveSpan) {
+TEST_F(HttpConnectionManagerImplTest,
+       StartAndFinishSpanNormalFlowEgressDecoratorOverrideOpNoActiveSpan) {
   setup(false, "");
   tracing_config_.reset(new TracingConnectionManagerConfig(
       {Tracing::OperationName::Egress, {LowerCaseString(":method")}}));
