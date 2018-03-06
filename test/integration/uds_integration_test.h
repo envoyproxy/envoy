@@ -2,6 +2,7 @@
 
 #include <tuple>
 
+#include "common/common/fmt.h"
 #include "common/http/codec_client.h"
 #include "common/stats/stats_impl.h"
 
@@ -57,14 +58,20 @@ public:
   void initialize() override;
 
   std::string getAdminSocketName() {
+    const testing::TestInfo* testInfo = testing::UnitTest::GetInstance()->current_test_info();
     return abstract_namespace_
-               ? "@/envoy-tests/uds-integration-test/admin"
-               : TestEnvironment::unixDomainSocketPath("uds-integration-test.admin.sock");
+               ? fmt::format("@/envoy-tests/{}/{}/admin", testInfo->test_case_name(),
+                             testInfo->name())
+               : TestEnvironment::unixDomainSocketPath(
+                     fmt::format("{}.{}.admin.sock", testInfo->test_case_name(), testInfo->name()));
   }
   std::string getListenerSocketName() {
+    const testing::TestInfo* testInfo = testing::UnitTest::GetInstance()->current_test_info();
     return abstract_namespace_
-               ? "@/envoy-tests/uds-integration-test/listener_0"
-               : TestEnvironment::unixDomainSocketPath("uds-integration-test.listener_0.sock");
+               ? fmt::format("@/envoy-tests/{}/{}/listener_0", testInfo->test_case_name(),
+                             testInfo->name())
+               : TestEnvironment::unixDomainSocketPath(fmt::format(
+                     "{}.{}.listener_0.sock", testInfo->test_case_name(), testInfo->name()));
   }
 
 protected:
