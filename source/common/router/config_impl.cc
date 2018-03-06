@@ -55,7 +55,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   expose_headers_ = config.expose_headers();
   max_age_ = config.max_age();
   if (config.has_allow_credentials()) {
-    allow_credentials_ = (PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
@@ -79,7 +79,7 @@ public:
 
     const Http::HeaderEntry* header = headers.get(header_name_);
     if (header) {
-      hash = (HashUtil::xxHash64(header->value().c_str()));
+      hash = HashUtil::xxHash64(header->value().c_str());
     }
     return hash;
   }
@@ -99,10 +99,10 @@ public:
 
     if (value.empty() && ttl_ != std::chrono::seconds(0)) {
       value = add_cookie(key_, ttl_);
-      hash = (HashUtil::xxHash64(value));
+      hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
-      hash = (HashUtil::xxHash64(value));
+      hash = HashUtil::xxHash64(value);
     }
     return hash;
   }
@@ -118,7 +118,7 @@ public:
                                     const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
-      hash = (HashUtil::xxHash64(downstream_addr));
+      hash = HashUtil::xxHash64(downstream_addr);
     }
     return hash;
   }
@@ -367,7 +367,7 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
     RuntimeData data;
     data.key_ = route_match.runtime().runtime_key();
     data.default_ = route_match.runtime().default_value();
-    runtime = (data);
+    runtime = data;
   }
 
   return runtime;

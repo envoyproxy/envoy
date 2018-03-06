@@ -403,7 +403,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  request_info_.response_code_ = (response_code);
+  request_info_.response_code_ = response_code;
 
   if (request_info_.hc_request_) {
     return;
@@ -789,7 +789,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
   request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_ = (std::move(route));
+  cached_route_ = std::move(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(

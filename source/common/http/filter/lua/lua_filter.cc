@@ -185,7 +185,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
   absl::optional<std::chrono::milliseconds> timeout;
   if (timeout_ms > 0) {
-    timeout = (std::chrono::milliseconds(timeout_ms));
+    timeout = std::chrono::milliseconds(timeout_ms);
   }
 
   http_request_ = filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
