@@ -49,7 +49,7 @@ TagNameValues::TagNameValues() {
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRegex(DYNAMO_TABLE, "^http(?=\\.).*?\\.dynamodb.(?:table|error)\\.((.*?)\\.)", ".dynamodb");
+  addRegex(DYNAMO_TABLE, "^http(?=\\.).*?\\.dynamodb.(?:table|error)\\.((.*?)\\.)", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
   addRegex(MONGO_COLLECTION, "^mongo(?=\\.).*?\\.collection\\.((.*?)\\.).*?query.\\w+?$",
@@ -74,10 +74,10 @@ TagNameValues::TagNameValues() {
   addRegex(SSL_CIPHER, "^listener(?=\\.).*?\\.ssl\\.cipher(\\.(.*?))$");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRegex(SSL_CIPHER_SUITE, "^cluster(?=\\.).*?\\.ssl\\.ciphers(\\.(.*?))$", "ssl.ciphers");
+  addRegex(SSL_CIPHER_SUITE, "^cluster(?=\\.).*?\\.ssl\\.ciphers(\\.(.*?))$", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRegex(GRPC_BRIDGE_SERVICE, "^cluster(?=\\.).*?\\.grpc\\.((.*?)\\.)", "grpc");
+  addRegex(GRPC_BRIDGE_SERVICE, "^cluster(?=\\.).*?\\.grpc\\.((.*?)\\.)", ".grpc.");
 
   // tcp.(<stat_prefix>.)<base_stat>
   addRegex(TCP_PREFIX, "^tcp\\.((.*?)\\.)\\w+?$");
@@ -91,8 +91,11 @@ TagNameValues::TagNameValues() {
   // cluster.(<cluster_name>.)*
   addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
 
-  // http.(<stat_prefix>.)* or listener.[<address>.]http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, "^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)", "http.");
+  // listener.[<address>.]http.(<stat_prefix>.)*
+  addRegex(HTTP_CONN_MANAGER_PREFIX, "^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)", ".http.");
+
+  // http.(<stat_prefix>.)*
+  addRegex(HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)");
 
   // listener.(<address>.)*
   addRegex(LISTENER_ADDRESS,
