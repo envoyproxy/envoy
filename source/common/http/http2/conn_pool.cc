@@ -102,9 +102,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
-
-    //reset idle timer
-    primary_client_->resetIdleTimer();
+    primary_client_->disableIdleTimer();
   }
 
   return nullptr;
@@ -209,9 +207,7 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   if (!client.closed_with_active_rq_) {
     checkForDrained();
   }
-
-  // Start the idle timer
-  client.startIdleTimer();
+  client.enableIdleTimer();
 }
 
 void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason reason) {
@@ -224,16 +220,12 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
   } else if (reason == StreamResetReason::RemoteReset) {
     host_->cluster().stats().upstream_rq_rx_reset_.inc();
   }
-
-  //Start the idle timer
-  client.startIdleTimer();
+  client.enableIdleTimer();
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
-      idle_timer_(parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); })) {
-
+      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
   parent_.conn_connect_ms_.reset(
       new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
   Upstream::Host::CreateConnectionData data =
@@ -244,6 +236,11 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   client_->setCodecClientCallbacks(*this);
   client_->setCodecConnectionCallbacks(*this);
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
+
+  bool idle_timeout_exists = false; // TODO: get it from config
+  if (idle_timeout_exists) {
+    idle_timer_ = parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
+  }
 
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();

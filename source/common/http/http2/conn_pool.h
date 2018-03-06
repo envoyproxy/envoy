@@ -47,14 +47,13 @@ protected:
 
     void onIdleTimeout() { parent_.onIdleTimeout(*this); }
 
-    void resetIdleTimer() {
+    void disableIdleTimer() {
       if (idle_timer_) {
         idle_timer_->disableTimer();
-        idle_timer_.reset();
       }
     }
 
-    void startIdleTimer() {
+    void enableIdleTimer() {
       if (idle_timer_) {
         idle_timer_->enableTimer(idle_timeout_);
       }
@@ -84,7 +83,8 @@ protected:
     Event::TimerPtr idle_timer_;
     Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
-    std::chrono::milliseconds idle_timeout_ = std::chrono::milliseconds(10000); //TODO: get it from config
+    std::chrono::milliseconds idle_timeout_ =
+        std::chrono::milliseconds(10000); // TODO: get it from config
   };
 
   typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
