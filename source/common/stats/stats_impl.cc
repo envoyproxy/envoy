@@ -8,6 +8,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/perf_annotation.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 
@@ -108,6 +109,7 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
 bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                                   IntervalSet<size_t>& remove_characters) const {
 
+  PERF_OPERATION(perf);
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
@@ -129,8 +131,10 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
     std::string::size_type start = remove_subexpr.first - stat_name.begin();
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
     remove_characters.insert(start, end);
+    PERF_RECORD(perf, "re-match", name_);
     return true;
   }
+  PERF_RECORD(perf, "re-miss", name_);
   return false;
 }
 

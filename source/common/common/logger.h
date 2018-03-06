@@ -57,21 +57,6 @@ public:
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) const { logger_->set_level(level); }
 
-  /* This is simple mapping between Logger severity levels and spdlog severity levels.
-   * The only reason for this mapping is to go around the fact that spdlog defines level as err
-   * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
-   * fine spdlog::info corresponds to LOGGER.info method.
-   */
-  typedef enum {
-    trace = spdlog::level::trace,
-    debug = spdlog::level::debug,
-    info = spdlog::level::info,
-    warn = spdlog::level::warn,
-    error = spdlog::level::err,
-    critical = spdlog::level::critical,
-    off = spdlog::level::off
-  } levels;
-
 private:
   Logger(const std::string& name);
 
@@ -207,12 +192,7 @@ protected:
 /**
  * Convenience macro to log to a user-specified logger.
  */
-#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
-  do {                                                                                             \
-    if (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level()) {  \
-      ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__);                                        \
-    }                                                                                              \
-  } while (0)
+#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
 
 /**
  * Convenience macro to get logger.

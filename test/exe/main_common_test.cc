@@ -9,6 +9,8 @@
 
 #include <unistd.h>
 
+#include "common/runtime/runtime_impl.h"
+
 #include "exe/main_common.h"
 
 #include "server/options_impl.h"
@@ -38,16 +40,32 @@ public:
   MainCommonTest()
       : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
-        random_string_(fmt::format("{}", static_cast<uint32_t>(getpid()))),
-        argv_({"envoy-static", "--base-id", random_string_.c_str(), nullptr}) {}
+        random_string_(fmt::format("{}", computeBaseId())),
+        argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
+               nullptr}) {}
+
+  /**
+   * Computes a numeric ID to incorporate into the names of
+   * shared-memory segments and domain sockets, to help keep them
+   * distinct from other tests that might be running concurrently.
+   *
+   * The PID is needed to isolate namespaces between concurrent
+   * processes in CI. The random number generator is needed
+   * sequentially executed test methods fail with an error in
+   * bindDomainSocket if the the same base-id is re-used.
+   *
+   * @return uint32_t a unique numeric ID based on the PID and a random number.
+   */
+  static uint32_t computeBaseId() {
+    Runtime::RandomGeneratorImpl random_generator_;
+    // Pick a prime number to give more of the 32-bits of entropy to the PID, and the
+    // remainder to the random number.
+    const uint32_t four_digit_prime = 7919;
+    return getpid() * four_digit_prime + random_generator_.random() % four_digit_prime;
+  }
 
   char** argv() { return const_cast<char**>(&argv_[0]); }
   int argc() { return argv_.size() - 1; }
-
-  void addConfig() {
-    addArg("-c");
-    addArg(config_file_.c_str());
-  }
 
   // Adds an argument, assuring that argv remains null-terminated.
   void addArg(const char* arg) {
@@ -68,7 +86,6 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  addConfig();
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
@@ -77,9 +94,20 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  addConfig();
   addArg("--disable-hot-restart");
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+}
+
+// Exercise init_only explicitly.
+TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  addArg("--disable-hot-restart");
+  addArg("--mode");
+  addArg("init_only");
+  MainCommon main_common(argc(), argv());
+  EXPECT_TRUE(main_common.run());
 }
 
 // Ensurees that existing users of main_common() can link.
@@ -96,6 +124,9 @@ TEST_F(MainCommonTest, LegacyMain) {
   std::unique_ptr<Envoy::OptionsImpl> options;
   int return_code = -1;
   try {
+    // Set the mode to init-only so main_common doesn't initiate a server-loop.
+    addArg("--mode");
+    addArg("init_only");
     options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
                                                    spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
@@ -104,12 +135,9 @@ TEST_F(MainCommonTest, LegacyMain) {
     return_code = EXIT_FAILURE;
   }
   if (return_code == -1) {
-    // Note that Envoy::main_common() will run an event loop if properly configured, which
-    // would hang the test. This is why we don't supply a config file in this testcase;
-    // we just want to make sure we wake up this code in a test.
     return_code = Envoy::main_common(*options);
   }
-  EXPECT_EQ(EXIT_FAILURE, return_code);
+  EXPECT_EQ(EXIT_SUCCESS, return_code);
 }
 
 } // namespace Envoy

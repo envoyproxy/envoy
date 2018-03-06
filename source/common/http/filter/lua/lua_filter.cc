@@ -481,23 +481,17 @@ void Filter::scriptError(const Envoy::Lua::LuaException& e) {
 void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
   switch (level) {
   case spdlog::level::trace:
-    ENVOY_LOG(trace, "script log: {}", message);
-    return;
+    return ENVOY_LOG(trace, "script log: {}", message);
   case spdlog::level::debug:
-    ENVOY_LOG(debug, "script log: {}", message);
-    return;
+    return ENVOY_LOG(debug, "script log: {}", message);
   case spdlog::level::info:
-    ENVOY_LOG(info, "script log: {}", message);
-    return;
+    return ENVOY_LOG(info, "script log: {}", message);
   case spdlog::level::warn:
-    ENVOY_LOG(warn, "script log: {}", message);
-    return;
+    return ENVOY_LOG(warn, "script log: {}", message);
   case spdlog::level::err:
-    ENVOY_LOG(error, "script log: {}", message);
-    return;
+    return ENVOY_LOG(error, "script log: {}", message);
   case spdlog::level::critical:
-    ENVOY_LOG(critical, "script log: {}", message);
-    return;
+    return ENVOY_LOG(critical, "script log: {}", message);
   case spdlog::level::off:
     NOT_IMPLEMENTED;
   }

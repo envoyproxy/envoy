@@ -60,10 +60,6 @@ TcpProxyConfig::TcpProxyConfig(
   if (config.has_deprecated_v1()) {
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
              route_desc : config.deprecated_v1().routes()) {
-      if (!context.clusterManager().get(route_desc.cluster())) {
-        throw EnvoyException(
-            fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
-      }
       routes_.emplace_back(Route(route_desc));
     }
   }

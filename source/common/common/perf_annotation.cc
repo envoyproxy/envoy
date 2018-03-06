@@ -122,7 +122,9 @@ std::string PerfAnnotationContext::toString() {
   // Create format-strings to right justify each column, e.g. {:>14} for a column of width 14.
   std::vector<std::string> formats;
   for (size_t i = 0; i < num_columns; ++i) {
-    formats.push_back(absl::StrCat("{:>", widths[i], "}"));
+    // left-justify category & description, but right-justify the numeric columns.
+    const absl::string_view justify = (i < num_columns - 2) ? ">" : "<";
+    formats.push_back(absl::StrCat("{:", justify, widths[i], "}"));
   }
 
   // Write out the table.

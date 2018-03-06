@@ -140,6 +140,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
     mode_ = Server::Mode::Serve;
   } else if (mode.getValue() == "validate") {
     mode_ = Server::Mode::Validate;
+  } else if (mode.getValue() == "init_only") {
+    mode_ = Server::Mode::InitOnly;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
     std::cerr << message << std::endl;

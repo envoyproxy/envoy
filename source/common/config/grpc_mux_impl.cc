@@ -150,7 +150,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
     return;
   }
-  if (api_state_[type_url].watches_.size() == 0) {
+  if (api_state_[type_url].watches_.empty()) {
     ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
     return;
   }
