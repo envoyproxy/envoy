@@ -13,11 +13,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class UdsIntegrationTest
+class UdsUpstreamIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
-  UdsIntegrationTest()
+  UdsUpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
         abstract_namespace_(std::get<1>(GetParam())) {}
 
@@ -46,4 +46,31 @@ public:
 protected:
   const bool abstract_namespace_;
 };
+
+class UdsListenerIntegrationTest : public HttpIntegrationTest,
+                                   public testing::TestWithParam<std::tuple<bool>> {
+public:
+  UdsListenerIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4),
+        abstract_namespace_(std::get<0>(GetParam())) {}
+
+  void initialize() override;
+
+  std::string getAdminSocketName() {
+    return abstract_namespace_
+               ? "@/envoy-tests/uds-integration-test/admin"
+               : TestEnvironment::unixDomainSocketPath("uds-integration-test.admin.sock");
+  }
+  std::string getListenerSocketName() {
+    return abstract_namespace_
+               ? "@/envoy-tests/uds-integration-test/listener_0"
+               : TestEnvironment::unixDomainSocketPath("uds-integration-test.listener_0.sock");
+  }
+
+protected:
+  HttpIntegrationTest::ConnectionCreationFunction createConnectionFn();
+
+  const bool abstract_namespace_;
+};
+
 } // namespace Envoy
