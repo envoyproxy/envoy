@@ -151,3 +151,37 @@ envoy_cc_library(
         "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "ext_authz_lib",
+    srcs = ["ext_authz.cc"],
+    deps = [
+        ":ext_authz_includes",
+        "//include/envoy/http:codes_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:enum_to_int",
+        "//source/common/ext_authz:ext_authz_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/router:config_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "ext_authz_includes",
+    hdrs = ["ext_authz.h"],
+    deps = [
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/ext_authz:ext_authz_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/json:json_validator_lib",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
+    ],
+)

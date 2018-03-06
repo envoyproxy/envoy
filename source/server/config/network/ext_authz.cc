@@ -19,11 +19,6 @@ namespace Configuration {
 NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
     const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
     FactoryContext& context) {
-
-  ASSERT(!proto_config.stat_prefix().empty());
-  ASSERT(!proto_config.grpc_service().envoy_grpc().cluster_name().empty() ||
-         !proto_config.grpc_service().google_grpc().target_uri().empty());
-
   ExtAuthz::TcpFilter::ConfigSharedPtr ext_authz_config(
       new ExtAuthz::TcpFilter::Config(proto_config, context.scope()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
@@ -39,7 +34,7 @@ NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
     auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
-        new ExtAuthz::TcpFilter::Instance(ext_authz_config, std::move(client))});
+        std::make_shared<ExtAuthz::TcpFilter::Instance>(ext_authz_config, std::move(client))});
   };
 }
 
