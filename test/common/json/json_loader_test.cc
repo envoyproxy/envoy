@@ -446,10 +446,8 @@ TEST(JsonLoaderTest, YamlObject) {
 }
 
 TEST(JsonLoaderTest, YamlAsJsonString) {
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("");
-    EXPECT_EQ(json->asJsonString(), "null");
-  }
+  const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("");
+  EXPECT_EQ(json->asJsonString(), "null");
 }
 
 TEST(JsonLoaderTest, BadYamlException) {
