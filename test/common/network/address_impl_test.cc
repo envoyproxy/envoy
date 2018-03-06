@@ -300,6 +300,12 @@ TEST(PipeInstanceTest, AbstractNamespace) {
 #endif
 }
 
+TEST(PipeInstanceTest, BadAddress) {
+  std::string long_address(1000, 'X');
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
+                          "exceeds maximum UNIX domain socket path size");
+}
+
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);

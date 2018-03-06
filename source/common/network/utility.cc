@@ -383,7 +383,7 @@ Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_add
   case envoy::api::v2::core::Address::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
   default:
-    throw EnvoyException("Address must be a socket or pipe: " + proto_address.DebugString());
+    NOT_REACHED;
   }
 }
 
