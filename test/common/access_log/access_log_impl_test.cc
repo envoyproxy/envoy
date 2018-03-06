@@ -155,6 +155,13 @@ public:
 
   void onRequestComplete() override { end_time_.value(std::chrono::steady_clock::now()); }
 
+  void resetUpstreamTimings() override {
+    first_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
+    last_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
+    first_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
+    last_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
+  }
+
   Optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);
   }

@@ -192,6 +192,11 @@ public:
   virtual void onRequestComplete() PURE;
 
   /**
+   * Resets all timings related to the upstream in the event of a retry.
+   */
+  virtual void resetUpstreamTimings() PURE;
+
+  /**
    * @return the number of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;

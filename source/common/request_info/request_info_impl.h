@@ -35,6 +35,7 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onLastDownstreamRxByteReceived() override {
+    ASSERT(!last_downstream_rx_byte_received.valid());
     last_downstream_rx_byte_received.value(std::chrono::steady_clock::now());
   }
 
@@ -43,6 +44,7 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onFirstUpstreamTxByteSent() override {
+    ASSERT(!first_upstream_tx_byte_sent_.valid());
     first_upstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
   }
 
@@ -51,6 +53,7 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onLastUpstreamTxByteSent() override {
+    ASSERT(!last_upstream_tx_byte_sent_.valid());
     last_upstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
   }
 
@@ -59,6 +62,7 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onFirstUpstreamRxByteReceived() override {
+    ASSERT(!first_upstream_rx_byte_received_.valid());
     first_upstream_rx_byte_received_.value(std::chrono::steady_clock::now());
   }
 
@@ -67,6 +71,7 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onLastUpstreamRxByteReceived() override {
+    ASSERT(!last_upstream_rx_byte_received_.valid());
     last_upstream_rx_byte_received_.value(std::chrono::steady_clock::now());
   }
 
@@ -75,6 +80,7 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onFirstDownstreamTxByteSent() override {
+    ASSERT(!first_downstream_tx_byte_sent_.valid());
     first_downstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
   }
 
@@ -83,13 +89,24 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   void onLastDownstreamTxByteSent() override {
+    ASSERT(!last_downstream_tx_byte_sent_.valid());
     last_downstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
   }
 
-  void onRequestComplete() override { final_time_.value(std::chrono::steady_clock::now()); }
-
   Optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(final_time_);
+  }
+
+  void onRequestComplete() override {
+    ASSERT(!final_time_.valid());
+    final_time_.value(std::chrono::steady_clock::now());
+  }
+
+  void resetUpstreamTimings() override {
+    first_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
+    last_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
+    first_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
+    last_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
   }
 
   uint64_t bytesReceived() const override { return bytes_received_; }

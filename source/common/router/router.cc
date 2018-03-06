@@ -744,6 +744,7 @@ bool Filter::setupRetry(bool end_stream) {
   }
 
   upstream_request_.reset();
+  callbacks_->requestInfo().resetUpstreamTimings();
   return true;
 }
 

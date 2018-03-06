@@ -35,6 +35,7 @@ public:
   MOCK_METHOD0(onLastDownstreamTxByteSent, void());
   MOCK_METHOD0(onRequestComplete, void());
   MOCK_CONST_METHOD0(requestComplete, Optional<std::chrono::nanoseconds>());
+  MOCK_METHOD0(resetUpstreamTimings, void());
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, Optional<Http::Protocol>());
   MOCK_METHOD1(protocol, void(Http::Protocol protocol));
