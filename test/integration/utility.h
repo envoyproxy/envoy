@@ -95,7 +95,6 @@ public:
    * @param url supplies the request url.
    * @param body supplies the optional request body to send.
    * @param type supplies the codec to use for the request.
-   * @param version the IP addess version of the client and server.
    * @param host supplies the host header to use for the request.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote easly disconnection.
@@ -106,7 +105,16 @@ public:
                     const std::string& host = "host");
 
   /**
-   * Same as a above, but connects to an IP port instead of any address.
+   * Make a new connection, issues a request, and then disconnect when the request is complete.
+   * @param port supplies the port to connect to on localhost.
+   * @param method supplies the request method.
+   * @param url supplies the request url.
+   * @param body supplies the optional request body to send.
+   * @param type supplies the codec to use for the request.
+   * @param version the IP addess version of the client and server.
+   * @param host supplies the host header to use for the request.
+   * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
+   *         remote easly disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
