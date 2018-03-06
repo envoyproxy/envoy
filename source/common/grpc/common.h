@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "absl/types/optional.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -12,6 +11,8 @@
 #include "envoy/stats/stats.h"
 
 #include "common/protobuf/protobuf.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -42,8 +43,8 @@ public:
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
    * @param trailers the trailers to parse.
-   * @return absl::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid status
-   *         is found.
+   * @return absl::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid
+   * status is found.
    */
   static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers);
 

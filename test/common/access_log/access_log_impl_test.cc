@@ -93,8 +93,10 @@ public:
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
   SystemTime start_time_;
-  absl::optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
-  absl::optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};
+  absl::optional<std::chrono::microseconds> request_received_duration_{
+      std::chrono::microseconds(1000)};
+  absl::optional<std::chrono::microseconds> response_received_duration_{
+      std::chrono::microseconds(2000)};
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
   absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};

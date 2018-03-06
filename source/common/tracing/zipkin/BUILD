@@ -29,7 +29,10 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
         "zipkin_tracer_impl.h",
     ],
-    external_deps = ["rapidjson", "abseil_optional"],
+    external_deps = [
+        "rapidjson",
+        "abseil_optional",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/local_info:local_info_interface",

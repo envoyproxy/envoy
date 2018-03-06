@@ -89,6 +89,7 @@ envoy_cc_library(
     name = "guarddog_lib",
     srcs = ["guarddog_impl.cc"],
     hdrs = ["guarddog_impl.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":watchdog_lib",
         "//include/envoy/event:dispatcher_interface",
@@ -101,7 +102,6 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(
@@ -237,6 +237,7 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":configuration_lib",
         ":connection_handler_lib",
@@ -273,7 +274,6 @@ envoy_cc_library(
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

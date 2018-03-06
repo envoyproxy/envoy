@@ -31,12 +31,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "configuration_interface",
     hdrs = ["configuration.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

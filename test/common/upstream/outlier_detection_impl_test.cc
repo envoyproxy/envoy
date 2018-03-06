@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "envoy/common/time.h"
 
 #include "common/network/utility.h"
@@ -17,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -1,5 +1,3 @@
-#include "absl/types/optional.h"
-
 #include "common/config/filter_json.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
@@ -16,6 +14,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

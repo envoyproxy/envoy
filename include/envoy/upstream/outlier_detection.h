@@ -5,9 +5,10 @@
 #include <functional>
 #include <memory>
 
-#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {

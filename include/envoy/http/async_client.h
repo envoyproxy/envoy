@@ -3,9 +3,10 @@
 #include <chrono>
 #include <memory>
 
-#include "absl/types/optional.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {

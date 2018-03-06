@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "absl/types/optional.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -12,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {

@@ -250,7 +250,7 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       // succeed that's fine.
       uint64_t converted;
       if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
-        entry.uint_value_= converted;
+        entry.uint_value_ = converted;
       }
 
       // Separate erase/insert calls required due to the value type being constant; this prevents

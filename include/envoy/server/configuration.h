@@ -7,10 +7,11 @@
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {

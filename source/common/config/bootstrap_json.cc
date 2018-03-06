@@ -22,7 +22,8 @@ void BootstrapJson::translateClusterManagerBootstrap(
     const auto json_sds = json_cluster_manager.getObject("sds");
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
     Config::CdsJson::translateCluster(*json_sds->getObject("cluster"),
-                                      absl::optional<envoy::api::v2::core::ConfigSource>(), *cluster);
+                                      absl::optional<envoy::api::v2::core::ConfigSource>(),
+                                      *cluster);
     Config::Utility::translateEdsConfig(
         *json_sds,
         *bootstrap.mutable_dynamic_resources()->mutable_deprecated_v1()->mutable_sds_config());

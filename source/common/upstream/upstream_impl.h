@@ -314,7 +314,8 @@ public:
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
-  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const override {
+  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
+  lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
   bool maintenanceMode() const override;

@@ -5,8 +5,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Runtime {

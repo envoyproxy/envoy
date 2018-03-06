@@ -43,8 +43,9 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
-                                            const absl::optional<std::chrono::milliseconds>& timeout) {
+AsyncClient::Request*
+AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+                      const absl::optional<std::chrono::milliseconds>& timeout) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, timeout);
   async_request->initialize();
@@ -60,9 +61,10 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
   }
 }
 
-AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
-                                            const absl::optional<std::chrono::milliseconds>& timeout,
-                                            bool buffer_body_for_retry) {
+AsyncClient::Stream*
+AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
+                       const absl::optional<std::chrono::milliseconds>& timeout,
+                       bool buffer_body_for_retry) {
   std::unique_ptr<AsyncStreamImpl> new_stream{
       new AsyncStreamImpl(*this, callbacks, timeout, buffer_body_for_retry)};
   new_stream->moveIntoList(std::move(new_stream), active_streams_);

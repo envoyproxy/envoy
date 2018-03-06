@@ -87,8 +87,8 @@ public:
    * implementation it is a fixed time window.
    * @param success_rate_request_volume the threshold of requests an accumulator has to have in
    *                                    order to be able to return a significant success rate value.
-   * @return a valid absl::optional<double> with the success rate. If there were not enough requests, an
-   *         invalid absl::optional<double> is returned.
+   * @return a valid absl::optional<double> with the success rate. If there were not enough
+   * requests, an invalid absl::optional<double> is returned.
    */
   absl::optional<double> getSuccessRate(uint64_t success_rate_request_volume);
 
@@ -125,7 +125,9 @@ public:
   void putResult(Result result) override;
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
-  const absl::optional<MonotonicTime>& lastUnejectionTime() override { return last_unejection_time_; }
+  const absl::optional<MonotonicTime>& lastUnejectionTime() override {
+    return last_unejection_time_;
+  }
   double successRate() const override { return success_rate_; }
 
 private:

@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -20,6 +19,7 @@
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 
+#include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {

@@ -217,7 +217,8 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
           (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
            RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) &&
       response_headers) {
-    absl::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(*response_headers);
+    absl::optional<Grpc::Status::GrpcStatus> status =
+        Grpc::Common::getGrpcStatus(*response_headers);
     if (status) {
       if ((status.value() == Grpc::Status::Canceled &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||

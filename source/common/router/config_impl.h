@@ -12,7 +12,6 @@
 
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
-#include "absl/types/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -21,6 +20,8 @@
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/router_ratelimit.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -201,15 +202,15 @@ public:
 
   // Router::HashPolicy
   absl::optional<uint64_t> generateHash(const std::string& downstream_addr,
-                                  const Http::HeaderMap& headers,
-                                  const AddCookieCallback add_cookie) const override;
+                                        const Http::HeaderMap& headers,
+                                        const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() {}
     virtual absl::optional<uint64_t> evaluate(const std::string& downstream_addr,
-                                        const Http::HeaderMap& headers,
-                                        const AddCookieCallback add_cookie) const PURE;
+                                              const Http::HeaderMap& headers,
+                                              const AddCookieCallback add_cookie) const PURE;
   };
 
   typedef std::unique_ptr<HashMethod> HashMethodPtr;
@@ -460,7 +461,8 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  static absl::optional<RuntimeData>
+  loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);

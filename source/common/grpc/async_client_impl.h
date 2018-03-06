@@ -64,7 +64,8 @@ private:
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();
-  void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status, const std::string& grpc_message);
+  void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
+                       const std::string& grpc_message);
 
   Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
@@ -85,7 +86,8 @@ class AsyncRequestImpl : public AsyncRequest, public AsyncStreamImpl, AsyncStrea
 public:
   AsyncRequestImpl(AsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
                    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
-                   Tracing::Span& parent_span, const absl::optional<std::chrono::milliseconds>& timeout);
+                   Tracing::Span& parent_span,
+                   const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
 

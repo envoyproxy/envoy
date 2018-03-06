@@ -136,9 +136,9 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
@@ -185,9 +185,9 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());

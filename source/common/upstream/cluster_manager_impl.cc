@@ -811,10 +811,9 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
                                  outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr
-ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                                     ClusterManager& cm) {
+CdsApiPtr ProdClusterManagerFactory::createCds(
+    const envoy::api::v2::core::ConfigSource& cds_config,
+    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
   return CdsApiImpl::create(cds_config, eds_config, cm, primary_dispatcher_, random_, local_info_,
                             stats_);
 }

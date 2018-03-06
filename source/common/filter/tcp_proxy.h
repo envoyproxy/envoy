@@ -101,7 +101,9 @@ public:
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  const absl::optional<std::chrono::milliseconds>& idleTimeout() { return shared_config_->idleTimeout(); }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() {
+    return shared_config_->idleTimeout();
+  }
   TcpProxyUpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
 

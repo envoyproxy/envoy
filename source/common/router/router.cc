@@ -518,8 +518,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
-    const bool dropped =
-        reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
+    const bool dropped = reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow;
     chargeUpstreamCode(code, upstream_host, dropped);
     // If we had non-5xx but still have been reset by backend or timeout before
     // starting response, we treat this as an error. We only get non-5xx when
@@ -884,7 +883,8 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
   clearRequestEncoder();
   if (!calling_encode_headers_) {
     request_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
-    parent_.onUpstreamReset(UpstreamResetType::Reset, absl::optional<Http::StreamResetReason>(reason));
+    parent_.onUpstreamReset(UpstreamResetType::Reset,
+                            absl::optional<Http::StreamResetReason>(reason));
   } else {
     deferred_reset_reason_ = reason;
   }
@@ -922,8 +922,9 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
   }
   resetStream();
   request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout);
-  parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
-                          absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
+  parent_.onUpstreamReset(
+      UpstreamResetType::PerTryTimeout,
+      absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
 }
 
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,

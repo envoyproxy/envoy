@@ -560,13 +560,14 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-absl::optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
+absl::optional<double>
+SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
   if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
     return absl::optional<double>();
   }
 
   return absl::optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100.0 /
-                          backup_success_rate_bucket_->total_request_counter_);
+                                backup_success_rate_bucket_->total_request_counter_);
 }
 
 } // namespace Outlier

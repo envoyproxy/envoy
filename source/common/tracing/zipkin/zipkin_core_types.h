@@ -2,13 +2,14 @@
 
 #include <memory>
 
-#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
 #include "common/common/hex.h"
 #include "common/tracing/zipkin/tracer_interface.h"
 #include "common/tracing/zipkin/util.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Zipkin {
@@ -171,7 +172,12 @@ public:
   /**
    * @return true if the endpoint attribute is set, or false otherwise.
    */
-  bool isSetEndpoint() const {  if(endpoint_){return true;} return false; }
+  bool isSetEndpoint() const {
+    if (endpoint_) {
+      return true;
+    }
+    return false;
+  }
 
   /**
    * Serializes the annotation as a Zipkin-compliant JSON representation as a string.
@@ -250,7 +256,12 @@ public:
   /**
    * @return true of the endpoint attribute has been set, or false otherwise.
    */
-  bool isSetEndpoint() const { if(endpoint_){return true;} return false;}
+  bool isSetEndpoint() const {
+    if (endpoint_) {
+      return true;
+    }
+    return false;
+  }
 
   /**
    * @return the key attribute.
@@ -327,7 +338,12 @@ public:
   /**
    * @return Whether or not the parent_id attribute is set.
    */
-  bool isSetParentId() const { if(parent_id_){return true;} return false;}
+  bool isSetParentId() const {
+    if (parent_id_) {
+      return true;
+    }
+    return false;
+  }
 
   /**
    * @return a vector with all annotations added to the span.
@@ -377,7 +393,7 @@ public:
   /**
    * @return Whether or not the timestamp attribute is set.
    */
-  bool isSetTimestamp() const { return timestamp_.has_value();}
+  bool isSetTimestamp() const { return timestamp_.has_value(); }
 
   /**
    * Sets the span's duration attribute.
@@ -387,7 +403,7 @@ public:
   /**
    * @return Whether or not the duration attribute is set.
    */
-  bool isSetDuration() const { return duration_.has_value();}
+  bool isSetDuration() const { return duration_.has_value(); }
 
   /**
    * Sets the higher 64 bits of the span's 128-bit trace id.

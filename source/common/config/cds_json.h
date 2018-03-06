@@ -2,9 +2,10 @@
 
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster/circuit_breaker.pb.h"
-#include "absl/types/optional.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {

@@ -50,6 +50,7 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/grpc:status",
         "//include/envoy/http:header_map_interface",
@@ -69,7 +70,6 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

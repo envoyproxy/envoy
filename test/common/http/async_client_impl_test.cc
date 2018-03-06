@@ -683,8 +683,8 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
       }));
 
   expectSuccess(503);
-  EXPECT_EQ(nullptr,
-            client_.send(std::move(message_), callbacks_, absl::optional<std::chrono::milliseconds>()));
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_,
+                                  absl::optional<std::chrono::milliseconds>()));
 
   EXPECT_EQ(
       1UL,
@@ -701,8 +701,8 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
 
   expectSuccess(503);
   message_->body().reset(new Buffer::OwnedImpl("hello"));
-  EXPECT_EQ(nullptr,
-            client_.send(std::move(message_), callbacks_, absl::optional<std::chrono::milliseconds>()));
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_,
+                                  absl::optional<std::chrono::milliseconds>()));
 
   EXPECT_EQ(
       1UL,

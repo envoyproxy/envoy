@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
-#include "absl/types/optional.h"
 
 #include "common/config/metadata.h"
 #include "common/upstream/subset_lb.h"
@@ -16,6 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -74,6 +74,7 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":admin_lib",
         ":api_lib",
@@ -100,5 +101,4 @@ envoy_cc_library(
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
-    external_deps=["abseil_optional"],
 )

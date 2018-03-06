@@ -54,6 +54,7 @@ envoy_cc_library(
     name = "cds_json_lib",
     srcs = ["cds_json.cc"],
     hdrs = ["cds_json.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":address_json_lib",
         ":json_utility_lib",
@@ -68,7 +69,6 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

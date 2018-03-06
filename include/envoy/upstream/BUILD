@@ -71,10 +71,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "outlier_detection_interface",
     hdrs = ["outlier_detection.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(
@@ -90,6 +90,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":health_check_host_monitor_interface",
         ":load_balancer_type_interface",
@@ -100,5 +101,4 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/ssl:context_interface",
     ],
-    external_deps=["abseil_optional"],
 )

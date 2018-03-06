@@ -10,7 +10,6 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "absl/types/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -19,6 +18,8 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -278,8 +279,8 @@ public:
    * returned if for example the specified HTTP header does not exist.
    */
   virtual absl::optional<uint64_t> generateHash(const std::string& downstream_address,
-                                          const Http::HeaderMap& headers,
-                                          AddCookieCallback add_cookie) const PURE;
+                                                const Http::HeaderMap& headers,
+                                                AddCookieCallback add_cookie) const PURE;
 };
 
 class MetadataMatchCriterion {

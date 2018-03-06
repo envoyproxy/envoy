@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-#include "absl/types/optional.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -23,6 +22,8 @@
 #include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {

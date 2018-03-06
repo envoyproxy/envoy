@@ -45,7 +45,8 @@ public:
   Request* send(MessagePtr&& request, Callbacks& callbacks,
                 const absl::optional<std::chrono::milliseconds>& timeout) override;
 
-  Stream* start(StreamCallbacks& callbacks, const absl::optional<std::chrono::milliseconds>& timeout,
+  Stream* start(StreamCallbacks& callbacks,
+                const absl::optional<std::chrono::milliseconds>& timeout,
                 bool buffer_body_for_retry) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -71,7 +72,8 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                  const absl::optional<std::chrono::milliseconds>& timeout, bool buffer_body_for_retry);
+                  const absl::optional<std::chrono::milliseconds>& timeout,
+                  bool buffer_body_for_retry);
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -213,7 +215,8 @@ private:
   };
 
   struct RouteImpl : public Router::Route {
-    RouteImpl(const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout)
+    RouteImpl(const std::string& cluster_name,
+              const absl::optional<std::chrono::milliseconds>& timeout)
         : route_entry_(cluster_name, timeout) {}
 
     // Router::Route

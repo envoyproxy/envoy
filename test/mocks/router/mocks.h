@@ -175,8 +175,8 @@ public:
 
   // Router::HashPolicy
   MOCK_CONST_METHOD3(generateHash, absl::optional<uint64_t>(const std::string& downstream_address,
-                                                      const Http::HeaderMap& headers,
-                                                      const AddCookieCallback add_cookie));
+                                                            const Http::HeaderMap& headers,
+                                                            const AddCookieCallback add_cookie));
 };
 
 class MockMetadataMatchCriteria : public MetadataMatchCriteria {

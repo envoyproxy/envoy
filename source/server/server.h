@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 
-#include "absl/types/optional.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
@@ -26,6 +25,8 @@
 #include "server/listener_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {

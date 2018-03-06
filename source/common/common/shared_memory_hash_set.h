@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "envoy/common/exception.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"

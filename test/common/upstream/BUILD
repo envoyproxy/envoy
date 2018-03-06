@@ -194,6 +194,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
         "//include/envoy/common:time_interface",
@@ -206,7 +207,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_test(

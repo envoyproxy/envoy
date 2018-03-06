@@ -5,9 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/tracing/http_tracer.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace RateLimit {

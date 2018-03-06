@@ -74,9 +74,9 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _, false))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const absl::optional<std::chrono::milliseconds>&, bool) {
+      .WillOnce(Invoke(
+          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const absl::optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -100,9 +100,9 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _, true))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const absl::optional<std::chrono::milliseconds>&, bool) {
+      .WillOnce(Invoke(
+          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const absl::optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));

@@ -74,7 +74,7 @@ public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
   absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback) const override {
+                                    const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
 
     const Http::HeaderEntry* header = headers.get(header_name_);
@@ -93,7 +93,7 @@ public:
   CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
 
   absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback add_cookie) const override {
+                                    const HashPolicy::AddCookieCallback add_cookie) const override {
     absl::optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
@@ -115,7 +115,7 @@ private:
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
   absl::optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
-                              const HashPolicy::AddCookieCallback) const override {
+                                    const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
       hash = (HashUtil::xxHash64(downstream_addr));
@@ -152,11 +152,12 @@ HashPolicyImpl::HashPolicyImpl(
 }
 
 absl::optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                const Http::HeaderMap& headers,
-                                                const AddCookieCallback add_cookie) const {
+                                                      const Http::HeaderMap& headers,
+                                                      const AddCookieCallback add_cookie) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const absl::optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers, add_cookie);
+    const absl::optional<uint64_t> new_hash =
+        hash_impl->evaluate(downstream_addr, headers, add_cookie);
     if (new_hash) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy

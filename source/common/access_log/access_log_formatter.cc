@@ -178,9 +178,8 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.responseCode()
-                 ? std::to_string(request_info.responseCode().value())
-                 : "0";
+      return request_info.responseCode() ? std::to_string(request_info.responseCode().value())
+                                         : "0";
     };
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {

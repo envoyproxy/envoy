@@ -5,7 +5,6 @@
 #include <mutex>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/watchdog.h"
@@ -14,6 +13,8 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {

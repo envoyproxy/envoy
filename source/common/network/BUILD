@@ -38,6 +38,7 @@ envoy_cc_library(
     name = "connection_lib",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         ":filter_manager_lib",
@@ -57,7 +58,6 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
     ],
-    external_deps=["abseil_optional"],
 )
 
 envoy_cc_library(

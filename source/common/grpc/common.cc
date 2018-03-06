@@ -248,7 +248,8 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
 
 void Common::checkForHeaderOnlyError(Http::Message& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
-  absl::optional<Status::GrpcStatus> grpc_status_code = Common::getGrpcStatus(http_response.headers());
+  absl::optional<Status::GrpcStatus> grpc_status_code =
+      Common::getGrpcStatus(http_response.headers());
   if (!grpc_status_code) {
     return;
   }
@@ -274,7 +275,8 @@ void Common::validateResponse(Http::Message& http_response) {
     throw Exception(absl::optional<uint64_t>(), "no response trailers");
   }
 
-  absl::optional<Status::GrpcStatus> grpc_status_code = Common::getGrpcStatus(*http_response.trailers());
+  absl::optional<Status::GrpcStatus> grpc_status_code =
+      Common::getGrpcStatus(*http_response.trailers());
   if (!grpc_status_code || grpc_status_code.value() < 0) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status trailer");
   }

@@ -50,14 +50,15 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
-        .WillOnce(Invoke([this](const Protobuf::MethodDescriptor& service_method,
-                                const Protobuf::Message&, Grpc::AsyncRequestCallbacks&,
-                                Tracing::Span&,
-                                const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
-          EXPECT_EQ("pb.lyft.ratelimit.RateLimitService", service_method.service()->full_name());
-          EXPECT_EQ("ShouldRateLimit", service_method.name());
-          return &async_request_;
-        }));
+        .WillOnce(
+            Invoke([this](const Protobuf::MethodDescriptor& service_method,
+                          const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+                          const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+              EXPECT_EQ("pb.lyft.ratelimit.RateLimitService",
+                        service_method.service()->full_name());
+              EXPECT_EQ("ShouldRateLimit", service_method.name());
+              return &async_request_;
+            }));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
 
