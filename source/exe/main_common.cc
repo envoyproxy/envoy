@@ -42,6 +42,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
+  Stats::RawStatData::configure(options_);
   switch (options_.mode()) {
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
@@ -53,7 +54,6 @@ MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options
       restarter_.reset(new Server::HotRestartNopImpl());
     }
 
-    Stats::RawStatData::configure(options_);
     tls_.reset(new ThreadLocal::InstanceImpl);
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
