@@ -261,6 +261,11 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
+  if (pipe_path.size() >= sizeof(address_.sun_path)) {
+    throw EnvoyException(
+        fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
+                    sizeof(address_.sun_path)));
+  }
   memset(&address_, 0, sizeof(address_));
   address_.sun_family = AF_UNIX;
   StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
