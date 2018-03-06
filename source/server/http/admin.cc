@@ -601,8 +601,8 @@ Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
       std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
 
   // start keep alive ping
-  hystrix_handler_info.ping_timer_ = hystrix_handler_info.callbacks_->dispatcher().createTimer(
-      [&hystrix_handler_info]() -> void {
+  hystrix_handler_info.ping_timer_ =
+      hystrix_handler_info.callbacks_->dispatcher().createTimer([&hystrix_handler_info]() -> void {
         HystrixHandler::sendKeepAlivePing(&hystrix_handler_info);
       });
 
