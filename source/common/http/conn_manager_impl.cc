@@ -364,7 +364,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  request_info_.finalTimeMonotonic(std::chrono::steady_clock::now());
+  request_info_.onRequestComplete();
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
@@ -758,7 +758,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
   if (end_stream) {
-    request_info_.lastDownstreamRxByteReceived(std::chrono::steady_clock::now());
+    request_info_.onLastDownstreamRxByteReceived();
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
 }
@@ -944,7 +944,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 #endif
 
   // Now actually encode via the codec.
-  request_info_.firstDownstreamTxByteSent(std::chrono::steady_clock::now());
+  request_info_.onFirstDownstreamTxByteSent();
   response_encoder_->encodeHeaders(headers,
                                    end_stream && continue_data_entry == encoder_filters_.end());
 
@@ -1035,7 +1035,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
-    request_info_.lastDownstreamTxByteSent(std::chrono::steady_clock::now());
+    request_info_.onLastDownstreamTxByteSent();
     request_timer_->complete();
     connection_manager_.doEndStream(*this);
   }

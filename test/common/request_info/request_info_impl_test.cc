@@ -17,6 +17,13 @@ namespace Envoy {
 namespace RequestInfo {
 namespace {
 
+std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
+                                       Optional<std::chrono::nanoseconds> timing) {
+  EXPECT_TRUE(timing.valid());
+  EXPECT_LE(last, timing.value());
+  return timing.value();
+}
+
 TEST(RequestInfoImplTest, TimingTest) {
   MonotonicTime pre_start = std::chrono::steady_clock::now();
   RequestInfoImpl info(Http::Protocol::Http2);
@@ -27,61 +34,38 @@ TEST(RequestInfoImplTest, TimingTest) {
   EXPECT_LE(pre_start, start) << "Start time was lower than expected";
   EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
-  std::chrono::nanoseconds dur = std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastDownstreamRxByteReceived().valid());
-  info.lastDownstreamRxByteReceived(start + dur);
-  Optional<std::chrono::nanoseconds> timing = info.lastDownstreamRxByteReceived();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onLastDownstreamRxByteReceived();
+  std::chrono::nanoseconds dur =
+      checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
 
-  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.firstUpstreamTxByteSent().valid());
-  info.firstUpstreamTxByteSent(start + dur);
-  timing = info.firstUpstreamTxByteSent();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onFirstUpstreamTxByteSent();
+  dur = checkDuration(dur, info.firstUpstreamTxByteSent());
 
-  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastUpstreamTxByteSent().valid());
-  info.lastUpstreamTxByteSent(start + dur);
-  timing = info.lastUpstreamTxByteSent();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onLastUpstreamTxByteSent();
+  dur = checkDuration(dur, info.lastUpstreamTxByteSent());
 
-  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.firstUpstreamRxByteReceived().valid());
-  info.firstUpstreamRxByteReceived(start + dur);
-  timing = info.firstUpstreamRxByteReceived();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onFirstUpstreamRxByteReceived();
+  dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
 
-  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastUpstreamRxByteReceived().valid());
-  info.lastUpstreamRxByteReceived(start + dur);
-  timing = info.lastUpstreamRxByteReceived();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onLastUpstreamRxByteReceived();
+  dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
 
-  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.firstDownstreamTxByteSent().valid());
-  info.firstDownstreamTxByteSent(start + dur);
-  timing = info.firstDownstreamTxByteSent();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onFirstDownstreamTxByteSent();
+  dur = checkDuration(dur, info.firstDownstreamTxByteSent());
 
-  dur += std::chrono::milliseconds(1);
   EXPECT_FALSE(info.lastDownstreamTxByteSent().valid());
-  info.lastDownstreamTxByteSent(start + dur);
-  timing = info.lastDownstreamTxByteSent();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  info.onLastDownstreamTxByteSent();
+  dur = checkDuration(dur, info.lastDownstreamTxByteSent());
 
-  dur += std::chrono::milliseconds(1);
-  EXPECT_FALSE(info.finalTimeMonotonic().valid());
-  info.finalTimeMonotonic(start + dur);
-  timing = info.finalTimeMonotonic();
-  EXPECT_TRUE(timing.valid());
-  EXPECT_EQ(dur, timing.value());
+  EXPECT_FALSE(info.requestComplete().valid());
+  info.onRequestComplete();
+  dur = checkDuration(dur, info.requestComplete());
 }
 
 TEST(RequestInfoImplTest, BytesTest) {

@@ -185,7 +185,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info.finalTimeMonotonic());
+      return AccessLogFormatUtils::durationToString(request_info.requestComplete());
     };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {

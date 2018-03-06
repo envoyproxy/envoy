@@ -32,7 +32,7 @@ MockRequestInfo::MockRequestInfo()
       .WillByDefault(ReturnPointee(&first_downstream_tx_byte_sent_));
   ON_CALL(*this, lastDownstreamTxByteSent())
       .WillByDefault(ReturnPointee(&last_downstream_tx_byte_sent_));
-  ON_CALL(*this, finalTimeMonotonic()).WillByDefault(ReturnPointee(&end_time_));
+  ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
   ON_CALL(*this, downstreamRemoteAddress()).WillByDefault(ReturnRef(downstream_remote_address_));

@@ -117,7 +117,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   {
     RequestInfoFormatter duration_format("DURATION");
     Optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
-    EXPECT_CALL(request_info, finalTimeMonotonic()).WillRepeatedly(Return(dur));
+    EXPECT_CALL(request_info, requestComplete()).WillRepeatedly(Return(dur));
     EXPECT_EQ("15", duration_format.format(header, header, request_info));
   }
 

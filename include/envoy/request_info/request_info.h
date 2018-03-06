@@ -105,9 +105,9 @@ public:
   virtual Optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
 
   /**
-   * @param time the monotonic clock time when the last byte of the request was received.
+   * Sets the time when the last byte of the request was received.
    */
-  virtual void lastDownstreamRxByteReceived(MonotonicTime time) PURE;
+  virtual void onLastDownstreamRxByteReceived() PURE;
 
   /**
    * @return the duration between the first byte of the request was sent upstream and the start of
@@ -117,9 +117,9 @@ public:
   virtual Optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
 
   /**
-   * @param time the monotonic clock time when the first byte of the request was sent upstream.
+   * Sets the time when the first byte of the request was sent upstream.
    */
-  virtual void firstUpstreamTxByteSent(MonotonicTime time) PURE;
+  virtual void onFirstUpstreamTxByteSent() PURE;
 
   /**
    * @return the duration between the last bye of the request was sent upstream and the start of the
@@ -128,9 +128,9 @@ public:
   virtual Optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
 
   /**
-   * @param time the monotonic clock time when the last bye of the request was sent upstream.
+   * Sets the time when the last bye of the request was sent upstream.
    */
-  virtual void lastUpstreamTxByteSent(MonotonicTime time) PURE;
+  virtual void onLastUpstreamTxByteSent() PURE;
 
   /**
    * @return the duration between the first byte of the response is received from upstream and the
@@ -139,10 +139,10 @@ public:
   virtual Optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
 
   /**
-   * @param time the monotonic clock time when the first byte of the response is received from
+   * Sets the time when the first byte of the response is received from
    * upstream.
    */
-  virtual void firstUpstreamRxByteReceived(MonotonicTime time) PURE;
+  virtual void onFirstUpstreamRxByteReceived() PURE;
 
   /**
    * @return the duration between the last byte of the response is received from upstream and the
@@ -151,10 +151,10 @@ public:
   virtual Optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
 
   /**
-   * @param time the monotonic clock time when the last byte of the response is received from
+   * Sets the time when the last byte of the response is received from
    * upstream.
    */
-  virtual void lastUpstreamRxByteReceived(MonotonicTime time) PURE;
+  virtual void onLastUpstreamRxByteReceived() PURE;
 
   /**
    * @return the duration between the first byte of the response is sent downstream and the start of
@@ -164,9 +164,9 @@ public:
   virtual Optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
 
   /**
-   * @param time the monotonic clock time when the first byte of the response is sent downstream.
+   * Sets the time when the first byte of the response is sent downstream.
    */
-  virtual void firstDownstreamTxByteSent(MonotonicTime time) PURE;
+  virtual void onFirstDownstreamTxByteSent() PURE;
 
   /**
    * @return the duration between the last byte of the response is sent downstream and the start of
@@ -175,21 +175,21 @@ public:
   virtual Optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
 
   /**
-   * @param time the monotonic clock time when the last byte of the response is sent downstream.
+   * Sets the time when the last byte of the response is sent downstream.
    */
-  virtual void lastDownstreamTxByteSent(MonotonicTime time) PURE;
-
-  /**
-   * @param time the end time for the request. This method is called once the request has been fully
-   * completed (i.e., when the request's ActiveStream is destroyed).
-   */
-  virtual void finalTimeMonotonic(MonotonicTime time) PURE;
+  virtual void onLastDownstreamTxByteSent() PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
-  virtual Optional<std::chrono::nanoseconds> finalTimeMonotonic() const PURE;
+  virtual Optional<std::chrono::nanoseconds> requestComplete() const PURE;
+
+  /**
+   * Sets the end time for the request. This method is called once the request has been fully
+   * completed (i.e., when the request's ActiveStream is destroyed).
+   */
+  virtual void onRequestComplete() PURE;
 
   /**
    * @return the number of body bytes sent in the response.
