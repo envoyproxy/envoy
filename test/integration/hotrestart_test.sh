@@ -118,8 +118,8 @@ fi
 HOT_RESTART_YAML_UDS="${TEST_TMPDIR}"/hot_restart_uds.yaml
 cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.yaml |
   sed -e "s#{{ test_tmpdir }}#${TEST_TMPDIR}#" | \
-  cat > "${HOT_RESTART_JSON_UDS}"
-JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
+  cat > "${HOT_RESTART_YAML_UDS}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_YAML_UDS}")
 
 # Enable this test to work with --runs_per_test
 if [[ -z "${TEST_RANDOM_SEED}" ]]; then
