@@ -77,8 +77,8 @@ TcpProxyConfig::TcpProxyConfig(
     const auto filter_it = filter_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
 
     if (filter_it != filter_metadata.end()) {
-      cluster_metadata_match_criteria_.reset(
-          new Router::MetadataMatchCriteriaImpl(filter_it->second));
+      cluster_metadata_match_criteria_ =
+          std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
 

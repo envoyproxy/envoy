@@ -106,11 +106,7 @@ public:
   TcpProxyUpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
-    if (cluster_metadata_match_criteria_) {
-      return cluster_metadata_match_criteria_.get();
-    }
-
-    return nullptr;
+    return cluster_metadata_match_criteria_.get();
   }
 
 private:
@@ -155,7 +151,9 @@ public:
   // Upstream::LoadBalancerContext
   Optional<uint64_t> computeHashKey() override { return {}; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
-    return config_->metadataMatchCriteria();
+    if (config_) {
+      return config_->metadataMatchCriteria();
+    }
   }
 
   const Network::Connection* downstreamConnection() const override {
