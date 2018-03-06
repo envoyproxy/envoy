@@ -32,8 +32,8 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
 
