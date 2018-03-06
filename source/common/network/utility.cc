@@ -374,7 +374,7 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::parseProtobufAddress(const envoy::api::v2::core::Address& proto_address) {
+Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::api::v2::core::Address::kSocketAddress:
     return Network::Utility::parseInternetAddress(proto_address.socket_address().address(),

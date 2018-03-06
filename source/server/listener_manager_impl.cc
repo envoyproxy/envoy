@@ -107,7 +107,7 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
-    : parent_(parent), address_(Network::Utility::parseProtobufAddress(config.address())),
+    : parent_(parent), address_(Network::Utility::protobufAddressToAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
