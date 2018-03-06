@@ -13,7 +13,7 @@
     }]
   },
   "listeners": [{
-    "address": "unix://{{ test_tmpdir }}/unix-sockets.listener_0",
+    "address": "unix://{{ socket_dir }}/unix-sockets.listener_0",
     "filters": [{
       "type": "read",
       "name": "http_connection_manager",

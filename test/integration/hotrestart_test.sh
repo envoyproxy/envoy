@@ -116,8 +116,9 @@ fi
 # Also test for listening on UNIX domain sockets. We use IPv4 for the
 # upstreams to avoid too much wild sedding.
 HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.json
+SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
 cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.json |
-  sed -e "s#{{ test_tmpdir }}#${TEST_TMPDIR}#" | \
+  sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
