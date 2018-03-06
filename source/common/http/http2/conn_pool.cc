@@ -207,7 +207,10 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   if (!client.closed_with_active_rq_) {
     checkForDrained();
   }
-  client.enableIdleTimer();
+
+  if (client.client_->numActiveRequests() == 0) {
+    client.enableIdleTimer();
+  }
 }
 
 void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason reason) {
@@ -220,7 +223,9 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
   } else if (reason == StreamResetReason::RemoteReset) {
     host_->cluster().stats().upstream_rq_rx_reset_.inc();
   }
-  client.enableIdleTimer();
+  if (client.client_->numActiveRequests() == 0) {
+    client.enableIdleTimer();
+  }
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
