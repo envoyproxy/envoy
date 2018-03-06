@@ -47,7 +47,7 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
   // TODO PERF: Avoid copy.
   std::string x_request_id = request_headers.RequestId()->value().c_str();
 
-  uint16_t result;
+  uint64_t result;
   // Skip if x-request-id is corrupted.
   if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
     return;

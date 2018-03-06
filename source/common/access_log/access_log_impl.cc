@@ -37,6 +37,8 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
     return lhs >= value;
   case envoy::config::filter::accesslog::v2::ComparisonFilter::EQ:
     return lhs == value;
+  case envoy::config::filter::accesslog::v2::ComparisonFilter::LE:
+    return lhs <= value;
   default:
     NOT_REACHED;
   }
@@ -44,7 +46,7 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
 
 FilterPtr
 FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
-                         Runtime::Loader& runtime) {
+                         Runtime::Loader& runtime, Runtime::RandomGenerator& random) {
   switch (config.filter_specifier_case()) {
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kStatusCodeFilter:
     return FilterPtr{new StatusCodeFilter(config.status_code_filter(), runtime)};
@@ -55,11 +57,11 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kTraceableFilter:
     return FilterPtr{new TraceableRequestFilter()};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kRuntimeFilter:
-    return FilterPtr{new RuntimeFilter(config.runtime_filter(), runtime)};
+    return FilterPtr{new RuntimeFilter(config.runtime_filter(), runtime, random)};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kAndFilter:
-    return FilterPtr{new AndFilter(config.and_filter(), runtime)};
+    return FilterPtr{new AndFilter(config.and_filter(), runtime, random)};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kOrFilter:
-    return FilterPtr{new OrFilter(config.or_filter(), runtime)};
+    return FilterPtr{new OrFilter(config.or_filter(), runtime, random)};
   default:
     NOT_REACHED;
   }
@@ -86,38 +88,41 @@ bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::RuntimeFilter& config,
-                             Runtime::Loader& runtime)
-    : runtime_(runtime), runtime_key_(config.runtime_key()) {}
+                             Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+    : runtime_(runtime), random_(random), runtime_key_(config.runtime_key()),
+      percent_(config.percent_sampled()),
+      use_independent_randomness_(config.use_independent_randomness()) {}
 
 bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
                              const Http::HeaderMap& request_header) {
   const Http::HeaderEntry* uuid = request_header.RequestId();
-  uint16_t sampled_value;
-  if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
-    uint64_t runtime_value =
-        std::min<uint64_t>(runtime_.snapshot().getInteger(runtime_key_, 0), 100);
-
-    return sampled_value < static_cast<uint16_t>(runtime_value);
-  } else {
-    return runtime_.snapshot().featureEnabled(runtime_key_, 0);
+  uint64_t random_value;
+  if (use_independent_randomness_ || uuid == nullptr ||
+      !UuidUtils::uuidModBy(uuid->value().c_str(), random_value,
+                            ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_))) {
+    random_value = random_.random();
   }
+
+  return runtime_.snapshot().featureEnabled(
+      runtime_key_, percent_.numerator(), random_value,
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_));
 }
 
 OperatorFilter::OperatorFilter(const Protobuf::RepeatedPtrField<
                                    envoy::config::filter::accesslog::v2::AccessLogFilter>& configs,
-                               Runtime::Loader& runtime) {
+                               Runtime::Loader& runtime, Runtime::RandomGenerator& random) {
   for (const auto& config : configs) {
-    filters_.emplace_back(FilterFactory::fromProto(config, runtime));
+    filters_.emplace_back(FilterFactory::fromProto(config, runtime, random));
   }
 }
 
 OrFilter::OrFilter(const envoy::config::filter::accesslog::v2::OrFilter& config,
-                   Runtime::Loader& runtime)
-    : OperatorFilter(config.filters(), runtime) {}
+                   Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+    : OperatorFilter(config.filters(), runtime, random) {}
 
 AndFilter::AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& config,
-                     Runtime::Loader& runtime)
-    : OperatorFilter(config.filters(), runtime) {}
+                     Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+    : OperatorFilter(config.filters(), runtime, random) {}
 
 bool OrFilter::evaluate(const RequestInfo::RequestInfo& info,
                         const Http::HeaderMap& request_headers) {
@@ -156,7 +161,7 @@ AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLo
                             Server::Configuration::FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
-    filter = FilterFactory::fromProto(config.filter(), context.runtime());
+    filter = FilterFactory::fromProto(config.filter(), context.runtime(), context.random());
   }
 
   auto& factory =

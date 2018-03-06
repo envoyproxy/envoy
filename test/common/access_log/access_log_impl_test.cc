@@ -41,6 +41,12 @@ parseAccessLogFromJson(const std::string& json_string) {
   return access_log;
 }
 
+envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const std::string& yaml) {
+  envoy::config::filter::accesslog::v2::AccessLog access_log;
+  MessageUtil::loadFromYaml(yaml, access_log);
+  return access_log;
+}
+
 class TestRequestInfo : public RequestInfo::RequestInfo {
 public:
   TestRequestInfo() {
@@ -260,21 +266,99 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   // Value is taken from random generator.
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(true));
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 42, 100))
+      .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(false));
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 43, 100))
+      .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 
   // Value is taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
-  EXPECT_CALL(runtime_.snapshot_, getInteger("access_log.test_key", 0)).WillOnce(Return(56));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
+      .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("access_log.test_key", 0)).WillOnce(Return(55));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterV2) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: TEN_THOUSAND
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  // Value is taken from random generator.
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 10000))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  // Value is taken from x-request-id.
+  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterV2IndependentRandomness) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: MILLION
+    use_independent_randomness: true
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  // Value should not be taken from x-request-id.
+  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 1000000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 1000000))
+      .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 }
@@ -573,6 +657,33 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(500));
   EXPECT_FALSE(filter.evaluate(info, request_headers));
+}
+
+TEST_F(AccessLogImplTest, StatusCodeLessThan) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  status_code_filter:
+    comparison:
+      op: LE
+      value:
+        default_value: 499
+        runtime_key: hello
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  request_info_.response_code_.value(499);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  request_info_.response_code_.value(500);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
 }
 
 } // namespace
