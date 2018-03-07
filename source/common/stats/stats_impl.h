@@ -44,6 +44,13 @@ public:
                   IntervalSet<size_t>& remove_characters) const override;
   absl::string_view prefixToken() const override { return prefix_; }
 
+  /**
+   * @param stat_name The stat name
+   * @return bool indicates whether tag extraction should be skipped for this stat_name due
+   * to a subdstring mismatch.
+   */
+  bool substrMismatch(const std::string& stat_name) const;
+
 private:
   /**
    * Examines a regex string, looking for the pattern: ^alphanumerics_with_underscores\.
