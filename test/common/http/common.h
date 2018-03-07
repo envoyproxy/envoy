@@ -20,7 +20,7 @@ public:
   Event::MockDispatcher dispatcher;
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
                      DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host,dispatcher),
+      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host, dispatcher),
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
