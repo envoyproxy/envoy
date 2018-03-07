@@ -10,8 +10,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/listen_socket.h"
 
-#include "common/stats/hystrix.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -34,33 +32,11 @@ namespace Server {
  */
 class HandlerInfo {
 public:
-  HandlerInfo(){};
-  virtual ~HandlerInfo(){};
-  virtual void Destroy(){};
+  virtual ~HandlerInfo() {};
+  virtual void Destroy() PURE;
 };
+
 typedef std::unique_ptr<HandlerInfo> HandlerInfoPtr;
-
-/**
- * This class contains data which will be sent from admin filter to a hystrix_event_stream handler
- * and build a class which contains the relevant data.
- */
-class HystrixHandlerInfo : public HandlerInfo {
-public:
-  HystrixHandlerInfo(Http::StreamDecoderFilterCallbacks* callbacks)
-      : stats_(std::make_unique<Stats::Hystrix>()), data_timer_(nullptr), ping_timer_(nullptr),
-        callbacks_(callbacks) {}
-  virtual ~HystrixHandlerInfo(){};
-  void Destroy();
-
-  /**
-   * HystrixHandlerInfo includes statistics for hystrix API, timers for build (and send) data and
-   * keep alive messages and the handler's callback
-   */
-  Stats::HystrixPtr stats_;
-  Event::TimerPtr data_timer_;
-  Event::TimerPtr ping_timer_;
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
-};
 
 /**
  * Global admin HTTP endpoint for the server.

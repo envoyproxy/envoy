@@ -590,7 +590,7 @@ Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
       Http::Headers::get().AccessControlAllowOriginValue.All);
   response_headers.insertNoChunks().value().setReference("0");
 
-  HystrixHandlerInfo& hystrix_handler_info = dynamic_cast<HystrixHandlerInfo&>(handler_info);
+  HystrixHandlerInfoImpl& hystrix_handler_info = dynamic_cast<HystrixHandlerInfoImpl&>(handler_info);
 
   // start streaming
   hystrix_handler_info.data_timer_ = hystrix_handler_info.callbacks_->dispatcher().createTimer(
@@ -624,10 +624,10 @@ void AdminFilter::onComplete() {
   bool end_stream = true;
 
   if (path.find("/hystrix_event_stream") == std::string::npos) {
-    handler_info_ = std::make_unique<HandlerInfo>();
+    handler_info_ = std::make_unique<HandlerInfoImpl>();
     code = parent_.runCallback(path, *header_map, response, *handler_info_);
   } else {
-    handler_info_ = std::make_unique<HystrixHandlerInfo>(callbacks_);
+    handler_info_ = std::make_unique<HystrixHandlerInfoImpl>(callbacks_);
     code = parent_.runCallback(path, *header_map, response, *handler_info_);
     end_stream = false;
   }
@@ -846,7 +846,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
   return false;
 }
 
-void HystrixHandlerInfo::Destroy() {
+void HystrixHandlerInfoImpl::Destroy() {
   if (data_timer_) {
     data_timer_->disableTimer();
     data_timer_.reset();
@@ -857,7 +857,7 @@ void HystrixHandlerInfo::Destroy() {
   }
 }
 
-void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfo* hystrix_handler_info,
+void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfoImpl* hystrix_handler_info,
                                                 Server::Instance& server) {
   hystrix_handler_info->stats_->incCounter();
   for (auto& cluster : server.clusterManager().clusters()) {
@@ -866,7 +866,7 @@ void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfo* hystrix_hand
   }
 }
 
-void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfo* hystrix_handler_info,
+void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix_handler_info,
                                                  Server::Instance& server) {
   updateHystrixRollingWindow(hystrix_handler_info, server);
   std::stringstream ss;
@@ -891,7 +891,7 @@ void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfo* hystrix_han
       std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
 }
 
-void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfo* hystrix_handler_info) {
+void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_info) {
   Buffer::OwnedImpl data;
   data.add(":\n\n");
   hystrix_handler_info->callbacks_->encodeData(data, false);

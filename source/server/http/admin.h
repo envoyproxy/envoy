@@ -22,11 +22,45 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/stats/hystrix.h"
 
 #include "server/config/network/http_connection_manager.h"
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * This class contains data which will be sent from admin filter to a handler
+ * and build a class which contains the relevant data.
+ */
+class HandlerInfoImpl : public HandlerInfo {
+public:
+  HandlerInfoImpl(){};
+  virtual ~HandlerInfoImpl(){};
+  virtual void Destroy(){};
+};
+
+/**
+ * This class contains data which will be sent from admin filter to a hystrix_event_stream handler
+ * and build a class which contains the relevant data.
+ */
+class HystrixHandlerInfoImpl : public HandlerInfo {
+public:
+  HystrixHandlerInfoImpl(Http::StreamDecoderFilterCallbacks* callbacks)
+      : stats_(new Stats::Hystrix()), data_timer_(nullptr), ping_timer_(nullptr),
+        callbacks_(callbacks) {}
+  virtual ~HystrixHandlerInfoImpl(){};
+  virtual void Destroy();
+
+  /**
+   * HystrixHandlerInfoImpl includes statistics for hystrix API, timers for build (and send) data and
+   * keep alive messages and the handler's callback
+   */
+  Stats::HystrixPtr stats_;
+  Event::TimerPtr data_timer_;
+  Event::TimerPtr ping_timer_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+};
 
 /**
  * Implementation of Server::admin.
@@ -292,7 +326,7 @@ public:
    * filter (callback, timers, statistics)
    * @param server contains envoy statistics
    */
-  static void updateHystrixRollingWindow(HystrixHandlerInfo* hystrix_handler_info,
+  static void updateHystrixRollingWindow(HystrixHandlerInfoImpl* hystrix_handler_info,
                                          Server::Instance& server);
   /**
    * Builds a buffer of envoy statistics which will be sent to hystrix dashboard according to
@@ -301,14 +335,14 @@ public:
    * filter (callback, timers, statistics)
    * @param server contains envoy statistics*
    */
-  static void prepareAndSendHystrixStream(HystrixHandlerInfo* hystrix_handler_info,
+  static void prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix_handler_info,
                                           Server::Instance& server);
   /**
    * Sends a keep alive (ping) message to hystrix dashboard
    * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
    * filter (callback, timers, statistics)
    */
-  static void sendKeepAlivePing(HystrixHandlerInfo* hystrix_handler_info);
+  static void sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_info);
 };
 
 } // namespace Server
