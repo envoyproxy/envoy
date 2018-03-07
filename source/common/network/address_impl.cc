@@ -261,6 +261,11 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
+  if (pipe_path.size() >= sizeof(address_.sun_path)) {
+    throw EnvoyException(
+        fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
+                    sizeof(address_.sun_path)));
+  }
   memset(&address_, 0, sizeof(address_));
   address_.sun_family = AF_UNIX;
   StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
@@ -280,6 +285,10 @@ int PipeInstance::bind(int fd) const {
     return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
                   offsetof(struct sockaddr_un, sun_path) + address_length_);
   }
+  // Try to unlink an existing filesystem object at the requested path. Ignore
+  // errors -- it's fine if the path doesn't exist, and if it exists but can't
+  // be unlinked then `::bind()` will generate a reasonable errno.
+  unlink(address_.sun_path);
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 

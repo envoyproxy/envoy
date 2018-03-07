@@ -113,6 +113,16 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
 fi
 
+# Also test for listening on UNIX domain sockets. We use IPv4 for the
+# upstreams to avoid too much wild sedding.
+HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.json
+SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
+cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.json |
+  sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
+  sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  cat > "${HOT_RESTART_JSON_UDS}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
+
 # Enable this test to work with --runs_per_test
 if [[ -z "${TEST_RANDOM_SEED}" ]]; then
   BASE_ID=1
@@ -128,7 +138,7 @@ do
   # TODO(jun03): instead of setting the base-id, the validate server should use the nop hot restart
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
-      --service-node node --base-id "${BASE_ID}"
+      --max-obj-name-len 500 --service-node node --base-id "${BASE_ID}"
 
   # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
   # sanity test.
@@ -136,7 +146,7 @@ do
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+      --max-obj-name-len 500 --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
 
   FIRST_SERVER_PID=$BACKGROUND_PID
 
@@ -159,7 +169,8 @@ do
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   echo fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ...
   ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
+    --max-obj-name-len 500 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for hot-restart-version mismatch when max-obj-name-len differs
@@ -178,7 +189,7 @@ do
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_1}"
+      --max-obj-name-len 500 --admin-address-path "${ADMIN_ADDRESS_PATH_1}"
 
   SECOND_SERVER_PID=$BACKGROUND_PID
 
@@ -196,7 +207,7 @@ do
   start_test Starting epoch 2
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 2  --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_2}"
+      --max-obj-name-len 500 --admin-address-path "${ADMIN_ADDRESS_PATH_2}"
 
   THIRD_SERVER_PID=$BACKGROUND_PID
   sleep 3
