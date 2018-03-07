@@ -414,12 +414,7 @@ public:
   /**
    * @return whether or not the trace_id_high attribute is set.
    */
-  bool isSetTraceIdHigh() const {
-    if (trace_id_high_) {
-      return true;
-    }
-    return false;
-  }
+  bool isSetTraceIdHigh() const { return trace_id_high_.has_value(); }
 
   /**
    * Sets the span start-time attribute (monotonic, used to calculate duration).
