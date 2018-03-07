@@ -285,6 +285,9 @@ int PipeInstance::bind(int fd) const {
     return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
                   offsetof(struct sockaddr_un, sun_path) + address_length_);
   }
+  // Try to unlink an existing filesystem object at the requested path. Ignore
+  // errors -- it's fine if the path doesn't exist, and if it exists but can't
+  // be unlinked then `::bind()` will generate a reasonable errno.
   unlink(address_.sun_path);
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }

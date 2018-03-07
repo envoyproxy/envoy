@@ -57,21 +57,17 @@ public:
 
   void initialize() override;
 
-  std::string getAdminSocketName() {
-    const std::string path = TestEnvironment::unixDomainSocketPath("admin.sock");
+  std::string getSocketName(const std::string& path) {
+    const std::string name = TestEnvironment::unixDomainSocketPath(path);
     if (!abstract_namespace_) {
-      return path;
+      return name;
     }
-    return "@" + path;
+    return "@" + name;
   }
 
-  std::string getListenerSocketName() {
-    const std::string path = TestEnvironment::unixDomainSocketPath("listener_0.sock");
-    if (!abstract_namespace_) {
-      return path;
-    }
-    return "@" + path;
-  }
+  std::string getAdminSocketName() { return getSocketName("admin.sock"); }
+
+  std::string getListenerSocketName() { return getSocketName("listener_0.sock"); }
 
 protected:
   HttpIntegrationTest::ConnectionCreationFunction createConnectionFn();
