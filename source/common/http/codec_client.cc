@@ -24,7 +24,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
 
-  bool idle_timeout_exists = true; // TODO: get it from config
+  bool idle_timeout_exists = false; // TODO: get it from config
   if (idle_timeout_exists) {
     idle_timer_ = dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
   }
