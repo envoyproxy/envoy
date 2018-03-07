@@ -67,7 +67,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
               "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
           nullptr),
-      host_description,*dispatcher);
+      host_description, *dispatcher);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
