@@ -405,7 +405,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(Http::CodecClient::Type::HTTP1, std::move(data.connection_),
-                                   data.host_description_,dispatcher_);
+                                   data.host_description_, dispatcher_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -902,8 +902,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,dispatcher_);
+  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
+                                                 std::move(data.connection_),
+                                                 data.host_description_, dispatcher_);
 }
 
 } // namespace Upstream
