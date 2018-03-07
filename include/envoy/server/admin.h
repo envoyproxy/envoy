@@ -32,7 +32,7 @@ namespace Server {
  */
 class HandlerInfo {
 public:
-  virtual ~HandlerInfo() {};
+  virtual ~HandlerInfo(){};
   virtual void Destroy() PURE;
 };
 

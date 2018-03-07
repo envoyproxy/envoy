@@ -77,6 +77,9 @@ envoy_cc_library(
     hdrs = ["hystrix.h"],
     deps = [
         ":stats_lib",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
     ],
 )

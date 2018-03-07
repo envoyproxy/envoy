@@ -233,7 +233,7 @@ TEST_F(RdsImplTest, Basic) {
 )EOF";
   EXPECT_EQ("", rds_->versionInfo());
   Http::HeaderMapImpl header_map;
-  Server::HandlerInfo handler_info;
+  Server::HandlerInfoImpl handler_info;
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data, handler_info));
   EXPECT_EQ(routes_expected_output_no_routes, TestUtility::bufferToString(data));
   data.drain(data.length());
@@ -617,7 +617,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   // Test Admin /routes handler.
   Http::HeaderMapImpl header_map;
-  Server::HandlerInfo handler_info;
+  Server::HandlerInfoImpl handler_info;
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data, handler_info));
   EXPECT_EQ(routes_expected_output, TestUtility::bufferToString(data));
   data.drain(data.length());

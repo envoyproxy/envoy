@@ -41,28 +41,6 @@ public:
 };
 
 /**
- * This class contains data which will be sent from admin filter to a hystrix_event_stream handler
- * and build a class which contains the relevant data.
- */
-class HystrixHandlerInfoImpl : public HandlerInfo {
-public:
-  HystrixHandlerInfoImpl(Http::StreamDecoderFilterCallbacks* callbacks)
-      : stats_(new Stats::Hystrix()), data_timer_(nullptr), ping_timer_(nullptr),
-        callbacks_(callbacks) {}
-  virtual ~HystrixHandlerInfoImpl(){};
-  virtual void Destroy();
-
-  /**
-   * HystrixHandlerInfoImpl includes statistics for hystrix API, timers for build (and send) data and
-   * keep alive messages and the handler's callback
-   */
-  Stats::HystrixPtr stats_;
-  Event::TimerPtr data_timer_;
-  Event::TimerPtr ping_timer_;
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
-};
-
-/**
  * Implementation of Server::admin.
  */
 class AdminImpl : public Admin,
@@ -312,37 +290,6 @@ private:
    * Take a string and sanitize it according to Prometheus conventions.
    */
   static std::string sanitizeName(const std::string& name);
-};
-
-/**
- * Convert statistics from envoy format to hystrix format and prepare them and writes them to the
- * appropriate socket
- */
-class HystrixHandler {
-public:
-  /**
-   * Update counter and set values of upstream_rq statistics
-   * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
-   * filter (callback, timers, statistics)
-   * @param server contains envoy statistics
-   */
-  static void updateHystrixRollingWindow(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                         Server::Instance& server);
-  /**
-   * Builds a buffer of envoy statistics which will be sent to hystrix dashboard according to
-   * hystrix API
-   * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
-   * filter (callback, timers, statistics)
-   * @param server contains envoy statistics*
-   */
-  static void prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                          Server::Instance& server);
-  /**
-   * Sends a keep alive (ping) message to hystrix dashboard
-   * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
-   * filter (callback, timers, statistics)
-   */
-  static void sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_info);
 };
 
 } // namespace Server

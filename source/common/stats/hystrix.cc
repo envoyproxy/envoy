@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -29,8 +30,6 @@ uint64_t Hystrix::getRollingValue(std::string cluster_name, std::string stats) {
   if (rolling_stats_map_.find(key) != rolling_stats_map_.end()) {
     // if the counter was reset, the result is negative
     // better return 0, will be back to normal once one rolling window passes
-    // better idea what to return? could change the algorithm to keep last valid delta,
-    // updated with pushNewValue and kept stable when the update is negative.
     if (rolling_stats_map_[key][current_index_] <
         rolling_stats_map_[key][(current_index_ + 1) % num_of_buckets_]) {
       return 0;
@@ -213,6 +212,82 @@ std::string Hystrix::printRollingWindow() {
     out_str << std::endl;
   }
   return out_str.str();
+}
+
+void HystrixHandlerInfoImpl::Destroy() {
+  if (data_timer_) {
+    data_timer_->disableTimer();
+    data_timer_.reset();
+  }
+  if (ping_timer_) {
+    ping_timer_->disableTimer();
+    ping_timer_.reset();
+  }
+}
+
+void HystrixHandler::HandleEventStream(HystrixHandlerInfoImpl* hystrix_handler_info,
+                                       Server::Instance& server) {
+  Server::Instance* serverPtr = &server;
+  // start streaming
+  hystrix_handler_info->data_timer_ = hystrix_handler_info->callbacks_->dispatcher().createTimer(
+      [hystrix_handler_info, serverPtr]() -> void {
+        HystrixHandler::prepareAndSendHystrixStream(hystrix_handler_info, serverPtr);
+      });
+  hystrix_handler_info->data_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
+
+  // start keep alive ping
+  hystrix_handler_info->ping_timer_ =
+      hystrix_handler_info->callbacks_->dispatcher().createTimer([hystrix_handler_info]() -> void {
+        HystrixHandler::sendKeepAlivePing(hystrix_handler_info);
+      });
+
+  hystrix_handler_info->ping_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
+}
+
+void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfoImpl* hystrix_handler_info,
+                                                Server::Instance* server) {
+  hystrix_handler_info->stats_->incCounter();
+  for (auto& cluster : server->clusterManager().clusters()) {
+    hystrix_handler_info->stats_->updateRollingWindowMap(server->stats(),
+                                                         cluster.second.get().info()->name());
+  }
+}
+
+void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix_handler_info,
+                                                 Server::Instance* server) {
+  updateHystrixRollingWindow(hystrix_handler_info, server);
+  std::stringstream ss;
+  for (auto& cluster : server->clusterManager().clusters()) {
+    hystrix_handler_info->stats_->getClusterStats(
+        ss, cluster.second.get().info()->name(),
+        cluster.second.get()
+            .info()
+            ->resourceManager(Upstream::ResourcePriority::Default)
+            .pendingRequests()
+            .max(),
+        server->stats()
+            .gauge("cluster." + cluster.second.get().info()->name() + ".membership_total")
+            .value());
+  }
+  Buffer::OwnedImpl data;
+  data.add(ss.str());
+  hystrix_handler_info->callbacks_->encodeData(data, false);
+
+  // restart timer
+  hystrix_handler_info->data_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
+}
+
+void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_info) {
+  Buffer::OwnedImpl data;
+  data.add(":\n\n");
+  hystrix_handler_info->callbacks_->encodeData(data, false);
+
+  // restart timer
+  hystrix_handler_info->ping_timer_->enableTimer(
+      std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
 }
 
 } // namespace Stats
