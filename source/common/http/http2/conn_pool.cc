@@ -102,7 +102,6 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
-    primary_client_->disableIdleTimer();
   }
 
   return nullptr;
@@ -176,12 +175,6 @@ void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
   client.client_->close();
 }
 
-void ConnPoolImpl::onIdleTimeout(ActiveClient& client) {
-  ENVOY_CONN_LOG(debug, "idle timeout", *client.client_);
-  host_->cluster().stats().upstream_cx_idle_timeout_.inc();
-  client.client_->close();
-}
-
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
@@ -207,10 +200,6 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
   if (!client.closed_with_active_rq_) {
     checkForDrained();
   }
-
-  if (client.client_->numActiveRequests() == 0) {
-    client.enableIdleTimer();
-  }
 }
 
 void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason reason) {
@@ -222,9 +211,6 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
     host_->cluster().stats().upstream_rq_tx_reset_.inc();
   } else if (reason == StreamResetReason::RemoteReset) {
     host_->cluster().stats().upstream_rq_rx_reset_.inc();
-  }
-  if (client.client_->numActiveRequests() == 0) {
-    client.enableIdleTimer();
   }
 }
 
@@ -241,11 +227,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   client_->setCodecClientCallbacks(*this);
   client_->setCodecConnectionCallbacks(*this);
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
-
-  bool idle_timeout_exists = false; // TODO: get it from config
-  if (idle_timeout_exists) {
-    idle_timer_ = parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
-  }
 
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
@@ -269,7 +250,7 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
-                                           data.host_description_)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

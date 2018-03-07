@@ -12,8 +12,9 @@ namespace Envoy {
 namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-                         Upstream::HostDescriptionConstSharedPtr host)
-    : type_(type), connection_(std::move(connection)), host_(host) {
+                         Upstream::HostDescriptionConstSharedPtr host,
+                         Event::Dispatcher& dispatcher)
+    : type_(type), connection_(std::move(connection)), host_(host), dispatcher_(dispatcher) {
   // Make sure upstream connections process data and then the FIN, rather than processing
   // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for details)
   connection_->detectEarlyCloseWhenReadDisabled(false);
@@ -22,6 +23,11 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
+
+  bool idle_timeout_exists = true; // TODO: get it from config
+  if (idle_timeout_exists) {
+    idle_timer_ = dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
+  }
 
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
@@ -37,6 +43,9 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamDestroy();
   }
+  if (numActiveRequests() == 0) {
+    enableIdleTimer();
+  }
 }
 
 StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
@@ -45,6 +54,9 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
   request->encoder_->getStream().addCallbacks(*request);
   request->moveIntoList(std::move(request), active_requests_);
   return *active_requests_.front()->encoder_;
+  std::cout << "disabling idle timer..."
+            << "\n";
+  disableIdleTimer();
 }
 
 void CodecClient::onEvent(Network::ConnectionEvent event) {
@@ -120,9 +132,15 @@ void CodecClient::onData(Buffer::Instance& data) {
   }
 }
 
+void CodecClient::onIdleTimeout() {
+  host_->cluster().stats().upstream_cx_idle_timeout_.inc();
+  close();
+}
+
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                                 Upstream::HostDescriptionConstSharedPtr host)
-    : CodecClient(type, std::move(connection), host) {
+                                 Upstream::HostDescriptionConstSharedPtr host,
+                                 Event::Dispatcher& dispatcher)
+    : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
     codec_.reset(new Http1::ClientConnectionImpl(*connection_, *this));

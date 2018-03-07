@@ -81,7 +81,6 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
     attachRequestToClient(*busy_clients_.front(), response_decoder, callbacks);
-    busy_clients_.front()->disableIdleTimer();
     return nullptr;
   }
 
@@ -95,7 +94,6 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     // If we have no connections at all, make one no matter what so we don't starve.
     if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || can_create_connection) {
       createNewConnection();
-      busy_clients_.front()->disableIdleTimer();
     }
 
     ENVOY_LOG(debug, "queueing request due to no available connections");
@@ -213,7 +211,6 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   } else {
     processIdleClient(client);
   }
-  client.enableIdleTimer();
 }
 
 void ConnPoolImpl::processIdleClient(ActiveClient& client) {
@@ -292,11 +289,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);
-
-  bool idle_timeout_exists = false; // TODO: get it from config
-  if (idle_timeout_exists) {
-    idle_timer_ = parent_.dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
-  }
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
@@ -329,15 +321,9 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
   codec_client_->close();
 }
 
-void ConnPoolImpl::onIdleTimeout(ActiveClient& client) {
-  ENVOY_CONN_LOG(debug, "idle timeout", *client.codec_client_);
-  host_->cluster().stats().upstream_cx_idle_timeout_.inc();
-  client.codec_client_->close();
-}
-
 CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

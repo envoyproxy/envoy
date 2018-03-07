@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -112,7 +113,7 @@ protected:
    * @param host supplies the owning host.
    */
   CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-              Upstream::HostDescriptionConstSharedPtr host);
+              Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   // Http::ConnectionCallbacks
   void onGoAway() override {
@@ -121,10 +122,27 @@ protected:
     }
   }
 
+  void onIdleTimeout();
+  void disableIdleTimer() {
+    if (idle_timer_) {
+      idle_timer_->disableTimer();
+    }
+  }
+
+  void enableIdleTimer() {
+    if (idle_timer_) {
+      idle_timer_->enableTimer(idle_timeout_);
+    }
+  }
+
   const Type type_;
   ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
+  Event::Dispatcher& dispatcher_;
+  Event::TimerPtr idle_timer_;
+  std::chrono::milliseconds idle_timeout_ =
+      std::chrono::milliseconds(10000); // TODO: get it from config
 
 private:
   /**
@@ -206,7 +224,7 @@ typedef std::unique_ptr<CodecClient> CodecClientPtr;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 };
 
 } // namespace Http
