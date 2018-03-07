@@ -7,7 +7,7 @@
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
-#include  "common/stats/stats_impl.h"
+
 #include "server/http/admin.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -16,6 +16,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -292,54 +293,5 @@ TEST(PrometheusStatsFormatter, FormattedTags) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(PrometheusStatsFormatter, statsAsPrometheus) {
-  
-  // create two clusters and two gauges with metric name being same same and 
-  // different tag names. In the end there only two metric names
-  // should be inserted, one for gauge and one for counter
-  
-  Stats::TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
-  std::string name = "cluster.test_cluster_1.upstream_cx_total";
-  std::vector<Stats::Tag> tags;
-  Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
-  tags.push_back(tag1);
-  Stats::HeapRawStatDataAllocator alloc_;
-  Stats::RawStatData *data = alloc_.alloc(name);
-  Stats::CounterSharedPtr c1(new Stats::CounterImpl(*data, alloc_, std::string(name),std::move(tags)));
-  std::list<Stats::CounterSharedPtr>counters;
-  counters.push_back(c1);
-
-  std::string name1 = "cluster.test_cluster_1.upstream_cx_total";
-  std::vector<Stats::Tag> tags1;
-  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
-  tags1.push_back(tag2);
-  Stats::HeapRawStatDataAllocator alloc1_;
-  Stats::RawStatData *data1 = alloc1_.alloc(name);
-  Stats::CounterSharedPtr c2(new Stats::CounterImpl(*data1, alloc1_, std::string(name1),std::move(tags1)));
-  counters.push_back(c2);
-  
-  std::list<Stats::GaugeSharedPtr>gauges;
-  std::vector<Stats::Tag> tags3;
-  std::string name3 = "cluster.test_cluster_2.upstream_cx_total";
-  Stats::Tag tag3 = {"another_tag_name_3", "another_tag_3-value"};
-  tags3.push_back(tag3);
-  Stats::HeapRawStatDataAllocator alloc3_;
-  Stats::RawStatData *data3 = alloc3_.alloc(name3);
-  Stats::GaugeSharedPtr g3(new Stats::GaugeImpl(*data3, alloc3_, std::string(name3),std::move(tags3)));
-  gauges.push_back(g3);
- 
-  std::vector<Stats::Tag> tags4;
-  std::string name4 = "cluster.test_cluster_2.upstream_cx_total";
-  Stats::Tag tag4 = {"another_tag_name_4", "another_tag_4-value"};
-  tags3.push_back(tag4);
-  Stats::HeapRawStatDataAllocator alloc4_;
-  Stats::RawStatData *data4 = alloc4_.alloc(name4);
-  Stats::GaugeSharedPtr g4(new Stats::GaugeImpl(*data4, alloc4_, std::string(name4),std::move(tags4)));
-  gauges.push_back(g4);
-   
-  Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters,gauges,response));
-
-}
 } // namespace Server
 } // namespace Envoy

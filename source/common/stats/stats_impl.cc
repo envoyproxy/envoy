@@ -138,7 +138,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // This must be zero-initialized
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
-  data_=data;
+  data_ = data;
   return data;
 }
 
@@ -245,20 +245,20 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 HeapRawStatDataAllocator::~HeapRawStatDataAllocator() {
-  if( data_!=nullptr && (data_->ref_count_ >0)) {
-   --data_->ref_count_;
-   std::free(&(*data_));
-   data_=nullptr;
- }
+  if (data_ != nullptr && (data_->ref_count_ > 0)) {
+    --data_->ref_count_;
+    std::free(&(*data_));
+    data_ = nullptr;
+  }
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
   // This allocator does not ever have concurrent access to the raw data.
-  if( data_!=nullptr && (data_->ref_count_ >0)){
-  ASSERT(data.ref_count_ ==1);
-  --data.ref_count_;
-  std::free(&data);
- }
+  if (data_ != nullptr && (data_->ref_count_ > 0)) {
+    ASSERT(data.ref_count_ == 1);
+    --data.ref_count_;
+    std::free(&data);
+  }
 }
 
 void RawStatData::initialize(absl::string_view key) {

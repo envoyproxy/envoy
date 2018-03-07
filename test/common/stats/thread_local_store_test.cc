@@ -148,7 +148,6 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get());
   EXPECT_EQ(2L, store_->gauges().front().use_count());
-
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -180,7 +179,6 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
   tls_.shutdownThread();
-
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
@@ -203,7 +201,6 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
 }
 
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
@@ -232,7 +229,6 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
@@ -282,7 +278,6 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
 }
 
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
@@ -298,7 +293,6 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -319,7 +313,6 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 
   tls_.shutdownThread();
-
 }
 
 } // namespace Stats

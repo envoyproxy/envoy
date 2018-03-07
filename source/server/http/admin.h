@@ -250,7 +250,7 @@ public:
    * Extracts counters and gauges and relevant tags, appending them to
    * the response buffer after sanitizing the metric / label names.
    */
-  static uint64_t statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                 const std::list<Stats::GaugeSharedPtr>& gauges,
                                 Buffer::Instance& response);
   /**

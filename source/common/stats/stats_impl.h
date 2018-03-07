@@ -282,10 +282,9 @@ private:
  */
 class CounterImpl : public Counter, public MetricImpl {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+  CounterImpl(RawStatData& data, RawStatDataAllocator& /*alloc*/, std::string&& tag_extracted_name,
               std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data) {}
   ~CounterImpl() {}
 
   // Stats::Counter
@@ -300,9 +299,9 @@ public:
   void reset() override { data_.value_ = 0; }
   bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
   uint64_t value() const override { return data_.value_; }
+
 private:
   RawStatData& data_;
-  RawStatDataAllocator& alloc_;
 };
 
 /**
@@ -365,10 +364,10 @@ public:
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
   ~HeapRawStatDataAllocator();
-private:
- RawStatData *data_=nullptr;
-};
 
+private:
+  RawStatData* data_ = nullptr;
+};
 
 /**
  * A stats cache template that is used by the isolated store.
