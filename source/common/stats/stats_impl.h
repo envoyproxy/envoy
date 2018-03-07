@@ -32,6 +32,9 @@ public:
    * Creates a tag extractor from the regex provided. name and regex must be non-empty.
    * @param name name for tag extractor.
    * @param regex regex expression.
+   * @param substr a substring that -- if provided -- must be present in a stat name
+   *               in order to match the regex. This is an optional performance tweak
+   *               to avoid large numbers of failed regex lookups.
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex,
