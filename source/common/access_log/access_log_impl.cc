@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/optional.h"
+#include "envoy/common/time.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -83,8 +85,11 @@ bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http
 }
 
 bool DurationFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
+  Optional<std::chrono::nanoseconds> final = info.requestComplete();
+  ASSERT(final.valid());
+
   return compareAgainstValue(
-      std::chrono::duration_cast<std::chrono::milliseconds>(info.duration()).count());
+      std::chrono::duration_cast<std::chrono::milliseconds>(final.value()).count());
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v2::RuntimeFilter& config,
