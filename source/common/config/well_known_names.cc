@@ -92,7 +92,7 @@ TagNameValues::TagNameValues() {
   addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, "^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)", ".http.");
+  addRegex(HTTP_CONN_MANAGER_PREFIX, "^listener(?=\\.).*?\\.http\\.((.*?)\\.)", ".http.");
 
   // http.(<stat_prefix>.)*
   addRegex(HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)");
