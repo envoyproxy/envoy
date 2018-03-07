@@ -73,4 +73,12 @@ TEST(Logger, logAsStatement) {
     ENVOY_LOG_MISC(critical, "test message 4");
   }
 }
+
+#ifdef NVLOG
+TEST(Logger, doNotExpandTraceAndDebug) {
+  // The following two macros should not be expanded to no-op if NVLOG compile flag is defined.
+  ENVOY_LOG_TO_LOGGER(nonExistingLogger, trace, "test message 5");
+  ENVOY_LOG_TO_LOGGER(nonExistingLogger, debug, "test message 6");
+}
+#endif /* NVLOG */
 } // namespace Envoy
