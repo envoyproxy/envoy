@@ -51,6 +51,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
+  if (config.representIpv4RemoteAddressAsIpv4MappedIpv6()) {
+    // TODO FXI FIX
+    // check IpVersion, prepend '::ffff:
+    (void) (config.representIpv4RemoteAddressAsIpv4MappedIpv6());
+  }
   if (config.useRemoteAddress()) {
     single_xff_address = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by

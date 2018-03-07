@@ -288,6 +288,11 @@ public:
    * @return bool supplies if the HttpConnectionManager should proxy the Expect: 100-Continue
    */
   virtual bool proxy100Continue() const PURE;
+
+  /**
+   * @return should the HttpConnectionManager representIpv4RemoteAddressAsIpv4MappedIpv6 TODO(FIX FIX)
+   */
+  virtual bool representIpv4RemoteAddressAsIpv4MappedIpv6() const PURE;
 };
 
 /**

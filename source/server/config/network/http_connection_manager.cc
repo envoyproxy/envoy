@@ -129,12 +129,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
-      proxy_100_continue_(config.proxy_100_continue()) {
+      proxy_100_continue_(config.proxy_100_continue()),
+      represent_ipv4_remote_address_as_ipv4_mapped_ipv6_(config.represent_ipv4_remote_address_as_ipv4_mapped_ipv6()) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,
       context_.initManager(), route_config_provider_manager_);
-
+    
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
     forward_client_cert_ = Http::ForwardClientCertType::Sanitize;

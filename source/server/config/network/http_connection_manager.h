@@ -102,6 +102,7 @@ public:
   const Optional<std::string>& userAgent() override { return user_agent_; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  bool representIpv4RemoteAddressAsIpv4MappedIpv6() const override { return represent_ipv4_remote_address_as_ipv4_mapped_ipv6_; }
 
   static const std::string DEFAULT_SERVER_STRING;
 
@@ -132,6 +133,7 @@ private:
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
+  bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6_;
 };
 
 } // namespace Configuration
