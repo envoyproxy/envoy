@@ -33,7 +33,9 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   }
 
   // Set the sampled header.
-  request_headers.insertXB3Sampled().value().setReference(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
+  request_headers.insertXB3Sampled().value().setReference(
+      span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
+                      : ZipkinCoreConstants::get().NOT_SAMPLED);
 
   // Set the ot-span-context header with the new context.
   SpanContext context(span_);
@@ -108,6 +110,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     uint64_t trace_id(0);
     uint64_t span_id(0);
     uint64_t parent_id(0);
+    bool sampled(true);
     if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16) ||
         !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
         (request_headers.XB3ParentSpanId() &&
@@ -115,13 +118,22 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
       return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
-    SpanContext context(trace_id, span_id, parent_id);
+    if (request_headers.XB3Sampled()) {
+      sampled = ZipkinCoreConstants::get().SAMPLED.compare(
+                    request_headers.XB3Sampled()->value().getString()) == 0;
+    }
+    SpanContext context(trace_id, span_id, parent_id, sampled);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
   } else {
     // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
+
+    if (request_headers.XB3Sampled()) {
+      new_zipkin_span->setSampled(ZipkinCoreConstants::get().SAMPLED.compare(
+                                      request_headers.XB3Sampled()->value().getString()) == 0);
+    }
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));

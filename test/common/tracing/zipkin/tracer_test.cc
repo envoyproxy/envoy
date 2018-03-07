@@ -172,9 +172,9 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   const std::string generated_parent_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string modified_root_span_context_str =
-      root_span_context.traceIdAsHexString() + ";" + root_span_context.idAsHexString() + ";" +
-      generated_parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
+  const std::string modified_root_span_context_str = root_span_context.traceIdAsHexString() + ";" +
+                                                     root_span_context.idAsHexString() + ";" +
+                                                     generated_parent_id;
   SpanContext modified_root_span_context;
   modified_root_span_context.populateFromString(modified_root_span_context_str);
   SpanPtr new_shared_context_span =
@@ -296,6 +296,64 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
+}
+
+TEST(ZipkinTracerTest, finishNotSampledSpan) {
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  Tracer tracer("my_service_name", addr, random_generator);
+  NiceMock<MockSystemTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.currentTime();
+
+  // ==============
+  // Test finishing a span that is marked as not sampled
+  // ==============
+
+  NiceMock<Tracing::MockConfig> config;
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
+
+  // Associate a reporter with the tracer
+  TestReporterImpl* reporter_object = new TestReporterImpl(135);
+  ReporterPtr reporter_ptr(reporter_object);
+  tracer.setReporter(std::move(reporter_ptr));
+
+  // Creates a root-span with a CS annotation
+  SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
+  span->setSampled(false);
+  span->finish();
+
+  // Test if the reporter's reportSpan method was NOT called upon finishing the span
+  EXPECT_EQ(0ULL, reporter_object->reportedSpans().size());
+}
+
+TEST(ZipkinTracerTest, SpanSampledPropagatedToChild) {
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  Tracer tracer("my_service_name", addr, random_generator);
+  NiceMock<MockSystemTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.currentTime();
+
+  NiceMock<Tracing::MockConfig> config;
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
+
+  // Create parent span
+  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
+  parent_span->setSampled(true);
+
+  SpanContext parent_context1(*parent_span);
+  SpanPtr child_span1 = tracer.startSpan(config, "child_span 1", timestamp, parent_context1);
+
+  // Test that child span sampled flag is true
+  EXPECT_TRUE(child_span1->sampled());
+
+  parent_span->setSampled(false);
+  SpanContext parent_context2(*parent_span);
+  SpanPtr child_span2 = tracer.startSpan(config, "child_span 2", timestamp, parent_context2);
+
+  // Test that sampled flag is false
+  EXPECT_FALSE(child_span2->sampled());
 }
 } // namespace Zipkin
 } // namespace Envoy

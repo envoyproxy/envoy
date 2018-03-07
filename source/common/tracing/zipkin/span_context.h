@@ -3,6 +3,7 @@
 #include <regex>
 
 #include "common/tracing/zipkin/util.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
@@ -17,18 +18,20 @@ public:
   /**
    * Default constructor. Creates an empty context.
    */
-  SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_initialized_(false) {}
+  SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_initialized_(false), sampled_(true) {}
 
   /**
-   * Constructor that creates a context object from the supplied trace, span
-   * and parent ids.
+   * Constructor that creates a context object from the supplied trace, span and
+   * parent ids, and sampled flag.
    *
    * @param trace_id The trace id.
    * @param id The span id.
    * @param parent_id The parent id.
+   * @param sampled The sampled flag.
    */
-  SpanContext(const uint64_t trace_id, const uint64_t id, const uint64_t parent_id)
-      : trace_id_(trace_id), id_(id), parent_id_(parent_id), is_initialized_(true) {}
+  SpanContext(const uint64_t trace_id, const uint64_t id, const uint64_t parent_id, bool sampled)
+      : trace_id_(trace_id), id_(id), parent_id_(parent_id), is_initialized_(true),
+        sampled_(sampled) {}
 
   /**
    * Constructor that creates a context object from the given Zipkin span object.
@@ -96,11 +99,24 @@ public:
    */
   std::string traceIdAsHexString() const { return Hex::uint64ToHex(trace_id_); }
 
+  /**
+   * @return the sampled flag.
+   */
+  bool sampled() const { return sampled_; }
+
+  /**
+   * @return the sampled flag as a 1-character string.
+   */
+  std::string sampledAsString() const {
+    return sampled_ ? ZipkinCoreConstants::get().SAMPLED : ZipkinCoreConstants::get().NOT_SAMPLED;
+  }
+
 private:
   uint64_t trace_id_;
   uint64_t id_;
   uint64_t parent_id_;
   bool is_initialized_;
+  bool sampled_;
 };
 } // namespace Zipkin
 } // namespace Envoy

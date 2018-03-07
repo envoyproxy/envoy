@@ -20,7 +20,8 @@ static const std::string& fieldSeparator() { CONSTRUCT_ON_FIRST_USE(std::string,
  */
 static const std::string& unitializedSpanContext() {
   CONSTRUCT_ON_FIRST_USE(std::string, "0000000000000000" + fieldSeparator() + "0000000000000000" +
-                                          fieldSeparator() + "0000000000000000");
+                                          fieldSeparator() + "0000000000000000" + fieldSeparator() +
+                                          ZipkinCoreConstants::get().SAMPLED);
 }
 
 /**
@@ -38,14 +39,11 @@ static const std::string& hexDigitGroupRegexStr() {
  * guaranteed). In this case, the compilation units are ZipkinCoreConstants and SpanContext.
  */
 static const std::string& spanContextRegexStr() {
-  // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})((;(cs|sr|cr|ss))*)$
+  // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})(;[01])?$
   CONSTRUCT_ON_FIRST_USE(std::string, "^" + hexDigitGroupRegexStr() + fieldSeparator() +
                                           hexDigitGroupRegexStr() + fieldSeparator() +
-                                          hexDigitGroupRegexStr() + "((" + fieldSeparator() + "(" +
-                                          ZipkinCoreConstants::get().CLIENT_SEND + "|" +
-                                          ZipkinCoreConstants::get().SERVER_RECV + "|" +
-                                          ZipkinCoreConstants::get().CLIENT_RECV + "|" +
-                                          ZipkinCoreConstants::get().SERVER_SEND + "))*)$");
+                                          hexDigitGroupRegexStr() + "(" + fieldSeparator() +
+                                          "[01])?$");
 }
 
 /**
@@ -57,13 +55,20 @@ static const std::string& spanContextRegexStr() {
 static const std::regex& spanContextRegex() {
   CONSTRUCT_ON_FIRST_USE(std::regex, spanContextRegexStr());
 }
+
+/**
+ * @return a string with the pattern to match for 'not sampled'.
+ */
+static const std::string& notSampledMatch() {
+  CONSTRUCT_ON_FIRST_USE(std::string, fieldSeparator() + ZipkinCoreConstants::get().NOT_SAMPLED);
+}
 } // namespace
 
 SpanContext::SpanContext(const Span& span) {
   trace_id_ = span.traceId();
   id_ = span.id();
   parent_id_ = span.isSetParentId() ? span.parentId() : 0;
-
+  sampled_ = span.sampled();
   is_initialized_ = true;
 }
 
@@ -74,7 +79,7 @@ const std::string SpanContext::serializeToString() {
 
   std::string result;
   result = traceIdAsHexString() + fieldSeparator() + idAsHexString() + fieldSeparator() +
-           parentIdAsHexString();
+           parentIdAsHexString() + fieldSeparator() + sampledAsString();
 
   return result;
 }
@@ -83,12 +88,14 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
   std::smatch match;
 
   trace_id_ = parent_id_ = id_ = 0;
+  sampled_ = true;
 
   if (std::regex_search(span_context_str, match, spanContextRegex())) {
     // This is a valid string encoding of the context
     trace_id_ = std::stoull(match.str(1), nullptr, 16);
     id_ = std::stoull(match.str(2), nullptr, 16);
     parent_id_ = std::stoull(match.str(3), nullptr, 16);
+    sampled_ = match.str(4).compare(notSampledMatch()) != 0;
 
     is_initialized_ = true;
   } else {

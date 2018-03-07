@@ -16,9 +16,11 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("0000000000000000", span_context.idAsHexString());
   EXPECT_EQ(0ULL, span_context.parent_id());
   EXPECT_EQ("0000000000000000", span_context.parentIdAsHexString());
-  EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000", span_context.serializeToString());
+  EXPECT_EQ(true, span_context.sampled());
+  EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000;1",
+            span_context.serializeToString());
 
-  // Span context populated with trace id, id and parent id
+  // Span context populated with trace id, id and parent id - but no sampled flag
   span_context.populateFromString("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c");
   EXPECT_EQ(2722130815203937913ULL, span_context.trace_id());
   EXPECT_EQ("25c6f38dd0600e79", span_context.traceIdAsHexString());
@@ -26,7 +28,27 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
-  EXPECT_EQ("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c", span_context.serializeToString());
+  EXPECT_EQ(true, span_context.sampled());
+  EXPECT_EQ("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c;1",
+            span_context.serializeToString());
+
+  // Span context populated with trace id, id, parent id and sampled (false) flag
+  span_context.populateFromString("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c;0");
+  EXPECT_EQ(2722130815203937913ULL, span_context.trace_id());
+  EXPECT_EQ("25c6f38dd0600e79", span_context.traceIdAsHexString());
+  EXPECT_EQ(6228615153417491119ULL, span_context.id());
+  EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
+  EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
+  EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
+  EXPECT_EQ(false, span_context.sampled());
+  EXPECT_EQ("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c;0",
+            span_context.serializeToString());
+
+  // Span context populated with trace id, id, parent id and sampled (true) flag
+  span_context.populateFromString("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c;1");
+  EXPECT_EQ(true, span_context.sampled());
+  EXPECT_EQ("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c;1",
+            span_context.serializeToString());
 
   // Span context populated with invalid string: it gets reset to its non-initialized state
   span_context.populateFromString("invalid string");
@@ -36,7 +58,8 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("0000000000000000", span_context.idAsHexString());
   EXPECT_EQ(0ULL, span_context.parent_id());
   EXPECT_EQ("0000000000000000", span_context.parentIdAsHexString());
-  EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000", span_context.serializeToString());
+  EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000;1",
+            span_context.serializeToString());
 }
 
 TEST(ZipkinSpanContextTest, populateFromSpan) {
@@ -50,12 +73,15 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("0000000000000000", span_context.idAsHexString());
   EXPECT_EQ(0ULL, span_context.parent_id());
   EXPECT_EQ("0000000000000000", span_context.parentIdAsHexString());
-  EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000", span_context.serializeToString());
+  EXPECT_EQ(true, span_context.sampled());
+  EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000;1",
+            span_context.serializeToString());
 
-  // Span context populated with trace id, id and parent id
+  // Span context populated with trace id, id, parent id and sampled (true) flag
   span.setTraceId(2722130815203937912ULL);
   span.setId(6228615153417491119ULL);
   span.setParentId(14164264937399213340ULL);
+  span.setSampled(true);
   SpanContext span_context_2(span);
   EXPECT_EQ(2722130815203937912ULL, span_context_2.trace_id());
   EXPECT_EQ("25c6f38dd0600e78", span_context_2.traceIdAsHexString());
@@ -63,8 +89,16 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("56707c7b3e1092af", span_context_2.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context_2.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context_2.parentIdAsHexString());
-  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c",
+  EXPECT_EQ(true, span_context_2.sampled());
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;1",
             span_context_2.serializeToString());
+
+  // And with sampled (false) flag
+  span.setSampled(false);
+  SpanContext span_context_3(span);
+  EXPECT_EQ(false, span_context_3.sampled());
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;0",
+            span_context_3.serializeToString());
 
   // Test if we can handle 128-bit trace ids
   EXPECT_FALSE(span.isSetTraceIdHigh());
@@ -72,7 +106,7 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_TRUE(span.isSetTraceIdHigh());
   SpanContext span_context_high_id(span);
   // We currently drop the high bits. So, we expect the same context as above
-  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c",
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;0",
             span_context_high_id.serializeToString());
 }
 } // namespace Zipkin
