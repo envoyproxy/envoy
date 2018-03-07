@@ -5,11 +5,19 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
+#include "common/singleton/const_singleton.h"
 
 #include "opentracing/tracer.h"
 
 namespace Envoy {
 namespace Tracing {
+
+class OpenTracingTagValues {
+public:
+  const std::string SAMPLING_PRIORITY = "sampling.priority";
+};
+
+typedef ConstSingleton<OpenTracingTagValues> OpenTracingTags;
 
 #define OPENTRACING_TRACER_STATS(COUNTER)                                                          \
   COUNTER(span_context_extraction_error)                                                           \
@@ -49,7 +57,8 @@ public:
 
   // Tracer::TracingDriver
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const std::string& operation_name, SystemTime start_time) override;
+                    const std::string& operation_name, SystemTime start_time,
+                    const Tracing::Decision& tracing_decision) override;
 
   virtual opentracing::Tracer& tracer() PURE;
 
@@ -63,6 +72,9 @@ public:
   virtual PropagationMode propagationMode() const { return PropagationMode::SingleHeader; }
 
   OpenTracingTracerStats& tracerStats() { return tracer_stats_; }
+
+protected:
+  virtual bool useTagForSamplingDecision() PURE;
 
 private:
   OpenTracingTracerStats tracer_stats_;
