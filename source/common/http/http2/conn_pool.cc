@@ -74,6 +74,7 @@ void ConnPoolImpl::checkForDrained() {
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   ASSERT(drained_callbacks_.empty());
+  
   // First see if we need to handle max streams rollover.
   uint64_t max_streams = host_->cluster().maxRequestsPerConnection();
   if (max_streams == 0) {
@@ -217,6 +218,7 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
+  
   parent_.conn_connect_ms_.reset(
       new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
   Upstream::Host::CreateConnectionData data =

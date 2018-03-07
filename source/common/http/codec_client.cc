@@ -53,10 +53,8 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   request->moveIntoList(std::move(request), active_requests_);
-  return *active_requests_.front()->encoder_;
-  std::cout << "disabling idle timer..."
-            << "\n";
   disableIdleTimer();
+  return *active_requests_.front()->encoder_;
 }
 
 void CodecClient::onEvent(Network::ConnectionEvent event) {
@@ -130,11 +128,6 @@ void CodecClient::onData(Buffer::Instance& data) {
   if (protocol_error) {
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
   }
-}
-
-void CodecClient::onIdleTimeout() {
-  host_->cluster().stats().upstream_cx_idle_timeout_.inc();
-  close();
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,

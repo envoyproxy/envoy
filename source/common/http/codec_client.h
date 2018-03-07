@@ -122,7 +122,11 @@ protected:
     }
   }
 
-  void onIdleTimeout();
+  void onIdleTimeout() {
+    host_->cluster().stats().upstream_cx_idle_timeout_.inc();
+    close();
+  }
+
   void disableIdleTimer() {
     if (idle_timer_) {
       idle_timer_->disableTimer();
