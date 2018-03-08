@@ -145,8 +145,7 @@ protected:
   Upstream::HostDescriptionConstSharedPtr host_;
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr idle_timer_;
-  std::chrono::milliseconds idle_timeout_ =
-      std::chrono::milliseconds(10000); // TODO: get it from config
+  std::chrono::milliseconds idle_timeout_;
 
 private:
   /**

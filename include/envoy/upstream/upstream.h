@@ -384,6 +384,11 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
+   * @return the idle timeout for upstream connection pool connections.
+   */
+  virtual const Optional<std::chrono::milliseconds>& idleTimeout() const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;

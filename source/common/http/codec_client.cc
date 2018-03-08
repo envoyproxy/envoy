@@ -24,10 +24,9 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
 
-  if (host_->cluster().common_http_protocol_options().has_idle_timeout()) {
+  if (host_->cluster().idleTimeout().valid()) {
     idle_timer_ = dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
-    idle_timeout_.value(std::chrono::milliseconds(
-        Protobuf::util::TimeUtil::DurationToMilliseconds(host_->cluster().common_http_protocol_options().idle_timeout())));
+    idle_timeout_ = host_->cluster().idleTimeout().value();
   }
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
