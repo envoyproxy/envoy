@@ -45,7 +45,7 @@ TEST(Logger, evaluateParams) {
   // log message with higher severity and make sure that params were evaluated.
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "test message '{}'", i++);
-  ASSERT_THAT(i, testing::Eq(2));
+  EXPECT_THAT(i, testing::Eq(2));
 }
 
 TEST(Logger, doNotEvaluateParams) {
@@ -55,7 +55,7 @@ TEST(Logger, doNotEvaluateParams) {
   // params should not be evaluated.
   GET_MISC_LOGGER().set_level(spdlog::level::critical);
   ENVOY_LOG_MISC(error, "test message '{}'", i++);
-  ASSERT_THAT(i, testing::Eq(1));
+  EXPECT_THAT(i, testing::Eq(1));
 }
 
 TEST(Logger, logAsStatement) {
@@ -72,8 +72,8 @@ TEST(Logger, logAsStatement) {
   else
     ENVOY_LOG_MISC(critical, "test message 2 '{}'", j++);
 
-  ASSERT_THAT(i, testing::Eq(1));
-  ASSERT_THAT(j, testing::Eq(1));
+  EXPECT_THAT(i, testing::Eq(1));
+  EXPECT_THAT(j, testing::Eq(1));
 
   // do the same with curly brackets
   if (true) {
@@ -82,8 +82,8 @@ TEST(Logger, logAsStatement) {
     ENVOY_LOG_MISC(critical, "test message 4 '{}'", j++);
   }
 
-  ASSERT_THAT(i, testing::Eq(1));
-  ASSERT_THAT(j, testing::Eq(1));
+  EXPECT_THAT(i, testing::Eq(1));
+  EXPECT_THAT(j, testing::Eq(1));
 }
 
 #ifdef NVLOG
@@ -92,10 +92,10 @@ TEST(Logger, doNotExpandTraceAndDebug) {
 
   // The following two macros should be expanded to no-op if NVLOG compile flag is defined.
   ENVOY_LOG_TO_LOGGER(nonExistingLogger, trace, "test message 5 '{}'", i++);
-  ASSERT_THAT(i, testing::Eq(1));
+  EXPECT_THAT(i, testing::Eq(1));
 
   ENVOY_LOG_TO_LOGGER(nonExistingLogger, debug, "test message 6 '{}'", i++);
-  ASSERT_THAT(i, testing::Eq(1));
+  EXPECT_THAT(i, testing::Eq(1));
 }
 #endif /* NVLOG */
 } // namespace Envoy
