@@ -205,13 +205,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
   }
 
-  for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    // Now load all the secondary clusters.
-    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
-      loadCluster(cluster, false);
-    }
-  }
-
   // All the static clusters have been loaded. At this point we can check for the
   // existence of the v1 sds backing cluster, and the ads backing cluster.
   // TODO(htuch): Add support for multiple clusters, #1170.
@@ -268,6 +261,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
   } else {
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
+  }
+
+  // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    // Now load all the secondary clusters.
+    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
   }
 
   // We can now potentially create the CDS API once the backing cluster exists.
