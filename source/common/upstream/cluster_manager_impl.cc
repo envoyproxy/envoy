@@ -205,10 +205,45 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
   }
 
+  // Now setup ADS if needed, this might rely on a primary cluster and the
+  // thread local cluster manager.
+  if (bootstrap.dynamic_resources().has_ads_config()) {
+    ads_mux_.reset(new Config::GrpcMuxImpl(
+        bootstrap.node(),
+        Config::Utility::factoryForApiConfigSource(
+            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+            ->create(),
+        primary_dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+  } else {
+    ads_mux_.reset(new Config::NullGrpcMuxImpl());
+  }
+
+  ads_mux_->start();
+
+  // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    // Now load all the secondary clusters.
+    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+      loadCluster(cluster, false);
+    }
+  }
+
   // All the static clusters have been loaded. At this point we can check for the
   // existence of the v1 sds backing cluster, and the ads backing cluster.
   // TODO(htuch): Add support for multiple clusters, #1170.
   const ClusterInfoMap loaded_clusters = clusters();
+
+  Optional<std::string> local_cluster_name;
+  if (!cm_config.local_cluster_name().empty()) {
+    local_cluster_name_ = cm_config.local_cluster_name();
+    local_cluster_name.value(cm_config.local_cluster_name());
+    if (primary_clusters_.find(local_cluster_name.value()) == primary_clusters_.end()) {
+      throw EnvoyException(
+          fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
+    }
+  }
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
     switch (sds_config.config_source_specifier_case()) {
@@ -231,45 +266,12 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
   }
 
-  Optional<std::string> local_cluster_name;
-  if (!cm_config.local_cluster_name().empty()) {
-    local_cluster_name_ = cm_config.local_cluster_name();
-    local_cluster_name.value(cm_config.local_cluster_name());
-    if (primary_clusters_.find(local_cluster_name.value()) == primary_clusters_.end()) {
-      throw EnvoyException(
-          fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
-    }
-  }
-
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
   tls_->set([this, local_cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
-
-  // Now setup ADS if needed, this might rely on a primary cluster and the
-  // thread local cluster manager.
-  if (bootstrap.dynamic_resources().has_ads_config()) {
-    ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(),
-        Config::Utility::factoryForApiConfigSource(
-            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
-            ->create(),
-        primary_dispatcher,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
-  } else {
-    ads_mux_.reset(new Config::NullGrpcMuxImpl());
-  }
-
-  // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
-  for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    // Now load all the secondary clusters.
-    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
-      loadCluster(cluster, false);
-    }
-  }
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
@@ -289,8 +291,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // Potentially move to secondary initialization on the static bootstrap clusters if all primary
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
-
-  ads_mux_->start();
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
