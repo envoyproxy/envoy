@@ -120,6 +120,12 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   if (request_info.getResponseFlag(RequestInfo::ResponseFlag::RateLimited)) {
     common_access_log.mutable_response_flags()->set_rate_limited(true);
   }
+
+  if (request_info.getResponseFlag(RequestInfo::ResponseFlag::UnauthorizedExternalService)) {
+    common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
+        envoy::config::filter::accesslog::v2::ResponseFlags_Unauthorized_Reason::
+            ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
+  }
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
